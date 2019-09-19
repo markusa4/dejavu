@@ -1,0 +1,3 @@
+/home/markus/CLionProjects/brutus/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/markus/CLionProjects/brutus/cmake-build-debug/CMakeFiles/brutus.dir
+/home/markus/CLionProjects/brutus/cmake-build-debug/CMakeFiles/edit_cache.dir
