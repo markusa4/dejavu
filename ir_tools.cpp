@@ -9,18 +9,22 @@
 #include "refinement.h"
 #include "selector.h"
 #include "invariant.h"
+#include "group.h"
 
-// compute a canonical labelling of the graph using individualization-refinement
-void ir_tools::label_graph(graph *g, bijection *canon_p) {
+// compute a canonical labelling of the sgraph using individualization-refinement
+void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
     coloring c;
     g->initialize_coloring(&c);
 
+    group G(g->v.size()); // automorphism group
     refinement R;
     selector S;
     trail T; // a trail for backtracking and undoing refinements
+    // ToDo: also keep "prefix" for base fixing and backjumping -- so do this for current path and best path
     invariant I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
     invariant best_I; // so far best explored invariant
     bijection best_leaf;
+    bool other_best_leaf = false;
 
     I.push_level();
     std::set<std::pair<int, int>> changes;
@@ -36,6 +40,22 @@ void ir_tools::label_graph(graph *g, bijection *canon_p) {
                 std::cout << "Discrete coloring found." << std::endl;
                 I.print();
                 backtrack = true;
+                // either this is the new best leaf or we can derive an automorphism
+                if(other_best_leaf) {
+                    std::cout << "Certifying automorphism" << std::endl;
+                    bijection leaf;
+                    leaf.read_from_coloring(&c);
+                    bijection automorphism = leaf;
+                    automorphism.inverse();
+                    automorphism.compose(best_leaf);
+                    assert(g->certify_automorphism(automorphism));
+                    bool added = G.add_permutation(&automorphism);
+                    std::cout << "Automorphism added: " << added << std::endl;
+                } else {
+                    other_best_leaf = true;
+                    best_leaf.read_from_coloring(&c);
+                    best_I = I;
+                }
             }
         }
 
@@ -47,6 +67,30 @@ void ir_tools::label_graph(graph *g, bijection *canon_p) {
             I.push_level();
             R.refine_coloring(g, &c, &changes, &I);
             T.push_op_r(&changes);
+
+            if(other_best_leaf) {
+                // compare invariant
+                switch (I.top_is_geq(best_I.get_level(I.current_level()))) {
+                    case -1:
+                        std::cout << "Better branch" << std::endl;
+                        // this branch is better, let's not continue comparing
+                        other_best_leaf = false;
+                        break;
+                    case 0:
+                        std::cout << "Equal" << std::endl;
+                        // equally good
+                        break;
+                    case 1:
+                        std::cout << "Pruned through invariant" << std::endl;
+                        // other branch was better, go back
+                        backtrack = true;
+                        continue;
+                        break;
+                    default:
+                        assert(false);
+                }
+            }
+
         } else if(T.last_op() == OP_R  && !backtrack) {
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //                                             INDIVIDUALIZATION
@@ -54,7 +98,7 @@ void ir_tools::label_graph(graph *g, bijection *canon_p) {
             // collect all elements of color s
             std::stack<int> color_s;
             int i = s;
-            while((i == 0) || c.ptn[i - 1] != 0) {
+            while((i == s) || (i == 0) || c.ptn[i - 1] != 0) {
                 color_s.push(c.lab[i]);
                 i += 1;
             }
@@ -96,6 +140,8 @@ void ir_tools::label_graph(graph *g, bijection *canon_p) {
             T.pop_op_r();
         }
     }
+    std::cout << "Group size: ";
+    G.print_group_size();
 }
 
 void trail::push_op_r(std::set<std::pair<int, int>>* color_class_changes) {
@@ -148,3 +194,4 @@ void trail::pop_op_i_v() {
 void trail::push_op_i_v(int v) {
     trail_op_i_v.push(v);
 }
+

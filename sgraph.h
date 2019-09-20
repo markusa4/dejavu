@@ -5,10 +5,10 @@
 #include "bijection.h"
 #include "coloring.h"
 
-class graph {
+class sgraph {
     struct vertexComparator {
-        vertexComparator(const graph& g) : g(g) {}
-        const graph& g;
+        vertexComparator(const sgraph& g) : g(g) {}
+        const sgraph& g;
 
         bool operator()( const int & v1, const int & v2) {
             return g.d[v1] < g.d[v2];
@@ -19,8 +19,8 @@ public:
     std::vector<int> d;
     std::vector<int> e;
 
-    graph permute_graph(bijection p);
-    bool certify_isomorphism(bijection p);
+    sgraph permute_graph(bijection p);
+    bool certify_automorphism(bijection p);
     void initialize_coloring(coloring* c);
 };
 

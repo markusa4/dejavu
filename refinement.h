@@ -9,7 +9,7 @@
 #include <queue>
 #include <set>
 #include "coloring.h"
-#include "graph.h"
+#include "sgraph.h"
 #include "invariant.h"
 #include <list>
 
@@ -33,11 +33,11 @@ private:
 
 class refinement {
 public:
-    void refine_coloring(graph* g, coloring* c, std::set<std::pair<int, int>> *changes, invariant* I);
-    void individualize_vertex(graph* g, coloring* c, int v);
-    void undo_individualize_vertex(graph *g, coloring *c, int v);
-    void refine_color_class(graph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I);
-    void undo_refine_color_class(graph *g, coloring *c, std::set<std::pair<int, int>> *changes);
+    void refine_coloring(sgraph* g, coloring* c, std::set<std::pair<int, int>> *changes, invariant* I);
+    void individualize_vertex(sgraph* g, coloring* c, int v);
+    void undo_individualize_vertex(sgraph *g, coloring *c, int v);
+    void refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I);
+    void undo_refine_color_class(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes);
 private:
     cumulative_counting counting_array;
 };

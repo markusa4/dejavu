@@ -5,11 +5,11 @@
 #include <set>
 #include <stack>
 #include "bijection.h"
-#include "graph.h"
+#include "sgraph.h"
 
 class ir_tools {
 public:
-    void label_graph(graph* g, bijection* canon_p);
+    void label_graph(sgraph* g, bijection* canon_p);
 };
 
 enum ir_operation {

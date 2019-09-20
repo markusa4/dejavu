@@ -7,11 +7,15 @@
 
 
 #include <vector>
+#include "coloring.h"
 
 class bijection {
 public:
     std::vector<int> map;
     int map_vertex(int v);
+    void read_from_coloring(coloring *c);
+    void compose(bijection p);
+    void inverse();
 };
 
 

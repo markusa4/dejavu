@@ -32,7 +32,7 @@ bool compare_pair(std::pair<int, int> p1, std::pair<int, int> p2)
 }
 
 
-void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant* I) {
+void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant* I) {
     std::cout << "Refining..." << std::endl;
     counting_array.initialize(g->v.size(), c);
     std::queue<std::pair<int, int>> worklist_color_classes;
@@ -48,7 +48,7 @@ void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, 
         std::pair<int, int> next_color_class = worklist_color_classes.front();
         worklist_color_classes.pop();
 
-        std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
+       //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
         // write color class and size to invariant
         I->write_top(-1);
         I->write_top(next_color_class.first);
@@ -79,14 +79,14 @@ void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, 
             I->write_top(new_class);
             I->write_top(new_class_sz);
             if(largest_color_class != new_class) {
-                std::cout << "(" << new_class << ", " << new_class_sz << ")" << std::endl;
+                //std::cout << "(" << new_class << ", " << new_class_sz << ")" << std::endl;
                 worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
             }
         }
     }
 }
 
-void refinement::refine_color_class(graph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I) {
+void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     std::set<std::pair<int, int>> color_set_worklist;
     std::set<int> vertex_worklist;
@@ -125,7 +125,7 @@ void refinement::refine_color_class(graph *g, coloring *c, int color_class, int 
     for(auto p = color_class_split_worklist->begin(); p != color_class_split_worklist->end(); ++p) {
         int v_old_color = p->first;
         int v_new_color = p->second;
-        std::cout << "Color split (" << v_old_color << ", " << v_new_color << ")" << std::endl;
+        //std::cout << "Color split (" << v_old_color << ", " << v_new_color << ")" << std::endl;
         if(v_old_color != v_new_color) {
             new_colors.insert(v_new_color);
             c->ptn[v_new_color] = -1;
@@ -137,7 +137,7 @@ void refinement::refine_color_class(graph *g, coloring *c, int color_class, int 
         int color = p->second;
         int old_color = c->vertex_to_col[vertex];
 
-        std::cout << "set " << vertex << " to " << color << std::endl;
+        //std::cout << "set " << vertex << " to " << color << std::endl;
 
         int vertex_old_pos = c->vertex_to_lab[vertex];
         int vertex_at_pos = c->lab[color + c->ptn[color] + 1];
@@ -164,7 +164,7 @@ void refinement::refine_color_class(graph *g, coloring *c, int color_class, int 
     counting_array.reset();
 }
 
-void refinement::individualize_vertex(graph *g, coloring *c, int v) {
+void refinement::individualize_vertex(sgraph *g, coloring *c, int v) {
     int color = c->vertex_to_col[v];
     int pos   = c->vertex_to_lab[v];
     int color_class_size = c->ptn[color];
@@ -183,7 +183,7 @@ void refinement::individualize_vertex(graph *g, coloring *c, int v) {
     c->ptn[color + color_class_size - 1] = 0;
 }
 
-void refinement::undo_individualize_vertex(graph *g, coloring *c, int v) {
+void refinement::undo_individualize_vertex(sgraph *g, coloring *c, int v) {
     int color = c->vertex_to_col[v];
     int pos   = c->vertex_to_lab[v];
     assert(color == pos);
@@ -198,12 +198,12 @@ void refinement::undo_individualize_vertex(graph *g, coloring *c, int v) {
     }
 }
 
-void refinement::undo_refine_color_class(graph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
+void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
     std::queue<int> reset_ends;
     for(auto p = changes->begin(); p != changes->end(); ++p) {
         int old_color = c->vertex_to_col[c->lab[p->first]];
         int new_color = p->second;
-        std::cout << new_color << " back to " << old_color << std::endl;
+        //std::cout << new_color << " back to " << old_color << std::endl;
         if(old_color != new_color && c->vertex_to_col[c->lab[new_color]] == new_color) {
             reset_ends.push(new_color - 1);
             for (int j = new_color; j <= new_color + c->ptn[new_color]; ++j) {

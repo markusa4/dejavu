@@ -10,8 +10,10 @@ class invariant {
 public:
     void push_level();
     void pop_level();
+    int current_level();
+    std::vector<int>* get_level(int i);
     std::vector<int> top_level();
-    void top_is_geq(std::vector<int> *other);
+    int top_is_geq(std::vector<int> *other);
     void write_top(int i);
     void print();
 };

@@ -7,8 +7,18 @@ std::vector<int> invariant::top_level() {
     return vec_invariant[vec_invariant.size() - 1];
 }
 
-void invariant::top_is_geq(std::vector<int> *other) {
-
+int invariant::top_is_geq(std::vector<int> *other) {
+    for(int i = 0; i < other->size(); ++i) {
+        if(i >= vec_invariant[vec_invariant.size() - 1].size())
+            return -1;
+        if((*other)[i] < vec_invariant[vec_invariant.size() - 1][i]) {
+            return 1;
+        }
+    }
+    if(vec_invariant[vec_invariant.size() - 1].size() > other->size())
+        return 1;
+    assert(vec_invariant[vec_invariant.size() - 1].size() == other->size());
+    return 0;
 }
 
 void invariant::pop_level() {
@@ -30,4 +40,12 @@ void invariant::print() {
         }
         std::cout << std::endl;
     }
+}
+
+int invariant::current_level() {
+    return vec_invariant.size() - 1;
+}
+
+std::vector<int>* invariant::get_level(int i) {
+    return &vec_invariant[i];
 }

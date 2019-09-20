@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.14)
-project(brutus)
+project(dejavu)
 
 set(CMAKE_CXX_STANDARD 14)
 add_compile_options("-D_GLIBCXX_ASSERTIONS" "-D_FORTIFY_SOURCE=2" "-O0")
-add_executable(brutus main.cpp graph.cpp graph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h ir_tools.cpp ir_tools.h)
+
+set(source_list "nauty/gtnauty.o;nauty/gtools.o;nauty/gutil1.o;nauty/gutil2.o;nauty/naugraph.o;nauty/naugroup.o;nauty/naurng.o;nauty/nausparse.o;nauty/nautil.o;nauty/nautinv.o;nauty/naututil.o;nauty/nauty.o;nauty/schreier.o;nauty/traces.o")
+add_custom_target(nauty_target
+        COMMAND make all
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/nauty
+        )
+
+add_executable(dejavu main.cpp sgraph.cpp sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h ir_tools.cpp ir_tools.h group.cpp group.h ${source_list})
+add_dependencies(dejavu nauty_target)

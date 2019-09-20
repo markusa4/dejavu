@@ -7,11 +7,11 @@
 
 
 #include "coloring.h"
-#include "graph.h"
+#include "sgraph.h"
 
 class selector {
 public:
-    int select_color(graph *g, coloring *c);
+    int select_color(sgraph *g, coloring *c);
 };
 
 

@@ -2,11 +2,11 @@
 #include <assert.h>
 #include <iostream>
 #include <set>
-#include "graph.h"
+#include "sgraph.h"
 
 
-// initialize a coloring of this graph, partitioning degrees of vertices
-void graph::initialize_coloring(coloring *c) {
+// initialize a coloring of this sgraph, partitioning degrees of vertices
+void sgraph::initialize_coloring(coloring *c) {
     c->lab.reserve(this->v.size());
     c->ptn.reserve(this->v.size());
     c->vertex_to_col.reserve(this->v.size());
@@ -44,8 +44,8 @@ void graph::initialize_coloring(coloring *c) {
     std::cout << "Cells: " << cells << std::endl;
 }
 
-// certify that a permutation is an isomorphism of the graph
-bool graph::certify_isomorphism(bijection p) {
+// certify that a permutation is an automorphism of the sgraph
+bool sgraph::certify_automorphism(bijection p) {
     assert(p.map.size() == v.size());
 
     for(int i = 0; i < v.size(); ++i) {
@@ -53,7 +53,7 @@ bool graph::certify_isomorphism(bijection p) {
         if(d[i] != d[image_i]) // degrees must be equal
             return false;
 
-        // isomorphism must preserve neighbours
+        // automorphism must preserve neighbours
         std::set<int> image_neighbours_of_i;
         for(int j = v[i]; j < v[i] + d[i]; ++j) {
             int vertex_j = e[j];

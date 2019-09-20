@@ -13,7 +13,7 @@
 using std::string;
 using std::vector;
 
-void parser::parse_dimacs_file(std::string filename, graph* g) {
+void parser::parse_dimacs_file(std::string filename, sgraph* g) {
     std::ifstream infile(filename);
     vector<vector<int>> incidence_list;
     string line;

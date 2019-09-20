@@ -5,7 +5,7 @@
 #include "selector.h"
 
 // "first non-trivial color", -1 if coloring is discrete
-int selector::select_color(graph *g, coloring *c) {
+int selector::select_color(sgraph *g, coloring *c) {
     for(int i = 0; i < c->ptn.size();){
         if(c->ptn[i] != 0) {
             return i;
