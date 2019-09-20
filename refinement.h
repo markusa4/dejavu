@@ -31,8 +31,9 @@ class refinement {
 public:
     void refine_coloring(graph* g, coloring* c, std::set<std::pair<int, int>> *changes);
     void individualize_vertex(graph* g, coloring* c, int v);
+    void undo_individualize_vertex(graph *g, coloring *c, int v);
     void refine_color_class(graph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist);
-    void undo_changes(graph *g, coloring *c, std::set<std::pair<int, int>> *changes);
+    void undo_refine_color_class(graph *g, coloring *c, std::set<std::pair<int, int>> *changes);
 private:
     cumulative_counting counting_array;
 };

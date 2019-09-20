@@ -160,13 +160,28 @@ void refinement::individualize_vertex(graph *g, coloring *c, int v) {
     c->ptn[color + color_class_size - 1] = 0;
 }
 
-void refinement::undo_changes(graph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
+void refinement::undo_individualize_vertex(graph *g, coloring *c, int v) {
+    int color = c->vertex_to_col[v];
+    int pos   = c->vertex_to_lab[v];
+    assert(color == pos);
+    assert(pos > 0);
+    assert(c->ptn[pos] == 0);
+    int new_color = c->vertex_to_col[c->lab[pos - 1]];
+
+    c->ptn[new_color] += 1;
+    c->vertex_to_col[v] = new_color;
+    if(c->ptn[pos - 1] == 0) {
+        c->ptn[pos - 1] = 1;
+    }
+}
+
+void refinement::undo_refine_color_class(graph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
     std::queue<int> reset_ends;
     for(auto p = changes->begin(); p != changes->end(); ++p) {
-        int old_color = p->first;
+        int old_color = c->vertex_to_col[c->lab[p->first]];
         int new_color = p->second;
-
-        if(old_color != new_color) {
+        std::cout << new_color << " back to " << old_color << std::endl;
+        if(old_color != new_color && c->vertex_to_col[c->lab[new_color]] == new_color) {
             reset_ends.push(new_color - 1);
             for (int j = new_color; j <= new_color + c->ptn[new_color]; ++j) {
                 c->vertex_to_col[c->lab[j]] = old_color;
@@ -178,7 +193,7 @@ void refinement::undo_changes(graph *g, coloring *c, std::set<std::pair<int, int
     while(!reset_ends.empty()) {
         int i = reset_ends.front();
         reset_ends.pop();
-        if(c->ptn[i] == 0) {
+        if(i >= 0 && c->ptn[i] == 0) {
             c->ptn[i] = 1;
         }
     }

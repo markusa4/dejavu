@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "refinement.h"
 #include "selector.h"
+#include "ir_tools.h"
 #include <assert.h>
 
 void label_graph(graph* g, bijection* canon_p) {
@@ -9,25 +10,9 @@ void label_graph(graph* g, bijection* canon_p) {
     g->initialize_coloring(&c);
     std::cout << "------------------" << std::endl;
 
-    refinement R;
-    selector S;
+    ir_tools IR;
+    IR.label_graph(g, canon_p);
 
-    std::set<std::pair<int, int>> changes;
-
-    R.refine_coloring(g, &c, &changes);
-    R.undo_changes(g, &c, &changes);
-
-    int s = S.select_color(g, &c);
-
-    if(s == - 1) {
-        std::cout << "Discrete coloring found." << std::endl;
-    }
-
-    int v = c.lab[s];
-    std::cout << "Individualizing " << v << ", color class " << s << std::endl;
-    R.individualize_vertex(g, &c, v);
-
-    R.refine_coloring(g, &c, &changes);
 }
 
 int main() {
@@ -37,8 +22,8 @@ int main() {
     // parse a graph
     parser p;
     graph g;
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10.bliss", &g);
+    p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-4", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-5", &g);
     // canonically label the graph
     bijection canon_p;
