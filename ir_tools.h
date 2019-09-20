@@ -21,8 +21,11 @@ class trail {
     std::stack<std::set<std::pair<int, int>>> trail_color_class_changes;
     std::stack<std::stack<int>> trail_op_i_class;
     std::stack<int> trail_op_i_v;
+    int domain_size;
+    int* ipath;
+    int ipos;
 public:
-    trail();
+    trail(int domain_size);
     void push_op_r(std::set<std::pair<int, int>> *color_class_changes);
     void push_op_i(std::stack<int> *individualizaiton_todo, int v);
     ir_operation last_op();
@@ -30,6 +33,7 @@ public:
     std::stack<int>& top_op_i_class();
     int top_op_i_v();
     void pop_op_r();
+    void free_path();
     void pop_op_i_class();
     void pop_op_i_v();
     void push_op_i_v(int v);

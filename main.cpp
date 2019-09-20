@@ -21,7 +21,7 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-20.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-100.bliss", &g);
     p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-5", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-2", &g);
     // canonically label the sgraph

@@ -19,8 +19,8 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
     group G(g->v.size()); // automorphism group
     refinement R;
     selector S;
-    trail T; // a trail for backtracking and undoing refinements
-    // ToDo: also keep "prefix" for base fixing and backjumping -- so do this for current path and best path
+    trail T(g->v.size()); // a trail for backtracking and undoing refinements
+    // ToDo: also keep array of individualized vertices for base fixing and backjumping -- so do this for current path and best path
     invariant I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
     invariant best_I; // so far best explored invariant
     bijection best_leaf;
@@ -142,6 +142,7 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
     }
     std::cout << "Group size: ";
     G.print_group_size();
+    T.free_path();
 }
 
 void trail::push_op_r(std::set<std::pair<int, int>>* color_class_changes) {
@@ -154,11 +155,14 @@ void trail::push_op_i(std::stack<int>* individualizaiton_todo, int v) {
     trail_operation.push(OP_I);
     trail_op_i_class.push(std::stack<int>());
     trail_op_i_class.top().swap(*individualizaiton_todo);
-    trail_op_i_v.push(v);
+    push_op_i_v(v);
 }
 
-trail::trail() {
+trail::trail(int domain_size) {
     trail_operation.push(OP_END);
+    this->domain_size = domain_size;
+    ipath = new int[domain_size];
+    ipos = 0;
 }
 
 ir_operation trail::last_op() {
@@ -188,10 +192,17 @@ int trail::top_op_i_v() {
 }
 
 void trail::pop_op_i_v() {
+    ipos -= 1;
     trail_op_i_v.pop();
 }
 
 void trail::push_op_i_v(int v) {
+    assert(ipos >= 0 && ipos < domain_size);
+    ipath[ipos] = v;
+    ipos += 1;
     trail_op_i_v.push(v);
 }
 
+void trail::free_path() {
+    delete[] ipath;
+}
