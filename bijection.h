@@ -6,8 +6,12 @@
 #define BRUTUS_BIJECTION_H
 
 
-class bijection {
+#include <vector>
 
+class bijection {
+public:
+    std::vector<int> map;
+    int map_vertex(int v);
 };
 
 

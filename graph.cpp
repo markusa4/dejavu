@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <iostream>
+#include <set>
 #include "graph.h"
 
 
@@ -41,4 +42,35 @@ void graph::initialize_coloring(coloring *c) {
     }
 
     std::cout << "Cells: " << cells << std::endl;
+}
+
+// certify that a permutation is an isomorphism of the graph
+bool graph::certify_isomorphism(bijection p) {
+    assert(p.map.size() == v.size());
+
+    for(int i = 0; i < v.size(); ++i) {
+        int image_i = p.map_vertex(i);
+        if(d[i] != d[image_i]) // degrees must be equal
+            return false;
+
+        // isomorphism must preserve neighbours
+        std::set<int> image_neighbours_of_i;
+        for(int j = v[i]; j < v[i] + d[i]; ++j) {
+            int vertex_j = e[j];
+            int image_j  = p.map_vertex(vertex_j);
+            image_neighbours_of_i.insert(image_j);
+        }
+        for(int j = v[image_i]; j < v[image_i] + d[image_i]; ++j) {
+            int vertex_j = e[j];
+            if(image_neighbours_of_i.find(vertex_j) == image_neighbours_of_i.end()) {
+                return false;
+            }
+            image_neighbours_of_i.erase(image_neighbours_of_i.find(vertex_j));
+        }
+        if(!image_neighbours_of_i.empty()) {
+            return false;
+        }
+    }
+
+    return true;
 }

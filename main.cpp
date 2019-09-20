@@ -12,7 +12,6 @@ void label_graph(graph* g, bijection* canon_p) {
 
     ir_tools IR;
     IR.label_graph(g, canon_p);
-
 }
 
 int main() {
@@ -23,9 +22,15 @@ int main() {
     parser p;
     graph g;
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10.bliss", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-4", &g);
+    p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-5", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-5", &g);
     // canonically label the graph
+
+
+    //bijection test;
+    //test.map = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    //std::cout << g.certify_isomorphism(test) << std::endl;
+
     bijection canon_p;
     label_graph(&g, &canon_p);
     return 0;

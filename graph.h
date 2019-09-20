@@ -20,6 +20,7 @@ public:
     std::vector<int> e;
 
     graph permute_graph(bijection p);
+    bool certify_isomorphism(bijection p);
     void initialize_coloring(coloring* c);
 };
 

@@ -7,6 +7,7 @@
 #include <set>
 #include <iostream>
 #include <assert.h>
+#include <algorithm>
 
 void remove_duplicates(std::list<std::pair<int, int>> *l) {
     std::set<std::pair<int, int>> found;
@@ -20,7 +21,18 @@ void remove_duplicates(std::list<std::pair<int, int>> *l) {
     }
 }
 
-void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
+bool compare_pair(std::pair<int, int> p1, std::pair<int, int> p2)
+{
+    if(p1.first < p2.first) {
+        return true;
+    } else if(p1.first == p2.first) {
+        return (p1.second < p2.second);
+    }
+    return false;
+}
+
+
+void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant* I) {
     std::cout << "Refining..." << std::endl;
     counting_array.initialize(g->v.size(), c);
     std::queue<std::pair<int, int>> worklist_color_classes;
@@ -37,7 +49,12 @@ void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, 
         worklist_color_classes.pop();
 
         std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
-        refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits);
+        // write color class and size to invariant
+        I->write_top(-1);
+        I->write_top(next_color_class.first);
+        I->write_top(next_color_class.second);
+
+        refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
 
         // find first, largest color class
         int largest_color_class    = -1;
@@ -52,11 +69,15 @@ void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, 
         }
 
         // add all new classes except for the last one
-        std::cout << "Adding color classes to queue..." << std::endl;
+        //std::cout << "Adding color classes to queue..." << std::endl;
+
+        //std::sort(color_class_splits.begin(), color_class_splits.end(), compare_pair);
         for(auto cc = color_class_splits.begin(); cc != color_class_splits.end(); ++cc) {
             changes->insert(*cc);
             int new_class    = cc->second;
             int new_class_sz = c->ptn[new_class] + 1;
+            I->write_top(new_class);
+            I->write_top(new_class_sz);
             if(largest_color_class != new_class) {
                 std::cout << "(" << new_class << ", " << new_class_sz << ")" << std::endl;
                 worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
@@ -65,7 +86,7 @@ void refinement::refine_coloring(graph *g, coloring *c, std::set<std::pair<int, 
     }
 }
 
-void refinement::refine_color_class(graph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist) {
+void refinement::refine_color_class(graph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     std::set<std::pair<int, int>> color_set_worklist;
     std::set<int> vertex_worklist;
@@ -84,11 +105,14 @@ void refinement::refine_color_class(graph *g, coloring *c, int color_class, int 
         cc += 1;
     }
 
+    //counting_array.write_color_degrees(I);
+
     // split color classes according to count in counting array
     for(auto v = vertex_worklist.begin(); v != vertex_worklist.end(); ++v) {
         int v_class_size = c->ptn[c->vertex_to_col[*v]] + 1;
         int v_old_color  = c->vertex_to_col[*v];
         int v_new_color  = v_old_color + v_class_size - counting_array.get_size(*v);
+
         if(v_new_color != v_old_color) {
             color_set_worklist.insert(std::pair<int, int>(*v, v_new_color));
             color_class_split_worklist->push_front(std::pair<int, int>(v_old_color, v_old_color));
@@ -138,7 +162,6 @@ void refinement::refine_color_class(graph *g, coloring *c, int color_class, int 
     }
 
     counting_array.reset();
-    std::cout << "Reset done." << std::endl;
 }
 
 void refinement::individualize_vertex(graph *g, coloring *c, int v) {
@@ -199,6 +222,13 @@ void refinement::undo_refine_color_class(graph *g, coloring *c, std::set<std::pa
     }
 }
 
+void cumulative_counting::write_color_degrees(invariant* I) {
+    /*for(int i = 0; i < col_list_short.size(); ++i) {
+        I->write_top(col_list_short[i]);
+        I->write_top(sizes[i][1]);
+    }*/
+}
+
 void cumulative_counting::initialize(int size, coloring *c) {
     this->c = c;
     for(int i = 0; i < size; ++i) {
@@ -215,9 +245,11 @@ void cumulative_counting::reset() {
         count[index] = 0;
     }
     this->sizes.clear();
+    col_list_short.clear();
     for(int i = 0; i < c->ptn.size();) {
         assert(i==0?true:c->ptn[i - 1] == 0);
         col_list[i] = this->sizes.size();
+        col_list_short.push_back(i);
         this->sizes.emplace_back(std::vector<int>());
         this->sizes[col_list[i]].push_back(c->ptn[i] + 1);
         i += c->ptn[i] + 1;
