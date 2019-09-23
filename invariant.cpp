@@ -14,11 +14,25 @@ int invariant::top_is_geq(std::vector<int> *other) {
         if((*other)[i] < vec_invariant[vec_invariant.size() - 1][i]) {
             return 1;
         }
+        if((*other)[i] > vec_invariant[vec_invariant.size() - 1][i]) {
+            return -1;
+        }
     }
     if(vec_invariant[vec_invariant.size() - 1].size() > other->size())
         return 1;
     assert(vec_invariant[vec_invariant.size() - 1].size() == other->size());
     return 0;
+}
+
+bool invariant::top_is_eq(std::vector<int> *other) {
+    std::vector<int>* top_vector = &vec_invariant[vec_invariant.size() - 1];
+    if(other->size() != top_vector->size())
+        return false;
+    for(int i = 0; i < other->size(); ++i) {
+        if((*other)[i] != (*top_vector)[i])
+            return false;
+    }
+    return true;
 }
 
 void invariant::pop_level() {

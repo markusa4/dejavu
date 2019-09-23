@@ -16,6 +16,8 @@ public:
     int top_is_geq(std::vector<int> *other);
     void write_top(int i);
     void print();
+
+    bool top_is_eq(std::vector<int> *other);
 };
 
 

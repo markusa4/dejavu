@@ -34,11 +34,16 @@ group::group(int domain_size) {
     getorbits(b, domain_size - 1, gp, &gens, domain_size);
 }
 
+group::~group() {
+    freeschreier(&gp, &gens);
+}
+
 void group::print_group_size() {
     double grpsize1;
     int grpsize2;
     grouporder(b, domain_size - 1, gp, &gens, &grpsize1, &grpsize2, domain_size);
     std::cout << grpsize1 << " * 10^" << (grpsize2) << std::endl; // 10 ^ grpsize2 actually
     //deleteunmarked(&gens);
-    std::cout << "gens: " << schreier_gens(gens) << std::endl;
+    std::cout << "Generators: " << schreier_gens(gens) << std::endl;
 }
+

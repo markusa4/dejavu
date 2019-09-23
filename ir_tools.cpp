@@ -6,6 +6,7 @@
 #include <iostream>
 #include <assert.h>
 #include "ir_tools.h"
+#include "trail.h"
 #include "refinement.h"
 #include "selector.h"
 #include "invariant.h"
@@ -96,14 +97,14 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
             //                                             INDIVIDUALIZATION
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // collect all elements of color s
-            std::stack<int> color_s;
+            std::deque<int> color_s;
             int i = s;
             while((i == s) || (i == 0) || c.ptn[i - 1] != 0) {
-                color_s.push(c.lab[i]);
+                color_s.push_front(c.lab[i]);
                 i += 1;
             }
-            int v = color_s.top();
-            color_s.pop();
+            int v = color_s.front();
+            color_s.pop_front();
             assert(color_s.size() > 0);
             // individualize first vertex of class, save the rest of the class in trail
             R.individualize_vertex(g, &c, v);
@@ -124,8 +125,8 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
                 continue;
             } else {
                 // there is another vertex we have to try, so we are done backtracking
-                int v = T.top_op_i_class().top();
-                T.top_op_i_class().pop();
+                int v = T.top_op_i_class().front();
+                T.top_op_i_class().pop_front();
                 T.push_op_i_v(v);
                 R.individualize_vertex(g, &c, v);
                 backtrack = false;
@@ -143,66 +144,4 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
     std::cout << "Group size: ";
     G.print_group_size();
     T.free_path();
-}
-
-void trail::push_op_r(std::set<std::pair<int, int>>* color_class_changes) {
-    trail_operation.push(OP_R);
-    trail_color_class_changes.push(std::set<std::pair<int, int>>());
-    trail_color_class_changes.top().swap(*color_class_changes);
-}
-
-void trail::push_op_i(std::stack<int>* individualizaiton_todo, int v) {
-    trail_operation.push(OP_I);
-    trail_op_i_class.push(std::stack<int>());
-    trail_op_i_class.top().swap(*individualizaiton_todo);
-    push_op_i_v(v);
-}
-
-trail::trail(int domain_size) {
-    trail_operation.push(OP_END);
-    this->domain_size = domain_size;
-    ipath = new int[domain_size];
-    ipos = 0;
-}
-
-ir_operation trail::last_op() {
-    return trail_operation.top();
-}
-
-std::set<std::pair<int, int>>& trail::top_op_r() {
-    return trail_color_class_changes.top();
-}
-
-void trail::pop_op_r() {
-    trail_operation.pop();
-    trail_color_class_changes.pop();
-}
-
-std::stack<int>& trail::top_op_i_class() {
-    return trail_op_i_class.top();
-}
-
-void trail::pop_op_i_class() {
-    trail_operation.pop();
-    trail_op_i_class.pop();
-}
-
-int trail::top_op_i_v() {
-    return trail_op_i_v.top();
-}
-
-void trail::pop_op_i_v() {
-    ipos -= 1;
-    trail_op_i_v.pop();
-}
-
-void trail::push_op_i_v(int v) {
-    assert(ipos >= 0 && ipos < domain_size);
-    ipath[ipos] = v;
-    ipos += 1;
-    trail_op_i_v.push(v);
-}
-
-void trail::free_path() {
-    delete[] ipath;
 }

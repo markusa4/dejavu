@@ -28,3 +28,11 @@ void bijection::compose(bijection p) {
         map[i] = p.map[map[i]];
     }
 }
+
+bijection::bijection() {
+    map = std::vector<int>();
+}
+
+bijection::~bijection() {
+
+}

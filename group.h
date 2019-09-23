@@ -17,6 +17,7 @@ public:
     schreier *gp;
     permnode *gens;
     group(int domain_size);
+    ~group();
     bool add_permutation(bijection* p);
     void print_group_size();
 };

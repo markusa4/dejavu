@@ -19,6 +19,7 @@ public:
     void reset();
     void increment(int index);
     int get_size(int index);
+    int get(int index);
     const int operator[](const size_t index);
 private:
     coloring* c;
@@ -38,6 +39,7 @@ public:
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
     void refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes);
+    void complete_colorclass_invariant(sgraph *g, coloring *c, invariant *I);
 private:
     cumulative_counting counting_array;
 };

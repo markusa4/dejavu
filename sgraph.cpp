@@ -41,7 +41,7 @@ void sgraph::initialize_coloring(coloring *c) {
         }
     }
 
-    std::cout << "Cells: " << cells << std::endl;
+    //std::cout << "Cells: " << cells << std::endl;
 }
 
 // certify that a permutation is an automorphism of the sgraph
