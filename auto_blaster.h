@@ -21,7 +21,7 @@ public:
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re);
+                           std::default_random_engine *re, int *restarts);
 };
 
 

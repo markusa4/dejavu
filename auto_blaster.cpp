@@ -1,6 +1,7 @@
 //
 // Created by markus on 23.09.19.
 //
+//#define NDEBUG
 
 #include "auto_blaster.h"
 #include <stack>
@@ -154,24 +155,23 @@ void auto_blaster::find_automorphism(sgraph *g, bool compare, invariant* canon_I
     assert(false);
 }
 
-void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re) {
-    bool backtrack = false;
+void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts) {
+    bool backtrack = true;
     std::set<std::pair<int, int>> changes;
     refinement R;
     selector S;
+    coloring c;
+    invariant I;
+    *restarts -= 1;
+    ir_operation last_op;
 
-    // initialize a search state
-    coloring c = start_c;
-    invariant I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-    ir_operation last_op = OP_R;
-    //
-
-    while(true) {
+    while (true) {
         if (backtrack) {
             // initialize a search state
+            *restarts += 1;
             c = start_c;
             I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-            ir_operation last_op = OP_R;
+            last_op = OP_R;
             backtrack = false;
         }
 
@@ -180,33 +180,26 @@ void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* ca
             s = S.select_color(g, &c);
             if (s == -1) {
                 if (compare) {
-                    // std::cout << "Discrete coloring found." << std::endl;
                     assert(I.top_is_eq(canon_I->get_level(I.current_level())));
                     I.push_level();
-                    //T.print_path();
-                    R.complete_colorclass_invariant(g, &c, &I);
+                    //R.complete_colorclass_invariant(g, &c, &I);
                     if (!I.top_is_eq(canon_I->get_level(I.current_level()))) {
                         assert(false);
                         I.pop_level();
                         backtrack = true;
                         continue;
                     }
-                    //std::cout << "Compare:" << I.top_is_eq(canon_I->get_level(I.current_level())) << std::endl;
                     // we can derive an automorphism!
                     bijection leaf;
                     leaf.read_from_coloring(&c);
                     *automorphism = leaf;
                     automorphism->inverse();
                     automorphism->compose(*canon_leaf);
-                    assert(g->certify_automorphism(*automorphism));
+                    //assert(g->certify_automorphism(*automorphism));
                     return;
                 } else {
-                    // std::cout << "Discrete coloring found." << std::endl;
                     I.push_level();
-                    //T.print_path();
-                    //I.print();
-                    R.complete_colorclass_invariant(g, &c, &I);
-                    //I.print();
+                    //R.complete_colorclass_invariant(g, &c, &I);
                     canon_leaf->read_from_coloring(&c);
                     *canon_I = I;
                     return;
@@ -218,7 +211,6 @@ void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //                                                REFINEMENT
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //std::cout << "R";
             changes.clear();
             I.push_level();
             R.refine_coloring(g, &c, &changes, &I);
@@ -229,9 +221,6 @@ void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* ca
                 if (I.top_is_eq(canon_I->get_level(I.current_level()))) {
                     continue;
                 } else {
-                    //std::cout << "Backtracking" << std::endl;
-                    //T.print_path();
-                    //I.print();
                     backtrack = true;
                     continue;
                 }
@@ -241,18 +230,9 @@ void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* ca
             //                                             INDIVIDUALIZATION
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // collect all elements of color s
-            //std::cout << "I";
-            std::deque<int> color_s;
-            int i = s;
-            while ((i == s) || (i == 0) || c.ptn[i - 1] != 0) {
-                color_s.push_front(c.lab[i]);
-                i += 1;
-            }
-            std::shuffle(color_s.begin(), color_s.end(), *re);
-            int v = color_s.front();
-            color_s.pop_front();
-            assert(color_s.size() > 0);
-            // individualize random vertex of class, save the rest of the class in trail
+            int rpos = s + ((*re)() % (c.ptn[s] + 1));
+            int v = c.lab[rpos];
+            // individualize random vertex of class
             R.individualize_vertex(g, &c, v);
             last_op = OP_I;
         }
@@ -278,12 +258,15 @@ void auto_blaster::sample(sgraph *g, bool master, bool* done) {
         for(int i = 0; i < CONFIG_THREADS - 1; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
     }
-    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &trash, &re);
+    int trash_int = 0;
+    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &trash, &re, &trash_int);
     std::cout << "Found canonical leaf." << std::endl;
 
     int abort_counter = 0;
     int sampled_paths = 0;
     int sampled_paths_all = 0;
+    int restarts = 0;
+
     // sample for automorphisms
     if(master) {
         // initialize automorphism group
@@ -299,7 +282,7 @@ void auto_blaster::sample(sgraph *g, bool master, bool* done) {
             if(CONFIG_BACKTRACK) {
                 find_automorphism(g, true, &canon_I, &canon_leaf, &automorphism, &re);
             } else {
-                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re);
+                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts);
             }
             bool added = G.add_permutation(&automorphism);
             if (added) {
@@ -327,6 +310,7 @@ void auto_blaster::sample(sgraph *g, bool master, bool* done) {
         *done = true;
         std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
         std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
+        std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
         std::cout << "Group size: ";
         G.print_group_size();
         while(!work_threads.empty()) {
@@ -339,7 +323,7 @@ void auto_blaster::sample(sgraph *g, bool master, bool* done) {
             if(CONFIG_BACKTRACK) {
                 find_automorphism(g, true, &canon_I, &canon_leaf, &automorphism, &re);
             } else {
-                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re);
+                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts);
             }
             Q.enqueue(automorphism);
         }

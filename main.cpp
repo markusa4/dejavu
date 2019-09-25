@@ -1,4 +1,4 @@
-#define NDEBUG
+// #define NDEBUG
 
 #include <iostream>
 #include "parser.h"
@@ -77,16 +77,11 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-700.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-700.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-31", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-31", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
     // canonically label the sgraph
-
-
-    //bijection test;
-    //test.map = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    //std::cout << g.certify_automorphism(test) << std::endl;
 
     //bijection canon_p;
     //label_graph(&g, &canon_p);

@@ -112,8 +112,6 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         cc += 1;
     }
 
-    //counting_array.write_color_degrees(I);
-
     // split color classes according to count in counting array
     for(auto v = vertex_worklist.begin(); v != vertex_worklist.end(); ++v) {
         int v_class_size = c->ptn[c->vertex_to_col[*v]] + 1;
@@ -146,8 +144,6 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         int vertex = p->first;
         int color = p->second;
         int old_color = c->vertex_to_col[vertex];
-
-        //std::cout << "set " << vertex << " to " << color << std::endl;
 
         int vertex_old_pos = c->vertex_to_lab[vertex];
         int vertex_at_pos = c->lab[color + c->ptn[color] + 1];
@@ -355,7 +351,7 @@ void cumulative_counting::initialize(int size, coloring *c) {
     reset();
 }
 
-void cumulative_counting::reset() {
+void cumulative_counting::reset() { // ToDo: this is way too inefficient. can not iterate over colors!
     while(!reset_queue.empty()) {
         int index = reset_queue.front();
         reset_queue.pop();
