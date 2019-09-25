@@ -20,6 +20,7 @@ class trail {
     std::stack<ir_operation> trail_operation;
     std::stack<std::set<std::pair<int, int>>> trail_color_class_changes;
     std::stack<std::deque<int>> trail_op_i_class;
+    std::vector<int> path;
     std::stack<int> trail_op_i_v;
     int domain_size;
     int* ipath;
@@ -37,6 +38,10 @@ public:
     void pop_op_i_class();
     void pop_op_i_v();
     void push_op_i_v(int v);
+
+    int size();
+
+    void print_path();
 };
 
 #endif //DEJAVU_TRAIL_H

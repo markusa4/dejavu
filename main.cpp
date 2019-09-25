@@ -1,3 +1,5 @@
+#define NDEBUG
+
 #include <iostream>
 #include "parser.h"
 #include "refinement.h"
@@ -75,10 +77,10 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-500.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-5", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/hole11.bliss", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-700.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-31", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
     // canonically label the sgraph
 
 
@@ -89,7 +91,7 @@ int main() {
     //bijection canon_p;
     //label_graph(&g, &canon_p);
 
-    std::cout << "Sampling..." << std::endl;
+    std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     Clock::time_point timer = Clock::now();
     auto_blaster A;
     bool done;

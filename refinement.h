@@ -40,6 +40,7 @@ public:
     void refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes);
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant *I);
+    bool assert_is_equitable(sgraph *g, coloring *c);
 private:
     cumulative_counting counting_array;
 };

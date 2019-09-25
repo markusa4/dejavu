@@ -14,6 +14,7 @@ using std::string;
 using std::vector;
 
 void parser::parse_dimacs_file(std::string filename, sgraph* g) {
+    std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>> incidence_list;
     string line;
@@ -52,8 +53,8 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
         }
     }
 
-    std::cout << "Vertices: " << g->v.size() << std::endl;
-    std::cout << "Edges: " << g->e.size() << std::endl;
+    std::cout << "Vertices: \t" << g->v.size() << std::endl;
+    std::cout << "Edges: \t\t" << g->e.size() << std::endl;
 
     assert(nv == g->v.size());
     assert(nv == g->d.size());

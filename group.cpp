@@ -10,12 +10,12 @@ bool group::add_permutation(bijection *p) {
     // copy to proper array
     assert(p->map.size() == domain_size);
     int* _p = new int[domain_size];
-    std::cout << "perm: ";
+    //std::cout << "perm: ";
     for(int k = 0; k < p->map.size(); ++k) {
         _p[k] = p->map[k];
-        std::cout << p->map[k] << " ";
+        //std::cout << p->map[k] << " ";
     }
-    std::cout << std::endl;
+    //std::cout << std::endl;
     bool was_added = condaddgenerator(&gp, &gens, _p, domain_size);
     delete[] _p;
     expandschreier(gp, &gens, domain_size);

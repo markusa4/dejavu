@@ -3,6 +3,7 @@
 //
 
 #include <assert.h>
+#include <iostream>
 #include "trail.h"
 
 void trail::push_op_r(std::set<std::pair<int, int>>* color_class_changes) {
@@ -54,6 +55,7 @@ int trail::top_op_i_v() {
 void trail::pop_op_i_v() {
     ipos -= 1;
     trail_op_i_v.pop();
+    path.pop_back();
 }
 
 void trail::push_op_i_v(int v) {
@@ -61,8 +63,20 @@ void trail::push_op_i_v(int v) {
     ipath[ipos] = v;
     ipos += 1;
     trail_op_i_v.push(v);
+    path.push_back(v);
+}
+
+void trail::print_path() {
+    for(int i = 0; i < ipos; ++i) {
+        std::cout << ipath[i] << " ";
+    }
+    std::cout << std::endl;
 }
 
 void trail::free_path() {
     delete[] ipath;
+}
+
+int trail::size() {
+    return trail_operation.size();
 }

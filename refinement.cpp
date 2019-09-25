@@ -63,6 +63,9 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int,
         for(auto cc = color_class_splits.begin(); cc != color_class_splits.end(); ++cc) {
             int new_class    = cc->second;
             int new_class_sz = c->ptn[new_class] + 1;
+            I->write_top(-7);
+            I->write_top(new_class);
+            I->write_top(new_class_sz);
             if((largest_color_class_sz < new_class_sz) || (largest_color_class_sz == new_class_sz && new_class < largest_color_class)) {
                 largest_color_class = new_class;
                 largest_color_class_sz = new_class_sz;
@@ -81,6 +84,8 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int,
             }
         }
     }
+
+    assert(assert_is_equitable(g, c));
 }
 
 void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I) {
@@ -89,7 +94,7 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     std::set<int> vertex_workset;
     std::list<int> vertex_worklist;
     std::set<int> new_colors;
-    std::unordered_map<int, int> color_degrees;
+    std::list<std::pair<int, int>>  color_degrees;
 
     int cc = color_class; // iterate over color class
     while(cc < color_class + class_size) { // increment value of neighbours of vc by 1
@@ -114,7 +119,7 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         int v_class_size = c->ptn[c->vertex_to_col[*v]] + 1;
         int v_old_color  = c->vertex_to_col[*v];
         int v_new_color  = v_old_color + v_class_size - counting_array.get_size(*v);
-        color_degrees.insert(std::pair<int, int>(v_new_color, counting_array.get(*v)));
+        color_degrees.emplace_back(std::pair<int, int>(v_new_color, counting_array.get(*v)));
         if(v_new_color != v_old_color) {
             color_set_worklist.insert(std::pair<int, int>(*v, v_new_color));
             color_class_split_worklist->push_front(std::pair<int, int>(v_old_color, v_old_color));
@@ -124,16 +129,13 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
 
     color_class_split_worklist->sort();
     color_class_split_worklist->unique();
+    color_degrees.sort();
+    color_degrees.unique();
     remove_duplicates(color_class_split_worklist); // only for assertions...
 
     for(auto p = color_class_split_worklist->begin(); p != color_class_split_worklist->end(); ++p) {
         int v_old_color = p->first;
         int v_new_color = p->second;
-        I->write_top(-2);
-        I->write_top(v_new_color);
-        I->write_top(c->ptn[v_new_color] + 1);
-        I->write_top(color_degrees[v_new_color]);
-        //std::cout << "Color split (" << v_old_color << ", " << v_new_color << ")" << std::endl;
         if(v_old_color != v_new_color) {
             new_colors.insert(v_new_color);
             c->ptn[v_new_color] = -1;
@@ -167,6 +169,14 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         if(*new_color != 0) {
             c->ptn[*new_color - 1] = 0;
         }
+    }
+
+    for(auto p = color_degrees.begin(); p != color_degrees.end(); ++p) {
+        int v_color = p->first;
+        int v_degree = p->second;
+        I->write_top(-40);
+        I->write_top(v_color);
+        I->write_top(v_degree);
     }
 
     // sanity check
@@ -229,7 +239,7 @@ void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::set<std::p
         int old_color = c->vertex_to_col[c->lab[p->first]];
         int new_color = p->second;
         //std::cout << new_color << " back to " << old_color << std::endl;
-        if(old_color != new_color && c->vertex_to_col[c->lab[new_color]] == new_color) {
+        if(old_color < new_color && c->vertex_to_col[c->lab[new_color]] == new_color) {
             reset_ends.push(new_color - 1);
             for (int j = new_color; j <= new_color + c->ptn[new_color]; ++j) {
                 c->vertex_to_col[c->lab[j]] = old_color;
@@ -244,6 +254,23 @@ void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::set<std::p
         if(i >= 0 && c->ptn[i] == 0) {
             c->ptn[i] = 1;
         }
+    }
+
+    // sanity check
+    int expect0 = 0;
+    bool expectsize = true;
+    for(int i = 0; i < c->lab.size(); ++i) {
+        if(expectsize) {
+            expectsize = false;
+            expect0 = c->ptn[i];
+        }
+        if(expect0 == 0) {
+            assert(c->ptn[i] == 0);
+            expectsize = true;
+        } else {
+            assert(c->ptn[i] > 0);
+        }
+        expect0 -= 1;
     }
 }
 
@@ -263,8 +290,52 @@ void refinement::complete_colorclass_invariant(sgraph *g, coloring *c, invariant
     }
 }
 
-void refinement::test() {
-    
+bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
+    std::vector<int> neighbour_col_canon;
+    std::vector<int> neighbour_col;
+    bool first_of_color = true;
+
+    for(int i = 0; i < g->v.size(); ++i) {
+        neighbour_col.clear();
+        int v = c->lab[i];
+        for(int j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
+            neighbour_col.push_back(c->vertex_to_col[g->e[j]]);
+        }
+        std::sort(neighbour_col.begin(), neighbour_col.end());
+        if(first_of_color) {
+            first_of_color = false;
+            neighbour_col_canon.swap(neighbour_col);
+        } else {
+            for (auto j = 0; j < neighbour_col.size(); ++j) {
+                assert(neighbour_col[j] == neighbour_col_canon[j]);
+            }
+        }
+
+        if(c->ptn[i] == 0) {
+            first_of_color = true;
+        }
+    }
+
+    int expect0 = 0;
+    bool expectsize = true;
+    //std::cout << "part";
+    for(int i = 0; i < c->lab.size(); ++i) {
+        if(expectsize) {
+            expectsize = false;
+            expect0 = c->ptn[i];
+        }
+        if(expect0 == 0) {
+            //std::cout << i << " ";
+            assert(c->ptn[i] == 0);
+            expectsize = true;
+        } else {
+            assert(c->ptn[i] > 0);
+        }
+        expect0 -= 1;
+    }
+    //std::cout << std::endl;
+
+    return true;
 }
 
 

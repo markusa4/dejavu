@@ -8,16 +8,15 @@
 class invariant {
     std::vector<std::vector<int>> vec_invariant;
 public:
-    void push_level();
-    void pop_level();
-    int current_level();
-    std::vector<int>* get_level(int i);
-    std::vector<int> top_level();
-    int top_is_geq(std::vector<int> *other);
-    void write_top(int i);
-    void print();
-
-    bool top_is_eq(std::vector<int> *other);
+    virtual void push_level();
+    virtual void pop_level();
+    virtual int current_level();
+    virtual std::vector<int>* get_level(int i);
+    virtual std::vector<int> top_level();
+    virtual int top_is_geq(std::vector<int> *other);
+    virtual void write_top(int i);
+    virtual void print();
+    virtual bool top_is_eq(std::vector<int> *other);
 };
 
 
