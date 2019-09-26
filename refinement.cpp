@@ -95,16 +95,18 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     std::set<std::pair<int, int>> color_set_worklist;
     std::list<int> vertex_worklist_it;
     std::set<int> new_colors;
-    std::list<std::pair<int, int>>  color_degrees;
+
+    std::list<std::pair<int, int>> old_color_classes;
+    std::set<int> old_colors_classes_set;
 
     int cc = color_class; // iterate over color class
-    while(cc < color_class + class_size) { // increment value of neighbours of vc by 1
+    while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
         int vc = c->lab[cc];
         int pe = g->v[vc];
-        for(int i = pe; i < pe + g->d[vc]; i++) {
+        for (int i = pe; i < pe + g->d[vc]; i++) {
             // v is a neighbour of vc
             int v = g->e[i];
-            if(!vertex_worklist.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
+            if (!vertex_worklist.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
                 vertex_worklist.set(v);
                 vertex_worklist_it.push_back(v);
             }
@@ -114,35 +116,23 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     }
 
     // split color classes according to count in counting array
-    for(auto v = vertex_worklist_it.begin(); v != vertex_worklist_it.end(); ++v) {
+    // care: does not respect lab order
+    for (auto v = vertex_worklist_it.begin(); v != vertex_worklist_it.end(); ++v) {
         int v_class_size = c->ptn[c->vertex_to_col[*v]] + 1;
-        int v_old_color  = c->vertex_to_col[*v];
+        int v_old_color = c->vertex_to_col[*v];
         int v_new_color;
-        if(counting_array.get_count(*v) == 0) {
-            v_new_color  = v_old_color;
+        if (counting_array.get_count(*v) == 0) {
+            v_new_color = v_old_color;
         } else {
-            v_new_color  = v_old_color + v_class_size - counting_array.get_size(*v);
+            v_new_color = v_old_color + v_class_size - counting_array.get_size(*v);
         }
-
-        color_degrees.emplace_back(std::pair<int, int>(v_new_color, counting_array.get_count(*v)));
-
-        if(v_new_color != v_old_color) {
+        if (old_colors_classes_set.find(v_old_color) == old_colors_classes_set.end()) {
+            assert(c->ptn[v_old_color] >= 0);
+            old_color_classes.emplace_back(std::pair<int, int>(v_old_color, v_class_size));
+            old_colors_classes_set.insert(v_old_color);
+        }
+        if (v_new_color != v_old_color) {
             color_set_worklist.insert(std::pair<int, int>(*v, v_new_color));
-            color_class_split_worklist->push_front(std::pair<int, int>(v_old_color, v_old_color));
-            color_class_split_worklist->push_front(std::pair<int, int>(v_old_color, v_new_color));
-        }
-    }
-
-    // ToDo: too inefficient
-    color_class_split_worklist->sort();
-    color_class_split_worklist->unique();
-    color_degrees.sort();
-    color_degrees.unique();
-
-    for(auto p = color_class_split_worklist->begin(); p != color_class_split_worklist->end(); ++p) {
-        int v_old_color = p->first;
-        int v_new_color = p->second;
-        if(v_old_color != v_new_color) {
             new_colors.insert(v_new_color);
             c->ptn[v_new_color] = -1;
         }
@@ -175,12 +165,25 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    for(auto p = color_degrees.begin(); p != color_degrees.end(); ++p) {
-        int v_color = p->first;
-        int v_degree = p->second;
-        I->write_top(-40);
-        I->write_top(v_color);
-        I->write_top(v_degree);
+    old_color_classes.sort();
+
+    // ToDo: integrate max color class size here
+    for(auto it = old_color_classes.begin(); it != old_color_classes.end(); ++it) {
+        for(int i = it->first; i < it->first + it->second;){
+            assert(i >= 0 && i < c->ptn.size());
+            assert(c->ptn[i] + 1 > 0);
+            int v_color  = i;
+            int v_degree = counting_array.get_count(c->lab[i]);
+            I->write_top(-40);
+            I->write_top(v_color);
+            I->write_top(v_degree);
+            if(!(i == it->first && c->ptn[i] + 1== it->second)) {
+                color_class_split_worklist->push_front(std::pair<int, int>(it->first, i));
+            } else {
+                break;
+            }
+            i += c->ptn[i] + 1;
+        }
     }
 
     vertex_worklist.reset();
@@ -374,6 +377,7 @@ int cumulative_counting::get_size(int index) {
 }
 
 int cumulative_counting::get_count(int index) {
+    assert(index < count.size());
     return count[index];
 }
 
