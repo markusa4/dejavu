@@ -21,7 +21,7 @@
 #include "invariant_acc.h"
 #include <pthread.h>
 
-void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
+void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
     bool backtrack = true;
     std::set<std::pair<int, int>> changes;
     refinement R;
@@ -108,8 +108,9 @@ void auto_blaster::find_automorphism_prob(sgraph *g, bool compare, invariant* ca
     }
 }
 
-void auto_blaster::sample(sgraph *g, bool master, bool* done) {
+void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     // find comparison leaf
+    //std::cout << &g << ", " << this << std::endl;
     invariant canon_I;
     std::vector<std::thread> work_threads;
     bijection canon_leaf;

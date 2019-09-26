@@ -17,7 +17,7 @@ class auto_blaster {
     invariant start_I;
     coloring start_c;
 public:
-    void sample(sgraph *g, bool master, bool* done);
+    void sample(sgraph* g, bool master, bool* done);
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
