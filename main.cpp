@@ -1,5 +1,3 @@
-// #define NDEBUG
-
 #include <iostream>
 #include "parser.h"
 #include "refinement.h"
@@ -77,10 +75,10 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-700.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-1000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-31", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/3pipe.bliss", &g);
     // canonically label the sgraph
 
     //bijection canon_p;
@@ -89,7 +87,7 @@ int main() {
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     Clock::time_point timer = Clock::now();
     auto_blaster A;
-    bool done;
+    bool done = false;
     A.sample(&g, true, &done);
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;

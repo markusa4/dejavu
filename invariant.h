@@ -17,6 +17,8 @@ public:
     virtual void write_top(int i);
     virtual void print();
     virtual bool top_is_eq(std::vector<int> *other);
+
+    bool level_is_eq(invariant *other, int level);
 };
 
 

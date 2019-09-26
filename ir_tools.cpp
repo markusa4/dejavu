@@ -14,7 +14,7 @@
 
 // compute a canonical labelling of the sgraph using individualization-refinement
 void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
-    coloring c;
+   /* coloring c;
     g->initialize_coloring(&c);
 
     group G(g->v.size()); // automorphism group
@@ -143,5 +143,5 @@ void ir_tools::label_graph(sgraph *g, bijection *canon_p) {
     }
     std::cout << "Group size: ";
     G.print_group_size();
-    T.free_path();
+    T.free_path();*/
 }

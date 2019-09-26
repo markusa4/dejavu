@@ -12,6 +12,8 @@
 class selector {
 public:
     int select_color(sgraph *g, coloring *c);
+
+    int select_color2(sgraph *g, coloring *c);
 };
 
 

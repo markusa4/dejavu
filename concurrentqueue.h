@@ -132,7 +132,7 @@ namespace moodycamel { namespace details {
 } }
 #else
 // Use a nice trick from this answer: http://stackoverflow.com/a/8438730/21475
-// In order to get a numeric thread ID in a platform-independent way, we use a thread-local
+// In order to get_count a numeric thread ID in a platform-independent way, we use a thread-local
 // static variable's address as a thread identifier :-)
 #if defined(__GNUC__) || defined(__INTEL_COMPILER)
 #define MOODYCAMEL_THREADLOCAL __thread
@@ -1941,7 +1941,7 @@ private:
 					
 					// We need to be careful here about subtracting and dividing because of index wrap-around.
 					// When an index wraps, we need to preserve the sign of the offset when dividing it by the
-					// block size (in order to get a correct signed block count offset in all cases):
+					// block size (in order to get_count a correct signed block count offset in all cases):
 					auto headBase = localBlockIndex->entries[localBlockIndexHead].base;
 					auto blockBaseIndex = index & ~static_cast<index_t>(BLOCK_SIZE - 1);
 					auto offset = static_cast<size_t>(static_cast<typename std::make_signed<index_t>::type>(blockBaseIndex - headBase) / BLOCK_SIZE);

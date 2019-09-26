@@ -9,7 +9,7 @@
 #include <vector>
 #include "invariant.h"
 
-class invariant_acc : public invariant {
+class invariant_acc {
     std::vector<std::vector<int>> vec_invariant;
 public:
     void push_level();
@@ -22,6 +22,8 @@ public:
     void print();
 
     bool top_is_eq(std::vector<int> *other);
+
+    bool level_is_eq(invariant_acc *other, int level);
 };
 
 

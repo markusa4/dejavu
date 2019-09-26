@@ -10,18 +10,18 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
+#include "invariant_acc.h"
 
 class auto_blaster {
     moodycamel::ConcurrentQueue<bijection> Q;
     invariant start_I;
     coloring start_c;
 public:
-    void find_automorphism(sgraph *g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re);
     void sample(sgraph *g, bool master, bool* done);
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts);
+                           std::default_random_engine *re, int *restarts, bool* done);
 };
 
 

@@ -11,32 +11,8 @@ std::vector<int> invariant_acc::top_level() {
     return vec_invariant[vec_invariant.size() - 1];
 }
 
-int invariant_acc::top_is_geq(std::vector<int> *other) {
-    for(int i = 0; i < other->size(); ++i) {
-        if(i >= vec_invariant[vec_invariant.size() - 1].size())
-            return -1;
-        if((*other)[i] < vec_invariant[vec_invariant.size() - 1][i]) {
-            return 1;
-        }
-        if((*other)[i] > vec_invariant[vec_invariant.size() - 1][i]) {
-            return -1;
-        }
-    }
-    if(vec_invariant[vec_invariant.size() - 1].size() > other->size())
-        return 1;
-    assert(vec_invariant[vec_invariant.size() - 1].size() == other->size());
-    return 0;
-}
-
-bool invariant_acc::top_is_eq(std::vector<int> *other) {
-    std::vector<int>* top_vector = &vec_invariant[vec_invariant.size() - 1];
-    if(other->size() != top_vector->size())
-        return false;
-    for(int i = 0; i < other->size(); ++i) {
-        if((*other)[i] != (*top_vector)[i])
-            return false;
-    }
-    return true;
+bool invariant_acc::level_is_eq(invariant_acc* other, int level) {
+    return (*(*other).get_level(level))[0] == vec_invariant[level][0];
 }
 
 void invariant_acc::pop_level() {
@@ -45,6 +21,7 @@ void invariant_acc::pop_level() {
 
 void invariant_acc::push_level() {
     vec_invariant.emplace_back(std::vector<int>());
+    vec_invariant[vec_invariant.size() - 1].push_back(1);
 }
 
 void invariant_acc::write_top(int i) {

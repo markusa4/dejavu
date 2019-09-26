@@ -7,6 +7,19 @@ std::vector<int> invariant::top_level() {
     return vec_invariant[vec_invariant.size() - 1];
 }
 
+bool invariant::level_is_eq(invariant* other, int level) {
+    std::vector<int>* my_vec = &vec_invariant[level];
+    std::vector<int>* other_vec = other->get_level(level);
+
+    if(other_vec->size() != my_vec->size())
+        return false;
+    for(int i = 0; i < other_vec->size(); ++i) {
+        if((*other_vec)[i] != (*my_vec)[i])
+            return false;
+    }
+    return true;
+}
+
 int invariant::top_is_geq(std::vector<int> *other) {
     for(int i = 0; i < other->size(); ++i) {
         if(i >= vec_invariant[vec_invariant.size() - 1].size())

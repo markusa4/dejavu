@@ -10,7 +10,7 @@
 #include <set>
 #include "coloring.h"
 #include "sgraph.h"
-#include "invariant.h"
+#include "invariant_acc.h"
 #include <list>
 
 class cumulative_counting {
@@ -19,18 +19,27 @@ public:
     void reset();
     void increment(int index);
     int get_size(int index);
-    int get(int index);
-    const int operator[](const size_t index);
+    int get_count(int index);
+    void set_coloring(coloring *c);
 private:
     coloring* c;
     std::vector<int> count;
     std::vector<std::vector<int>> sizes;
     std::queue<int>  reset_queue;
-    std::vector<int> col_list;
-    std::vector<int> col_list_short;
-
-    void write_color_degrees(invariant *I);
+    std::queue<int>  reset_queue_sizes;
 };
+
+class work_set {
+public:
+    void initialize(int size);
+    void set(int index);
+    bool get(int index);
+    void reset();
+private:
+    std::queue<int>  reset_queue;
+    std::vector<bool> s;
+};
+
 
 class refinement {
 public:
@@ -42,7 +51,9 @@ public:
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant *I);
     bool assert_is_equitable(sgraph *g, coloring *c);
 private:
+    bool initialized = false;
     cumulative_counting counting_array;
+    work_set vertex_worklist;
 };
 
 
