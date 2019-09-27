@@ -18,12 +18,14 @@ bool group::add_permutation(bijection *p) {
     //std::cout << std::endl;
     bool was_added = condaddgenerator(&gp, &gens, _p, domain_size);
     delete[] _p;
-    expandschreier(gp, &gens, domain_size);
+    if(was_added) {
+        expandschreier(gp, &gens, domain_size);
+    }
     return was_added;
 }
 
 group::group(int domain_size) {
-    schreier_fails(10);
+    schreier_fails(2);
     this->domain_size = domain_size;
     std::cout << "Creating new group... " << std::endl;
     newgroup(&gp, &gens, domain_size);

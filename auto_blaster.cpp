@@ -28,6 +28,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     selector S;
     coloring c;
     invariant I;
+    std::list<int> init_color_class;
     *restarts -= 1;
     ir_operation last_op;
 
@@ -37,9 +38,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if(*done) {
                 return;
             }
+            if(*restarts >= 0) {
+                //std::cout << "Restart." << *restarts << std::endl;
+            }
             *restarts += 1;
             c = start_c;
             I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
+            init_color_class.clear();
             last_op = OP_R;
             backtrack = false;
         }
@@ -64,6 +69,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     *automorphism = leaf;
                     automorphism->inverse();
                     automorphism->compose(*canon_leaf);
+                    std::cout << "Found automorphism." << *restarts << std::endl;
                     assert(g->certify_automorphism(*automorphism));
                     return;
                 } else {
@@ -82,7 +88,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             changes.clear();
             I.push_level();
-            R.refine_coloring(g, &c, &changes, &I);
+            assert(init_color_class.size() == 2);
+            R.refine_coloring(g, &c, &changes, &I, &init_color_class);
             //R.complete_colorclass_invariant(g, &c, &I);
             last_op = OP_R;
             if (compare) {
@@ -99,11 +106,18 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             //                                             INDIVIDUALIZATION
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // collect all elements of color s
+            init_color_class.clear();
             int rpos = s + ((*re)() % (c.ptn[s] + 1));
             int v = c.lab[rpos];
             // individualize random vertex of class
             R.individualize_vertex(g, &c, v);
             last_op = OP_I;
+            assert(init_color_class.empty());
+            int labpos = c.vertex_to_lab[v];
+            assert(labpos == c.vertex_to_col[v]);
+            init_color_class.push_back(labpos);
+            assert(c.vertex_to_col[v] > 0);
+            init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
         }
     }
 }
@@ -124,7 +138,8 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     if(master) {
         start_I.push_level();
         g->initialize_coloring(&start_c);
-        R.refine_coloring(g, &start_c, &changes, &start_I);
+        std::list<int> init_color_class;
+        R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class);
         std::cout << "Launching workers..." << std::endl;
         for(int i = 0; i < CONFIG_THREADS - 1; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
@@ -150,8 +165,9 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
             sampled_paths += 1;
             // sample myself
             bijection automorphism;
+            bool added;
             find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, &trash_bool);
-            bool added = G.add_permutation(&automorphism);
+            added = G.add_permutation(&automorphism);
             if (added) {
                 abort_counter = 0;
             } else {
@@ -171,7 +187,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
                         abort_counter += 1;
                     }
                 }
-            } while(d);
+            } while(d && abort_counter <= 3);
         }
         *done = true;
         std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
@@ -188,6 +204,9 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     //                                                      SLAVE THREAD
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         while(!(*done)) {
+            if(Q.size_approx() > 50) {
+                sleep(1);
+            }
             bijection automorphism;
             find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
             Q.enqueue(automorphism);

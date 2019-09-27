@@ -11,21 +11,28 @@
 #include <unordered_map>
 #include <algorithm>
 
-void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant_acc* I) {
+void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class) {
     //std::cout << "Refining..." << std::endl;
     if(!initialized) {
         counting_array.initialize(g->v.size(), c);
         vertex_worklist.initialize(g->v.size());
+        color_worklist.initialize(g->v.size());
         initialized = true;
         largest_color_class_index = new int[c->lab.size()];
     }
     counting_array.set_coloring(c);
     std::queue<std::pair<int, int>> worklist_color_classes;
 
-    // initialize queue with all classes
-    for(int i = 0; i < c->ptn.size(); ) {
-        worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
-        i += c->ptn[i] + 1;
+    if(init_color_class->empty()) {
+        // initialize queue with all classes
+        for (int i = 0; i < c->ptn.size();) {
+            worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
+            i += c->ptn[i] + 1;
+        }
+    } else {
+        for(auto it = init_color_class->begin(); it != init_color_class->end(); ++it) {
+            worklist_color_classes.push(std::pair<int, int>(*it, c->ptn[*it] + 1));
+        }
     }
 
     while(!worklist_color_classes.empty()) {
@@ -35,7 +42,7 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int,
 
        //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
         // write color class and size to invariant
-        //I->write_top(-1);
+        I->write_top(-1);
         I->write_top(next_color_class.first);
         I->write_top(next_color_class.second);
 
@@ -56,17 +63,15 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int,
         }
         assert(color_class_splits.size() > 0? skip > 0: true);
     }
-    assert(assert_is_equitable(g, c));
+    //assert(assert_is_equitable(g, c));
 }
 
-void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant_acc* I, int* largest_color_class_index) {
+void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I, int* largest_color_class_index) {
     // for all vertices of the color class...
-    std::set<std::pair<int, int>> color_set_worklist;
+    std::list<std::pair<int, int>> color_set_worklist;
     std::list<int> vertex_worklist_it;
     std::set<int> new_colors;
-
     std::list<std::pair<int, int>> old_color_classes;
-    std::set<int> old_colors_classes_set;
 
     int cc = color_class; // iterate over color class
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
@@ -95,13 +100,13 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         } else {
             v_new_color = v_old_color + v_class_size - counting_array.get_size(*v);
         }
-        if (old_colors_classes_set.find(v_old_color) == old_colors_classes_set.end()) {
+        if (!color_worklist.get(v_old_color)) {
             assert(c->ptn[v_old_color] >= 0);
             old_color_classes.emplace_back(std::pair<int, int>(v_old_color, v_class_size));
-            old_colors_classes_set.insert(v_old_color);
+            color_worklist.set(v_old_color);
         }
         if (v_new_color != v_old_color) {
-            color_set_worklist.insert(std::pair<int, int>(*v, v_new_color));
+            color_set_worklist.emplace_back(std::pair<int, int>(*v, v_new_color));
             new_colors.insert(v_new_color);
             c->ptn[v_new_color] = -1;
         }
@@ -148,6 +153,7 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             I->write_top(-40);
             I->write_top(v_color);
             I->write_top(v_degree);
+            I->write_top(c->ptn[i] + 1);
             if(!(i == it->first && c->ptn[i] + 1== it->second)) {
                 if(largest_color_class_size < c->ptn[i] + 1) {
                     largest_color_class_size = c->ptn[i] + 1;
@@ -164,6 +170,7 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     }
 
     vertex_worklist.reset();
+    color_worklist.reset();
     counting_array.reset();
 }
 
