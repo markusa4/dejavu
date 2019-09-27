@@ -19,7 +19,7 @@ bool group::add_permutation(bijection *p) {
     bool was_added = condaddgenerator(&gp, &gens, _p, domain_size);
     delete[] _p;
     if(was_added) {
-        expandschreier(gp, &gens, domain_size);
+        //expandschreier(gp, &gens, domain_size);
     }
     return was_added;
 }

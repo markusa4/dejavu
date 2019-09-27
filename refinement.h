@@ -40,6 +40,20 @@ private:
     std::vector<bool> s;
 };
 
+class work_list {
+public:
+    void initialize(int size);
+    void push_back(int index);
+    int pop_back();
+    bool empty();
+    void reset();
+    ~work_list();
+private:
+    int* arr;
+    int arr_sz = -1;
+    int cur_pos;
+};
+
 
 class refinement {
 public:
@@ -54,8 +68,11 @@ public:
 private:
     bool initialized = false;
     cumulative_counting counting_array;
-    work_set vertex_worklist;
-    work_set color_worklist;
+    work_set vertex_workset;
+    work_set color_worklset;
+    work_list color_worklist_vertex;
+    work_list color_worklist_color;
+    work_list vertex_worklist;
     int* largest_color_class_index;
 };
 
