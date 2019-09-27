@@ -13,6 +13,7 @@
 class group {
 public:
     int domain_size;
+    int base_size;
     int* b;
     schreier *gp;
     permnode *gens;

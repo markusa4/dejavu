@@ -42,6 +42,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 //std::cout << "Restart." << *restarts << std::endl;
             }
             *restarts += 1;
+            // ToDo: undo refinement instead?
             c = start_c;
             I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             init_color_class.clear();
@@ -88,7 +89,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             changes.clear();
             I.push_level();
-            assert(init_color_class.size() == 2);
+            //assert(init_color_class.size() == 2);
             R.refine_coloring(g, &c, &changes, &I, &init_color_class);
             //R.complete_colorclass_invariant(g, &c, &I);
             last_op = OP_R;
@@ -117,7 +118,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             assert(labpos == c.vertex_to_col[v]);
             init_color_class.push_back(labpos);
             assert(c.vertex_to_col[v] > 0);
-            init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
         }
     }
 }
@@ -204,12 +205,16 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     //                                                      SLAVE THREAD
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         while(!(*done)) {
-            if(Q.size_approx() > 50) {
-                sleep(1);
-            }
             bijection automorphism;
             find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
             Q.enqueue(automorphism);
+            if(Q.size_approx() > 20) {
+                if(Q.size_approx() < 100) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                }
+            }
         }
         return;
     }

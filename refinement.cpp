@@ -334,7 +334,7 @@ void cumulative_counting::initialize(int size, coloring *c) {
         this->count.push_back(0);
         this->sizes.emplace_back(std::vector<int>());
         this->sizes[this->sizes.size() - 1].push_back(-1);
-        this->sizes[this->sizes.size() - 1].reserve(16);
+        //this->sizes[this->sizes.size() - 1].reserve(16);
     }
     reset();
 }
@@ -350,7 +350,7 @@ void cumulative_counting::reset() {
         reset_queue_sizes.pop();
         sizes[index].clear();
         sizes[index].push_back(-1);
-        sizes[index].reserve(16);
+        //sizes[index].reserve(16);
     }
 }
 
