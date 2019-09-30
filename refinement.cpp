@@ -73,7 +73,6 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     // for all vertices of the color class...
     // ToDo: can replace worklists with fixed size arrays
     //std::list<std::pair<int, int>> color_set_worklist;
-    std::list<int> vertex_worklist_it;
     std::set<int> new_colors;
     std::list<std::pair<int, int>> old_color_classes;
 
@@ -86,7 +85,6 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             int v = g->e[i];
             if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
                 vertex_workset.set(v);
-                //vertex_worklist_it.push_back(v);
                 vertex_worklist.push_back(v);
             }
             counting_array.increment(v);

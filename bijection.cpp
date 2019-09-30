@@ -2,6 +2,9 @@
 // Created by markus on 19.09.19.
 //
 
+#include <algorithm>
+#include <chrono>
+#include <random>
 #include "bijection.h"
 
 int bijection::map_vertex(int v) {
@@ -35,4 +38,17 @@ bijection::bijection() {
 
 bijection::~bijection() {
 
+}
+
+bijection bijection::random_bijection(int n) {
+    bijection p;
+    p.map = std::vector<int>();
+    p.map.reserve(n);
+    for(int i = 0; i < n; ++i) {
+        p.map.push_back(i);
+    }
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine re = std::default_random_engine(seed);
+    std::shuffle(p.map.begin(), p.map.end(), re);
+    return p;
 }

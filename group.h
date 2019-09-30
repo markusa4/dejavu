@@ -15,9 +15,10 @@ public:
     int domain_size;
     int base_size;
     int* b;
+    int added;
     schreier *gp;
     permnode *gens;
-    group(int domain_size);
+    group(int domain_size, bijection* base_points);
     ~group();
     bool add_permutation(bijection* p);
     void print_group_size();

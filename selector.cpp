@@ -25,7 +25,6 @@ int selector::select_color(sgraph *g, coloring *c) {
         if(c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
             largest_cell = i;
             largest_cell_sz = c->ptn[i];
-            break;
         }
         i += c->ptn[i] + 1;
     }

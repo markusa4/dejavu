@@ -18,6 +18,7 @@ public:
     void read_from_coloring(coloring *c);
     void compose(bijection p);
     void inverse();
+    static bijection random_bijection(int n);
 };
 
 

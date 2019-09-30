@@ -70,7 +70,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     *automorphism = leaf;
                     automorphism->inverse();
                     automorphism->compose(*canon_leaf);
-                    std::cout << "Found automorphism." << *restarts << std::endl;
+                    //std::cout << "Found automorphism." << *restarts << std::endl;
                     assert(g->certify_automorphism(*automorphism));
                     return;
                 } else {
@@ -119,6 +119,9 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class.push_back(labpos);
             assert(c.vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+            if (!compare) {
+                automorphism->map.push_back(v);
+            }
         }
     }
 }
@@ -129,7 +132,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     invariant canon_I;
     std::vector<std::thread> work_threads;
     bijection canon_leaf;
-    bijection trash;
+    bijection base_points;
     bool trash_bool = false;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine re = std::default_random_engine(seed);
@@ -146,7 +149,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
     }
     int trash_int = 0;
-    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &trash, &re, &trash_int, &trash_bool);
+    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
     std::cout << "Found canonical leaf." << std::endl;
 
     int abort_counter = 0;
@@ -160,7 +163,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
-        group G(g->v.size());
+        group G(g->v.size(), &base_points);
         // run algorithm
         while (abort_counter <= 4) {
             sampled_paths += 1;

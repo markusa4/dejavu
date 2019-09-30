@@ -74,3 +74,24 @@ bool sgraph::certify_automorphism(bijection p) {
 
     return true;
 }
+
+sgraph sgraph::permute_graph(bijection p) {
+    sgraph ng;
+    ng.v = v;
+    ng.e = e;
+    ng.d = d;
+
+    int epos = 0;
+    for(int i = 0; i < v.size(); ++i) {
+        int mapped_v = p.map_vertex(i);
+        ng.d[i] = d[mapped_v];
+        ng.v[i] = epos;
+        for(int j = 0; j < d[mapped_v]; j++) {
+            ng.e[epos + j] = e[v[mapped_v] + j];
+        }
+        epos += ng.d[i];
+    }
+    assert(epos == ng.e.size());
+
+    return ng;
+}
