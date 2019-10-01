@@ -42,7 +42,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 //std::cout << "Restart." << *restarts << std::endl;
             }
             *restarts += 1;
-            // ToDo: undo refinement instead?
             c = start_c;
             I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             init_color_class.clear();

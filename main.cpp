@@ -76,12 +76,14 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-1000.bliss", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-70", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/5pipe.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-50", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/3pipe.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
     // canonically label the sgraph
 

@@ -75,7 +75,7 @@ bool sgraph::certify_automorphism(bijection p) {
     return true;
 }
 
-sgraph sgraph::permute_graph(bijection p) {
+sgraph sgraph::permute_graph(bijection p) { // ToDo: broken
     sgraph ng;
     ng.v = v;
     ng.e = e;
@@ -87,10 +87,13 @@ sgraph sgraph::permute_graph(bijection p) {
         ng.d[i] = d[mapped_v];
         ng.v[i] = epos;
         for(int j = 0; j < d[mapped_v]; j++) {
-            ng.e[epos + j] = e[v[mapped_v] + j];
+            ng.e[epos + j] = p.map_vertex(e[v[mapped_v] + j]);
         }
         epos += ng.d[i];
     }
+    assert(ng.v.size() == v.size());
+    assert(ng.e.size() == e.size());
+    assert(ng.d.size() == d.size());
     assert(epos == ng.e.size());
 
     return ng;

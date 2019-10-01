@@ -7,8 +7,10 @@
 
 
 #include "bijection.h"
-#include "nauty/traces.h"
-#include "nauty/naugroup.h"
+// #include "nauty/traces.h"
+// #include "nauty/naugroup.h"
+
+#include "my_schreier.h"
 
 class group {
 public:
