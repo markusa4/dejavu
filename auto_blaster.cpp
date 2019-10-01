@@ -16,10 +16,13 @@
 #include "selector.h"
 #include "invariant.h"
 #include "configuration.h"
-#include "group.h"
+#include "sequential_group.h"
 #include "concurrentqueue.h"
 #include "invariant_acc.h"
 #include <pthread.h>
+
+extern long mmultcount;
+extern long mfiltercount;
 
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
     bool backtrack = true;
@@ -162,7 +165,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
-        group G(g->v.size(), &base_points);
+        sequential_group G(g->v.size(), &base_points);
         // run algorithm
         while (abort_counter <= 4) {
             sampled_paths += 1;
@@ -196,6 +199,9 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
         std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
         std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
         std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
+        std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
+        std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
+        std::cout << "Base size:  " << G.base_size << std::endl;
         std::cout << "Group size: ";
         G.print_group_size();
         while(!work_threads.empty()) {

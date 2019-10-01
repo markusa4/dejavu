@@ -10,7 +10,7 @@
 #include "refinement.h"
 #include "selector.h"
 #include "invariant.h"
-#include "group.h"
+#include "sequential_group.h"
 
 // compute a canonical labelling of the sgraph using individualization-refinement
 void ir_tools::label_graph(sgraph *g, bijection *canon_p) {

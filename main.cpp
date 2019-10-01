@@ -82,7 +82,7 @@ int main() {
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-50", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/3pipe.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
     // canonically label the sgraph
@@ -104,7 +104,10 @@ int main() {
 
     timer = Clock::now();
     bench_traces(&g);
-    solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
+    double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "Compare: " << nauty_solve_time / solve_time << std::endl;
     return 0;
 }

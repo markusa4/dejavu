@@ -10,9 +10,9 @@
 // #include "nauty/traces.h"
 // #include "nauty/naugroup.h"
 
-#include "my_schreier.h"
+#include "nauty/schreier.h"
 
-class group {
+class sequential_group {
 public:
     int domain_size;
     int base_size;
@@ -20,8 +20,8 @@ public:
     int added;
     schreier *gp;
     permnode *gens;
-    group(int domain_size, bijection* base_points);
-    ~group();
+    sequential_group(int domain_size, bijection* base_points);
+    ~sequential_group();
     bool add_permutation(bijection* p);
     void print_group_size();
 };
