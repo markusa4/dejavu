@@ -19,11 +19,13 @@
 #include "sequential_group.h"
 #include "concurrentqueue.h"
 #include "invariant_acc.h"
+#include "pipeline_group.h"
 #include <pthread.h>
 
 extern long mmultcount;
 extern long mfiltercount;
 
+// ToDo: recreate backtracking version
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
     bool backtrack = true;
     std::set<std::pair<int, int>> changes;
@@ -199,8 +201,8 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
         std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
         std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
         std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
-        std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
-        std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
+        //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
+        //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
         std::cout << "Base size:  " << G.base_size << std::endl;
         std::cout << "Group size: ";
         G.print_group_size();
@@ -220,9 +222,78 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
                 if(Q.size_approx() < 100) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 } else {
+                    std::cout << "Throttle" << std::endl;
                     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
             }
+        }
+        return;
+    }
+}
+
+void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline_group* G) {
+    // find comparison leaf
+    invariant canon_I;
+    std::vector<std::thread> work_threads;
+    bijection canon_leaf;
+    bijection base_points;
+    bool trash_bool = false;
+    int trash_int = 0;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine re = std::default_random_engine(seed);
+
+    refinement R;
+    std::set<std::pair<int, int>> changes;
+    if(master) {
+        start_I.push_level();
+        g->initialize_coloring(&start_c);
+        std::list<int> init_color_class;
+        R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class);
+        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
+        G = new pipeline_group(g->v.size(), &base_points, CONFIG_SIFT_PIPELINE_DEPTH);
+        std::cout << "Launching refinement worker..." << std::endl;
+        for(int i = 0; i < CONFIG_REFINEMENT_WORKERS; i++)
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, this, g, false, done, G));
+    }
+    std::cout << "Found canonical leaf." << std::endl;
+
+    int abort_counter = 0;
+    int sampled_paths = 0;
+    int sampled_paths_all = 0;
+    int restarts = 0;
+
+    // sample for automorphisms
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                      MASTER THREAD
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if(master) {
+        // initialize automorphism group
+        G->launch_pipeline_threads(done);
+        G->pipeline_stage(0, done);
+        // run algorithm
+        std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
+        std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
+        std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
+        //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
+        //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
+        std::cout << "Base size:  " << G->base_size << std::endl;
+        std::cout << "Group size: ";
+        G->print_group_size();
+        G->join_threads();
+        while(!work_threads.empty()) {
+            work_threads[work_threads.size()-1].join();
+            work_threads.pop_back();
+        }
+        delete G;
+    } else {
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //                                                      SLAVE THREAD
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
+        while(!(*done)) {
+            bijection automorphism;
+            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
+            G->add_permutation(&automorphism);
         }
         return;
     }

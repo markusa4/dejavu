@@ -11,6 +11,7 @@
 //#include "nauty/schreier.h"
 
 #include "my_schreier.h"
+#include "concurrentqueue.h"
 
 
 class sequential_group {
@@ -19,8 +20,8 @@ public:
     int base_size;
     int* b;
     int added;
-    schreier *gp;
-    permnode *gens;
+    mschreier *gp;
+    mpermnode *gens;
     sequential_group(int domain_size, bijection* base_points);
     ~sequential_group();
     bool add_permutation(bijection* p);

@@ -11,6 +11,7 @@
 #include "invariant.h"
 #include "concurrentqueue.h"
 #include "invariant_acc.h"
+#include "pipeline_group.h"
 
 class auto_blaster {
     moodycamel::ConcurrentQueue<bijection> Q;
@@ -22,6 +23,8 @@ public:
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
                            std::default_random_engine *re, int *restarts, bool* done);
+
+    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G);
 };
 
 

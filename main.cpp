@@ -7,6 +7,7 @@
 #include <assert.h>
 #include "nauty/traces.h"
 #include "nauty/naugroup.h"
+#include "configuration.h"
 #include <chrono>
 
 typedef std::chrono::high_resolution_clock Clock;
@@ -68,7 +69,7 @@ void bench_traces(sgraph* g) {
 }
 
 
-int main() {
+int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
@@ -76,13 +77,14 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-2000.bliss", &g);
+    p.parse_dimacs_file(argv[1], &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-50", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/5pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
     // canonically label the sgraph
@@ -94,7 +96,11 @@ int main() {
     Clock::time_point timer = Clock::now();
     auto_blaster A;
     bool done = false;
-    A.sample(&g, true, &done);
+    if(CONFIG_SIFT_PIPELINE_DEPTH <= 0) {
+        A.sample(&g, true, &done);
+    } else {
+        A.sample_pipelined(&g, true, &done, nullptr);
+    }
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
 

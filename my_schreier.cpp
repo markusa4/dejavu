@@ -14,28 +14,25 @@
 #include <mutex>
 #include "my_schreier.h"
 
-long mmultcount = 0;
-long mfiltercount = 0;
+//long mmultcount = 0;
+//long mfiltercount = 0;
 
 std::mutex circ_mutex;
 
-static permnode id_permnode;
+static mpermnode id_permnode;
 /* represents identity, no actual content, doesn't need TLS_ATTR */
 #define ID_PERMNODE (&id_permnode)
 
-static TLS_ATTR schreier *mschreier_freelist = NULL;
+static TLS_ATTR mschreier *mschreier_freelist = NULL;
 /* Freelist of scheier structures connected by next field.
      * vec, pwr and orbits fields are assumed allocated. */
-static TLS_ATTR permnode *mpermnode_freelist = NULL;
+static TLS_ATTR mpermnode *mpermnode_freelist = NULL;
 /* Freelist of permnode structures connected by next field.
      * p[] is assumed extended. */
 
 static TLS_ATTR int mschreierfails = SCHREIERFAILS;
 
 #define TMP
-
-static boolean mfilterschreier(schreier *, int *, permnode **, boolean, int, int);
-static boolean mfilterschreier_interval(schreier *, int *, permnode **, boolean, int, int, int, int, filterstate* state);
 
 #define PNCODE(x) ((int)(((size_t)(x)>>3)&0xFFFUL))
 
@@ -50,7 +47,7 @@ mtestispermutation(int id, int *p, int n)
    not a permutation. */
 {
     int i, m;
-    DYNALLSTAT(set, seen, seen_sz);
+    DYNALLSTAT_NOSTATIC(set, seen, seen_sz);
 
     for (i = 0; i < n; ++i)
         if (p[i] < 0 || p[i] > n) break;
@@ -100,8 +97,8 @@ static void
 mclearfreelists(void)
 /* Clear the schreier and permnode freelists */
 {
-    schreier *sh, *nextsh;
-    permnode *p, *nextp;
+    mschreier *sh, *nextsh;
+    mpermnode *p, *nextp;
 
     nextsh = mschreier_freelist;
     while (nextsh) {
@@ -125,11 +122,11 @@ mclearfreelists(void)
 
 /************************************************************************/
 
-static permnode
+static mpermnode
 *mnewpermnode(int n)
 /* Allocate a new permode structure, with initialized next/prev fields */
 {
-    permnode *p;
+    mpermnode *p;
 
     while (mpermnode_freelist) {
         p = mpermnode_freelist;
@@ -142,7 +139,7 @@ static permnode
             free(p);
     }
 
-    p = (permnode *) malloc(sizeof(permnode) + (n - 2) * sizeof(int));
+    p = (mpermnode *) malloc(sizeof(mpermnode) + (n - 2) * sizeof(int));
 
     if (p == NULL) {
         fprintf(ERRFILE, ">E malloc failed in newpermnode()\n");
@@ -157,11 +154,11 @@ static permnode
 
 /************************************************************************/
 
-static schreier
+static mschreier
 *mnewschreier(int n)
 /* Allocate a new schreier structure, with initialised next field */
 {
-    schreier *sh;
+    mschreier *sh;
 
     while (mschreier_freelist) {
         sh = mschreier_freelist;
@@ -177,14 +174,14 @@ static schreier
         }
     }
 
-    sh = (schreier *) malloc(sizeof(schreier));
+    sh = (mschreier *) malloc(sizeof(mschreier));
 
     if (sh == NULL) {
         fprintf(ERRFILE, ">E malloc failed in newschreier()\n");
         exit(1);
     }
 
-    sh->vec = (permnode **) malloc(sizeof(permnode *) * n);
+    sh->vec = (mpermnode **) malloc(sizeof(mpermnode *) * n);
     sh->pwr = (int *) malloc(sizeof(int) * n);
     sh->orbits = (int *) malloc(sizeof(int) * n);
 
@@ -202,12 +199,12 @@ static schreier
 /************************************************************************/
 
 void
-mfreeschreier(schreier **gp, permnode **gens)
+mfreeschreier(mschreier **gp, mpermnode **gens)
 /* Free schreier structure and permutation ring.  Assume this is everything. */
 /* Use NULL for arguments which don't need freeing. */
 {
-    schreier *sh, *nextsh;
-    permnode *p, *nextp;
+    mschreier *sh, *nextsh;
+    mpermnode *p, *nextp;
 
     if (gp && *gp) {
         nextsh = *gp;
@@ -234,12 +231,12 @@ mfreeschreier(schreier **gp, permnode **gens)
 
 /************************************************************************/
 
-permnode *
-mfindpermutation(permnode *pn, int *p, int n)
+mpermnode *
+mfindpermutation(mpermnode *pn, int *p, int n)
 /* Return a pointer to permutation p in the circular list,
  * or NULL if it isn't present. */
 {
-    permnode *rn;
+    mpermnode *rn;
     int i;
 
     if (!pn) return NULL;
@@ -258,17 +255,17 @@ mfindpermutation(permnode *pn, int *p, int n)
 /************************************************************************/
 
 void
-maddpermutation(permnode **ring, int *p, int n)
+maddpermutation(mpermnode **ring, int *p, int n)
 /* Add new permutation to circular list, marked.
  * and return pointer to it in *ring. */
 {
-    permnode *pn, *rn;
+    mpermnode *pn, *rn;
 
+    circ_mutex.lock();
     pn = mnewpermnode(n);
     rn = *ring;
 
     memcpy(pn->p, p, n * sizeof(int));
-    circ_mutex.lock();
     if (!rn)
         pn->next = pn->prev = pn;
     else {
@@ -286,7 +283,7 @@ maddpermutation(permnode **ring, int *p, int n)
 /************************************************************************/
 
 static void
-maddpermutationunmarked(permnode **ring, int *p, int n)
+maddpermutationunmarked(mpermnode **ring, int *p, int n)
 /* Add new permutation to circular list, not marked.
  * and return pointer to it in *ring. */
 {
@@ -298,7 +295,7 @@ maddpermutationunmarked(permnode **ring, int *p, int n)
 /************************************************************************/
 
 boolean
-maddgenerator(schreier **gp, permnode **ring, int *p, int n)
+maddgenerator(mschreier **gp, mpermnode **ring, int *p, int n)
 /* Add new permutation to group, unless it is discovered to be
  * already in the group.  It is is possible to be in the group
  * and yet this fact is not discovered.
@@ -315,7 +312,7 @@ maddgenerator(schreier **gp, permnode **ring, int *p, int n)
 /************************************************************************/
 
 boolean
-mcondaddgenerator(schreier **gp, permnode **ring, int *p, int n)
+mcondaddgenerator(mschreier **gp, mpermnode **ring, int *p, int n)
 /* Add new permutation to group, unless it is discovered to be
  * already in the group.  It is is possible to be in the group
  * and yet this fact is not discovered, but this version will
@@ -333,10 +330,10 @@ mcondaddgenerator(schreier **gp, permnode **ring, int *p, int n)
 /************************************************************************/
 
 static void
-mdelpermnode(permnode **ring)
+mdelpermnode(mpermnode **ring)
 /* Delete permnode at head of circular list, making the next node head. */
 {
-    permnode *newring;
+    mpermnode *newring;
 
     if (!*ring) return;
 
@@ -357,10 +354,10 @@ mdelpermnode(permnode **ring)
 /************************************************************************/
 
 void
-mdeleteunmarked(permnode **ring)
+mdeleteunmarked(mpermnode **ring)
 /* Delete all permutations in the ring that are not marked */
 {
-    permnode *pn, *firstmarked;
+    mpermnode *pn, *firstmarked;
 
     pn = *ring;
     firstmarked = NULL;
@@ -379,7 +376,7 @@ mdeleteunmarked(permnode **ring)
 /************************************************************************/
 
 static void
-mclearvector(permnode **vec, permnode **ring, int n)
+mclearvector(mpermnode **vec, mpermnode **ring, int n)
 /* clear vec[0..n-1], freeing permnodes that have no other references
  * and are not marked */
 {
@@ -401,7 +398,7 @@ mclearvector(permnode **vec, permnode **ring, int n)
 /************************************************************************/
 
 static void
-minitschreier(schreier *sh, int n)
+minitschreier(mschreier *sh, int n)
 /* Initialise schreier structure to trivial orbits and empty vector */
 {
     int i;
@@ -416,7 +413,7 @@ minitschreier(schreier *sh, int n)
 /************************************************************************/
 
 void
-mnewgroup(schreier **sh, permnode **ring, int n)
+mnewgroup(mschreier **sh, mpermnode **ring, int n)
 /* Make the trivial group, allow for ring to be set elsewhere */
 {
     *sh = mnewschreier(n);
@@ -448,7 +445,7 @@ mapplyperm(int *wp, int *p, int k, int n)
         else if (k == 5)
             for (i = 0; i < n; ++i) wp[i] = p[p[p[p[p[wp[i]]]]]];
     } else if (k <= 19) {
-        DYNALLSTAT(int, mworkpermA, mworkpermA_sz);
+        DYNALLSTAT_NOSTATIC(int, mworkpermA, mworkpermA_sz);
         DYNALLOC1(int, mworkpermA, mworkpermA_sz, n, "applyperm");
         for (i = 0; i < n; ++i) mworkpermA[i] = p[p[p[i]]];
         for (; k >= 6; k -= 6)
@@ -466,9 +463,9 @@ mapplyperm(int *wp, int *p, int k, int n)
         DYNFREE(mworkpermA, mworkpermA_sz);
     } else {
         m = SETWORDSNEEDED(n);
-        DYNALLSTAT(int, mworkpermA, mworkpermA_sz);
-        DYNALLSTAT(int, mworkpermB, mworkpermB_sz);
-        DYNALLSTAT(set, mworkset2, mworkset2_sz);
+        DYNALLSTAT_NOSTATIC(int, mworkpermA, mworkpermA_sz);
+        DYNALLSTAT_NOSTATIC(int, mworkpermB, mworkpermB_sz);
+        DYNALLSTAT_NOSTATIC(set, mworkset2, mworkset2_sz);
         DYNALLOC1(int, mworkpermA, mworkpermA_sz, n, "applyperm");
         DYNALLOC1(int, mworkpermB, mworkpermB_sz, n, "applyperm");
         DYNALLOC1(set, mworkset2, mworkset2_sz, m, "applyperm");
@@ -505,8 +502,7 @@ mapplyperm(int *wp, int *p, int k, int n)
 
 /************************************************************************/
 
-static boolean
-mfilterschreier(schreier *gp, int *p, permnode **ring,
+boolean mfilterschreier(mschreier *gp, int *p, mpermnode **ring,
                 boolean ingroup, int maxlevel, int n)
 /* Filter permutation p up to level maxlevel of gp.
  * Use ingroup=TRUE if p is known to be in the group, otherwise
@@ -517,15 +513,15 @@ mfilterschreier(schreier *gp, int *p, permnode **ring,
 {
     int i, j, j1, j2, lev;
     int ipwr;
-    schreier *sh;
+    mschreier *sh;
     int *orbits, *pwr;
-    permnode **vec, *curr;
+    mpermnode **vec, *curr;
     boolean changed, lchanged, ident;
 
-    DYNALLSTAT(int, mworkperm, mworkperm_sz);
+    DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
 
-    ++mfiltercount;
+    //++mfiltercount;
 
     memcpy(mworkperm, p, n * sizeof(int));
 
@@ -591,7 +587,7 @@ mfilterschreier(schreier *gp, int *p, permnode **ring,
 
             while (j != sh->fixed) {
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
-                ++mmultcount;
+               // ++mmultcount;
                 curr = NULL;
                 j = mworkperm[sh->fixed];
             }
@@ -612,8 +608,7 @@ mfilterschreier(schreier *gp, int *p, permnode **ring,
 /************************************************************************/
 
 
-static boolean
-mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
+boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                 boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state)
 /* Interval version for pipelining:
  * if startlevel = 0,        initialize all DS
@@ -629,19 +624,19 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
 {
     int i, j, j1, j2, lev;
     int ipwr;
-    schreier *sh;
+    mschreier *sh;
     int *orbits, *pwr;
     bool loop_break;
-    permnode **vec, *curr;
+    mpermnode **vec, *curr;
     boolean changed, lchanged, ident;
 
-    DYNALLSTAT(int, mworkperm, mworkperm_sz);
+    DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     if (maxlevel < 0) maxlevel = n + 1;
 
     if(startlevel == 0) {
         DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
 
-        ++mfiltercount;
+        //++mfiltercount;
 
         memcpy(mworkperm, p, n * sizeof(int));
 
@@ -665,6 +660,8 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
         ident = state->ident ;
         assert(state->level == startlevel - 1);
         loop_break = state->loop_break;
+        mworkperm = state->workperm;
+        mworkperm_sz = state->workperm_sz;
     }
 
     for (lev = startlevel; lev <= endlevel; ++lev) {
@@ -718,12 +715,12 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
 
             while (j != sh->fixed) {
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
-                ++mmultcount;
+                //++mmultcount;
                 curr = NULL;
                 j = mworkperm[sh->fixed];
             }
             sh = sh->next;
-        } else{
+        } else {
             loop_break = true;
             break;
         }
@@ -738,6 +735,7 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
         DYNFREE(mworkperm, mworkperm_sz);
         return changed;
     } else {
+        //assert(false);
         state->sh   = sh;
         state->orbits = orbits;
         state->pwr  = pwr;
@@ -748,6 +746,8 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
         state->ident    = ident;
         state->level = endlevel;
         state->loop_break = loop_break;
+        state->workperm = mworkperm;
+        state->workperm_sz = mworkperm_sz;
         return true;
     }
 }
@@ -755,18 +755,18 @@ mfilterschreier_interval(schreier *gp, int *p, permnode **ring,
 /************************************************************************/
 
 boolean
-mexpandschreier(schreier *gp, permnode **ring, int n)
+mexpandschreier(mschreier *gp, mpermnode **ring, int n)
 /* filter random elements until schreierfails failures.
  * Return true if it ever expanded. */
 {
     int i, j, nfails, wordlen, skips;
     boolean changed;
-    permnode *pn;
+    mpermnode *pn;
 
     pn = *ring;
     if (pn == NULL) return FALSE;
 
-    DYNALLSTAT(int, mworkperm2, mworkperm2_sz);
+    DYNALLSTAT_NOSTATIC(int, mworkperm2, mworkperm2_sz);
     DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
 
     nfails = 0;
@@ -795,8 +795,49 @@ mexpandschreier(schreier *gp, permnode **ring, int n)
 
 /************************************************************************/
 
+bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_element* element)
+/* filter random elements until schreierfails failures.
+ * Return true if it ever expanded. */
+{
+    int i, j, wordlen, skips;
+    boolean changed;
+    mpermnode *pn;
+
+    pn = *ring;
+    if (pn == NULL) return false;
+
+    circ_mutex.lock();
+    DYNALLSTAT_NOSTATIC(int, mworkperm2, mworkperm2_sz);
+    DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
+
+    element->perm    = mworkperm2;
+    element->perm_sz = mworkperm2_sz;
+
+    changed = FALSE;
+
+    for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
+
+    memcpy(mworkperm2, pn->p, n * sizeof(int));
+
+
+    wordlen = 1 + KRAN(3);
+    for (j = 0; j < wordlen; ++j) {
+        for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
+        for (i = 0; i < n; ++i) mworkperm2[i] = pn->p[mworkperm2[i]];
+    }
+
+    circ_mutex.unlock();
+    return true;
+}
+
+void free_random_element(random_element* r) {
+    DYNFREE(r->perm, r->perm_sz);
+}
+
+/************************************************************************/
+
 int *
-mgetorbits(int *fix, int nfix, schreier *gp, permnode **ring, int n)
+mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
 /* Get a pointer to the orbits for this partial base. The pointer
  * remains valid until pruneset(), getorbits(), getorbitsmin()
  * or grouporder() is called with an incompatible base (neither a
@@ -805,7 +846,7 @@ mgetorbits(int *fix, int nfix, schreier *gp, permnode **ring, int n)
  */
 {
     int k;
-    schreier *sh, *sha;
+    mschreier *sh, *sha;
 
     sh = gp;
     for (k = 0; k < nfix; ++k) {
@@ -838,11 +879,11 @@ mgetorbits(int *fix, int nfix, schreier *gp, permnode **ring, int n)
 
 /************************************************************************/
 int
-mschreier_gens(permnode *ring)
+mschreier_gens(mpermnode *ring)
 /* Returns the number of generators in the ring */
 {
     int j;
-    permnode *pn;
+    mpermnode *pn;
 
     if (!ring) j = 0;
     else for (j = 1, pn = ring->next; pn != ring; pn = pn->next) ++j;
@@ -851,18 +892,18 @@ mschreier_gens(permnode *ring)
 }
 
 void
-mgrouporder(int *fix, int nfix, schreier *gp, permnode **ring,
+mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
             double *grpsize1, int *grpsize2, int n)
 /* process the base like in getorbits(), then return the product of the
  * orbits along the base, using the largest orbit at the end if the
  * base is not complete.
 */
 {
-    schreier *sh;
+    mschreier *sh;
     int i, j, k, fx;
     int *orb;
 
-    DYNALLSTAT(int, mworkperm, mworkperm_sz);
+    DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
 
     mgetorbits(fix, nfix, gp, ring, n);
