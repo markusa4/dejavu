@@ -31,6 +31,17 @@ typedef struct schreierlevel
     permnode *marker;              /* points to marker for this level */
 } schreier;
 
+
+typedef struct filterstatestruct {
+    int level;
+    bool loop_break;
+    schreier *sh;
+    int *orbits, *pwr;
+    permnode **vec, *curr;
+    boolean changed, lchanged, ident;
+    bool ingroup;
+} filterstate;
+
 #define SCHREIERFAILS 10
 /* Default number of Schreier failures before giving up. */
 

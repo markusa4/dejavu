@@ -76,7 +76,7 @@ int main() {
     // parse a sgraph
     parser p;
     sgraph g;
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-2000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
