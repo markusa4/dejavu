@@ -261,7 +261,6 @@ maddpermutation(mpermnode **ring, int *p, int n)
 {
     mpermnode *pn, *rn;
 
-    circ_mutex.lock();
     pn = mnewpermnode(n);
     rn = *ring;
 
@@ -277,7 +276,6 @@ maddpermutation(mpermnode **ring, int *p, int n)
     pn->refcount = 0;
     pn->mark = 1;
     *ring = pn;
-    circ_mutex.unlock();
 }
 
 /************************************************************************/
@@ -423,7 +421,7 @@ mnewgroup(mschreier **sh, mpermnode **ring, int n)
 
 /************************************************************************/
 
-static void
+void
 mapplyperm(int *wp, int *p, int k, int n)
 /* Apply the permutation p, k times to each element of wp */
 {
@@ -699,6 +697,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
 
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
+                        circ_mutex.lock();
                         if (!curr) {
                             if (!ingroup) maddpermutation(ring, mworkperm, n);
                             else maddpermutationunmarked(ring, mworkperm, n);
@@ -708,12 +707,17 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                         vec[j] = curr;
                         pwr[j] = ipwr--;
                         ++curr->refcount;
+                        circ_mutex.unlock();
                     }
                 }
 
             j = mworkperm[sh->fixed];
-
+                int test__ = 0;
             while (j != sh->fixed) {
+                test__ += 1;
+                if(test__ == 1000) {
+                    std::cout << "probably infinite loop" << std::endl;
+                }
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                 //++mmultcount;
                 curr = NULL;
@@ -803,10 +807,13 @@ bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_elem
     boolean changed;
     mpermnode *pn;
 
-    pn = *ring;
-    if (pn == NULL) return false;
-
     circ_mutex.lock();
+    pn = *ring;
+    if (pn == NULL) {
+        circ_mutex.unlock();
+        return false;
+    }
+
     DYNALLSTAT_NOSTATIC(int, mworkperm2, mworkperm2_sz);
     DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
 
@@ -845,6 +852,7 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
  * MUST NOT BE MODIFIED by the calling program.
  */
 {
+    circ_mutex.lock();
     int k;
     mschreier *sh, *sha;
 
@@ -854,7 +862,10 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
         sh = sh->next;
     }
 
-    if (k == nfix) return sh->orbits;
+    if (k == nfix)  {
+        circ_mutex.unlock();
+        return sh->orbits;
+    }
 
     sh->fixed = fix[k];
     mclearvector(sh->vec, ring, n);
@@ -874,6 +885,7 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
     }
 
     if (*ring) mexpandschreier(gp, ring, n);
+    circ_mutex.unlock();
     return sh->orbits;
 }
 

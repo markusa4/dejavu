@@ -129,7 +129,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
                 if(back_idle_ms % 10000 == 0) {
-                    std::cout << "Pipeline(" << n << ") back idle " << front_idle_ms << ", "
+                    std::cout << "Pipeline(" << n << ") back idle " << back_idle_ms << ", "
                               << pipeline_queues[n + 1].size_approx() << std::endl;
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
