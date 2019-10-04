@@ -25,6 +25,10 @@ public:
                            std::default_random_engine *re, int *restarts, bool* done);
 
     void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G);
+
+    void
+    find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
+                         std::default_random_engine *re, int *restarts, bool *done);
 };
 
 

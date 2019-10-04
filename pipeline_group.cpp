@@ -119,7 +119,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         if (is_last_stage) {
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup, result));
         } else {
-            while(pipeline_queues[n + 1].size_approx() > 50) {
+            while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 back_idle_ms += 1;
             }
@@ -129,9 +129,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }
 
-bool pipeline_group::add_permutation(bijection *p, int* idle_ms) {
+bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
     //std::cout << "enqueued" << std::endl;
-    while(automorphisms.size_approx() > 50) {
+    while(automorphisms.size_approx() > 50 && (!(*done))) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
         *idle_ms += 1;
     }

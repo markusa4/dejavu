@@ -31,7 +31,7 @@ public:
     pipeline_group();
     void initialize(int domain_size, bijection *base_points, int stages);
     ~pipeline_group();
-    bool add_permutation(bijection* p, int* idle_ms);
+    bool add_permutation(bijection* p, int* idle_ms, bool* done);
     void print_group_size();
     void pipeline_stage(int n, bool* done);
     void launch_pipeline_threads(bool *done);

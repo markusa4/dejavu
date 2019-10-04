@@ -130,6 +130,112 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     }
 }
 
+void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
+    bool backtrack = true;
+    std::set<std::pair<int, int>> changes;
+    refinement R;
+    selector S;
+    coloring c;
+    invariant I;
+    std::list<int> init_color_class;
+    *restarts -= 1;
+    ir_operation last_op;
+
+    trail T(g->v.size());
+    c = start_c;
+    I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
+    init_color_class.clear();
+    last_op = OP_R;
+    backtrack = false;
+
+    while (true) {
+        if (backtrack) {
+            // initialize a search state
+            if(*done) {
+                return;
+            }
+            if(*restarts >= 0) {
+                //std::cout << "Restart." << *restarts << std::endl;
+            }
+        }
+
+        int s;
+        if (!backtrack) {
+            s = S.select_color(g, &c);
+            if (s == -1) {
+                if (compare) {
+                    assert(I.level_is_eq(canon_I, I.current_level()));
+                    I.push_level();
+                    //R.complete_colorclass_invariant(g, &c, &I);
+                    if (!I.level_is_eq(canon_I, I.current_level())) {
+                        assert(false);
+                        I.pop_level();
+                        backtrack = true;
+                        continue;
+                    }
+                    // we can derive an automorphism!
+                    bijection leaf;
+                    leaf.read_from_coloring(&c);
+                    *automorphism = leaf;
+                    automorphism->inverse();
+                    automorphism->compose(*canon_leaf);
+                    //std::cout << "Found automorphism." << *restarts << std::endl;
+                    assert(g->certify_automorphism(*automorphism));
+                    return;
+                } else {
+                    I.push_level();
+                    //R.complete_colorclass_invariant(g, &c, &I);
+                    canon_leaf->read_from_coloring(&c);
+                    *canon_I = I;
+                    return;
+                }
+            }
+        }
+
+        if (last_op == OP_I) { // add new operations to trail...
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                                REFINEMENT
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            changes.clear();
+            I.push_level();
+            //assert(init_color_class.size() == 2);
+            R.refine_coloring(g, &c, &changes, &I, &init_color_class);
+            //R.complete_colorclass_invariant(g, &c, &I);
+            last_op = OP_R;
+            if (compare) {
+                // compare invariant
+                if (I.level_is_eq(canon_I, I.current_level())) {
+                    continue;
+                } else {
+                    backtrack = true;
+                    continue;
+                }
+            }
+        } else if (last_op == OP_R) {
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                             INDIVIDUALIZATION
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // collect all elements of color s
+            init_color_class.clear();
+            int rpos = s + ((*re)() % (c.ptn[s] + 1));
+            int v = c.lab[rpos];
+            // individualize random vertex of class
+            R.individualize_vertex(g, &c, v);
+            last_op = OP_I;
+            assert(init_color_class.empty());
+            int labpos = c.vertex_to_lab[v];
+            assert(labpos == c.vertex_to_col[v]);
+            init_color_class.push_back(labpos);
+            assert(c.vertex_to_col[v] > 0);
+            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+            if (!compare) {
+                automorphism->map.push_back(v);
+            }
+        }
+    }
+}
+
+
 void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     // find comparison leaf
     //std::cout << &g << ", " << this << std::endl;
@@ -294,7 +400,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         while(!(*done)) {
             bijection automorphism;
             find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
-            G->add_permutation(&automorphism, &idle_ms);
+            G->add_permutation(&automorphism, &idle_ms, done);
         }
         std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
