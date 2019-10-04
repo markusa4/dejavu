@@ -163,6 +163,7 @@ void pipeline_group::initialize(int domain_size, bijection *base_points, int sta
     determine_stages();
 }
 
+// ToDo: do this better, more drastic towards start
 void pipeline_group::determine_stages() {
     std::cout << "Pipeline: ";
     for(int i = 0; i < stages; ++i) {

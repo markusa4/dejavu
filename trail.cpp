@@ -4,17 +4,19 @@
 
 #include <assert.h>
 #include <iostream>
+#include <algorithm>
+#include <random>
 #include "trail.h"
 
-void trail::push_op_r(std::set<std::pair<int, int>>* color_class_changes) {
+void trail::push_op_r(std::list<std::pair<int, int>>* color_class_changes) {
     trail_operation.push(OP_R);
-    trail_color_class_changes.push(std::set<std::pair<int, int>>());
+    trail_color_class_changes.push(std::list<std::pair<int, int>>());
     trail_color_class_changes.top().swap(*color_class_changes);
 }
 
-void trail::push_op_i(std::deque<int>* individualizaiton_todo, int v) {
+void trail::push_op_i(std::list<int>* individualizaiton_todo, int v) {
     trail_operation.push(OP_I);
-    trail_op_i_class.push(std::deque<int>());
+    trail_op_i_class.push(std::list<int>());
     trail_op_i_class.top().swap(*individualizaiton_todo);
     push_op_i_v(v);
 }
@@ -30,7 +32,7 @@ ir_operation trail::last_op() {
     return trail_operation.top();
 }
 
-std::set<std::pair<int, int>>& trail::top_op_r() {
+std::list<std::pair<int, int>>& trail::top_op_r() {
     return trail_color_class_changes.top();
 }
 
@@ -39,8 +41,11 @@ void trail::pop_op_r() {
     trail_color_class_changes.pop();
 }
 
-std::deque<int>& trail::top_op_i_class() {
+std::list<int>& trail::top_op_i_class() {
     return trail_op_i_class.top();
+}
+void trail::shuffle_top_i_class(std::default_random_engine* re) {
+    //std::shuffle(trail_op_i_class.top().begin(), trail_op_i_class.top().end(), *re);
 }
 
 void trail::pop_op_i_class() {

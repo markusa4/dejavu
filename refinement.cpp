@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <algorithm>
 
-void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class) {
+void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes) {
     //std::cout << "Refining..." << std::endl;
     if(!initialized) {
         counting_array.initialize(g->v.size(), c);
@@ -54,6 +54,8 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::set<std::pair<int,
         // add all new classes except for the first, largest one
         int skip = 0;
         for(auto cc = color_class_splits.begin(); cc != color_class_splits.end(); ++cc) {
+            if(track_changes)
+                changes->push_back(*cc);
             int old_class    = cc->first;
             int new_class    = cc->second;
             int new_class_sz = c->ptn[new_class] + 1;
@@ -212,12 +214,13 @@ void refinement::undo_individualize_vertex(sgraph *g, coloring *c, int v) {
 
     c->ptn[new_color] += 1;
     c->vertex_to_col[v] = new_color;
+    assert(c->ptn[new_color] > 0);
     if(c->ptn[pos - 1] == 0) {
         c->ptn[pos - 1] = 1;
     }
 }
 
-void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::set<std::pair<int, int>> *changes) {
+void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes) {
     std::queue<int> reset_ends;
     for(auto p = changes->begin(); p != changes->end(); ++p) {
         int old_color = c->vertex_to_col[c->lab[p->first]];
@@ -278,6 +281,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     std::vector<int> neighbour_col_canon;
     std::vector<int> neighbour_col;
     bool first_of_color = true;
+    bool test = true;
 
     for(int i = 0; i < g->v.size(); ++i) {
         neighbour_col.clear();
@@ -291,7 +295,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
             neighbour_col_canon.swap(neighbour_col);
         } else {
             for (auto j = 0; j < neighbour_col.size(); ++j) {
-                assert(neighbour_col[j] == neighbour_col_canon[j]);
+                test = test && (neighbour_col[j] == neighbour_col_canon[j]);
             }
         }
 
@@ -309,14 +313,14 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
         }
         if(expect0 == 0) {
             //std::cout << i << " ";
-            assert(c->ptn[i] == 0);
+            test = test && (c->ptn[i] == 0);
             expectsize = true;
         } else {
-            assert(c->ptn[i] > 0);
+            test = test && (c->ptn[i] > 0);
         }
         expect0 -= 1;
     }
-    return true;
+    return test;
 }
 
 refinement::~refinement() {
