@@ -73,6 +73,5 @@ int selector::select_color(sgraph *g, coloring *c, int seed) {
         case 3:
         default:
             return select_color_first(g, c);
-
     }
 }

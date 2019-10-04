@@ -24,6 +24,7 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         largest_color_class_index = new int[c->lab.size()];
     }
     counting_array.set_coloring(c);
+    std::list<std::pair<int, int>> color_class_splits;
     std::queue<std::pair<int, int>> worklist_color_classes;
 
     if(init_color_class->empty()) {
@@ -39,7 +40,7 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     }
 
     while(!worklist_color_classes.empty()) {
-        std::list<std::pair<int, int>> color_class_splits;
+        color_class_splits.clear(); // <- 2%
         std::pair<int, int> next_color_class = worklist_color_classes.front();
         worklist_color_classes.pop();
 
@@ -76,7 +77,7 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     // ToDo: can replace worklists with fixed size arrays
     //std::list<std::pair<int, int>> color_set_worklist;
     std::set<int> new_colors;
-    std::list<std::pair<int, int>> old_color_classes;
+    std::vector<std::pair<int, int>> old_color_classes;
 
     int cc = color_class; // iterate over color class
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
@@ -148,7 +149,8 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    old_color_classes.sort();
+    std::sort(old_color_classes.begin(), old_color_classes.end());
+    //old_color_classes.sort();
 
     for(auto it = old_color_classes.begin(); it != old_color_classes.end(); ++it) {
         int largest_color_class      = -1;
@@ -159,8 +161,8 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             assert(c->ptn[i] + 1 > 0);
             int v_color  = i;
             int v_degree = counting_array.get_count(c->lab[i]);
-            I->write_top(-40);
-            I->write_top(v_color);
+            //I->write_top(-40);
+            I->write_top(-v_color);
             I->write_top(v_degree);
             I->write_top(c->ptn[i] + 1);
             if(!(i == it->first && c->ptn[i] + 1== it->second)) {

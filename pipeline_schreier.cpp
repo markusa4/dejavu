@@ -712,12 +712,12 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                 }
 
             j = mworkperm[sh->fixed];
-                int test__ = 0;
+                //int test__ = 0;
             while (j != sh->fixed) {
-                test__ += 1;
+                /*test__ += 1;
                 if(test__ == 1000) {
                     std::cout << "probably infinite loop" << std::endl;
-                }
+                }*/
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                 //++mmultcount;
                 curr = NULL;
