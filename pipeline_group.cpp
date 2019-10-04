@@ -167,7 +167,7 @@ void pipeline_group::determine_stages() {
     std::cout << "Pipeline: ";
     for(int i = 0; i < stages; ++i) {
         pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>());
-        intervals.push_back((base_size / stages) * (i + 1) - ((base_size / (stages* 2))));
+        intervals.push_back((base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2)))));
         std::cout << "/" << intervals[intervals.size() - 1];
     }
     std::cout << "(" <<  domain_size + 1 << ")" << std::endl;

@@ -238,7 +238,6 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
 
 void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     // find comparison leaf
-    //std::cout << &g << ", " << this << std::endl;
     invariant canon_I;
     std::vector<std::thread> work_threads;
     bijection canon_leaf;
