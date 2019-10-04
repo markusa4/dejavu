@@ -2,8 +2,8 @@
 // Created by markus on 01.10.19.
 //
 
-#ifndef DEJAVU_MY_SCHREIER_H
-#define DEJAVU_MY_SCHREIER_H
+#ifndef DEJAVU_PIPELINE_SCHREIER_H
+#define DEJAVU_PIPELINE_SCHREIER_H
 
 #include "nauty/nauty.h"
 #include "nauty/naurng.h"
@@ -92,4 +92,4 @@ extern void mschreier_check(int wordsize, int m, int n, int version);
 }
 #endif
 
-#endif //DEJAVU_MY_SCHREIER_H
+#endif //DEJAVU_PIPELINE_SCHREIER_H

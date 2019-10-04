@@ -20,6 +20,8 @@ void pipeline_group::join_threads() {
 }
 
 void pipeline_group::pipeline_stage(int n, bool* done) {
+    int front_idle_ms = 0;
+    int back_idle_ms  = 0;
     int abort_counter = 0;
     int random_abort_counter = 0;
 
@@ -68,7 +70,8 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             d = automorphisms.try_dequeue(p);
             // automorphisms non-empty? take that element
             while(!d && random_abort_counter >= 5) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                front_idle_ms += 1;
                 d = automorphisms.try_dequeue(p);
             }
 
@@ -95,7 +98,8 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             // take element from intermediate queue
             bool d = pipeline_queues[n].try_dequeue(state);
             while (!d && (!(*done))) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                front_idle_ms += 1;
                 d = pipeline_queues[n].try_dequeue(state);
             }
             if(*done) {break;}
@@ -115,18 +119,30 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         if (is_last_stage) {
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup, result));
         } else {
+            while(pipeline_queues[n + 1].size_approx() > 50) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                back_idle_ms += 1;
+            }
             pipeline_queues[n + 1].enqueue(state);
         }
     }
+    std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }
 
-bool pipeline_group::add_permutation(bijection *p) {
+bool pipeline_group::add_permutation(bijection *p, int* idle_ms) {
     //std::cout << "enqueued" << std::endl;
+    while(automorphisms.size_approx() > 50) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        *idle_ms += 1;
+    }
     automorphisms.enqueue(*p);
     return true;
 }
 
-pipeline_group::pipeline_group(int domain_size, bijection *base_points, int stages) {
+pipeline_group::pipeline_group() {
+}
+
+void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
     mschreier_fails(1);
     added = 0;
     this->domain_size = domain_size;
@@ -144,11 +160,15 @@ pipeline_group::pipeline_group(int domain_size, bijection *base_points, int stag
     mgetorbits(b, base_size, gp, &gens, domain_size);
 
     // create pipeline
+    determine_stages();
+}
+
+void pipeline_group::determine_stages() {
     std::cout << "Pipeline: ";
     for(int i = 0; i < stages; ++i) {
         pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>());
-        intervals.push_back((base_size / stages) * (i + 1));
-        std::cout << "/" << (base_size / stages) * (i + 1);
+        intervals.push_back((base_size / stages) * (i + 1) - ((base_size / (stages* 2))));
+        std::cout << "/" << intervals[intervals.size() - 1];
     }
     std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
     intervals[stages - 1] = domain_size + 1;

@@ -222,7 +222,6 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
                 if(Q.size_approx() < 100) {
                     std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 } else {
-                    std::cout << "Throttle" << std::endl;
                     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
             }
@@ -249,8 +248,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         g->initialize_coloring(&start_c);
         std::list<int> init_color_class;
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class);
-        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
-        G = new pipeline_group(g->v.size(), &base_points, CONFIG_SIFT_PIPELINE_DEPTH);
+        G = new pipeline_group();
         std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < CONFIG_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, this, g, false, done, G));
@@ -268,6 +266,8 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
+        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
+        G->initialize(g->v.size(), &base_points, CONFIG_SIFT_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
         // run algorithm
@@ -289,12 +289,14 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         //                                                      SLAVE THREAD
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        int idle_ms = 0;
         find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
         while(!(*done)) {
             bijection automorphism;
             find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
-            G->add_permutation(&automorphism);
+            G->add_permutation(&automorphism, &idle_ms);
         }
+        std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
     }
 }

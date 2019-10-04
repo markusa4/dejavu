@@ -10,7 +10,7 @@
 // #include "nauty/traces.h"
 //#include "nauty/schreier.h"
 
-#include "my_schreier.h"
+#include "pipeline_schreier.h"
 #include "concurrentqueue.h"
 
 

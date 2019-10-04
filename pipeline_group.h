@@ -6,7 +6,7 @@
 #define DEJAVU_PIPELINE_GROUP_H
 
 
-#include "my_schreier.h"
+#include "pipeline_schreier.h"
 #include "bijection.h"
 #include "concurrentqueue.h"
 
@@ -28,13 +28,16 @@ public:
     mschreier *gp;
     mpermnode *gens;
 
-    pipeline_group(int domain_size, bijection* base_points, int stages);
+    pipeline_group();
+    void initialize(int domain_size, bijection *base_points, int stages);
     ~pipeline_group();
-    bool add_permutation(bijection* p);
+    bool add_permutation(bijection* p, int* idle_ms);
     void print_group_size();
     void pipeline_stage(int n, bool* done);
     void launch_pipeline_threads(bool *done);
     void join_threads();
+
+    void determine_stages();
 };
 
 

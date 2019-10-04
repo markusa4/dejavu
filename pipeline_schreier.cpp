@@ -12,7 +12,7 @@
 #include <assert.h>
 #include <iostream>
 #include <mutex>
-#include "my_schreier.h"
+#include "pipeline_schreier.h"
 
 //long mmultcount = 0;
 //long mfiltercount = 0;
