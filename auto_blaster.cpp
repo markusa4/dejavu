@@ -50,6 +50,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             *restarts += 1;
             c = start_c;
             I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
+            if(compare)
+                I.set_compare_invariant(canon_I);
             init_color_class.clear();
             last_op = OP_R;
             backtrack = false;
@@ -146,6 +148,8 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     trail T(g->v.size());
     c = start_c;
     I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
+    if(compare)
+        I.set_compare_invariant(canon_I);
     init_color_class.clear();
     backtrack = false;
     T.push_op_r(&changes);
