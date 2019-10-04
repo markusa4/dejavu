@@ -46,7 +46,6 @@ int selector::select_color_largest(sgraph *g, coloring *c) {
 }
 
 int selector::seeded_select_color(sgraph *g, coloring *c, int seed) {
-    std::cout << seed << std::endl;
     std::vector<int> cells;
     for(int i = 0; i < c->ptn.size();){
         if(c->ptn[i] > 0) {

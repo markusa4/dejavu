@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include "pipeline_group.h"
+#include "configuration.h"
 
 void pipeline_group::launch_pipeline_threads(bool* done) {
     for(int i = 1; i < stages; ++i) {
@@ -57,7 +58,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                         random_abort_counter = 0;
                     }
                 }
-                if(abort_counter >= 5) {
+                if(abort_counter >= config.CONFIG_RAND_ABORT) {
                     *done = true;
                     break;
                 }
@@ -69,10 +70,13 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             // not done, so choose next element for the pipeline
             d = automorphisms.try_dequeue(p);
             // automorphisms non-empty? take that element
-            while(!d && random_abort_counter >= 5) {
+            while(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 front_idle_ms += 1;
                 d = automorphisms.try_dequeue(p);
+                if(front_idle_ms % 10000 == 0) {
+                    std::cout << "Pipeline(0) idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
+                }
             }
 
             if (d) {
