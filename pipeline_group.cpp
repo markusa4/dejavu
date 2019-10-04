@@ -75,7 +75,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                 front_idle_ms += 1;
                 d = automorphisms.try_dequeue(p);
                 if(front_idle_ms % 10000 == 0) {
-                    std::cout << "Pipeline(0) idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
+                    std::cout << "Pipeline(" << n << ") front idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
                 }
             }
 
@@ -102,6 +102,10 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             // take element from intermediate queue
             bool d = pipeline_queues[n].try_dequeue(state);
             while (!d && (!(*done))) {
+                if(front_idle_ms % 10000 == 0) {
+                    std::cout << "Pipeline(" << n << ") front idle " << front_idle_ms << ", "
+                              << pipeline_queues[n].size_approx() << std::endl;
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 front_idle_ms += 1;
                 d = pipeline_queues[n].try_dequeue(state);
@@ -124,6 +128,10 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup, result));
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
+                if(back_idle_ms % 10000 == 0) {
+                    std::cout << "Pipeline(" << n << ") back idle " << front_idle_ms << ", "
+                              << pipeline_queues[n + 1].size_approx() << std::endl;
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 back_idle_ms += 1;
             }
