@@ -6,9 +6,9 @@
 #define DEJAVU_CONFIGURATION_H
 
 struct configstruct {
-    bool CONFIG_IR_BACKTRACK = true;
+    bool CONFIG_IR_BACKTRACK = false;
     bool CONFIG_IR_BACKTRACK_RANDOM  = true;
-    int CONFIG_IR_CELL_SELECTOR = 0;
+    int CONFIG_IR_CELL_SELECTOR = 1;
     int CONFIG_IR_INVARIANT = 0;
 
     int CONFIG_RAND_ABORT = 5;

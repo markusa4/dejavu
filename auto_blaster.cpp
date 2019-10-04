@@ -97,11 +97,15 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             changes.clear();
             I.push_level();
             //assert(init_color_class.size() == 2);
-            R.refine_coloring(g, &c, &changes, &I, &init_color_class, false);
+            bool comp = R.refine_coloring(g, &c, &changes, &I, &init_color_class, false);
             //R.complete_colorclass_invariant(g, &c, &I);
             last_op = OP_R;
             if (compare) {
                 // compare invariant
+                if(!comp) {
+                    backtrack = true;
+                    continue;
+                }
                 if (I.level_is_eq(canon_I, I.current_level())) {
                     continue;
                 } else {

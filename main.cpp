@@ -5,7 +5,9 @@
 #include "ir_tools.h"
 #include "auto_blaster.h"
 #include <assert.h>
+extern "C" {
 #include "nauty/traces.h"
+}
 #include "nauty/naugroup.h"
 #include "configuration.h"
 #include <chrono>
@@ -24,7 +26,7 @@ void label_graph(sgraph* g, bijection* canon_p) {
     IR.label_graph(g, canon_p);
 }
 
-void bench_traces(sgraph* g) {
+void bench_nauty(sgraph* g) {
     //TracesStats stats;
     statsblk stats;
     sparsegraph sg;
@@ -67,6 +69,51 @@ void bench_traces(sgraph* g) {
     writegroupsize(stdout,stats.grpsize1,stats.grpsize2);
     std::cout << std::endl;
     //Traces(&sg,lab,ptn,orbits,&options,&stats,NULL);
+}
+
+void bench_traces(sgraph* g) {
+    TracesStats stats;
+    //statsblk stats;
+    sparsegraph sg;
+
+    DYNALLSTAT(int,lab,lab_sz);
+    DYNALLSTAT(int,ptn,ptn_sz);
+    DYNALLSTAT(int,orbits,orbits_sz);
+    //static DEFAULTOPTIONS_SPARSEGRAPH(options);
+
+    SG_INIT(sg);
+    int m = SETWORDSNEEDED(g->v.size());
+    nauty_check(WORDSIZE,m,g->v.size(),NAUTYVERSIONID);
+    SG_ALLOC(sg,g->v.size(),g->e.size(),"malloc");
+    sg.nv  = g->v.size();
+    sg.nde = g->e.size();
+    static DEFAULTOPTIONS_TRACES(options);
+   // static DEFAULTOPTIONS_SPARSEGRAPH(options);
+    //options.schreier = true;
+    schreier_fails(10);
+    options.defaultptn = false;
+
+    DYNALLOC1(int,lab,lab_sz,sg.nv,"malloc");
+    DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
+    DYNALLOC1(int,orbits,orbits_sz,sg.nv,"malloc");
+
+    for(int i = 0; i < g->v.size(); ++i) {
+        lab[i] = i;
+        ptn[i] = 1;
+        sg.v[i] = g->v[i];
+        sg.d[i] = g->d[i];
+    }
+
+    ptn[g->v.size() - 1] = 0;
+
+    for(int i = 0; i < g->e.size(); ++i) {
+        sg.e[i] = g->e[i];
+    }
+    //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
+    Traces(&sg,lab,ptn,orbits,&options,&stats,NULL);
+    std::cout << "Group size: ";
+    writegroupsize(stdout,stats.grpsize1,stats.grpsize2);
+    std::cout << std::endl;
 }
 
 int commandline_mode(int argc, char** argv) {
@@ -147,12 +194,22 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_traces(&g);
+    bench_nauty(&g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare: " << nauty_solve_time / solve_time << std::endl;
+    std::cout << "Traces" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+
+    timer = Clock::now();
+    bench_traces(&g);
+    double traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "Compare (nauty): "  << nauty_solve_time / solve_time << std::endl;
+    std::cout << "Compare (Traces): " << traces_solve_time / solve_time << std::endl;
     return 0;
 }
 
@@ -173,7 +230,7 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-50", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
@@ -199,11 +256,21 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_traces(&g);
+    bench_nauty(&g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare: " << nauty_solve_time / solve_time << std::endl;
+    std::cout << "Traces" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+
+    timer = Clock::now();
+    bench_traces(&g);
+    double traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "Compare (nauty): "  << nauty_solve_time / solve_time << std::endl;
+    std::cout << "Compare (Traces): " << traces_solve_time / solve_time << std::endl;
     return 0;
 }
