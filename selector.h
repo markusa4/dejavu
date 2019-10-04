@@ -8,13 +8,19 @@
 
 #include "coloring.h"
 #include "sgraph.h"
+#include "configuration.h"
 
 class selector {
 public:
-    int select_color(sgraph *g, coloring *c);
-    int select_color2(sgraph *g, coloring *c);
+    int select_color(sgraph *g, coloring *c, int seed);
 
-    int select_color3(sgraph *g, coloring *c);
+    int seeded_select_color(sgraph *g, coloring *c, int seed);
+
+    int select_color_largest(sgraph *g, coloring *c);
+
+    int select_color_smallest(sgraph *g, coloring *c);
+
+    int select_color_first(sgraph *g, coloring *c);
 };
 
 

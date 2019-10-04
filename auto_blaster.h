@@ -22,13 +22,13 @@ public:
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts, bool* done);
+                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed);
 
     void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G);
 
     void
     find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                         std::default_random_engine *re, int *restarts, bool *done);
+                         std::default_random_engine *re, int *restarts, bool *done, int selector_seed);
 };
 
 

@@ -26,7 +26,8 @@ extern long mmultcount;
 extern long mfiltercount;
 
 // ToDo: recreate backtracking version
-void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
+void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
+        bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
     bool backtrack = true;
     std::list<std::pair<int, int>> changes;
     refinement R;
@@ -56,7 +57,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
         int s;
         if (!backtrack) {
-            s = S.select_color(g, &c);
+            s = S.select_color(g, &c, selector_seed);
             if (s == -1) {
                 if (compare) {
                     assert(I.level_is_eq(canon_I, I.current_level()));
@@ -130,7 +131,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     }
 }
 
-void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done) {
+void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
+        bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
     bool backtrack;
     int backtrack_to_level = -1;
     std::list<std::pair<int, int>> changes;
@@ -166,7 +168,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
 
         int s;
         if (!backtrack) {
-            s = S.select_color(g, &c);
+            s = S.select_color(g, &c, selector_seed);
             if (s == -1) {
                 if (compare) {
                     assert(I.level_is_eq(canon_I, I.current_level()));
@@ -214,7 +216,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
                 if (I.level_is_eq(canon_I, I.current_level())) {
                     continue;
                 } else {
-                    if(CONFIG_IR_BACKTRACK_RANDOM) {
+                    if(config.CONFIG_IR_BACKTRACK_RANDOM) {
                         backtrack_to_level = ((*re)() % I.current_level());
                     }
                     backtrack = true;
@@ -231,7 +233,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
             int rpos = s + ((*re)() % (c.ptn[s] + 1));
             int v = c.lab[rpos];
             int i = s;
-            if(!CONFIG_IR_BACKTRACK_RANDOM) {
+            if(!config.CONFIG_IR_BACKTRACK_RANDOM) {
                 while ((i == s) || (i == 0) || c.ptn[i - 1] != 0) {
                     if (i != rpos) {
                         color_s.push_front(c.lab[i]);
@@ -265,14 +267,14 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
             //assert(R.assert_is_equitable(g, &c));
 
             // undo individualization
-            if((T.top_op_i_class().empty() && !CONFIG_IR_BACKTRACK_RANDOM) || backtrack_to_level > 0) {
+            if((T.top_op_i_class().empty() && !config.CONFIG_IR_BACKTRACK_RANDOM) || backtrack_to_level > 0) {
                 backtrack_to_level -= 1;
                 // we tested the entire color class, need to backtrack further
                 T.pop_op_i_class();
                 continue;
             } else {
                 // there is another vertex we have to try, so we are done backtracking
-                if(!CONFIG_IR_BACKTRACK_RANDOM) {
+                if(!config.CONFIG_IR_BACKTRACK_RANDOM) {
                     T.shuffle_top_i_class(re);
                     v = T.top_op_i_class().front();
                     T.top_op_i_class().pop_front();
@@ -313,6 +315,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     bool trash_bool = false;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine re = std::default_random_engine(seed);
+    int selector_seed = re() % INT32_MAX;
 
     refinement R;
     std::list<std::pair<int, int>> changes;
@@ -322,11 +325,11 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
         std::list<int> init_color_class;
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
         std::cout << "Launching workers..." << std::endl;
-        for(int i = 0; i < CONFIG_THREADS_NO_PIPELINE - 1; i++)
+        for(int i = 0; i < config.CONFIG_THREADS_NO_PIPELINE - 1; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
     }
     int trash_int = 0;
-    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
+    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed);
     std::cout << "Found canonical leaf." << std::endl;
 
     int abort_counter = 0;
@@ -347,7 +350,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
             // sample myself
             bijection automorphism;
             bool added;
-            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, &trash_bool);
+            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, &trash_bool, selector_seed);
             added = G.add_permutation(&automorphism);
             if (added) {
                 abort_counter = 0;
@@ -389,7 +392,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         while(!(*done)) {
             bijection automorphism;
-            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
+            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             Q.enqueue(automorphism);
             if(Q.size_approx() > 20) {
                 if(Q.size_approx() < 100) {
@@ -413,6 +416,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
     int trash_int = 0;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine re = std::default_random_engine(seed);
+    int selector_seed = re() % INT32_MAX;
 
     refinement R;
     std::list<std::pair<int, int>> changes;
@@ -423,7 +427,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
         G = new pipeline_group();
         std::cout << "Launching refinement worker..." << std::endl;
-        for(int i = 0; i < CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, this, g, false, done, G));
     }
     std::cout << "Found canonical leaf." << std::endl;
@@ -439,8 +443,8 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
-        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
-        G->initialize(g->v.size(), &base_points, CONFIG_THREADS_PIPELINE_DEPTH);
+        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed);
+        G->initialize(g->v.size(), &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
         // run algorithm
@@ -463,13 +467,13 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         //                                                      SLAVE THREAD
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         int idle_ms = 0;
-        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool);
+        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed);
         while(!(*done)) {
             bijection automorphism;
-            if(CONFIG_IR_BACKTRACK) {
-                find_automorphism_bt(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
+            if(config.CONFIG_IR_BACKTRACK) {
+                find_automorphism_bt(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             } else {
-                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done);
+                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             }
             G->add_permutation(&automorphism, &idle_ms, done);
         }

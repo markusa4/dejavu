@@ -9,10 +9,11 @@
 #include "nauty/naugroup.h"
 #include "configuration.h"
 #include <chrono>
+#include <string>
 
 typedef std::chrono::high_resolution_clock Clock;
-
 class time_point;
+configstruct config;
 
 void label_graph(sgraph* g, bijection* canon_p) {
     coloring c;
@@ -68,11 +69,100 @@ void bench_traces(sgraph* g) {
     //Traces(&sg,lab,ptn,orbits,&options,&stats,NULL);
 }
 
+int commandline_mode(int argc, char** argv) {
+    std::string filename = "";
+    bool entered_file = false;
+
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--file") {
+            if (i + 1 < argc) {
+                i++;
+                filename = argv[i];
+                entered_file = true;
+            } else {
+                std::cerr << "--file option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "--THREADS_REFINEMENT_WORKERS") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
+            } else {
+                std::cerr << "--THREADS_REFINEMENT_WORKERS option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "--THREADS_PIPELINE_DEPTH") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_THREADS_PIPELINE_DEPTH = atoi(argv[i]);
+            } else {
+                std::cerr << "--THREADS_PIPELINE_DEPTH option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "--IR_CELL_SELECTOR") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_CELL_SELECTOR = atoi(argv[i]);
+            } else {
+                std::cerr << "--IR_CELL_SELECTOR option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "--IR_BACKTRACK") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_BACKTRACK = (atoi(argv[i]) == 1);
+            } else {
+                std::cerr << "--IR_BACKTRACK option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+    }
+
+    if(!entered_file) {
+        std::cerr << "--file not specified" << std::endl;
+        return 1;
+    }
+    parser p;
+    sgraph g;
+    p.parse_dimacs_file(filename, &g);
+
+    std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
+    Clock::time_point timer = Clock::now();
+    auto_blaster A;
+    bool done = false;
+    if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
+        A.sample(&g, true, &done);
+    } else {
+        A.sample_pipelined(&g, true, &done, nullptr);
+    }
+    double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "nauty" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+
+    timer = Clock::now();
+    bench_traces(&g);
+    double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "Compare: " << nauty_solve_time / solve_time << std::endl;
+    return 0;
+}
+
+
 
 int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -96,7 +186,7 @@ int main(int argc, char *argv[]) {
     Clock::time_point timer = Clock::now();
     auto_blaster A;
     bool done = false;
-    if(CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
+    if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
         A.sample(&g, true, &done);
     } else {
         A.sample_pipelined(&g, true, &done, nullptr);
