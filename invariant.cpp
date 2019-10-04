@@ -60,6 +60,17 @@ void invariant::write_top(int i) {
     vec_invariant[vec_invariant.size() - 1].push_back(i);
 }
 
+bool invariant::write_top_and_compare(int i) {
+    int pos1 = vec_invariant.size() - 1;
+    vec_invariant[pos1].push_back(i);
+    int pos2 = vec_invariant[pos1].size() - 1;
+    if(has_compare) {
+        return vec_invariant[pos1][pos2] == (*compareI->get_level(pos1))[pos2];
+    } else {
+        return true;
+    }
+}
+
 void invariant::print() {
     for(int i = 0; i < vec_invariant.size(); ++i) {
         for(int j = 0; j < vec_invariant[i].size(); ++j) {
@@ -75,4 +86,9 @@ int invariant::current_level() {
 
 std::vector<int>* invariant::get_level(int i) {
     return &vec_invariant[i];
+}
+
+void invariant::set_compare_invariant(invariant* I) {
+    has_compare = true;
+    compareI = I;
 }

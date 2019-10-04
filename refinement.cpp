@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <algorithm>
 
-void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes) {
+bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes) {
     //std::cout << "Refining..." << std::endl;
     if(!initialized) {
         counting_array.initialize(g->v.size(), c);
@@ -46,11 +46,13 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
 
        //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
         // write color class and size to invariant
-        I->write_top(-1);
-        I->write_top(next_color_class.first);
-        I->write_top(next_color_class.second);
-
-        refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I, largest_color_class_index);
+        bool comp = true;
+        comp = comp && I->write_top_and_compare(-1);
+        comp = comp && I->write_top_and_compare(next_color_class.first);
+        comp = comp && I->write_top_and_compare(next_color_class.second);
+        comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I, largest_color_class_index);
+        if(!comp) // ToDo: changes of the latest refine_color_class?
+            return false;
 
         // add all new classes except for the first, largest one
         int skip = 0;
@@ -70,9 +72,10 @@ void refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         assert(color_class_splits.size() > 0? skip > 0: true);
     }
     //assert(assert_is_equitable(g, c));
+    return true;
 }
 
-void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I, int* largest_color_class_index) {
+bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I, int* largest_color_class_index) {
     // for all vertices of the color class...
     // ToDo: can replace worklists with fixed size arrays
     //std::list<std::pair<int, int>> color_set_worklist;
@@ -162,9 +165,12 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             int v_color  = i;
             int v_degree = counting_array.get_count(c->lab[i]);
             //I->write_top(-40);
-            I->write_top(-v_color);
-            I->write_top(v_degree);
-            I->write_top(c->ptn[i] + 1);
+            bool comp = true;
+            comp = comp && I->write_top_and_compare(-v_color);
+            comp = comp && I->write_top_and_compare(v_degree);
+            comp = comp && I->write_top_and_compare(c->ptn[i] + 1);
+            if(!comp)
+                return false;
             if(!(i == it->first && c->ptn[i] + 1== it->second)) {
                 if(largest_color_class_size < c->ptn[i] + 1) {
                     largest_color_class_size = c->ptn[i] + 1;
@@ -185,6 +191,8 @@ void refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     color_worklist_color.reset();
     color_worklist_vertex.reset();
     counting_array.reset();
+
+    return true;
 }
 
 void refinement::individualize_vertex(sgraph *g, coloring *c, int v) {

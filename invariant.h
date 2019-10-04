@@ -7,6 +7,8 @@
 
 class invariant {
     std::vector<std::vector<int>> vec_invariant;
+    invariant* compareI;
+    bool has_compare = false;
 public:
     virtual void push_level();
     virtual void pop_level();
@@ -19,6 +21,10 @@ public:
     virtual bool top_is_eq(std::vector<int> *other);
 
     bool level_is_eq(invariant *other, int level);
+
+    bool write_top_and_compare(int i);
+
+    void set_compare_invariant(invariant *I);
 };
 
 
