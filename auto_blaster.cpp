@@ -36,13 +36,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     invariant I;
     std::list<int> init_color_class;
     *restarts = 0;
-    ir_operation last_op;
+    ir_operation last_op = OP_R;
     I = start_I;
     c = start_c;
     if(compare)
         I.set_compare_invariant(canon_I);
     int startlevel = I.current_level();
-
+    
 
     while (true) {
         if (backtrack) {
