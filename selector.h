@@ -21,6 +21,8 @@ public:
     int select_color_smallest(sgraph *g, coloring *c);
 
     int select_color_first(sgraph *g, coloring *c);
+
+    int select_color_largest_degseq2(sgraph *g, coloring *c);
 };
 
 

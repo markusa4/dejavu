@@ -13,6 +13,20 @@
 #include "invariant_acc.h"
 #include <list>
 
+class work_queue {
+public:
+    void initialize(int size);
+    void push(int val);
+    int pop();
+    bool empty();
+    ~work_queue();
+private:
+    int* queue;
+    bool init = false;
+    int  sz;
+    int  pos;
+};
+
 class cumulative_counting {
 public:
     void initialize(int size, coloring *c);
@@ -25,8 +39,8 @@ private:
     coloring* c;
     std::vector<int> count;
     std::vector<std::vector<int>> sizes;
-    std::queue<int>  reset_queue;
-    std::queue<int>  reset_queue_sizes;
+    work_queue reset_queue;
+    work_queue reset_queue_sizes;
 };
 
 class work_set {

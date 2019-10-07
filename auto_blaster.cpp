@@ -102,16 +102,16 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             last_op = OP_R;
             if (compare) {
                 // compare invariant
-                if(!comp) {
+                if(!comp || !I.compare_sizes()) {
                     backtrack = true;
                     continue;
                 }
-                if (I.level_is_eq(canon_I, I.current_level())) {
+                //if (I.level_is_eq(canon_I, I.current_level())) {
                     continue;
-                } else {
-                    backtrack = true;
-                    continue;
-                }
+                //} else {
+                //    backtrack = true;
+               //     continue;
+               // }
             }
         } else if (last_op == OP_R) {
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,22 +214,21 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
             changes.clear();
             I.push_level();
             //assert(init_color_class.size() == 2);
-            R.refine_coloring(g, &c, &changes, &I, &init_color_class, true);
+            bool comp = R.refine_coloring(g, &c, &changes, &I, &init_color_class, true);
             //assert(R.assert_is_equitable(g, &c));
             T.push_op_r(&changes);
             //R.complete_colorclass_invariant(g, &c, &I);
             //last_op = OP_R;
             if (compare) {
                 // compare invariant
-                if (I.level_is_eq(canon_I, I.current_level())) {
-                    continue;
-                } else {
+                if(!comp || !I.compare_sizes()) {
                     if(config.CONFIG_IR_BACKTRACK_RANDOM) {
                         backtrack_to_level = ((*re)() % I.current_level());
                     }
                     backtrack = true;
                     continue;
                 }
+                continue;
             }
         } else if (!backtrack && T.last_op() == OP_R) {
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////

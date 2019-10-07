@@ -23,6 +23,7 @@ public:
     bool level_is_eq(invariant *other, int level);
 
     bool write_top_and_compare(int i);
+    bool compare_sizes();
 
     void set_compare_invariant(invariant *I);
 };
