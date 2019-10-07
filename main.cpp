@@ -125,6 +125,8 @@ int commandline_mode(int argc, char** argv) {
     std::fstream stat_file;
     std::string stat_filename = "test.dat";
     bool entered_stat_file = true;
+    bool comp_nauty = true;
+    bool comp_traces = true;
 
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--file") {
@@ -146,6 +148,12 @@ int commandline_mode(int argc, char** argv) {
                 std::cerr << "--stat_file option requires one argument." << std::endl;
                 return 1;
             }
+        }
+        if (std::string(argv[i]) == "--no_nauty") {
+            comp_nauty = false;
+        }
+        if (std::string(argv[i]) == "--no_traces") {
+            comp_traces = false;
         }
         if (std::string(argv[i]) == "--THREADS_REFINEMENT_WORKERS") {
             if (i + 1 < argc) {
@@ -253,7 +261,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    return commandline_mode(argc, argv);
+    //return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -261,10 +269,10 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file(argv[1], &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k150.dimacs", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k150.dimacs", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph

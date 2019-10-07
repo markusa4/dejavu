@@ -7,7 +7,7 @@
 
 struct configstruct {
     bool CONFIG_IR_BACKTRACK = false;
-    bool CONFIG_IR_BACKTRACK_RANDOM  = true;
+    bool CONFIG_IR_BACKTRACK_RANDOM  = false;
     int CONFIG_IR_CELL_SELECTOR = 1;
     int CONFIG_IR_INVARIANT = 0;
 
