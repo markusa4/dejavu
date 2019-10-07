@@ -240,7 +240,7 @@ int commandline_mode(int argc, char** argv) {
 
         }// use existing file
         std::cout<<"Appending to " << stat_filename << ".\n";
-        stat_file << g.v.size() << " " << solve_time << " " << nauty_solve_time << " " << traces_solve_time << "\n";
+        stat_file << g.v.size() << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
 
