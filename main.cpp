@@ -12,6 +12,7 @@ extern "C" {
 #include "configuration.h"
 #include <chrono>
 #include <string>
+#include <fstream>
 
 typedef std::chrono::high_resolution_clock Clock;
 class time_point;
@@ -47,6 +48,7 @@ void bench_nauty(sgraph* g) {
     options.schreier = true;
     schreier_fails(10);
     options.defaultptn = false;
+    //options.writeautoms = true;
 
     DYNALLOC1(int,lab,lab_sz,sg.nv,"malloc");
     DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
@@ -90,6 +92,7 @@ void bench_traces(sgraph* g) {
     static DEFAULTOPTIONS_TRACES(options);
    // static DEFAULTOPTIONS_SPARSEGRAPH(options);
     //options.schreier = true;
+    //options.writeautoms = true;
     schreier_fails(10);
     options.defaultptn = false;
 
@@ -119,6 +122,9 @@ void bench_traces(sgraph* g) {
 int commandline_mode(int argc, char** argv) {
     std::string filename = "";
     bool entered_file = false;
+    std::fstream stat_file;
+    std::string stat_filename = "test.dat";
+    bool entered_stat_file = true;
 
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--file") {
@@ -128,6 +134,16 @@ int commandline_mode(int argc, char** argv) {
                 entered_file = true;
             } else {
                 std::cerr << "--file option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+        if (std::string(argv[i]) == "--stat_file") {
+            if (i + 1 < argc) {
+                i++;
+                stat_filename = argv[i];
+                entered_stat_file = true;
+            } else {
+                std::cerr << "--stat_file option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -210,6 +226,24 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "Compare (nauty): "  << nauty_solve_time / solve_time << std::endl;
     std::cout << "Compare (Traces): " << traces_solve_time / solve_time << std::endl;
+
+    if(entered_stat_file) {
+        stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
+
+        // If file does not exist, Create new file
+        if (!stat_file )
+        {
+            std::cout << "Creating new stat_file..";
+
+            stat_file.open(stat_filename,  std::fstream::in | std::fstream::out | std::fstream::trunc);
+            stat_file <<"V dejavu nauty Traces\n";
+
+        }// use existing file
+        std::cout<<"Appending to " << stat_filename << ".\n";
+        stat_file << g.v.size() << " " << solve_time << " " << nauty_solve_time << " " << traces_solve_time << "\n";
+        stat_file.close();
+    }
+
     return 0;
 }
 
@@ -225,12 +259,12 @@ int main(int argc, char *argv[]) {
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-2000.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k-100", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k150.dimacs", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
