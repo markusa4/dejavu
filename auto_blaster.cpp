@@ -28,15 +28,21 @@ extern long mfiltercount;
 // ToDo: recreate backtracking version
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
         bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
-    bool backtrack = true;
+    bool backtrack = false;
     std::list<std::pair<int, int>> changes;
     refinement R;
     selector S;
     coloring c;
     invariant I;
     std::list<int> init_color_class;
-    *restarts -= 1;
+    *restarts = 0;
     ir_operation last_op;
+    I = start_I;
+    c = start_c;
+    if(compare)
+        I.set_compare_invariant(canon_I);
+    int startlevel = I.current_level();
+
 
     while (true) {
         if (backtrack) {
@@ -44,14 +50,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if(*done) {
                 return;
             }
-            if(*restarts >= 0) {
-                //std::cout << "Restart." << *restarts << std::endl;
-            }
             *restarts += 1;
+            //c.rewrite_ptn(&start_c);
             c = start_c;
-            I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-            if(compare)
-                I.set_compare_invariant(canon_I);
+
+            while(I.current_level() != startlevel)
+                I.pop_level();
+            // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             init_color_class.clear();
             last_op = OP_R;
             backtrack = false;

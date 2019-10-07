@@ -79,7 +79,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     // ToDo: can replace worklists with fixed size arrays
     //std::list<std::pair<int, int>> color_set_worklist;
     bool comp = true;
-    std::set<int> new_colors;
+    //std::set<int> new_colors;
     std::vector<std::pair<int, int>> old_color_classes;
 
     int cc = color_class; // iterate over color class
@@ -119,7 +119,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             color_worklist_vertex.push_back(v);
             color_worklist_color.push_back(v_new_color);
             //color_set_worklist.emplace_back(std::pair<int, int>(v, v_new_color));
-            new_colors.insert(v_new_color);
+            //new_colors.insert(v_new_color);
             c->ptn[v_new_color] = -1;
         }
     }
@@ -146,11 +146,11 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    for(auto new_color = new_colors.begin(); new_color != new_colors.end(); new_color++) {
+    /*for(auto new_color = new_colors.begin(); new_color != new_colors.end(); new_color++) {
         if(*new_color != 0) {
             c->ptn[*new_color - 1] = 0;
         }
-    }
+    }*/
 
     std::sort(old_color_classes.begin(), old_color_classes.end());
 
@@ -175,6 +175,13 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             } else {
                 break;
             }
+
+            /* */
+            if(v_color != 0) {
+                c->ptn[v_color - 1] = 0;
+            }
+            /* */
+
             i += c->ptn[i] + 1;
         }
 
@@ -352,15 +359,12 @@ void cumulative_counting::initialize(int size, coloring *c) {
 void cumulative_counting::reset() {
     while(!reset_queue.empty()) {
         int index = reset_queue.pop();
-        //reset_queue.pop();
         count[index] = 0;
     }
     while(!reset_queue_sizes.empty()) {
         int index = reset_queue_sizes.pop();
-        //reset_queue_sizes.pop();
-        sizes[index].clear();
-        sizes[index].push_back(-1);
-        //sizes[index].reserve(16);
+        sizes[index].resize(1);
+        //sizes[index].push_back(-1);
     }
 }
 
