@@ -32,7 +32,7 @@ class cumulative_counting {
 public:
     void initialize(int size, coloring *c);
     void reset();
-    void increment(int index);
+    void increment(int index, bool r);
     int get_size(int index);
     int get_count(int index);
     void set_coloring(coloring *c);
@@ -50,9 +50,12 @@ public:
     void set(int index);
     bool get(int index);
     void reset();
+    ~work_set();
 private:
     work_queue reset_queue;
-    std::vector<bool> s;
+    //std::vector<bool> s;
+    bool init = false;
+    bool* s;
 };
 
 class work_list {
@@ -108,6 +111,10 @@ private:
     work_list vertex_worklist;
     work_list_pair old_color_classes;
     int* largest_color_class_index;
+
+    bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
+                                      std::list<std::pair<int, int>> *color_class_split_worklist, invariant *I,
+                                      int *largest_color_class_index);
 };
 
 
