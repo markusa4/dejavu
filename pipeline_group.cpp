@@ -27,6 +27,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     int leafs_considered = 0;
     int random_abort_counter = 0;
 
+    if(base_size == 0)
+        *done = true;
+
     while(!(*done)) {
         // ToDo: load balancing
         // work on pipeline_results and track
