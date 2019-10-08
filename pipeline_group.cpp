@@ -179,11 +179,22 @@ void pipeline_group::initialize(int domain_size, bijection *base_points, int sta
 // ToDo: remove unncessary stages (size = 0)
 void pipeline_group::determine_stages() {
     std::cout << "Pipeline: ";
+    int ded = 0;
     for(int i = 0; i < stages; ++i) {
+        int stage_pos = (base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2))));
+
+        // skip stage if too small
+        if((!intervals.empty()) &&
+            (stage_pos - intervals[intervals.size() - 1] < config.CONFIG_THREADS_PIPELINE_STAGE_MIN)) {
+            ded += 1;
+            continue;
+        }
+
         pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>());
-        intervals.push_back((base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2)))));
+        intervals.push_back(stage_pos);
         std::cout << "/" << intervals[intervals.size() - 1];
     }
+    stages -= ded;
     std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
     intervals[stages - 1] = domain_size + 1;
 }
