@@ -102,7 +102,7 @@ private:
     bool initialized = false;
     cumulative_counting counting_array;
     work_set vertex_workset;
-    work_set color_worklset;
+    work_set color_workset;
     work_list color_worklist_vertex;
     work_list color_worklist_color;
     work_list vertex_worklist;

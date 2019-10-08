@@ -17,7 +17,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     if(!initialized) {
         counting_array.initialize(g->v.size(), c);
         vertex_workset.initialize(g->v.size());
-        color_worklset.initialize(g->v.size());
+        color_workset.initialize(g->v.size());
         vertex_worklist.initialize(g->v.size());
         old_color_classes.initialize(g->v.size());
         color_worklist_vertex.initialize(g->v.size());
@@ -78,10 +78,8 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
 bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, std::list<std::pair<int, int>> *color_class_split_worklist, invariant* I, int* largest_color_class_index) {
     // for all vertices of the color class...
     // ToDo: can replace worklists with fixed size arrays
-    //std::list<std::pair<int, int>> color_set_worklist;
     bool comp = true;
     //std::set<int> new_colors;
-    //std::vector<std::pair<int, int>> old_color_classes_;
 
     int cc = color_class; // iterate over color class
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
@@ -91,6 +89,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             // v is a neighbour of vc
             int v = g->e[i];
             if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
+            //if(counting_array.get_count(v) == 0) {
                 vertex_workset.set(v);
                 vertex_worklist.push_back(v);
             }
@@ -111,11 +110,11 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         } else {
             v_new_color = v_old_color + v_class_size - counting_array.get_size(v);
         }
-        if (!color_worklset.get(v_old_color)) {
+        if (!color_workset.get(v_old_color)) {
             assert(c->ptn[v_old_color] >= 0);
             old_color_classes.push_back(std::pair<int, int>(v_old_color, v_class_size));
             //old_color_classes_.emplace_back(std::pair<int, int>(v_old_color, v_class_size));
-            color_worklset.set(v_old_color);
+            color_workset.set(v_old_color);
         }
         if (v_new_color != v_old_color) {
             color_worklist_vertex.push_back(v);
@@ -148,12 +147,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    /*for(auto new_color = new_colors.begin(); new_color != new_colors.end(); new_color++) {
-        if(*new_color != 0) {
-            c->ptn[*new_color - 1] = 0;
-        }
-    }*/
-
     //std::sort(old_color_classes_.begin(), old_color_classes_.end());
     old_color_classes.sort();
 
@@ -178,7 +171,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
                     largest_color_class_size = c->ptn[i] + 1;
                     largest_color_class = i;
                 }
-                color_class_split_worklist->push_front(std::pair<int, int>(fst, i));
+                color_class_split_worklist->emplace_front(std::pair<int, int>(fst, i));
             } else {
                 break;
             }
@@ -196,7 +189,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     }
     vertex_worklist.reset();
     vertex_workset.reset();
-    color_worklset.reset();
+    color_workset.reset();
     color_worklist_color.reset();
     color_worklist_vertex.reset();
     old_color_classes.reset();
@@ -378,7 +371,7 @@ void cumulative_counting::reset() {
 
 void inline cumulative_counting::increment(int index) {
     if(count[index] == 0) {
-        reset_queue.push(index); // <- 1%, use ring instead
+        reset_queue.push(index);
     }
     count[index] += 1;
     assert(c->vertex_to_col[index] == c->vertex_to_col[c->lab[c->vertex_to_col[index]]]);
@@ -527,7 +520,9 @@ void work_list_pair::pop_back() {
 }
 
 void work_list_pair::sort() {
-    std::sort(arr, arr + arr_sz);
+    if(arr_sz > 1) {
+        std::sort(arr, arr + arr_sz);
+    }
 }
 
 bool work_list_pair::empty() {

@@ -10,7 +10,8 @@ class invariant {
     invariant* compareI;
     bool has_compare = false;
     bool no_write = false;
-    int fake_pos  = 0;
+    int cur_pos = -1;
+    std::vector<int>* compare_level;
 public:
     virtual void push_level();
     virtual void pop_level();
