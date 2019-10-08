@@ -12,6 +12,7 @@
 #include "sgraph.h"
 #include "invariant_acc.h"
 #include <list>
+#include <iostream>
 
 class work_queue {
 public:
@@ -68,6 +69,24 @@ private:
     int cur_pos;
 };
 
+class work_list_pair {
+public:
+    void initialize(int size);
+    void push_back(std::pair<int, int> value);
+    std::pair<int, int>* last();
+    void pop_back();
+    void sort();
+    bool empty();
+    void reset();
+    ~work_list_pair();
+private:
+    std::pair<int, int>* arr;
+    bool init = false;
+    int arr_sz = -1;
+    int cur_pos;
+};
+
+
 
 class refinement {
 public:
@@ -87,6 +106,7 @@ private:
     work_list color_worklist_vertex;
     work_list color_worklist_color;
     work_list vertex_worklist;
+    work_list_pair old_color_classes;
     int* largest_color_class_index;
 };
 

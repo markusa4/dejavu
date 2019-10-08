@@ -67,15 +67,15 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             s = S.select_color(g, &c, selector_seed);
             if (s == -1) {
                 if (compare) {
-                    assert(I.level_is_eq(canon_I, I.current_level()));
+                    //assert(I.level_is_eq(canon_I, I.current_level()));
                     I.push_level();
                     //R.complete_colorclass_invariant(g, &c, &I);
-                    if (!I.level_is_eq(canon_I, I.current_level())) {
+                    /*if (!I.level_is_eq(canon_I, I.current_level())) {
                         assert(false);
                         I.pop_level();
                         backtrack = true;
                         continue;
-                    }
+                    }*/
                     // we can derive an automorphism!
                     bijection leaf;
                     leaf.read_from_coloring(&c);

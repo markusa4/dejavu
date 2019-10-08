@@ -53,7 +53,12 @@ void invariant::pop_level() {
 }
 
 void invariant::push_level() {
-    vec_invariant.emplace_back(std::vector<int>());
+    if(no_write) {
+        vec_invariant.emplace_back(std::vector<int>());
+        vec_invariant[vec_invariant.size() - 1].push_back(0);
+    } else {
+        vec_invariant.emplace_back(std::vector<int>());
+    }
 }
 
 void invariant::write_top(int i) {
@@ -62,14 +67,26 @@ void invariant::write_top(int i) {
 
 bool invariant::write_top_and_compare(int i) {
     int pos1 = vec_invariant.size() - 1;
-    vec_invariant[pos1].push_back(i);
-    int pos2 = vec_invariant[pos1].size() - 1;
-    if(has_compare) {
-        if((*compareI->get_level(pos1)).size() <= pos2)
-            return false;
-        return vec_invariant[pos1][pos2] == (*compareI->get_level(pos1))[pos2];
+    if(no_write) {
+        int pos2 = vec_invariant[pos1][0];
+        vec_invariant[pos1][0] += 1;
+        if (has_compare) {
+            if ((*compareI->get_level(pos1)).size() <= pos2)
+                return false;
+            return i == (*compareI->get_level(pos1))[pos2];
+        } else {
+            return true;
+        }
     } else {
-        return true;
+        vec_invariant[pos1].push_back(i);
+        int pos2 = vec_invariant[pos1].size() - 1;
+        if (has_compare) {
+            if ((*compareI->get_level(pos1)).size() <= pos2)
+                return false;
+            return vec_invariant[pos1][pos2] == (*compareI->get_level(pos1))[pos2];
+        } else {
+            return true;
+        }
     }
 }
 
@@ -91,11 +108,18 @@ std::vector<int>* invariant::get_level(int i) {
 }
 
 void invariant::set_compare_invariant(invariant* I) {
+    no_write = true;
     has_compare = true;
     compareI = I;
 }
 
 bool invariant::compare_sizes() {
     assert(has_compare);
-    return vec_invariant[vec_invariant.size() - 1].size() == (compareI->get_level(vec_invariant.size() - 1))->size();
+    if(!no_write) {
+        return vec_invariant[vec_invariant.size() - 1].size() ==
+               (compareI->get_level(vec_invariant.size() - 1))->size();
+    } else {
+        return vec_invariant[vec_invariant.size() - 1][0] ==
+               (compareI->get_level(vec_invariant.size() - 1))->size();
+    }
 }

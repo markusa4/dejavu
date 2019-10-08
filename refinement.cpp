@@ -19,6 +19,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         vertex_workset.initialize(g->v.size());
         color_worklset.initialize(g->v.size());
         vertex_worklist.initialize(g->v.size());
+        old_color_classes.initialize(g->v.size());
         color_worklist_vertex.initialize(g->v.size());
         color_worklist_color.initialize(g->v.size());
         initialized = true;
@@ -80,7 +81,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     //std::list<std::pair<int, int>> color_set_worklist;
     bool comp = true;
     //std::set<int> new_colors;
-    std::vector<std::pair<int, int>> old_color_classes;
+    //std::vector<std::pair<int, int>> old_color_classes_;
 
     int cc = color_class; // iterate over color class
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
@@ -112,7 +113,8 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
         if (!color_worklset.get(v_old_color)) {
             assert(c->ptn[v_old_color] >= 0);
-            old_color_classes.emplace_back(std::pair<int, int>(v_old_color, v_class_size));
+            old_color_classes.push_back(std::pair<int, int>(v_old_color, v_class_size));
+            //old_color_classes_.emplace_back(std::pair<int, int>(v_old_color, v_class_size));
             color_worklset.set(v_old_color);
         }
         if (v_new_color != v_old_color) {
@@ -152,13 +154,18 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }*/
 
-    std::sort(old_color_classes.begin(), old_color_classes.end());
+    //std::sort(old_color_classes_.begin(), old_color_classes_.end());
+    old_color_classes.sort();
 
-    for(auto it = old_color_classes.begin(); it != old_color_classes.end(); ++it) {
+    //for(auto it = old_color_classes_.begin(); it != old_color_classes_.end(); ++it) {
+    while(!old_color_classes.empty()) {
+        int fst = old_color_classes.last()->first;
+        int snd = old_color_classes.last()->second;
+        old_color_classes.pop_back();
         int largest_color_class      = -1;
         int largest_color_class_size = -1;
 
-        for(int i = it->first; i < it->first + it->second;){
+        for(int i = fst; i < fst + snd;){
             assert(i >= 0 && i < c->ptn.size());
             assert(c->ptn[i] + 1 > 0);
             int v_color  = i;
@@ -166,12 +173,12 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             comp = comp && I->write_top_and_compare(-v_color);
             comp = comp && I->write_top_and_compare(v_degree);
             comp = comp && I->write_top_and_compare(c->ptn[i] + 1);
-            if(!(i == it->first && c->ptn[i] + 1== it->second)) {
+            if(!(i == fst && c->ptn[i] + 1== snd)) {
                 if(largest_color_class_size < c->ptn[i] + 1) {
                     largest_color_class_size = c->ptn[i] + 1;
                     largest_color_class = i;
                 }
-                color_class_split_worklist->push_front(std::pair<int, int>(it->first, i));
+                color_class_split_worklist->push_front(std::pair<int, int>(fst, i));
             } else {
                 break;
             }
@@ -185,13 +192,14 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             i += c->ptn[i] + 1;
         }
 
-        largest_color_class_index[it->first] = largest_color_class;
+        largest_color_class_index[fst] = largest_color_class;
     }
     vertex_worklist.reset();
     vertex_workset.reset();
     color_worklset.reset();
     color_worklist_color.reset();
     color_worklist_vertex.reset();
+    old_color_classes.reset();
     counting_array.reset();
 
     return comp;
@@ -492,4 +500,40 @@ work_queue::~work_queue() {
     if(init) {
         delete[] queue;
     }
+}
+
+void work_list_pair::push_back(std::pair<int, int> value) {
+    arr[arr_sz] = value;
+    arr_sz += 1;
+}
+
+std::pair<int, int> *work_list_pair::last() {
+    return &arr[arr_sz - 1];
+}
+
+void work_list_pair::initialize(int size) {
+    init = true;
+    arr = new std::pair<int, int>[size];
+    arr_sz = 0;
+}
+
+work_list_pair::~work_list_pair() {
+    if(init)
+        delete[] arr;
+}
+
+void work_list_pair::pop_back() {
+    arr_sz -= 1;
+}
+
+void work_list_pair::sort() {
+    std::sort(arr, arr + arr_sz);
+}
+
+bool work_list_pair::empty() {
+    return arr_sz == 0;
+}
+
+void work_list_pair::reset() {
+    arr_sz = 0;
 }

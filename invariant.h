@@ -9,6 +9,8 @@ class invariant {
     std::vector<std::vector<int>> vec_invariant;
     invariant* compareI;
     bool has_compare = false;
+    bool no_write = false;
+    int fake_pos  = 0;
 public:
     virtual void push_level();
     virtual void pop_level();
