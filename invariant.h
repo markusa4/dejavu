@@ -11,6 +11,7 @@ class invariant {
     bool has_compare = false;
     bool no_write = false;
     int cur_pos = -1;
+    int fake_sz = 0;
     std::vector<int>* compare_level;
 public:
     virtual void push_level();

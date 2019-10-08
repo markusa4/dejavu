@@ -50,6 +50,8 @@ bool invariant::top_is_eq(std::vector<int> *other) {
 
 void invariant::pop_level() {
     cur_pos -= 1;
+    if(cur_pos >= 0 && no_write)
+        fake_sz = vec_invariant[cur_pos][0];
     if(has_compare) {
         compare_level = compareI->get_level(cur_pos);
     }
@@ -57,6 +59,8 @@ void invariant::pop_level() {
 }
 
 void invariant::push_level() {
+    if(cur_pos >= 0 && no_write)
+        vec_invariant[cur_pos][0] = fake_sz;
     cur_pos += 1;
     if(has_compare) {
         compare_level = compareI->get_level(cur_pos);
@@ -64,6 +68,7 @@ void invariant::push_level() {
     if(no_write) {
         vec_invariant.emplace_back(std::vector<int>());
         vec_invariant[vec_invariant.size() - 1].push_back(0);
+        fake_sz = 0;
     } else {
         vec_invariant.emplace_back(std::vector<int>());
     }
@@ -75,8 +80,8 @@ void invariant::write_top(int i) {
 
 bool invariant::write_top_and_compare(int i) {
     if(no_write) {
-        int pos2 = vec_invariant[cur_pos][0];
-        vec_invariant[cur_pos][0] += 1;
+        int pos2 = fake_sz;
+        fake_sz += 1;
         return (compare_level->size() > pos2) && (i == (*compare_level)[pos2]);
     } else {
         vec_invariant[cur_pos].push_back(i);
@@ -120,7 +125,8 @@ bool invariant::compare_sizes() {
         return vec_invariant[vec_invariant.size() - 1].size() ==
                (compareI->get_level(vec_invariant.size() - 1))->size();
     } else {
-        return vec_invariant[vec_invariant.size() - 1][0] ==
-               (compareI->get_level(vec_invariant.size() - 1))->size();
+       // return vec_invariant[vec_invariant.size() - 1][0] ==
+        //       (compareI->get_level(vec_invariant.size() - 1))->size();
+        return fake_sz == (compareI->get_level(vec_invariant.size() - 1))->size();
     }
 }
