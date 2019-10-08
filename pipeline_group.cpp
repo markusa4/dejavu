@@ -24,6 +24,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     int front_idle_ms = 0;
     int back_idle_ms  = 0;
     int abort_counter = 0;
+    int leafs_considered = 0;
     int random_abort_counter = 0;
 
     while(!(*done)) {
@@ -46,6 +47,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             bool d = sift_results.try_dequeue(res);
             while(d) {
                 if(!res.first) {
+                    leafs_considered += 1;
                     if(!res.second) {
                         abort_counter += 1;
                     } else {
@@ -137,6 +139,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             }
             pipeline_queues[n + 1].enqueue(state);
         }
+    }
+    if(n == 0 ){
+        std::cout << "Leafs considered: " << leafs_considered << std::endl;
     }
     //std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }

@@ -135,7 +135,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class.push_back(labpos);
             assert(c.vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
-            if (!compare) {
+            if (!compare) { // base points
                 automorphism->map.push_back(v);
             }
         }
