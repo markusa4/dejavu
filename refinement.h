@@ -50,7 +50,7 @@ public:
     bool get(int index);
     void reset();
 private:
-    std::queue<int>  reset_queue;
+    work_queue reset_queue;
     std::vector<bool> s;
 };
 

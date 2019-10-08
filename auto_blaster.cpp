@@ -42,7 +42,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     if(compare)
         I.set_compare_invariant(canon_I);
     int startlevel = I.current_level();
-    
+
 
     while (true) {
         if (backtrack) {
@@ -336,13 +336,13 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
         g->initialize_coloring(&start_c);
         std::list<int> init_color_class;
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
-        std::cout << "Launching workers..." << std::endl;
+        //std::cout << "Launching workers..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_NO_PIPELINE - 1; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
     }
     int trash_int = 0;
     find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed);
-    std::cout << "Found canonical leaf." << std::endl;
+    //std::cout << "Found canonical leaf." << std::endl;
 
     int abort_counter = 0;
     int sampled_paths = 0;
@@ -438,11 +438,12 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         std::list<int> init_color_class;
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
         G = new pipeline_group();
-        std::cout << "Launching refinement worker..." << std::endl;
+        //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, this, g, false, done, G));
+        std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
     }
-    std::cout << "Found canonical leaf." << std::endl;
+    //std::cout << "Found canonical leaf." << std::endl;
 
     int abort_counter = 0;
     int sampled_paths = 0;
@@ -460,9 +461,9 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
         // run algorithm
-        std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
-        std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
-        std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
+        //std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
+        //std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
+        //std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
         //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
         //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
         std::cout << "Base size:  " << G->base_size << std::endl;
@@ -489,7 +490,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
             }
             G->add_permutation(&automorphism, &idle_ms, done);
         }
-        std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
+        //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
     }
 }

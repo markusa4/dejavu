@@ -407,6 +407,7 @@ void work_set::initialize(int size) {
     for(int i = 0; i < size; i++) {
         s.push_back(false);
     }
+    reset_queue.initialize(size);
 }
 
 void work_set::set(int index) {
@@ -423,8 +424,7 @@ bool work_set::get(int index) {
 
 void work_set::reset() {
     while(!reset_queue.empty()) {
-        int index = reset_queue.front();
-        reset_queue.pop();
+        int index = reset_queue.pop();
         s[index] = false;
     }
 }

@@ -8,9 +8,9 @@
 
 void pipeline_group::launch_pipeline_threads(bool* done) {
     for(int i = 1; i < stages; ++i) {
-        std::cout << "Launching pipeline worker (" << i << ")..." << std::endl;
         work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, done));
     }
+    std::cout << "Pipeline workers (" << stages << ")" << std::endl;
 }
 
 void pipeline_group::join_threads() {
@@ -138,7 +138,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             pipeline_queues[n + 1].enqueue(state);
         }
     }
-    std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
+    //std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }
 
 bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
