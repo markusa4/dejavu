@@ -465,8 +465,8 @@ void cumulative_counting::initialize(int size, coloring *c) {
     for(int i = 0; i < size; ++i) {
         this->count.push_back(0);
         this->sizes[i] = std::vector<int>();
+        this->sizes[i].reserve(8);
         this->sizes[i].push_back(-1);
-        //this->sizes[this->sizes.size() - 1].reserve(16);
     }
     reset_queue.initialize(size);
     reset_queue_sizes.initialize(size);
