@@ -11,6 +11,8 @@ struct configstruct {
     int CONFIG_IR_CELL_SELECTOR = 1;
     int CONFIG_IR_INVARIANT = 0;
 
+    int CONFIG_IR_REFINEMENT = 0;
+
     int CONFIG_RAND_ABORT = 5;
     int CONFIG_RAND_ABORT_RAND = 5;
 

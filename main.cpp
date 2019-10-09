@@ -191,6 +191,15 @@ int commandline_mode(int argc, char** argv) {
                 return 1;
             }
         }
+        if (std::string(argv[i]) == "--IR_REFINEMENT") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_REFINEMENT = atoi(argv[i]);
+            } else {
+                std::cerr << "--IR_REFINEMENT option requires one argument." << std::endl;
+                return 1;
+            }
+        }
     }
 
     if(!entered_file) {
@@ -209,7 +218,13 @@ int commandline_mode(int argc, char** argv) {
     if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
         A.sample(&g, true, &done);
     } else {
-        A.sample_pipelined(&g, true, &done, nullptr);
+        if(config.CONFIG_IR_REFINEMENT == 0) {
+            A.sample_pipelined(&g, true, &done, nullptr);
+        } else if(config.CONFIG_IR_REFINEMENT == 1) {
+            A.sample_pipelined_bucket(&g, true, &done, nullptr);
+        } else {
+            std::cout << "Unknown IR_REFINEMENT." << std::endl;
+        }
     }
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
