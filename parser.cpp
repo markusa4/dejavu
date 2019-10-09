@@ -27,9 +27,9 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
             case 'p':
                 iss.ignore(6);
                 iss >> nv >> ne;
-                g->v.reserve(nv);
-                g->d.reserve(nv);
-                g->e.reserve(ne * 2);
+                g->v = new int[nv];
+                g->d = new int[nv];
+                g->e = new int[ne * 2];
                 for(int i = 0; i < nv; ++i) {
                     incidence_list.emplace_back(vector<int>());
                 }
@@ -45,18 +45,26 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
         }
     }
 
+    int epos = 0;
+    int vpos = 0;
     for(int i = 0; i < incidence_list.size(); ++i) {
-        g->v.push_back(g->e.size());
-        g->d.push_back(incidence_list[i].size());
+        g->v[vpos] = epos;
+        g->d[vpos] = incidence_list[i].size();
+        vpos += 1;
         for(int j = 0; j < incidence_list[i].size(); ++j) {
-            g->e.push_back(incidence_list[i][j]);
+            g->e[epos] = incidence_list[i][j];
+            epos += 1;
         }
     }
 
-    std::cout << "Vertices: \t" << g->v.size() << std::endl;
-    std::cout << "Edges: \t\t" << g->e.size() << std::endl;
+    g->v_size = nv;
+    g->d_size = nv;
+    g->e_size = 2 * ne;
 
-    assert(nv == g->v.size());
-    assert(nv == g->d.size());
-    assert(2 * ne == g->e.size());
+    std::cout << "Vertices: \t" << g->v_size << std::endl;
+    std::cout << "Edges: \t\t" << g->e_size << std::endl;
+
+    assert(nv == g->v_size);
+    assert(nv == g->d_size);
+    assert(2 * ne == g->e_size);
 }

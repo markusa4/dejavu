@@ -79,11 +79,11 @@ void auto_blaster::find_automorphism_prob_bucket(sgraph* g, bool compare, invari
                     automorphism->inverse();
                     automorphism->compose(*canon_leaf);
                     if(!g->certify_automorphism(*automorphism)) {
-                        //std::cout << "Restart (leaf)." << *restarts << std::endl;
+                        std::cout << "Restart (leaf)." << *restarts << std::endl;
                         backtrack = true;
                         continue;
                     }
-                    //std::cout << "Found automorphism." << *restarts << std::endl;
+                    std::cout << "Found automorphism." << *restarts << std::endl;
                     return;
                 } else {
                     I.push_level();//I.print();
@@ -149,7 +149,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     *restarts = 0;
     ir_operation last_op = OP_R;
     I = start_I;
-    c = start_c;
+    c.copy(&start_c);
     if(compare)
         I.set_compare_invariant(canon_I);
     int startlevel = I.current_level();
@@ -163,7 +163,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             }
             *restarts += 1;
             //c.rewrite_ptn(&start_c);
-            c = start_c;
+            c.copy(&start_c);
 
             while(I.current_level() != startlevel)
                 I.pop_level();
@@ -265,7 +265,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     std::list<int> init_color_class;
     *restarts -= 1;
 
-    trail T(g->v.size());
+    trail T(g->v_size);
     c = start_c;
     I = start_I; // invariant, hopefully becomes complete in leafs such that automorphisms can be found
     if(compare)
@@ -466,7 +466,7 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
-        sequential_group G(g->v.size(), &base_points);
+        sequential_group G(g->v_size, &base_points);
         // run algorithm
         while (abort_counter <= 4) {
             sampled_paths += 1;
@@ -573,7 +573,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
     if(master) {
         // initialize automorphism group
         find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed);
-        G->initialize(g->v.size(), &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
+        G->initialize(g->v_size, &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
         // run algorithm
@@ -654,7 +654,7 @@ void auto_blaster::sample_pipelined_bucket(sgraph* g, bool master, bool* done, p
         // initialize automorphism group
         find_automorphism_prob_bucket(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &R);
         //sleep(10);
-        G->initialize(g->v.size(), &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
+        G->initialize(g->v_size, &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
         // run algorithm

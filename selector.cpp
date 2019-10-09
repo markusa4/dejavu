@@ -100,7 +100,7 @@ int selector::select_color(sgraph *g, coloring *c, int seed) {
 std::pair<int, int> selector::select_color_bucket(sgraph *g, coloring_bucket *c, int seed, int level) {
     int last_start = -1;
 
-    int largest_cell_sz  = g->v.size()+ 1;
+    int largest_cell_sz  = g->v_size+ 1;
     int largest_cell_pos = -1;
 
     for(int i = 0; i < c->lab_sz; ++i) {

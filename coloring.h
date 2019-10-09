@@ -11,6 +11,7 @@
 class coloring { // broken copy
 public:
     void rewrite_ptn(coloring* c);
+    void copy(coloring* c);
     int* lab;
     int* ptn;
     int lab_sz;

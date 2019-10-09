@@ -7,14 +7,14 @@
 
 // initialize a coloring of this sgraph, partitioning degrees of vertices
 void sgraph::initialize_coloring(coloring *c) {
-    c->lab = new int[this->v.size()];
-    c->ptn = new int[this->v.size()];
-    c->lab_sz = this->v.size();
-    c->ptn_sz = this->v.size();
+    c->lab = new int[this->v_size];
+    c->ptn = new int[this->v_size];
+    c->lab_sz = this->v_size;
+    c->ptn_sz = this->v_size;
     c->init = true;
-    c->vertex_to_col.reserve(this->v.size());
-    c->vertex_to_lab.reserve(this->v.size());
-    for(int i = 0; i < v.size(); i++) {
+    c->vertex_to_col.reserve(this->v_size);
+    c->vertex_to_lab.reserve(this->v_size);
+    for(int i = 0; i < v_size; i++) {
         c->vertex_to_col.push_back(-1);
         c->vertex_to_lab.push_back(-1);
         c->lab[i] = i;
@@ -48,7 +48,7 @@ void sgraph::initialize_coloring(coloring *c) {
 }
 
 void sgraph::initialize_coloring_bucket(coloring_bucket *c) {
-    int n = this->v.size();
+    int n = this->v_size;
     std::cout << "n:" << n << std::endl;
     c->lab = new int[n];
     c->ptn = new int[n];
@@ -65,9 +65,9 @@ void sgraph::initialize_coloring_bucket(coloring_bucket *c) {
 
 // certify that a permutation is an automorphism of the sgraph
 bool sgraph::certify_automorphism(bijection p) {
-    assert(p.map.size() == v.size());
+    assert(p.map.size() == v_size);
 
-    for(int i = 0; i < v.size(); ++i) {
+    for(int i = 0; i < v_size; ++i) {
         int image_i = p.map_vertex(i);
         if(d[i] != d[image_i]) // degrees must be equal
             return false;
@@ -101,7 +101,7 @@ sgraph sgraph::permute_graph(bijection p) { // ToDo: broken
     ng.d = d;
 
     int epos = 0;
-    for(int i = 0; i < v.size(); ++i) {
+    for(int i = 0; i < v_size; ++i) {
         int mapped_v = p.map_vertex(i);
         ng.d[i] = d[mapped_v];
         ng.v[i] = epos;
@@ -110,10 +110,10 @@ sgraph sgraph::permute_graph(bijection p) { // ToDo: broken
         }
         epos += ng.d[i];
     }
-    assert(ng.v.size() == v.size());
-    assert(ng.e.size() == e.size());
-    assert(ng.d.size() == d.size());
-    assert(epos == ng.e.size());
+    assert(ng.v_size == v_size);
+    assert(ng.e_size == e_size);
+    assert(ng.d_size == d_size);
+    assert(epos == ng.e_size);
 
     return ng;
 }

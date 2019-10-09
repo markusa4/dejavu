@@ -16,9 +16,13 @@ class sgraph {
         }
     };
 public:
-    std::vector<int> v;
-    std::vector<int> d;
-    std::vector<int> e;
+    int* v;
+    int* d;
+    int* e;
+
+    int v_size;
+    int d_size;
+    int e_size;
 
     sgraph permute_graph(bijection p);
     bool certify_automorphism(bijection p);

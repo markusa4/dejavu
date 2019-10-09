@@ -38,11 +38,11 @@ void bench_nauty(sgraph* g) {
     //static DEFAULTOPTIONS_SPARSEGRAPH(options);
 
     SG_INIT(sg);
-    int m = SETWORDSNEEDED(g->v.size());
-    nauty_check(WORDSIZE,m,g->v.size(),NAUTYVERSIONID);
-    SG_ALLOC(sg,g->v.size(),g->e.size(),"malloc");
-    sg.nv  = g->v.size();
-    sg.nde = g->e.size();
+    int m = SETWORDSNEEDED(g->v_size);
+    nauty_check(WORDSIZE,m,g->v_size,NAUTYVERSIONID);
+    SG_ALLOC(sg,g->v_size,g->e_size,"malloc");
+    sg.nv  = g->v_size;
+    sg.nde = g->e_size;
     //static DEFAULTOPTIONS_TRACES(options);
     static DEFAULTOPTIONS_SPARSEGRAPH(options);
     options.schreier = true;
@@ -54,16 +54,16 @@ void bench_nauty(sgraph* g) {
     DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
     DYNALLOC1(int,orbits,orbits_sz,sg.nv,"malloc");
 
-    for(int i = 0; i < g->v.size(); ++i) {
+    for(int i = 0; i < g->v_size; ++i) {
         lab[i] = i;
         ptn[i] = 1;
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
 
-    ptn[g->v.size() - 1] = 0;
+    ptn[g->v_size - 1] = 0;
 
-    for(int i = 0; i < g->e.size(); ++i) {
+    for(int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
     }
     sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
@@ -84,11 +84,11 @@ void bench_traces(sgraph* g) {
     //static DEFAULTOPTIONS_SPARSEGRAPH(options);
 
     SG_INIT(sg);
-    int m = SETWORDSNEEDED(g->v.size());
-    nauty_check(WORDSIZE,m,g->v.size(),NAUTYVERSIONID);
-    SG_ALLOC(sg,g->v.size(),g->e.size(),"malloc");
-    sg.nv  = g->v.size();
-    sg.nde = g->e.size();
+    int m = SETWORDSNEEDED(g->v_size);
+    nauty_check(WORDSIZE,m,g->v_size,NAUTYVERSIONID);
+    SG_ALLOC(sg,g->v_size,g->e_size,"malloc");
+    sg.nv  = g->v_size;
+    sg.nde = g->e_size;
     static DEFAULTOPTIONS_TRACES(options);
    // static DEFAULTOPTIONS_SPARSEGRAPH(options);
     //options.schreier = true;
@@ -100,16 +100,16 @@ void bench_traces(sgraph* g) {
     DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
     DYNALLOC1(int,orbits,orbits_sz,sg.nv,"malloc");
 
-    for(int i = 0; i < g->v.size(); ++i) {
+    for(int i = 0; i < g->v_size; ++i) {
         lab[i] = i;
         ptn[i] = 1;
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
 
-    ptn[g->v.size() - 1] = 0;
+    ptn[g->v_size - 1] = 0;
 
-    for(int i = 0; i < g->e.size(); ++i) {
+    for(int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
     }
     //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
@@ -249,7 +249,7 @@ int commandline_mode(int argc, char** argv) {
 
         }// use existing file
         std::cout<<"Appending to " << stat_filename << ".\n";
-        stat_file << g.v.size() << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
+        stat_file << g.v_size << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
 
@@ -279,7 +279,7 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
-     //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
+     //g = g.permute_graph(bijection::random_bijection(g.v_size)); // permute graph
     // canonically label the sgraph
 
     //bijection canon_p;
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
     if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
         A.sample(&g, true, &done);
     } else {
-        A.sample_pipelined_bucket(&g, true, &done, nullptr);
+        A.sample_pipelined(&g, true, &done, nullptr);
     }
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;

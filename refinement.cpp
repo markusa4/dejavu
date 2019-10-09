@@ -15,14 +15,14 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     //std::cout << "Refining..." << std::endl;
     bool comp = true;
     if(!initialized) {
-        counting_array.initialize(g->v.size(), c);
-        vertex_workset.initialize(g->v.size());
-        color_workset.initialize(g->v.size());
-        vertex_worklist.initialize(g->v.size());
-        old_color_classes.initialize(g->v.size());
-        color_worklist_vertex.initialize(g->v.size());
-        color_worklist_color.initialize(g->v.size());
-        color_class_splits.initialize(g->v.size());
+        counting_array.initialize(g->v_size, c);
+        vertex_workset.initialize(g->v_size);
+        color_workset.initialize(g->v_size);
+        vertex_worklist.initialize(g->v_size);
+        old_color_classes.initialize(g->v_size);
+        color_worklist_vertex.initialize(g->v_size);
+        color_worklist_color.initialize(g->v_size);
+        color_class_splits.initialize(g->v_size);
         initialized = true;
         largest_color_class_index = new int[c->lab_sz];
     }
@@ -83,13 +83,8 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     // for all vertices of the color class...
     // ToDo: can replace worklists with fixed size arrays
     bool comp = true;
-    //std::set<int> new_colors;
 
     int cc = color_class; // iterate over color class
-
-    //if(c->ptn[cc] == 0)  // singleton cell
-    //    return refine_color_class_singleton(g, c, color_class, class_size, color_class_split_worklist, I, largest_color_class_index);
-
 
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
         int vc = c->lab[cc];
@@ -99,7 +94,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             // v is a neighbour of vc
             int v = g->e[i];
             if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
-            //if(counting_array.get_count(v) == 0) {
                 vertex_workset.set(v);
                 vertex_worklist.push_back(v);
                 counting_array.increment(v, true);
@@ -397,7 +391,7 @@ void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::list<std::
 }
 
 void refinement::complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I) {
-    for(int i = 0; i < g->v.size(); ++i) {
+    for(int i = 0; i < g->v_size; ++i) {
         std::list<int> neighbour_col;
         int v = c->lab[i];
         I->write_top(-5);
@@ -418,7 +412,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     bool first_of_color = true;
     bool test = true;
 
-    for(int i = 0; i < g->v.size(); ++i) {
+    for(int i = 0; i < g->v_size; ++i) {
         neighbour_col.clear();
         int v = c->lab[i];
         for(int j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
@@ -467,10 +461,11 @@ refinement::~refinement() {
 
 void cumulative_counting::initialize(int size, coloring *c) {
     this->c = c;
+    sizes = new std::vector<int>[size];
     for(int i = 0; i < size; ++i) {
         this->count.push_back(0);
-        this->sizes.emplace_back(std::vector<int>());
-        this->sizes[this->sizes.size() - 1].push_back(-1);
+        this->sizes[i] = std::vector<int>();
+        this->sizes[i].push_back(-1);
         //this->sizes[this->sizes.size() - 1].reserve(16);
     }
     reset_queue.initialize(size);

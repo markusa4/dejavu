@@ -17,14 +17,14 @@ extern "C" {
      if(!has_nauty_graph) {
          sg = new sparsegraph;
          SG_INIT(*sg);
-         SG_ALLOC(*sg, g->v.size(), g->e.size(), "malloc");
-         sg->nv = g->v.size();
-         sg->nde = g->e.size();
-         for (int i = 0; i < g->v.size(); ++i) {
+         SG_ALLOC(*sg, g->v_size, g->e_size, "malloc");
+         sg->nv = g->v_size;
+         sg->nde = g->e_size;
+         for (int i = 0; i < g->v_size; ++i) {
              sg->v[i] = g->v[i];
              sg->d[i] = g->d[i];
          }
-         for (int i = 0; i < g->e.size(); ++i) {
+         for (int i = 0; i < g->e_size; ++i) {
              sg->e[i] = g->e[i];
          }
          n = sg->nv;

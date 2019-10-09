@@ -102,7 +102,7 @@ static TLS_ATTR set snwork[40*MAXM];
 *****************************************************************************/
 
 #if !MAXN
-static void
+void
 preparemarks1(size_t nn, short** vmark1, size_t* vmark1_sz, short* vmark1_val)
 {
     size_t oldsize;
@@ -116,7 +116,7 @@ preparemarks1(size_t nn, short** vmark1, size_t* vmark1_sz, short* vmark1_val)
 #endif
 
 #if !MAXN
-static void
+void
 preparemarks2(size_t nn, short** vmark2, size_t* vmark2_sz, short* vmark2_val)
 {
     size_t oldsize;
@@ -227,7 +227,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                 continue;
             }
 
-            longcode = MASH(longcode,v1);
+            //longcode = MASH(longcode,v1);
             if(!I->write_top_and_compare((v1))) {return false;}
             w1 = HITS[lab[v1]];
 
@@ -280,9 +280,9 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                 }
             } while (ptn[j++] > level);
 
-            longcode = MASH(longcode,w2);
+            //longcode = MASH(longcode,w2);
             if(!I->write_top_and_compare((w2))) {return false;}
-            longcode = MASH(longcode,v2);
+            //longcode = MASH(longcode,v2);
             if(!I->write_top_and_compare((v2))) {return false;}
             if (j != v2)   /* At least two fragments
                                 * v1..v2-1 = w1; v2..v3-1 = w2  */
@@ -331,7 +331,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                     for (k = v3-1; k < j-1;)
                     {
                         ptn[k] = level;
-                        longcode = MASH(longcode,k);
+                        //longcode = MASH(longcode,k);
                         if(!I->write_top_and_compare((k))) {return false;}
                         ++*numcells;
                         l = k+1;
@@ -357,7 +357,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
 
                     if (bigpos >= 0 && !ISELEMENT(active,v1))
                     {
-                        longcode = MASH(longcode,bigpos);
+                        //longcode = MASH(longcode,bigpos);
                         if(!I->write_top_and_compare((bigpos))) {return false;}
                         DELELEMENT(active,ACTIVE[bigpos]);
                         ADDELEMENT(active,v1);
@@ -388,7 +388,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
         }
 
         DELELEMENT(active,isplit);
-        longcode = MASH(longcode,isplit);
+        //longcode = MASH(longcode,isplit);
         if(!I->write_top_and_compare((isplit))) {return false;}
 
         if (trivsplit)
@@ -412,7 +412,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
             }
 
             if (hitcells > 1) sortints(HITCELL,hitcells);
-            longcode = MASH(longcode,hitcells);
+            //longcode = MASH(longcode,hitcells);
             if(!I->write_top_and_compare((hitcells))) {return false;}
 
             /* divide cells according to which vertices are hit */
@@ -420,7 +420,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
             for (i = 0; i < hitcells; ++i)
             {
                 j = v1 = v2 = HITCELL[i];
-                longcode = MASH(longcode,v2);
+                //longcode = MASH(longcode,v2);
                 if(!I->write_top_and_compare((v2))) {return false;}
                 k = 0;
                 do
@@ -432,7 +432,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                         lab[v2++] = lj;
                 } while (ptn[j++] > level);
 
-                longcode = MASH(longcode,k);
+                //longcode = MASH(longcode,k);
                 if(!I->write_top_and_compare((k))) {return false;}
                 v3 = v2;
                 while (--k >= 0)
@@ -448,7 +448,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                     if (v2 == v1+1) CELLSTART[lab[v1]] = n;
                     if (v3 == v2+1) CELLSTART[lab[v2]] = n;
                     ptn[v2-1] = level;
-                    longcode = MASH(longcode,v2);
+                    //longcode = MASH(longcode,v2);
                     if(!I->write_top_and_compare((v2))) {return false;}
                     if (v2-v1 <= v3-v2 && !ISELEMENT(active,v1))
                     {
@@ -499,13 +499,13 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
 
             /* divide cells according to hit counts */
 
-            longcode = MASH(longcode,hitcells);
+            //longcode = MASH(longcode,hitcells);
             if(!I->write_top_and_compare((hitcells))) {return false;}
             for (i = 0; i < hitcells; ++i)
             {
                 v1 = HITCELL[i];
                 w1 = HITS[lab[v1]];
-                longcode = MASH(longcode,v1);
+                //longcode = MASH(longcode,v1);
                 if(!I->write_top_and_compare((v1))) {return false;}
 
                 v2 = v1+1;
@@ -552,9 +552,9 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                     }
                 } while (ptn[j++] > level);
 
-                longcode = MASH(longcode,w1);
+                //longcode = MASH(longcode,w1);
                 if(!I->write_top_and_compare((w1))) {return false;}
-                longcode = MASH(longcode,v2);
+                //longcode = MASH(longcode,v2);
                 if(!I->write_top_and_compare((v2))) {return false;}
                 if (j != v2)   /* At least two fragments
                                 * v1..v2-1 = w1; v2..v3-1 = w2  */
@@ -587,7 +587,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                     else
                     {
                         /* Extra fragments: v3..j-1 > w2 */
-                        longcode = MASH(longcode,v3);
+                        //longcode = MASH(longcode,v3);
                         if(!I->write_top_and_compare((v3))) {return false;}
                         sortindirect(lab+v3,HITS,j-v3);
                         ACTIVE[nactive++] = v2;
@@ -601,7 +601,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                         {
                             bigpos = nactive-1;
                             bigsize = v3-v2;
-                            longcode = MASH(longcode,bigsize);
+                            //longcode = MASH(longcode,bigsize);
                             if(!I->write_top_and_compare((bigsize))) {return false;}
                         }
                         for (k = v3-1; k < j-1;)
@@ -612,7 +612,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
                             ADDELEMENT(active,l);
                             ACTIVE[nactive++] = l;
                             w3 = HITS[lab[l]];
-                            longcode = MASH(longcode,w3);
+                            //longcode = MASH(longcode,w3);
                             if(!I->write_top_and_compare((w3))) {return false;}
                             for (k = l; k < j-1
                                         && HITS[lab[k+1]] == w3; ++k)
@@ -643,7 +643,7 @@ dynamic_refine_sg(graph *g, int *lab, int *ptn, int level, int *numcells,
         }
     }
 
-    longcode = MASH(longcode,*numcells);
+    //longcode = MASH(longcode,*numcells);
     if(!I->write_top_and_compare((*numcells))) {return false;}
     *code = CLEANUP(longcode);
     return true;

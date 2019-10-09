@@ -39,7 +39,7 @@ public:
 private:
     coloring* c;
     std::vector<int> count;
-    std::vector<std::vector<int>> sizes;
+    std::vector<int>* sizes;
     work_queue reset_queue;
     work_queue reset_queue_sizes;
 };
