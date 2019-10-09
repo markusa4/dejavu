@@ -32,7 +32,8 @@ class cumulative_counting {
 public:
     void initialize(int size, coloring *c);
     void reset();
-    void increment(int index, bool r);
+    void increment(int index);
+    void increment_r(int index);
     int get_size(int index);
     int get_count(int index);
     void set_coloring(coloring *c);

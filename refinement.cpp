@@ -96,9 +96,9 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
                 vertex_workset.set(v);
                 vertex_worklist.push_back(v);
-                counting_array.increment(v, true);
+                counting_array.increment_r(v);
             } else {
-                counting_array.increment(v, false);
+                counting_array.increment(v);
             }
         }
         cc += 1;
@@ -486,12 +486,9 @@ void cumulative_counting::reset() {
     }
 }
 
-void inline cumulative_counting::increment(int index, bool r) {
+void inline cumulative_counting::increment(int index) {
     //if(count[index] == 0) {
     count[index] += 1;
-    if(r) {
-        reset_queue.push(index);
-    }
     assert(c->vertex_to_col[index] == c->vertex_to_col[c->lab[c->vertex_to_col[index]]]);
     int b_col_index = c->vertex_to_col[index];
     int sz = sizes[b_col_index].size();
@@ -505,6 +502,25 @@ void inline cumulative_counting::increment(int index, bool r) {
         sizes[b_col_index][count[index]] += 1;
     }
 }
+
+void inline cumulative_counting::increment_r(int index) {
+    //if(count[index] == 0) {
+    count[index] += 1;
+    reset_queue.push(index);
+    assert(c->vertex_to_col[index] == c->vertex_to_col[c->lab[c->vertex_to_col[index]]]);
+    int b_col_index = c->vertex_to_col[index];
+    int sz = sizes[b_col_index].size();
+    if(sz <= count[index]) {
+        if(sz <= 1) {
+            assert(sizes[b_col_index].size() == 1);
+            reset_queue_sizes.push(b_col_index);
+        }
+        sizes[b_col_index].push_back(1);
+    } else {
+        sizes[b_col_index][count[index]] += 1;
+    }
+}
+
 
 int cumulative_counting::get_size(int index) {
     assert(count[index] > 0);

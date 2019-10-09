@@ -26,7 +26,24 @@ public:
 
     bool level_is_eq(invariant *other, int level);
 
-    bool write_top_and_compare(int i);
+    inline bool write_top_and_compare(int i) {
+        if(no_write) {
+            int pos2 = fake_sz;
+            fake_sz += 1;
+            return (compare_level->size() > pos2) && (i == (*compare_level)[pos2]);
+        } else {
+            vec_invariant[cur_pos].push_back(i);
+            int pos2 = vec_invariant[cur_pos].size() - 1;
+            if (has_compare) {
+                if ((*compareI->get_level(cur_pos)).size() <= pos2)
+                    return false;
+                return vec_invariant[cur_pos][pos2] == (*compareI->get_level(cur_pos))[pos2];
+            } else {
+                return true;
+            }
+        }
+    }
+
     bool compare_sizes();
 
     void set_compare_invariant(invariant *I);

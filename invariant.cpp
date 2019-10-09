@@ -78,24 +78,6 @@ void invariant::write_top(int i) {
     vec_invariant[vec_invariant.size() - 1].push_back(i);
 }
 
-bool invariant::write_top_and_compare(int i) {
-    if(no_write) {
-        int pos2 = fake_sz;
-        fake_sz += 1;
-        return (compare_level->size() > pos2) && (i == (*compare_level)[pos2]);
-    } else {
-        vec_invariant[cur_pos].push_back(i);
-        int pos2 = vec_invariant[cur_pos].size() - 1;
-        if (has_compare) {
-            if ((*compareI->get_level(cur_pos)).size() <= pos2)
-                return false;
-            return vec_invariant[cur_pos][pos2] == (*compareI->get_level(cur_pos))[pos2];
-        } else {
-            return true;
-        }
-    }
-}
-
 void invariant::print() {
     for(int i = 0; i < vec_invariant.size(); ++i) {
         for(int j = 0; j < vec_invariant[i].size(); ++j) {
