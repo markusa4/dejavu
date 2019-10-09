@@ -20,10 +20,121 @@
 #include "concurrentqueue.h"
 #include "invariant_acc.h"
 #include "pipeline_group.h"
+#include "refinement_bucket.h"
 #include <pthread.h>
+#include <chrono>
 
 extern long mmultcount;
 extern long mfiltercount;
+
+void auto_blaster::find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
+                                          bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, refinement_bucket* R) {
+    bool backtrack = false;
+    std::list<std::pair<int, int>> changes;
+    selector S;
+    coloring_bucket c;
+    invariant I;
+    std::list<int> init_color_class;
+    *restarts = 0;
+    ir_operation last_op = OP_R;
+    I = start_I;
+    c.copy(&start_cb);
+    int level = 2;
+
+    if(compare)
+        I.set_compare_invariant(canon_I);
+    int startlevel = I.current_level();
+
+    while (true) {
+        if (backtrack) {
+            //std::cout << "backtrack" << std::endl;
+            // initialize a search state
+            //I.print();
+            //assert(false);
+            if(*done) {
+                return;
+            }
+            *restarts += 1;
+            c.copy(&start_cb);
+            while(I.current_level() != startlevel)
+                I.pop_level();
+            // invariant, hopefully becomes complete in leafs such that automorphisms can be found
+            init_color_class.clear();
+            last_op = OP_R;
+            backtrack = false;
+            level = 2;
+        }
+
+        std::pair<int, int> s;
+        if (!backtrack) {
+            s = S.select_color_bucket(g, &c, selector_seed, level);
+            if (s.first == -1) {
+                if (compare) {
+                    // we can derive an automorphism!
+                    bijection leaf;
+                    leaf.read_from_coloring_bucket(&c);
+                    //I.print();
+                    //c.print();
+                    *automorphism = leaf;
+                    automorphism->inverse();
+                    automorphism->compose(*canon_leaf);
+                    if(!g->certify_automorphism(*automorphism)) {
+                        //std::cout << "Restart (leaf)." << *restarts << std::endl;
+                        backtrack = true;
+                        continue;
+                    }
+                    //std::cout << "Found automorphism." << *restarts << std::endl;
+                    return;
+                } else {
+                    I.push_level();//I.print();
+
+                    canon_leaf->read_from_coloring_bucket(&c);
+                    *canon_I = I;
+                    std::cout << "Finished first" << std::endl;
+                    return;
+                }
+            }
+        }
+
+        if (last_op == OP_I) { // add new operations to trail...
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                                REFINEMENT
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            changes.clear();
+            I.push_level();
+            //assert(init_color_class.size() == 2);
+            bool comp = R->refine_coloring(g, &c, &I, level);
+            last_op = OP_R;
+            if (compare) {
+                // compare invariant
+                if(!comp || !I.compare_sizes()) {
+                    backtrack = true;
+                    continue;
+                }
+                //if (I.level_is_eq(canon_I, I.current_level())) {
+                continue;
+            }
+        } else if (last_op == OP_R) {
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                             INDIVIDUALIZATION
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // collect all elements of color s //
+            level += 1;
+            int rpos = s.first + ((*re)() % (s.second));
+            //std::cout << s.first << ", " << s.second << std::endl;
+            assert(rpos < c.lab_sz);
+            // cell size?
+            int v = c.lab[rpos];
+            // individualize random vertex of class
+            R->individualize_vertex(g, &c, s.first, v, level);
+            last_op = OP_I;
+            if (!compare) { // base points
+                automorphism->map.push_back(v);
+            }
+        }
+    }
+}
+
 
 // ToDo: recreate backtracking version
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
@@ -434,9 +545,14 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
     std::list<std::pair<int, int>> changes;
     if(master) {
         start_I.push_level();
+
+        std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(&start_c);
         std::list<int> init_color_class;
         R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+
         G = new pipeline_group();
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
@@ -487,6 +603,82 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
                 find_automorphism_bt(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             } else {
                 find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
+            }
+            G->add_permutation(&automorphism, &idle_ms, done);
+        }
+        //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
+        return;
+    }
+}
+
+
+void auto_blaster::sample_pipelined_bucket(sgraph* g, bool master, bool* done, pipeline_group* G) {
+    // find comparison leaf
+    invariant canon_I;
+    std::vector<std::thread> work_threads;
+    bijection canon_leaf;
+    bijection base_points;
+    bool trash_bool = false;
+    int trash_int = 0;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine re = std::default_random_engine(seed);
+    int selector_seed = re() % INT32_MAX;
+
+    refinement_bucket R;
+    std::list<std::pair<int, int>> changes;
+    if(master) {
+        start_I.push_level();
+
+        std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+        g->initialize_coloring_bucket(&start_cb);
+        std::list<int> init_color_class;
+        R.initialize_active(g);
+        R.refine_coloring(g, &start_cb, &start_I, 1);
+       // c.print();
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+
+        G = new pipeline_group();
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined_bucket, this, g, false, done, G));
+        std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
+    }
+
+    int restarts = 0;
+
+    // sample for automorphisms
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                                      MASTER THREAD
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    if(master) {
+        // initialize automorphism group
+        find_automorphism_prob_bucket(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &R);
+        //sleep(10);
+        G->initialize(g->v.size(), &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
+        G->launch_pipeline_threads(done);
+        G->pipeline_stage(0, done);
+        // run algorithm
+        std::cout << "Base size:  " << G->base_size << std::endl;
+        std::cout << "Group size: ";
+        G->print_group_size();
+        G->join_threads();
+        while(!work_threads.empty()) {
+            work_threads[work_threads.size()-1].join();
+            work_threads.pop_back();
+        }
+        delete G;
+    } else {
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //                                                      SLAVE THREAD
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        int idle_ms = 0;
+        find_automorphism_prob_bucket(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &R);
+        while(!(*done)) {
+            bijection automorphism;
+            if(config.CONFIG_IR_BACKTRACK) {
+                //find_automorphism_bt(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
+            } else {
+                find_automorphism_prob_bucket(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &R);
             }
             G->add_permutation(&automorphism, &idle_ms, done);
         }

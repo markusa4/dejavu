@@ -7,7 +7,7 @@
 
 int selector::select_color_first(sgraph *g, coloring *c) {
     int first_cell  = -1;
-    for(int i = 0; i < c->ptn.size();){
+    for(int i = 0; i < c->ptn_sz;){
         if(c->ptn[i] > 0) {
             first_cell = i;
             break;
@@ -21,8 +21,8 @@ int selector::select_color_first(sgraph *g, coloring *c) {
 // "first largest", -1 if coloring is discrete
 int selector::select_color_smallest(sgraph *g, coloring *c) {
     int smallest_cell  = -1;
-    int smallest_cell_sz = c->lab.size() + 1;
-    for(int i = 0; i < c->ptn.size();){
+    int smallest_cell_sz = c->lab_sz + 1;
+    for(int i = 0; i < c->ptn_sz;){
         if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
             smallest_cell = i;
             smallest_cell_sz = c->ptn[i];
@@ -35,7 +35,7 @@ int selector::select_color_smallest(sgraph *g, coloring *c) {
 int selector::select_color_largest(sgraph *g, coloring *c) {
     int largest_cell  = -1;
     int largest_cell_sz = -1;
-    for(int i = 0; i < c->ptn.size();){ // c->ptn[i] > largest_cell_sz &&
+    for(int i = 0; i < c->ptn_sz;){ // c->ptn[i] > largest_cell_sz &&
         if(c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
             largest_cell = i;
             largest_cell_sz = c->ptn[i];
@@ -53,7 +53,7 @@ int selector::select_color_largest_degseq2(sgraph *g, coloring *c) {
     int largest_cell  = -1;
     int largest_cell_sz = -1;
     int largest_cell_deg = -1;
-    for(int i = 0; i < c->ptn.size();) { // c->ptn[i] > largest_cell_sz &&
+    for(int i = 0; i < c->ptn_sz;) { // c->ptn[i] > largest_cell_sz &&
         if((c->ptn[i] > largest_cell_sz && (g->d[c->lab[i]] > 1) &&  c->ptn[i] > 0)) {
             largest_cell = i;
             largest_cell_sz = c->ptn[i];
@@ -68,7 +68,7 @@ int selector::select_color_largest_degseq2(sgraph *g, coloring *c) {
 
 int selector::seeded_select_color(sgraph *g, coloring *c, int seed) {
     std::vector<int> cells;
-    for(int i = 0; i < c->ptn.size();){
+    for(int i = 0; i < c->ptn_sz;){
         if(c->ptn[i] > 0) {
             cells.push_back(i);
         }
@@ -96,3 +96,24 @@ int selector::select_color(sgraph *g, coloring *c, int seed) {
             return select_color_first(g, c);
     }
 }
+
+std::pair<int, int> selector::select_color_bucket(sgraph *g, coloring_bucket *c, int seed, int level) {
+    int last_start = -1;
+
+    int largest_cell_sz  = g->v.size()+ 1;
+    int largest_cell_pos = -1;
+
+    for(int i = 0; i < c->lab_sz; ++i) {
+        if(c->ptn[i] <= level) {
+            int cell_sz = i - last_start;
+            if(cell_sz > 1 && cell_sz < largest_cell_sz) {
+                largest_cell_sz = cell_sz;
+                largest_cell_pos = last_start + 1;
+            }
+            last_start = i;
+        }
+    }
+
+    return std::pair<int, int>(largest_cell_pos, largest_cell_sz);
+}
+

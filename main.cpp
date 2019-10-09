@@ -201,6 +201,7 @@ int commandline_mode(int argc, char** argv) {
     sgraph g;
     p.parse_dimacs_file(filename, &g);
 
+    sleep(1);
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     Clock::time_point timer = Clock::now();
     auto_blaster A;
@@ -269,10 +270,13 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file(argv[1], &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/k/k/k150.dimacs", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/ag/ag/ag2-47", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-100", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-47", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
      //g = g.permute_graph(bijection::random_bijection(g.v.size())); // permute graph
@@ -288,7 +292,7 @@ int main(int argc, char *argv[]) {
     if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
         A.sample(&g, true, &done);
     } else {
-        A.sample_pipelined(&g, true, &done, nullptr);
+        A.sample_pipelined_bucket(&g, true, &done, nullptr);
     }
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;

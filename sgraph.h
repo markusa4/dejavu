@@ -4,6 +4,7 @@
 #include <vector>
 #include "bijection.h"
 #include "coloring.h"
+#include "coloring_bucket.h"
 
 class sgraph {
     struct vertexComparator {
@@ -22,6 +23,7 @@ public:
     sgraph permute_graph(bijection p);
     bool certify_automorphism(bijection p);
     void initialize_coloring(coloring* c);
+    void initialize_coloring_bucket(coloring_bucket* c);
 };
 
 #endif //BRUTUS_GRAPH_H

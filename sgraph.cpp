@@ -7,25 +7,28 @@
 
 // initialize a coloring of this sgraph, partitioning degrees of vertices
 void sgraph::initialize_coloring(coloring *c) {
-    c->lab.reserve(this->v.size());
-    c->ptn.reserve(this->v.size());
+    c->lab = new int[this->v.size()];
+    c->ptn = new int[this->v.size()];
+    c->lab_sz = this->v.size();
+    c->ptn_sz = this->v.size();
+    c->init = true;
     c->vertex_to_col.reserve(this->v.size());
     c->vertex_to_lab.reserve(this->v.size());
     for(int i = 0; i < v.size(); i++) {
         c->vertex_to_col.push_back(-1);
         c->vertex_to_lab.push_back(-1);
-        c->lab.push_back(i);
-        c->ptn.push_back(1);
+        c->lab[i] = i;
+        c->ptn[i] = 1;
     }
 
-    std::sort(c->lab.begin(), c->lab.end(), vertexComparator(*this));
+    std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
 
     int cells = 0;
     int last_new_cell   = 0;
-    for(int i = 0; i < c->lab.size(); i++) {
+    for(int i = 0; i < c->lab_sz; i++) {
         c->vertex_to_col[c->lab[i]] = last_new_cell;
         c->vertex_to_lab[c->lab[i]] = i;
-        if(i + 1 == c->lab.size()) {
+        if(i + 1 == c->lab_sz) {
             cells += 1;
             c->ptn[last_new_cell] = i - last_new_cell;
             c->ptn[i] = 0;
@@ -42,6 +45,22 @@ void sgraph::initialize_coloring(coloring *c) {
     }
 
     //std::cout << "Cells: " << cells << std::endl;
+}
+
+void sgraph::initialize_coloring_bucket(coloring_bucket *c) {
+    int n = this->v.size();
+    std::cout << "n:" << n << std::endl;
+    c->lab = new int[n];
+    c->ptn = new int[n];
+    c->lab_sz = n;
+    c->ptn_sz = n;
+
+    for(int i = 0; i < n; i++) {
+        c->lab[i] = i;
+        c->ptn[i] = n + 1;
+    }
+    c->ptn[n - 1] = 0;
+    c->init = true;
 }
 
 // certify that a permutation is an automorphism of the sgraph

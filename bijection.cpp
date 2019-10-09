@@ -6,6 +6,7 @@
 #include <chrono>
 #include <random>
 #include "bijection.h"
+#include "coloring_bucket.h"
 
 int bijection::map_vertex(int v) {
     return map[v];
@@ -13,8 +14,8 @@ int bijection::map_vertex(int v) {
 
 void bijection::read_from_coloring(coloring *c) {
     map.clear();
-    map.reserve(c->lab.size());
-    for(int i = 0; i < c->lab.size(); ++i) {
+    map.reserve(c->lab_sz);
+    for(int i = 0; i < c->lab_sz; ++i) {
         map.push_back(c->lab[i]);
     }
 }
@@ -51,4 +52,12 @@ bijection bijection::random_bijection(int n) {
     std::default_random_engine re = std::default_random_engine(seed);
     std::shuffle(p.map.begin(), p.map.end(), re);
     return p;
+}
+
+void bijection::read_from_coloring_bucket(coloring_bucket *c) {
+    map.clear();
+    map.reserve(c->lab_sz);
+    for(int i = 0; i < c->lab_sz; ++i) {
+        map.push_back(c->lab[i]);
+    }
 }

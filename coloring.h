@@ -8,13 +8,17 @@
 
 #include <vector>
 
-class coloring {
+class coloring { // broken copy
 public:
     void rewrite_ptn(coloring* c);
-    std::vector<int>  lab;
-    std::vector<int>  ptn;
+    int* lab;
+    int* ptn;
+    int lab_sz;
+    int ptn_sz;
+    bool init = false;
     std::vector<int>  vertex_to_col;
     std::vector<int>  vertex_to_lab;
+    ~coloring();
 };
 
 #endif //BRUTUS_COLORING_H

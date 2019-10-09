@@ -12,6 +12,8 @@
 
 class selector {
 public:
+    std::pair<int, int> select_color_bucket(sgraph *g, coloring_bucket *c, int seed, int level);
+
     int select_color(sgraph *g, coloring *c, int seed);
 
     int seeded_select_color(sgraph *g, coloring *c, int seed);

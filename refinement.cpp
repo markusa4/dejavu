@@ -24,7 +24,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_worklist_color.initialize(g->v.size());
         color_class_splits.initialize(g->v.size());
         initialized = true;
-        largest_color_class_index = new int[c->lab.size()];
+        largest_color_class_index = new int[c->lab_sz];
     }
     counting_array.set_coloring(c);
     //std::list<std::pair<int, int>> color_class_splits;
@@ -32,7 +32,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
 
     if(init_color_class->empty()) {
         // initialize queue with all classes
-        for (int i = 0; i < c->ptn.size();) {
+        for (int i = 0; i < c->ptn_sz;) {
             worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
             i += c->ptn[i] + 1;
         }
@@ -168,7 +168,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         int largest_color_class_size = -1;
 
         for(int i = fst; i < fst + snd;){
-            assert(i >= 0 && i < c->ptn.size());
+            assert(i >= 0 && i < c->ptn_sz);
             assert(c->ptn[i] + 1 > 0);
             int v_color  = i;
             int v_degree = counting_array.get_count(c->lab[i]);
@@ -284,7 +284,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         int largest_color_class_size = -1;
 
         for(int i = fst; i < fst + snd;) {
-            assert(i >= 0 && i < c->ptn.size());
+            assert(i >= 0 && i < c->ptn_sz);
             assert(c->ptn[i] + 1 > 0);
             int v_color  = i;
             int v_degree = counting_array.get_count(c->lab[i]);
@@ -381,7 +381,7 @@ void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::list<std::
     // sanity check
     int expect0 = 0;
     bool expectsize = true;
-    for(int i = 0; i < c->lab.size(); ++i) {
+    for(int i = 0; i < c->lab_sz; ++i) {
         if(expectsize) {
             expectsize = false;
             expect0 = c->ptn[i];
@@ -441,7 +441,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     int expect0 = 0;
     bool expectsize = true;
     //std::cout << "part";
-    for(int i = 0; i < c->lab.size(); ++i) {
+    for(int i = 0; i < c->lab_sz; ++i) {
         if(expectsize) {
             expectsize = false;
             expect0 = c->ptn[i];
