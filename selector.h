@@ -9,8 +9,12 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "configuration.h"
+#include <list>
 
 class selector {
+    int skipstart = 0;
+    std::list<std::pair<int, int>> largest_cache;
+
 public:
     std::pair<int, int> select_color_bucket(sgraph *g, coloring_bucket *c, int seed, int level);
 
@@ -25,6 +29,8 @@ public:
     int select_color_first(sgraph *g, coloring *c);
 
     int select_color_largest_degseq2(sgraph *g, coloring *c);
+
+    void empty_cache();
 };
 
 

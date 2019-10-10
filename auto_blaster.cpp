@@ -161,6 +161,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     while (true) {
         if(*done) return;
         if (backtrack) {
+            S.empty_cache();
             // initialize a search state
             *restarts += 1;
             //c.rewrite_ptn(&start_c);
