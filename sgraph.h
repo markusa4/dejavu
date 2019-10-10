@@ -6,7 +6,7 @@
 #include "coloring.h"
 #include "coloring_bucket.h"
 
-class sgraph {
+class alignas(64) sgraph {
     struct vertexComparator {
         vertexComparator(const sgraph& g) : g(g) {}
         const sgraph& g;
