@@ -615,6 +615,7 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         //                                                      SLAVE THREAD
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         int idle_ms = 0;
+        std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
         while(!(*done)) {
             bijection automorphism;
@@ -624,7 +625,10 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
                 find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &W);
             }
             G->add_permutation(&automorphism, &idle_ms, done);
+            sampled_paths += 1;
         }
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "Refinement speed: " << sampled_paths / (cref / 1000000.0) << "l/s" << std::endl;
         //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
     }

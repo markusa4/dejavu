@@ -27,6 +27,8 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     int leafs_considered = 0;
     int random_abort_counter = 0;
 
+    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+
     if(base_size == 0)
         *done = true;
 
@@ -44,12 +46,18 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         int *_p = nullptr;
         bool is_random = false;
 
+        // context switch
+        std::this_thread::yield();
         if (is_first_stage) {
             // collect results and determine whether done
             std::pair<bool, bool> res;
             bool d = sift_results.try_dequeue(res);
             while(d) {
                 if(!res.first) {
+                    if(leafs_considered == 0) {
+                        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                        std::cout << "First leaf arrived: " << cref / 1000000.0 << "ms" << std::endl;
+                    }
                     leafs_considered += 1;
                     if(!res.second) {
                         abort_counter += 1;
@@ -76,7 +84,8 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             d = automorphisms.try_dequeue(p);
             // automorphisms non-empty? take that element
             while(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                std::this_thread::yield();
+                //std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 front_idle_ms += 1;
                 d = automorphisms.try_dequeue(p);
                 /*if(front_idle_ms % 10000 == 0) {
@@ -112,6 +121,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                               << pipeline_queues[n].size_approx() << std::endl;
                 }*/
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                //std::this_thread::yield();
                 front_idle_ms += 1;
                 d = pipeline_queues[n].try_dequeue(state);
             }
@@ -138,6 +148,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                               << pipeline_queues[n + 1].size_approx() << std::endl;
                 }*/
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                //std::this_thread::yield();
                 back_idle_ms += 1;
             }
             pipeline_queues[n + 1].enqueue(state);
