@@ -8,7 +8,7 @@
 
 #include <vector>
 
-class coloring { // broken copy
+class alignas(64) coloring { // broken copy
 public:
     void rewrite_ptn(coloring* c);
     void copy(coloring* c);

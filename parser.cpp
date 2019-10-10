@@ -21,6 +21,7 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
     int nv, ne;
     while (std::getline(infile, line)) {
         std::istringstream iss(line);
+        //std::cout << line << std::endl;
         char m;
         if (!(iss >> m)) break;
         switch (m) {

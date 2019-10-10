@@ -55,9 +55,9 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
             numcells += 1;
         }
         for (int i = 0; i < c->ptn_sz;) {
-            if(numcells == 1 || largest_cell_pos == i) {
+           // if(numcells == 1 || largest_cell_pos == i) {
                 worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
-            }
+            //}
             i += c->ptn[i] + 1;
         }
     } else {
