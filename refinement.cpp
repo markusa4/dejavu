@@ -35,7 +35,6 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.initialize(g->v_size);
         initialized = true;
         largest_color_class_index = new int[c->lab_sz];
-        old_class_sizes = new int[c->lab_sz];
     }
     counting_array.set_coloring(c);
     //std::list<std::pair<int, int>> color_class_splits;
@@ -193,8 +192,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         old_color_classes.pop_back();
         int largest_color_class      = -1;
         int largest_color_class_size = -1;
-
-        old_class_sizes[fst] = snd;
 
         for(int i = fst; i < fst + snd;){
             assert(i >= 0 && i < c->ptn_sz);
@@ -490,7 +487,6 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
 refinement::~refinement() {
     if(initialized) {
         delete[] largest_color_class_index;
-        delete[] old_class_sizes;
     }
 
 }

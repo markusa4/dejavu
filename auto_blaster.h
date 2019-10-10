@@ -24,7 +24,7 @@ public:
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed);
+                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed, work_set* first_level_fail);
 
     void
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
