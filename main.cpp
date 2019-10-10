@@ -200,6 +200,15 @@ int commandline_mode(int argc, char** argv) {
                 return 1;
             }
         }
+        if (std::string(argv[i]) == "--THREADS_COPYG") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_THREADS_COPYG = (atoi(argv[i]) == 1);
+            } else {
+                std::cerr << "--THREADS_COPYG option requires one argument." << std::endl;
+                return 1;
+            }
+        }
     }
 
     if(!entered_file) {
@@ -207,8 +216,8 @@ int commandline_mode(int argc, char** argv) {
         return 1;
     }
     parser p;
-    sgraph g;
-    p.parse_dimacs_file(filename, &g);
+    sgraph* g = new sgraph;
+    p.parse_dimacs_file(filename, g);
 
     sleep(1);
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
@@ -216,12 +225,12 @@ int commandline_mode(int argc, char** argv) {
     auto_blaster A;
     bool done = false;
     if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-        A.sample(&g, true, &done);
+        A.sample(g, true, &done);
     } else {
         if(config.CONFIG_IR_REFINEMENT == 0) {
-            A.sample_pipelined(&g, true, &done, nullptr);
+            A.sample_pipelined(g, true, &done, nullptr);
         } else if(config.CONFIG_IR_REFINEMENT == 1) {
-            A.sample_pipelined_bucket(&g, true, &done, nullptr);
+            A.sample_pipelined_bucket(g, true, &done, nullptr);
         } else {
             std::cout << "Unknown IR_REFINEMENT." << std::endl;
         }
@@ -234,7 +243,7 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&g);
+    bench_nauty(g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -243,7 +252,7 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_traces(&g);
+    bench_traces(g);
     double traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -264,9 +273,11 @@ int commandline_mode(int argc, char** argv) {
 
         }// use existing file
         std::cout<<"Appending to " << stat_filename << ".\n";
-        stat_file << g.v_size << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
+        stat_file << g->v_size << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
+
+    delete g;
 
     return 0;
 }
@@ -277,18 +288,18 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-2000.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-2000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-47", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
@@ -302,12 +313,12 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     Clock::time_point timer = Clock::now();
-    auto_blaster A;
+    auto_blaster* A = new auto_blaster;
     bool done = false;
     if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-        A.sample(&g, true, &done);
+        A->sample(&g, true, &done);
     } else {
-        A.sample_pipelined(&g, true, &done, nullptr);
+        A->sample_pipelined(&g, true, &done, nullptr);
     }
     double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;

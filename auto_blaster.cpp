@@ -540,8 +540,15 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
     }
 }
 
-void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline_group* G) {
+void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G) {
     // find comparison leaf
+    sgraph* g = g_;
+    if(config.CONFIG_THREADS_COPYG && !master) {
+        g = new sgraph;
+        g->copy_graph(g_);
+    }
+
+
     invariant canon_I;
     std::vector<std::thread> work_threads;
     bijection canon_leaf;

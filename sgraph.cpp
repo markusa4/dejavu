@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <iostream>
 #include <set>
+#include <cstring>
 #include "sgraph.h"
 
 
@@ -116,4 +117,17 @@ sgraph sgraph::permute_graph(bijection p) { // ToDo: broken
     assert(epos == ng.e_size);
 
     return ng;
+}
+
+void sgraph::copy_graph(sgraph* g) {
+    v = new int[g->v_size];
+    d = new int[g->d_size];
+    e = new int[g->e_size];
+
+    memcpy(v, g->v, g->v_size*sizeof(int));
+    memcpy(d, g->d, g->d_size*sizeof(int));
+    memcpy(e, g->e, g->e_size*sizeof(int));
+    v_size = g->v_size;
+    d_size = g->d_size;
+    e_size = g->e_size;
 }

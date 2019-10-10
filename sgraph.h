@@ -28,6 +28,8 @@ public:
     bool certify_automorphism(bijection p);
     void initialize_coloring(coloring* c);
     void initialize_coloring_bucket(coloring_bucket* c);
+
+    void copy_graph(sgraph *g);
 };
 
 #endif //BRUTUS_GRAPH_H
