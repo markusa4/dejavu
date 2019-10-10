@@ -171,7 +171,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class.clear();
             last_op = OP_R;
             if(level == 2) first_level_fail->set(base);
-
+            //std::cout << "level " << level << "base " << base << std::endl;
             backtrack = false;
             level = 1;
         }
