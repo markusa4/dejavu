@@ -590,11 +590,14 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         std::cout << "Base size:  " << G->base_size << std::endl;
         std::cout << "Group size: ";
         G->print_group_size();
+        std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         G->join_threads();
         while(!work_threads.empty()) {
             work_threads[work_threads.size()-1].join();
             work_threads.pop_back();
         }
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
         delete G;
     } else {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
