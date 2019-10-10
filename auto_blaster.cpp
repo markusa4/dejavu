@@ -148,7 +148,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     work_set* first_level_fail = w->first_level_fail;
     S->empty_cache();
 
-
     std::list<int> init_color_class;
     *restarts = 0;
     int level = 1;
@@ -632,8 +631,8 @@ void auto_blaster::sample_pipelined(sgraph* g, bool master, bool* done, pipeline
         }
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Refinement speed: " << sampled_paths / (cref / 1000000.0) << "l/s" << std::endl;
-        std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
-        std::cout << "Dif: " << sampled_paths / (inner_t / 1000000.0)  - sampled_paths / (cref / 1000000.0) << "d" << std::endl;
+        //std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
+        //std::cout << "Dif: " << sampled_paths / (inner_t / 1000000.0)  - sampled_paths / (cref / 1000000.0) << "d" << std::endl;
         //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
     }
