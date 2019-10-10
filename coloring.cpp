@@ -26,6 +26,10 @@ void coloring::copy(coloring *c) {
             delete[] lab;
             delete[] ptn;
             init = false;
+        } else {
+            memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
+            vertex_to_col = c->vertex_to_col;
+            return;
         }
     }
 

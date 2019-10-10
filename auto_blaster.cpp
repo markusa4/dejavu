@@ -156,15 +156,12 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
 
     while (true) {
+        if(*done) return;
         if (backtrack) {
             // initialize a search state
-            if(*done) {
-                return;
-            }
             *restarts += 1;
             //c.rewrite_ptn(&start_c);
             c.copy(&start_c);
-
             while(I.current_level() != startlevel)
                 I.pop_level();
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
@@ -180,13 +177,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 if (compare) {
                     //assert(I.level_is_eq(canon_I, I.current_level()));
                     I.push_level();
-                    //R.complete_colorclass_invariant(g, &c, &I);
-                    /*if (!I.level_is_eq(canon_I, I.current_level())) {
-                        assert(false);
-                        I.pop_level();
-                        backtrack = true;
-                        continue;
-                    }*/
                     // we can derive an automorphism!
                     bijection leaf;
                     leaf.read_from_coloring(&c);
@@ -198,7 +188,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     return;
                 } else {
                     I.push_level();
-                    //R.complete_colorclass_invariant(g, &c, &I);
                     canon_leaf->read_from_coloring(&c);
                     *canon_I = I;
                     return;
@@ -222,12 +211,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     backtrack = true;
                     continue;
                 }
-                //if (I.level_is_eq(canon_I, I.current_level())) {
-                    continue;
-                //} else {
-                //    backtrack = true;
-               //     continue;
-               // }
+                continue;
             }
         } else if (last_op == OP_R) {
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////

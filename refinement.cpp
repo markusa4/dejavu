@@ -11,9 +11,19 @@
 #include <unordered_map>
 #include <algorithm>
 
+struct pairhash {
+public:
+    template <typename T, typename U>
+    std::size_t operator()(const std::pair<T, U> &x) const
+    {
+        return std::hash<T>()(x.first) ^ std::hash<U>()(x.second);
+    }
+};
+
 bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes) {
     //std::cout << "Refining..." << std::endl;
     bool comp = true;
+    //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
     if(!initialized) {
         counting_array.initialize(g->v_size, c);
         vertex_workset.initialize(g->v_size);
@@ -25,15 +35,30 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.initialize(g->v_size);
         initialized = true;
         largest_color_class_index = new int[c->lab_sz];
+        old_class_sizes = new int[c->lab_sz];
     }
     counting_array.set_coloring(c);
     //std::list<std::pair<int, int>> color_class_splits;
     std::queue<std::pair<int, int>> worklist_color_classes;
 
     if(init_color_class->empty()) {
-        // initialize queue with all classes
+        // initialize queue with all classes (except for largest one)
+        int numcells = 0;
+        int largest_cell_sz = -1;
+        int largest_cell_pos = -1;
         for (int i = 0; i < c->ptn_sz;) {
-            worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
+            //worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
+            if(c->ptn[i] + 1 > largest_cell_sz) {
+                largest_cell_sz  = c->ptn[i] + 1;
+                largest_cell_pos = i;
+            }
+            i += c->ptn[i] + 1;
+            numcells += 1;
+        }
+        for (int i = 0; i < c->ptn_sz;) {
+            if(numcells == 1 || largest_cell_pos == i) {
+                worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
+            }
             i += c->ptn[i] + 1;
         }
     } else {
@@ -47,6 +72,13 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.reset();
         std::pair<int, int> next_color_class = worklist_color_classes.front();
         worklist_color_classes.pop();
+
+        /*auto reduced_class = reduce_class.find(next_color_class);
+        if(reduced_class != reduce_class.end()) {
+            //std::cout << "reducing " << reduced_class->first.first << ", " << reduced_class->first.second
+            //<< " to " << reduced_class->second.first  << ", " <<  reduced_class->second.second << std::endl;
+            next_color_class = reduced_class->second;
+        }*/
 
        //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
         // write color class and size to invariant
@@ -69,6 +101,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
             if(largest_color_class_index[old_class] != new_class ) {
                 worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
             } else {
+                //reduce_class.insert(std::pair<std::pair<int, int>, std::pair<int, int>>(std::pair<int, int>(old_class, old_class_sizes[old_class]), std::pair<int, int>(new_class, new_class_sz)));
                 skip += 1;
             }
         }
@@ -160,6 +193,8 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         old_color_classes.pop_back();
         int largest_color_class      = -1;
         int largest_color_class_size = -1;
+
+        old_class_sizes[fst] = snd;
 
         for(int i = fst; i < fst + snd;){
             assert(i >= 0 && i < c->ptn_sz);
@@ -455,6 +490,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
 refinement::~refinement() {
     if(initialized) {
         delete[] largest_color_class_index;
+        delete[] old_class_sizes;
     }
 
 }
