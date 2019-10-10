@@ -13,6 +13,15 @@
 #include "invariant_acc.h"
 #include "pipeline_group.h"
 #include "refinement_bucket.h"
+#include "selector.h"
+
+struct auto_workspace {
+    refinement R;
+    selector S;
+    coloring c;
+    invariant I;
+    work_set* first_level_fail;
+};
 
 class auto_blaster {
     moodycamel::ConcurrentQueue<bijection> Q;
@@ -24,7 +33,7 @@ public:
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed, work_set* first_level_fail);
+                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed, auto_workspace* w);
 
     void
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
