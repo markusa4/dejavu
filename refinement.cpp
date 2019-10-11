@@ -26,7 +26,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
     if(!initialized) {
         counting_array.initialize(g->v_size, c);
-        vertex_workset.initialize(g->v_size);
+        //vertex_workset.initialize(g->v_size);
         color_workset.initialize(g->v_size);
         vertex_worklist.initialize(g->v_size);
         old_color_classes.initialize(g->v_size);
@@ -107,11 +107,9 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
             color_class_splits.pop_back();
             int new_class_sz = c->ptn[new_class] + 1;
             if(skipped_largest || !is_largest) {
-                //std::cout << "skipped" << std::endl;
                 worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
             } else {
                 skipped_largest = true;
-                //reduce_class.insert(std::pair<std::pair<int, int>, std::pair<int, int>>(std::pair<int, int>(old_class, old_class_sizes[old_class]), std::pair<int, int>(new_class, new_class_sz)));
                 skip += 1;
             }
         }
@@ -136,8 +134,9 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         for (int i = pe; i < end_i; i++) {
             // v is a neighbour of vc
             int v = g->e[i];
-            if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
-                vertex_workset.set(v);
+            //if (!vertex_workset.get(v)) { // <- ToDo: think about this: && c->ptn[c->vertex_to_col[v]] > 0
+                //vertex_workset.set(v);
+            if(counting_array.get_count(v) == 0) {
                 vertex_worklist.push_back(v);
                 counting_array.increment_r(v);
             } else {
@@ -235,7 +234,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
     vertex_worklist.reset();
-    vertex_workset.reset();
+    //vertex_workset.reset();
     color_workset.reset();
     color_worklist_color.reset();
     color_worklist_vertex.reset();
