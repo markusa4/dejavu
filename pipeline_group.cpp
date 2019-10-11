@@ -21,8 +21,8 @@ void pipeline_group::join_threads() {
 }
 
 void pipeline_group::pipeline_stage(int n, bool* done) {
-    int front_idle_ms = 0;
-    int back_idle_ms  = 0;
+   // int front_idle_ms = 0;
+   // int back_idle_ms  = 0;
     int abort_counter = 0;
     int leafs_considered = 0;
     int random_abort_counter = 0;
@@ -84,9 +84,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             d = automorphisms.try_dequeue(p);
             // automorphisms non-empty? take that element
             while(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND) {
-                std::this_thread::yield();
-                //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                front_idle_ms += 1;
+                //std::this_thread::yield();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                //front_idle_ms += 1;
                 d = automorphisms.try_dequeue(p);
                 /*if(front_idle_ms % 10000 == 0) {
                     std::cout << "Pipeline(" << n << ") front idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
@@ -122,7 +122,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                 }*/
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 //std::this_thread::yield();
-                front_idle_ms += 1;
+                //front_idle_ms += 1;
                 d = pipeline_queues[n].try_dequeue(state);
             }
             if(*done) {break;}
@@ -149,7 +149,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                 }*/
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 //std::this_thread::yield();
-                back_idle_ms += 1;
+                //back_idle_ms += 1;
             }
             pipeline_queues[n + 1].enqueue(state);
         }
