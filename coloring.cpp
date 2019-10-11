@@ -45,7 +45,7 @@ void coloring::copy(coloring *c) {
     ptn_sz = c->ptn_sz;
 
     vertex_to_col = c->vertex_to_col;
-    vertex_to_lab = c->vertex_to_lab;
+    //vertex_to_lab = c->vertex_to_lab;
 
     init = true;
 }

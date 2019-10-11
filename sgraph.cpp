@@ -14,10 +14,10 @@ void sgraph::initialize_coloring(coloring *c) {
     c->ptn_sz = this->v_size;
     c->init = true;
     c->vertex_to_col.reserve(this->v_size);
-    c->vertex_to_lab.reserve(this->v_size);
+   // c->vertex_to_lab.reserve(this->v_size);
     for(int i = 0; i < v_size; i++) {
         c->vertex_to_col.push_back(-1);
-        c->vertex_to_lab.push_back(-1);
+        //c->vertex_to_lab.push_back(-1);
         c->lab[i] = i;
         c->ptn[i] = 1;
     }
@@ -28,7 +28,7 @@ void sgraph::initialize_coloring(coloring *c) {
     int last_new_cell   = 0;
     for(int i = 0; i < c->lab_sz; i++) {
         c->vertex_to_col[c->lab[i]] = last_new_cell;
-        c->vertex_to_lab[c->lab[i]] = i;
+        //c->vertex_to_lab[c->lab[i]] = i;
         if(i + 1 == c->lab_sz) {
             cells += 1;
             c->ptn[last_new_cell] = i - last_new_cell;

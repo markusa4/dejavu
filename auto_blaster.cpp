@@ -231,7 +231,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class.clear();
             int rpos = s + ((*re)() % (c->ptn[s] + 1));
             int v = c->lab[rpos];
-
+            //assert(rpos == c->vertex_to_lab[v]);
             // first level fail prevention
             if(level == 1) {
                 while(first_level_fail->get(v)) {
@@ -241,12 +241,10 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             }
 
             // individualize random vertex of class
-            R->individualize_vertex(g, c, v);
+            int newpos = R->individualize_vertex(g, c, v);
             last_op = OP_I;
             assert(init_color_class.empty());
-            int labpos = c->vertex_to_lab[v];
-            assert(labpos == c->vertex_to_col[v]);
-            init_color_class.push_back(labpos);
+            init_color_class.push_back(newpos);
             assert(c->vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
@@ -259,8 +257,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 }
 
 void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
-        bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
-    bool backtrack;
+       bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
+    /*bool backtrack;
     int backtrack_to_level = -1;
     std::list<std::pair<int, int>> changes;
     refinement R;
@@ -373,10 +371,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
             // individualize random vertex of class
             R.individualize_vertex(g, &c, v);
             // last_op = OP_I;
-            assert(init_color_class.empty());
-            int labpos = c.vertex_to_lab[v];
-            assert(labpos == c.vertex_to_col[v]);
-            init_color_class.push_back(labpos);
+            init_color_class.push_back(rpos);
             assert(c.vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) {
@@ -430,7 +425,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
             T.pop_op_r();
         }
     }
-    T.free_path();
+    T.free_path();*/
 }
 
 

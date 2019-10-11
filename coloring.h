@@ -18,7 +18,7 @@ public:
     int ptn_sz;
     bool init = false;
     std::vector<int>  vertex_to_col;
-    std::vector<int>  vertex_to_lab;
+    //std::vector<int>  vertex_to_lab;
     ~coloring();
 };
 

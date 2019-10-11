@@ -170,7 +170,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    while(!color_worklist_vertex.empty()) {
+    /*while(!color_worklist_vertex.empty()) {
         assert(!color_worklist_color.empty());
         int vertex = color_worklist_vertex.pop_back();
         int color  = color_worklist_color.pop_back();
@@ -190,8 +190,30 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             assert(color > old_color);
             c->ptn[old_color] -= 1;
         }
-    }
+    }*/
 
+    /* Sequential replace*/
+    while(!color_worklist_vertex.empty()) {
+        assert(!color_worklist_color.empty());
+        int vertex = color_worklist_vertex.pop_back();
+        int color  = color_worklist_color.pop_back();
+        int old_color = c->vertex_to_col[vertex];
+
+        // dont know old pos: need to search
+        int vertex_at_pos = c->lab[color + c->ptn[color] + 1];
+        int old_pos       = old_color;
+        while(c->lab[old_pos] != vertex) old_pos += 1;
+
+        c->lab[old_pos] = vertex_at_pos;
+        c->lab[color + c->ptn[color] + 1] = vertex;
+        c->vertex_to_col[vertex] = color;
+        c->ptn[color] += 1;
+        if (old_color != color) {
+            assert(color > old_color);
+            c->ptn[old_color] -= 1;
+        }
+    }
+    /* */
     //std::sort(old_color_classes_.begin(), old_color_classes_.end());
     old_color_classes.sort();
 
@@ -244,28 +266,35 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     return comp;
 }
 
-void refinement::individualize_vertex(sgraph *g, coloring *c, int v) {
+int refinement::individualize_vertex(sgraph *g, coloring *c, int v) {
     //assert(initialized);
+
     int color = c->vertex_to_col[v];
-    int pos   = c->vertex_to_lab[v];
+    //int pos   = c->vertex_to_lab[v];
+    int pos   = color;
+    while(c->lab[pos] != v) pos += 1;
+
     int color_class_size = c->ptn[color];
     assert(color_class_size > 0);
     int new_color = color + color_class_size;
 
     int vertex_at_pos = c->lab[color + color_class_size];
     c->lab[pos] = vertex_at_pos;
-    c->vertex_to_lab[vertex_at_pos] = pos;
+    //c->vertex_to_lab[vertex_at_pos] = pos;
 
     c->lab[color + color_class_size] = v;
-    c->vertex_to_lab[v] = color + color_class_size;
+    //c->vertex_to_lab[v] = color + color_class_size;
     c->vertex_to_col[v] = color + color_class_size;
 
     c->ptn[color] -= 1;
     c->ptn[color + color_class_size - 1] = 0;
+    return color + color_class_size;
+
 }
 
 void refinement::undo_individualize_vertex(sgraph *g, coloring *c, int v) {
-    int color = c->vertex_to_col[v];
+    assert(false);
+    /*int color = c->vertex_to_col[v];
     int pos   = c->vertex_to_lab[v];
     assert(color == pos);
     assert(pos > 0);
@@ -277,7 +306,7 @@ void refinement::undo_individualize_vertex(sgraph *g, coloring *c, int v) {
     assert(c->ptn[new_color] > 0);
     if(c->ptn[pos - 1] == 0) {
         c->ptn[pos - 1] = 1;
-    }
+    }*/
 }
 
 void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes) {
