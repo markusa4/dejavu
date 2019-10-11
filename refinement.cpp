@@ -384,8 +384,11 @@ refinement::~refinement() {
 
 void cumulative_counting::initialize(int size) {
     sizes = new std::vector<int>[size];
+    count = new int[size];
+    init = true;
+
     for(int i = 0; i < size; ++i) {
-        this->count.push_back(0);
+        count[i]       = 0;
         this->sizes[i] = std::vector<int>();
         this->sizes[i].reserve(1);
         this->sizes[i].push_back(-1);
@@ -447,6 +450,13 @@ int cumulative_counting::get_size(int index, int color) {
 int cumulative_counting::get_count(int index) {
     assert(index < count.size());
     return count[index];
+}
+
+cumulative_counting::~cumulative_counting() {
+    if(init) {
+        delete[] count;
+        delete[] sizes;
+    }
 }
 
 void work_set::initialize(int size) {

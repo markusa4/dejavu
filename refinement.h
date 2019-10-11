@@ -37,8 +37,10 @@ public:
     void increment_r(int index, int color);
     int get_size(int index,  int color);
     int get_count(int index);
+    ~cumulative_counting();
 private:
-    std::vector<int> count;
+    int* count;
+    bool init = false;
     std::vector<int>* sizes;
     work_queue reset_queue;
     work_queue reset_queue_sizes;
