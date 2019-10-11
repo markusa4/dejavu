@@ -24,11 +24,10 @@ public:
     int d_size;
     int e_size;
 
-    sgraph permute_graph(bijection p);
+    void permute_graph(sgraph* ng, bijection* p);
     bool certify_automorphism(bijection p);
     void initialize_coloring(coloring* c);
     void initialize_coloring_bucket(coloring_bucket* c);
-
     void copy_graph(sgraph *g);
 };
 

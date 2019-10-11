@@ -6,6 +6,7 @@
 #include "invariant_acc.h"
 #include <list>
 #include <set>
+#include <tuple>
 #include <iostream>
 #include <assert.h>
 #include <unordered_map>
@@ -33,6 +34,19 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_worklist_color.initialize(g->v_size);
         color_class_splits.initialize(g->v_size);
         initialized = true;
+
+        int n = g->v_size;
+        int size = 0;
+        size += n * 8 * 4;
+        size += n;
+        size += n * 8 * 4;
+        size += n * 8 * 4 * 2;
+        size += n * 8 * 4;
+        size += n * 8 * 4 * 2;
+        size += n * 8 * 4 * 2;
+
+        size += n * 8 * 4 * 4;
+        std::cout << "Workspace size: " << size / 8 << "bytes" << std::endl;
     }
 
     //std::list<std::pair<int, int>> color_class_splits;
@@ -105,6 +119,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     return comp;
 }
 
+//__attribute__((optimize("unroll-loops")))
 bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     bool comp = true;
@@ -155,9 +170,11 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
+    color_workset.reset();
+
     while(!color_worklist_vertex.empty()) {
         assert(!color_worklist_color.empty());
-        int vertex = color_worklist_vertex.pop_back();
+        int vertex    = color_worklist_vertex.pop_back();
         int color     = color_worklist_color.last()->second;
         int old_color = color_worklist_color.last()->first;
         color_worklist_color.pop_back();
@@ -240,11 +257,10 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             i += c->ptn[i] + 1;
         }
     }
-    vertex_worklist.reset();
-    //vertex_workset.reset();
-    color_workset.reset();
-    color_worklist_color.reset();
-    color_worklist_vertex.reset();
+    //vertex_worklist.reset();
+    //color_workset.reset();
+    //color_worklist_color.reset();
+    //color_worklist_vertex.reset();
     old_color_classes.reset();
     counting_array.reset();
 

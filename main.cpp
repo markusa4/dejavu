@@ -220,6 +220,12 @@ int commandline_mode(int argc, char** argv) {
     p.parse_dimacs_file(filename, g);
 
     sleep(1);
+    std::cout << "Permuting graph---------------------------------------------------" << std::endl;
+    sgraph _g;
+    bijection pr;
+    bijection::random_bijection(&pr, g->v_size);
+    g->permute_graph(&_g, &pr); // permute graph
+    delete g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     int repeat = 10;
     double avg = 0;
@@ -229,12 +235,12 @@ int commandline_mode(int argc, char** argv) {
         auto_blaster A;
         bool done = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            A.sample(g, true, &done);
+            A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(g, true, &done, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                A.sample_pipelined_bucket(g, true, &done, nullptr);
+                A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }
@@ -250,7 +256,7 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(g);
+    bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -259,7 +265,7 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_traces(g);
+    bench_traces(&_g);
     double traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -284,8 +290,6 @@ int commandline_mode(int argc, char** argv) {
         stat_file.close();
     }
 
-    delete g;
-
     return 0;
 }
 
@@ -295,7 +299,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-   // return commandline_mode(argc, argv);
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -312,14 +316,14 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
-     //g = g.permute_graph(bijection::random_bijection(g.v_size)); // permute graph
-    // canonically label the sgraph
-
-    //bijection canon_p;
-    //label_graph(&g, &canon_p);
+    std::cout << "Permuting graph---------------------------------------------------" << std::endl;
+    sgraph _g;
+    bijection pr;
+    bijection::random_bijection(&pr, g.v_size);
+    g.permute_graph(&_g, &pr); // permute graph
 
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 100;
+    int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {
@@ -327,12 +331,12 @@ int main(int argc, char *argv[]) {
         auto_blaster A;
         bool done = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            A.sample(&g, true, &done);
+            A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&g, true, &done, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                A.sample_pipelined_bucket(&g, true, &done, nullptr);
+                A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }
@@ -347,7 +351,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&g);
+    bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -356,7 +360,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_traces(&g);
+    bench_traces(&_g);
     double traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 

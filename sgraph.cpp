@@ -95,28 +95,44 @@ bool sgraph::certify_automorphism(bijection p) {
     return true;
 }
 
-sgraph sgraph::permute_graph(bijection p) { // ToDo: broken
-    sgraph ng;
-    ng.v = v;
-    ng.e = e;
-    ng.d = d;
+void sgraph::permute_graph(sgraph* ng, bijection* p) { // ToDo: broken
+    ng->v = new int[v_size];
+    ng->d = new int[d_size];
+    ng->e = new int[e_size];
+    ng->v_size = v_size;
+    ng->d_size = d_size;
+    ng->e_size = e_size;
+
+    bijection p_inv;
+    p_inv.map = p->map;
+    p_inv.inverse();
+
+    std::set<int> vertices_hit;
 
     int epos = 0;
     for(int i = 0; i < v_size; ++i) {
-        int mapped_v = p.map_vertex(i);
-        ng.d[i] = d[mapped_v];
-        ng.v[i] = epos;
-        for(int j = 0; j < d[mapped_v]; j++) {
-            ng.e[epos + j] = p.map_vertex(e[v[mapped_v] + j]);
+        int mapped_v = p->map_vertex(i);
+        assert(p_inv.map_vertex(mapped_v) == i);
+        assert(mapped_v < v_size);
+        vertices_hit.insert(mapped_v);
+        ng->d[i] = d[mapped_v];
+        ng->v[i] = epos;
+        for(int j = v[mapped_v]; j < v[mapped_v] + d[mapped_v]; j++) {
+            assert(j < e_size);
+            ng->e[epos] = p_inv.map_vertex(e[j]);
+            epos += 1;
         }
-        epos += ng.d[i];
+        //epos += ng->d[i];
     }
-    assert(ng.v_size == v_size);
-    assert(ng.e_size == e_size);
-    assert(ng.d_size == d_size);
-    assert(epos == ng.e_size);
 
-    return ng;
+    //assert(v_size == vertices_hit.size());
+
+    assert(ng->v_size == v_size);
+    assert(ng->e_size == e_size);
+    assert(ng->d_size == d_size);
+    assert(epos == ng->e_size);
+
+    return;
 }
 
 void sgraph::copy_graph(sgraph* g) {

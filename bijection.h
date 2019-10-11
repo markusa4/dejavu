@@ -20,7 +20,9 @@ public:
     void read_from_coloring_bucket(coloring_bucket *c);
     void compose(bijection p);
     void inverse();
-    static bijection random_bijection(int n);
+    static void random_bijection(bijection* p, int n);
+
+    void print();
 };
 
 
