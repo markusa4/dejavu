@@ -135,7 +135,6 @@ void auto_blaster::find_automorphism_prob_bucket(sgraph* g, bool compare, invari
     }
 }
 
-// ToDo: recreate backtracking version
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
         bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, auto_workspace* w) {
     bool backtrack = false;

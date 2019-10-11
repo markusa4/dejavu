@@ -31,15 +31,13 @@ private:
 
 class cumulative_counting {
 public:
-    void initialize(int size, coloring *c);
+    void initialize(int size);
     void reset();
-    void increment(int index);
-    void increment_r(int index);
-    int get_size(int index);
+    void increment(int index, int color);
+    void increment_r(int index, int color);
+    int get_size(int index,  int color);
     int get_count(int index);
-    void set_coloring(coloring *c);
 private:
-    coloring* c;
     std::vector<int> count;
     std::vector<int>* sizes;
     work_queue reset_queue;
@@ -122,11 +120,10 @@ public:
 private:
     bool initialized = false;
     cumulative_counting counting_array;
-    work_set vertex_workset;
-    work_set color_workset;
+    work_set  color_workset;
     work_list color_worklist_vertex;
-    work_list color_worklist_color;
-    work_list vertex_worklist;
+    work_list_pair color_worklist_color;
+    work_list_pair vertex_worklist;
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
     int* largest_color_class_index;
