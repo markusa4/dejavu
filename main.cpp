@@ -227,7 +227,7 @@ int commandline_mode(int argc, char** argv) {
     g->permute_graph(&_g, &pr); // permute graph
     delete g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 10;
+    int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {
@@ -235,12 +235,12 @@ int commandline_mode(int argc, char** argv) {
         auto_blaster A;
         bool done = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            A.sample(&_g, true, &done);
+            //A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                A.sample_pipelined_bucket(&_g, true, &done, nullptr);
+               // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }
@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
     g.permute_graph(&_g, &pr); // permute graph
 
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 1;
+    int repeat = 10;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {
@@ -331,12 +331,12 @@ int main(int argc, char *argv[]) {
         auto_blaster A;
         bool done = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            A.sample(&_g, true, &done);
+         //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                A.sample_pipelined_bucket(&_g, true, &done, nullptr);
+               // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }

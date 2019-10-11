@@ -21,13 +21,16 @@ struct auto_workspace {
     coloring c;
     invariant I;
     work_set first_level_fail;
+
+    invariant* start_I;
+    coloring* start_c;
 };
 
 class auto_blaster {
-    moodycamel::ConcurrentQueue<bijection> Q;
-    invariant start_I;
-    coloring start_c;
-    coloring_bucket start_cb;
+    //moodycamel::ConcurrentQueue<bijection> Q;
+    //invariant start_I;
+    //coloring start_c;
+    //coloring_bucket start_cb;
 public:
     void sample(sgraph* g, bool master, bool* done);
 
@@ -39,7 +42,7 @@ public:
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
                                                      bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed,  refinement_bucket* R);
 
-    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G);
+    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G, invariant* start_I, coloring* start_c);
 
     void
     find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
