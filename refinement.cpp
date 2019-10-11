@@ -386,7 +386,7 @@ void cumulative_counting::initialize(int size, coloring *c) {
     for(int i = 0; i < size; ++i) {
         this->count.push_back(0);
         this->sizes[i] = std::vector<int>();
-        this->sizes[i].reserve(8);
+        this->sizes[i].reserve(1);
         this->sizes[i].push_back(-1);
     }
     reset_queue.initialize(size);
@@ -459,9 +459,11 @@ void cumulative_counting::set_coloring(coloring *c) {
 }
 
 void work_set::initialize(int size) {
-    s = new bool[size];
+    //s = new bool[size];
+    s.reserve(size);
     for(int i = 0; i < size; i++) {
-        s[i] = false;
+        //s[i] = false;
+        s.push_back(false);
     }
     reset_queue.initialize(size);
     init = true;
@@ -487,8 +489,8 @@ void work_set::reset() {
 }
 
 work_set::~work_set() {
-    if(init)
-        delete[] s;
+   // if(init)
+        //delete[] s;
 
 }
 

@@ -15,7 +15,7 @@
 #include "refinement_bucket.h"
 #include "selector.h"
 
-struct alignas(64) auto_workspace {
+struct auto_workspace {
     refinement R;
     selector S;
     coloring c;
@@ -23,7 +23,7 @@ struct alignas(64) auto_workspace {
     work_set* first_level_fail;
 };
 
-class alignas(64) auto_blaster {
+class auto_blaster {
     moodycamel::ConcurrentQueue<bijection> Q;
     invariant start_I;
     coloring start_c;

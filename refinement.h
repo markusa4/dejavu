@@ -13,6 +13,7 @@
 #include "invariant_acc.h"
 #include <list>
 #include <iostream>
+#include <bitset>
 
 class work_queue {
 public:
@@ -54,9 +55,10 @@ public:
     ~work_set();
 private:
     work_queue reset_queue;
-    //std::vector<bool> s;
+    std::vector<bool> s;
     bool init = false;
-    bool* s;
+   // bool* s;
+  // std::bitset< s;
 };
 
 class work_list {

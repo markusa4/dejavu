@@ -221,22 +221,29 @@ int commandline_mode(int argc, char** argv) {
 
     sleep(1);
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    Clock::time_point timer = Clock::now();
-    auto_blaster A;
-    bool done = false;
-    if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-        A.sample(g, true, &done);
-    } else {
-        if(config.CONFIG_IR_REFINEMENT == 0) {
-            A.sample_pipelined(g, true, &done, nullptr);
-        } else if(config.CONFIG_IR_REFINEMENT == 1) {
-            A.sample_pipelined_bucket(g, true, &done, nullptr);
+    int repeat = 10;
+    double avg = 0;
+    Clock::time_point timer;
+    for(int i = 0; i < repeat; ++i) {
+        timer = Clock::now();
+        auto_blaster A;
+        bool done = false;
+        if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
+            A.sample(g, true, &done);
         } else {
-            std::cout << "Unknown IR_REFINEMENT." << std::endl;
+            if (config.CONFIG_IR_REFINEMENT == 0) {
+                A.sample_pipelined(g, true, &done, nullptr);
+            } else if (config.CONFIG_IR_REFINEMENT == 1) {
+                A.sample_pipelined_bucket(g, true, &done, nullptr);
+            } else {
+                std::cout << "Unknown IR_REFINEMENT." << std::endl;
+            }
         }
+        double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+        avg += solve_time / repeat;
+        std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
     }
-    double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
+    std::cout << "Avg solve time: " << avg / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "nauty" << std::endl;
@@ -257,8 +264,8 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare (nauty): "  << nauty_solve_time / solve_time << std::endl;
-    std::cout << "Compare (Traces): " << traces_solve_time / solve_time << std::endl;
+    std::cout << "Compare (nauty): "  << nauty_solve_time / avg << std::endl;
+    std::cout << "Compare (Traces): " << traces_solve_time / avg << std::endl;
 
     if(entered_stat_file) {
         stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
@@ -273,7 +280,7 @@ int commandline_mode(int argc, char** argv) {
 
         }// use existing file
         std::cout<<"Appending to " << stat_filename << ".\n";
-        stat_file << g->v_size << " " << solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
+        stat_file << g->v_size << " " << avg / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
 
@@ -288,13 +295,13 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    return commandline_mode(argc, argv);
+   // return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-2000.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
@@ -312,17 +319,29 @@ int main(int argc, char *argv[]) {
     //label_graph(&g, &canon_p);
 
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    Clock::time_point timer = Clock::now();
-    auto_blaster* A = new auto_blaster;
-    bool done = false;
-    if(config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-        A->sample(&g, true, &done);
-    } else {
-        A->sample_pipelined(&g, true, &done, nullptr);
+    int repeat = 100;
+    double avg = 0;
+    Clock::time_point timer;
+    for(int i = 0; i < repeat; ++i) {
+        timer = Clock::now();
+        auto_blaster A;
+        bool done = false;
+        if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
+            A.sample(&g, true, &done);
+        } else {
+            if (config.CONFIG_IR_REFINEMENT == 0) {
+                A.sample_pipelined(&g, true, &done, nullptr);
+            } else if (config.CONFIG_IR_REFINEMENT == 1) {
+                A.sample_pipelined_bucket(&g, true, &done, nullptr);
+            } else {
+                std::cout << "Unknown IR_REFINEMENT." << std::endl;
+            }
+        }
+        double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+        avg += solve_time / repeat;
+        std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
     }
-    double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
-
+    std::cout << "Avg solve time: " << avg / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "nauty" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
@@ -342,7 +361,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare (nauty): "  << nauty_solve_time / solve_time << std::endl;
-    std::cout << "Compare (Traces): " << traces_solve_time / solve_time << std::endl;
+    std::cout << "Compare (nauty): "  << nauty_solve_time / avg << std::endl;
+    std::cout << "Compare (Traces): " << traces_solve_time / avg << std::endl;
     return 0;
 }

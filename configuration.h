@@ -20,7 +20,7 @@ struct configstruct {
     int CONFIG_THREADS_REFINEMENT_WORKERS = 2;
     int CONFIG_THREADS_PIPELINE_DEPTH = 1;
     int CONFIG_THREADS_PIPELINE_STAGE_MIN = 10;
-    bool CONFIG_THREADS_COPYG = true;
+    bool CONFIG_THREADS_COPYG = false;
 };
 
 extern configstruct config;
