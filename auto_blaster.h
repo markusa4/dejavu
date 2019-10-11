@@ -21,7 +21,10 @@ struct auto_workspace {
     coloring c;
     invariant I;
     work_set first_level_fail;
+
     coloring* start_c;
+    invariant* canon_I;
+    bijection* canon_leaf;
 };
 
 class auto_blaster {
@@ -40,7 +43,7 @@ public:
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
                                                      bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed,  refinement_bucket* R);
 
-    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G, coloring* start_c);
+    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I);
 
     void
     find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,

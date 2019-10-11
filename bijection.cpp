@@ -34,9 +34,9 @@ void bijection::inverse() {
     }
 }
 
-void bijection::compose(bijection p) {
+void bijection::compose(bijection* p) {
     for(int i = 0; i < map.size(); ++i) {
-        map[i] = p.map[map[i]];
+        map[i] = p->map[map[i]];
     }
 }
 

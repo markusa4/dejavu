@@ -198,7 +198,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     leaf.read_from_coloring(c);
                     *automorphism = leaf;
                     automorphism->inverse();
-                    automorphism->compose(*canon_leaf);
+                    automorphism->compose(canon_leaf);
                     //std::cout << "Found automorphism." << *restarts << std::endl;
                     assert(g->certify_automorphism(*automorphism));
                     return;
@@ -547,7 +547,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     }
 }*/
 
-void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c) {
+void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I) {
     // find comparison leaf
     sgraph* g = g_;
 
@@ -556,9 +556,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         g->copy_graph(g_);
     }
 
-    invariant canon_I;
     std::vector<std::thread> work_threads;
-    bijection canon_leaf;
     bijection base_points;
     bool trash_bool = false;
     int trash_int = 0;
@@ -566,25 +564,31 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     std::default_random_engine re = std::default_random_engine(seed);
     int selector_seed = re() % INT32_MAX;
 
-    refinement R;
     std::list<std::pair<int, int>> changes;
 
     invariant start_I;
    // start_I.push_level();
 
+    auto_workspace W;
+    W.first_level_fail.initialize(g->v_size);
+
     if(master) {
+        canon_I    = new invariant;
+        canon_leaf = new bijection;
         start_c = new coloring;
         std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(start_c);
         std::list<int> init_color_class;
-        R.refine_coloring(g, start_c, &changes, &start_I, &init_color_class, false);
+        W.start_c = start_c;
+        W.R.refine_coloring(g, start_c, &changes, &start_I, &init_color_class, false);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
 
         G = new pipeline_group();
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_c));
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_c, canon_leaf, canon_I));
         std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
     }
     //std::cout << "Found canonical leaf." << std::endl;
@@ -592,17 +596,12 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     int sampled_paths = 0;
     int restarts = 0;
 
-    auto_workspace W;
-    W.first_level_fail.initialize(g->v_size);
-    W.start_c = start_c;
-
     // sample for automorphisms
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //                                                      MASTER THREAD
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     if(master) {
         // initialize automorphism group
-        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
         G->initialize(g->v_size, &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
         G->pipeline_stage(0, done);
@@ -629,16 +628,17 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         //                                                      SLAVE THREAD
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         int idle_ms = 0;
+        W.start_c = start_c;
        // std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-        find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
+        //find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
         //double inner_t = 0;
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
             if(config.CONFIG_IR_BACKTRACK) {
-                find_automorphism_bt(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
+                //find_automorphism_bt(g, true, canon_I, canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             } else {
-                find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &W);
+                find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &W);
             }
             //inner_t += (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - inner_timer).count());
             G->add_permutation(&automorphism, &idle_ms, done);
