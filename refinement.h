@@ -83,11 +83,9 @@ public:
     bool empty();
     void reset();
     ~work_list_pair();
-private:
     std::pair<int, int>* arr;
     bool init = false;
     int arr_sz = -1;
-    int cur_pos;
 };
 
 class work_list_pair_bool {
@@ -126,11 +124,6 @@ private:
     work_list_pair vertex_worklist;
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
-    int* largest_color_class_index;
-
-    bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
-                                      std::list<std::pair<int, int>> *color_class_split_worklist, invariant *I,
-                                      int *largest_color_class_index);
 };
 
 

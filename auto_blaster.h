@@ -20,7 +20,7 @@ struct auto_workspace {
     selector S;
     coloring c;
     invariant I;
-    work_set* first_level_fail;
+    work_set first_level_fail;
 };
 
 class auto_blaster {

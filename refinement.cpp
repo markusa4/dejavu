@@ -46,7 +46,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         size += n * 8 * 4 * 2;
 
         size += n * 8 * 4 * 4;
-        std::cout << "Workspace size: " << size / 8 << "bytes" << std::endl;
+        //std::cout << "Workspace size: " << size / 8 << "bytes" << std::endl;
     }
 
     //std::list<std::pair<int, int>> color_class_splits;
@@ -69,13 +69,6 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.reset();
         std::pair<int, int> next_color_class = worklist_color_classes.front();
         worklist_color_classes.pop();
-
-        /*auto reduced_class = reduce_class.find(next_color_class);
-        if(reduced_class != reduce_class.end()) {
-            //std::cout << "reducing " << reduced_class->first.first << ", " << reduced_class->first.second
-            //<< " to " << reduced_class->second.first  << ", " <<  reduced_class->second.second << std::endl;
-            next_color_class = reduced_class->second;
-        }*/
 
        //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
         // write color class and size to invariant
@@ -195,28 +188,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         }
     }
 
-    /* Sequential replace*/
-    /*while(!color_worklist_vertex.empty()) {
-        assert(!color_worklist_color.empty());
-        int vertex = color_worklist_vertex.pop_back();
-        int color  = color_worklist_color.pop_back();
-        int old_color = c->vertex_to_col[vertex];
-
-        // dont know old pos: need to search
-        int vertex_at_pos = c->lab[color + c->ptn[color] + 1];
-        int old_pos       = old_color;
-        while(c->lab[old_pos] != vertex) old_pos += 1;
-
-        c->lab[old_pos] = vertex_at_pos;
-        c->lab[color + c->ptn[color] + 1] = vertex;
-        c->vertex_to_col[vertex] = color;
-        c->ptn[color] += 1;
-        if (old_color != color) {
-            assert(color > old_color);
-            c->ptn[old_color] -= 1;
-        }
-    }*/
-    /* */
     //std::sort(old_color_classes_.begin(), old_color_classes_.end());
     old_color_classes.sort();
 
@@ -225,7 +196,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         int fst = old_color_classes.last()->first;
         int snd = old_color_classes.last()->second;
         old_color_classes.pop_back();
-        int largest_color_class      = -1;
         int largest_color_class_size = -1;
 
         for(int i = fst; i < fst + snd;){
@@ -241,7 +211,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
                 if(largest_color_class_size < c->ptn[i] + 1) {
                     mark_as_largest = true;
                     largest_color_class_size = c->ptn[i] + 1;
-                    largest_color_class = i;
                 }
                 color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(std::pair<int, int>(fst, i), mark_as_largest));
             } else {
@@ -257,12 +226,9 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             i += c->ptn[i] + 1;
         }
     }
-    //vertex_worklist.reset();
-    //color_workset.reset();
-    //color_worklist_color.reset();
-    //color_worklist_vertex.reset();
-    old_color_classes.reset();
+
     counting_array.reset();
+    old_color_classes.reset();
 
     return comp;
 }

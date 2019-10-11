@@ -144,7 +144,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     selector* S = &w->S;
     coloring* c = &w->c;
     invariant* I = &w->I;
-    work_set* first_level_fail = w->first_level_fail;
+    work_set* first_level_fail = &w->first_level_fail;
     S->empty_cache();
 
     std::list<int> init_color_class;
@@ -451,12 +451,8 @@ void auto_blaster::sample(sgraph* g, bool master, bool* done) {
             work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
     }
     int trash_int = 0;
-    work_set first_level_fail;
-    first_level_fail.initialize(g->v_size);
     auto_workspace W;
-    W.first_level_fail = &first_level_fail;
-
-    first_level_fail.initialize(g->v_size);
+    W.first_level_fail.initialize(g->v_size);
     find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
     //std::cout << "Found canonical leaf." << std::endl;
 
@@ -577,10 +573,9 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     int sampled_paths = 0;
     int sampled_paths_all = 0;
     int restarts = 0;
-    work_set first_level_fail;
-    first_level_fail.initialize(g->v_size);
+
     auto_workspace W;
-    W.first_level_fail = &first_level_fail;
+    W.first_level_fail.initialize(g->v_size);
 
     // sample for automorphisms
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
