@@ -92,14 +92,29 @@ private:
     int cur_pos;
 };
 
-
+class work_list_pair_bool {
+public:
+    void initialize(int size);
+    void push_back(std::pair<std::pair<int, int>, bool> value);
+    std::pair<std::pair<int, int>, bool>* last();
+    void pop_back();
+    void sort();
+    bool empty();
+    void reset();
+    ~work_list_pair_bool();
+private:
+    std::pair<std::pair<int, int>, bool>* arr;
+    bool init = false;
+    int arr_sz = -1;
+    int cur_pos;
+};
 
 class refinement {
 public:
     bool refine_coloring(sgraph* g, coloring* c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes);
     void individualize_vertex(sgraph* g, coloring* c, int v);
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
-    bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair* color_class_split_worklist, invariant* I, int* largest_color_class_index);
+    bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
     bool assert_is_equitable(sgraph *g, coloring *c);
@@ -113,7 +128,7 @@ private:
     work_list color_worklist_color;
     work_list vertex_worklist;
     work_list_pair old_color_classes;
-    work_list_pair color_class_splits;
+    work_list_pair_bool color_class_splits;
     int* largest_color_class_index;
 
     bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,

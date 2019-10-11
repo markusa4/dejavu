@@ -34,7 +34,6 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_worklist_color.initialize(g->v_size);
         color_class_splits.initialize(g->v_size);
         initialized = true;
-        largest_color_class_index = new int[c->lab_sz];
     }
     counting_array.set_coloring(c);
     //std::list<std::pair<int, int>> color_class_splits;
@@ -84,22 +83,34 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         comp = comp && I->write_top_and_compare(-1);
         comp = comp && I->write_top_and_compare(next_color_class.first);
         comp = comp && I->write_top_and_compare(next_color_class.second);
-        comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I, largest_color_class_index);
+        comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
 
         // add all new classes except for the first, largest one
         int skip = 0;
         //for(auto cc = color_class_splits.begin(); cc != color_class_splits.end(); ++cc) {
+
+        int  latest_old_class = -1;
+        bool skipped_largest = false;
+
         while(!color_class_splits.empty()) {
             if(track_changes)
-                changes->push_back(*color_class_splits.last());
-            int old_class    = color_class_splits.last()->first;
-            int new_class    = color_class_splits.last()->second;
+                changes->push_back(color_class_splits.last()->first);
+            int old_class    = color_class_splits.last()->first.first;
+            int new_class    = color_class_splits.last()->first.second;
+            bool is_largest  = color_class_splits.last()->second;
+
+            if(latest_old_class != old_class) {
+                latest_old_class = old_class;
+                skipped_largest = false;
+            }
+
             color_class_splits.pop_back();
             int new_class_sz = c->ptn[new_class] + 1;
-            assert(largest_color_class_index[old_class] != -1);
-            if(largest_color_class_index[old_class] != new_class ) {
+            if(skipped_largest || !is_largest) {
+                //std::cout << "skipped" << std::endl;
                 worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
             } else {
+                skipped_largest = true;
                 //reduce_class.insert(std::pair<std::pair<int, int>, std::pair<int, int>>(std::pair<int, int>(old_class, old_class_sizes[old_class]), std::pair<int, int>(new_class, new_class_sz)));
                 skip += 1;
             }
@@ -111,7 +122,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     return comp;
 }
 
-bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair* color_class_split_worklist, invariant* I, int* largest_color_class_index) {
+bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     // ToDo: can replace worklists with fixed size arrays
     bool comp = true;
@@ -201,13 +212,15 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             comp = comp && I->write_top_and_compare(-v_color);
             comp = comp && I->write_top_and_compare(v_degree);
             comp = comp && I->write_top_and_compare(c->ptn[i] + 1);
+            bool mark_as_largest = false;
             if(!(i == fst && c->ptn[i] + 1== snd)) {
                 if(largest_color_class_size < c->ptn[i] + 1) {
+                    mark_as_largest = true;
                     largest_color_class_size = c->ptn[i] + 1;
                     largest_color_class = i;
                 }
                 //color_class_split_worklist->emplace_front(std::pair<int, int>(fst, i));
-                color_class_split_worklist->push_back(std::pair<int, int>(fst, i));
+                color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(std::pair<int, int>(fst, i), mark_as_largest));
             } else {
                 break;
             }
@@ -220,8 +233,6 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
 
             i += c->ptn[i] + 1;
         }
-
-        largest_color_class_index[fst] = largest_color_class;
     }
     vertex_worklist.reset();
     vertex_workset.reset();
@@ -374,10 +385,6 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
 }
 
 refinement::~refinement() {
-    if(initialized) {
-        delete[] largest_color_class_index;
-    }
-
 }
 
 void cumulative_counting::initialize(int size, coloring *c) {
@@ -594,5 +601,43 @@ bool work_list_pair::empty() {
 }
 
 void work_list_pair::reset() {
+    arr_sz = 0;
+}
+
+void work_list_pair_bool::push_back(std::pair<std::pair<int, int>, bool> value) {
+    arr[arr_sz] = value;
+    arr_sz += 1;
+}
+
+std::pair<std::pair<int, int>, bool>* work_list_pair_bool::last() {
+    return &arr[arr_sz - 1];
+}
+
+void work_list_pair_bool::initialize(int size) {
+    init = true;
+    arr = new std::pair<std::pair<int, int>, bool>[size];
+    arr_sz = 0;
+}
+
+work_list_pair_bool::~work_list_pair_bool() {
+    if(init)
+        delete[] arr;
+}
+
+void work_list_pair_bool::pop_back() {
+    arr_sz -= 1;
+}
+
+void work_list_pair_bool::sort() {
+    if(arr_sz > 1) {
+        std::sort(arr, arr + arr_sz);
+    }
+}
+
+bool work_list_pair_bool::empty() {
+    return arr_sz == 0;
+}
+
+void work_list_pair_bool::reset() {
     arr_sz = 0;
 }
