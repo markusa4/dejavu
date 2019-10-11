@@ -146,7 +146,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     invariant* I = &w->I;
     work_set* first_level_fail = &w->first_level_fail;
     coloring* start_c = w->start_c;
-    invariant* start_I = w->start_I;
+    invariant start_I;
 
     S->empty_cache();
 
@@ -154,11 +154,10 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     *restarts = 0;
     int level = 1;
     ir_operation last_op = OP_R;
-    *I = *start_I;
+    *I = start_I;
     c->copy(start_c);
     if(compare)
         I->set_compare_invariant(canon_I);
-    int startlevel = I->current_level();
 
     int base;
 
@@ -171,8 +170,12 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             *restarts += 1;
             //c.rewrite_ptn(&start_c);
             c->copy(start_c);
-            while(I->current_level() != startlevel)
-                I->pop_level();
+            //while(I->current_level() != startlevel)
+            //    I->pop_level();
+            *I = start_I;
+            if(compare)
+                I->set_compare_invariant(canon_I);
+
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             init_color_class.clear();
             last_op = OP_R;
@@ -188,7 +191,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if (s == -1) {
                 if (compare) {
                     //assert(I.level_is_eq(canon_I, I.current_level()));
-                    I->push_level();
+                    //I->push_level();
+                    //I->write_top_and_compare(INT32_MAX);
                     // we can derive an automorphism!
                     bijection leaf;
                     leaf.read_from_coloring(c);
@@ -199,7 +203,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     assert(g->certify_automorphism(*automorphism));
                     return;
                 } else {
-                    I->push_level();
+                    //I->push_level();
                     canon_leaf->read_from_coloring(c);
                     *canon_I = *I;
                     return;
@@ -212,14 +216,16 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             //                                                REFINEMENT
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             changes.clear();
-            I->push_level();
+            bool comp = I->write_top_and_compare(INT32_MAX);
             //assert(init_color_class.size() == 2);
-            bool comp = R->refine_coloring(g, c, &changes, I, &init_color_class, false);
+            comp = comp && R->refine_coloring(g, c, &changes, I, &init_color_class, false);
+            comp = comp && I->write_top_and_compare(INT32_MAX);
+            comp = comp && I->write_top_and_compare(INT32_MIN);
             //R.complete_colorclass_invariant(g, &c, &I);
             last_op = OP_R;
             if (compare) {
                 // compare invariant
-                if(!comp || !I->compare_sizes()) {
+                if(!comp) { // || !I->compare_sizes()
                     backtrack = true;
                     continue;
                 }
@@ -229,6 +235,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //                                             INDIVIDUALIZATION
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
             // collect all elements of color s
             init_color_class.clear();
             int rpos = s + ((*re)() % (c->ptn[s] + 1));
@@ -254,6 +261,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             }
             base = v;
             level += 1;
+
+            bool comp = I->write_top_and_compare(INT32_MIN);
+            comp && I->write_top_and_compare(INT32_MIN);
+            if(!comp) {
+                backtrack = true;
+                continue;
+            }
         }
     }
 }
@@ -533,7 +547,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     }
 }*/
 
-void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, invariant* start_I, coloring* start_c) {
+void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c) {
     // find comparison leaf
     sgraph* g = g_;
 
@@ -554,22 +568,23 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
 
     refinement R;
     std::list<std::pair<int, int>> changes;
-    if(master) {
-        start_I = new invariant;
-        start_c = new coloring;
-        start_I->push_level();
 
+    invariant start_I;
+   // start_I.push_level();
+
+    if(master) {
+        start_c = new coloring;
         std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(start_c);
         std::list<int> init_color_class;
-        R.refine_coloring(g, start_c, &changes, start_I, &init_color_class, false);
+        R.refine_coloring(g, start_c, &changes, &start_I, &init_color_class, false);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
 
         G = new pipeline_group();
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_I, start_c));
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_c));
         std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
     }
     //std::cout << "Found canonical leaf." << std::endl;
@@ -580,7 +595,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     auto_workspace W;
     W.first_level_fail.initialize(g->v_size);
     W.start_c = start_c;
-    W.start_I = start_I;
 
     // sample for automorphisms
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
