@@ -18,7 +18,7 @@
 
 typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int, bool>>> com_pad;
 
-struct auto_workspace {
+struct alignas(64) auto_workspace {
     refinement R;
     selector S;
     coloring c;
@@ -31,9 +31,6 @@ struct auto_workspace {
 
     coloring* start_c;
     invariant start_I;
-
-    invariant* canon_I;
-    bijection* canon_leaf;
 
     com_pad* communicator_pad;
     int communicator_id;

@@ -464,10 +464,11 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     int selector_seed = re() % INT32_MAX;
     com_pad pad;
 
-    invariant start_I;
    // start_I.push_level();
 
     auto_workspace W;
+    invariant start_I;
+
     W.first_level_fail.initialize(g->v_size);
     W.first_level_succ.initialize(g->v_size);
 

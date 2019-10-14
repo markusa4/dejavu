@@ -6,7 +6,7 @@
 #include <vector>
 #include "assert.h"
 
-class invariant {
+class alignas(64) invariant {
     std::vector<int>* vec_invariant = nullptr;
     invariant* compareI;
     bool has_compare = false;
