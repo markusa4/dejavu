@@ -180,7 +180,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class = -1;
             last_op = OP_R;
             if(level == 2) first_level_fail->set(base);
-            //std::cout << "level " << level << "base " << base << std::endl;
+
             backtrack = false;
             level = 1;
         }
@@ -631,6 +631,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
        // make my own canonical leaf...
         canon_I    = new invariant;
         canon_leaf = new bijection;
+        coloring* start_c = W.start_c;
+        W.start_c = new coloring;
+        W.start_c->copy(start_c);
+
         find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
 
         //double inner_t = 0;
@@ -646,6 +650,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
             G->add_permutation(&automorphism, &idle_ms, done);
             sampled_paths += 1;
         }
+
+        delete W.start_c;
         //double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "Refinement speed: " << sampled_paths / (cref / 1000000.0) << "l/s" << std::endl;
         //std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
