@@ -66,7 +66,7 @@ void sgraph::initialize_coloring_bucket(coloring_bucket *c) {
 
 // certify that a permutation is an automorphism of the sgraph
 bool sgraph::certify_automorphism(bijection p) {
-    assert(p.map.size() == v_size);
+    assert(p.map_sz == v_size);
 
     for(int i = 0; i < v_size; ++i) {
         int image_i = p.map_vertex(i);
@@ -105,7 +105,10 @@ void sgraph::permute_graph(sgraph* ng, bijection* p) { // ToDo: broken
     ng->max_degree = max_degree;
 
     bijection p_inv;
-    p_inv.map = p->map;
+    p_inv.map = new int[p->map_sz];
+    p_inv.map_sz = p->map_sz;
+    p_inv.deletable();
+    memcpy(p_inv.map, p->map, p->map_sz*sizeof(int));
     p_inv.inverse();
 
     std::set<int> vertices_hit;

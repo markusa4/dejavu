@@ -16,7 +16,7 @@
 #include "selector.h"
 
 
-typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int, bool>>> com_pad;
+typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int>>> com_pad;
 
 struct alignas(64) auto_workspace {
     refinement R;
@@ -27,13 +27,25 @@ struct alignas(64) auto_workspace {
     work_set first_level_succ;
     int first_level_sz = 0;
     int first_level = 1;
+    int base_size = 0;
     int first_level_succ_point = -1;
+    std::tuple<int, int>* dequeue_space;
+    int dequeue_space_sz = 0;
+
+    std::tuple<int, int>* enqueue_space;
+    int enqueue_space_sz = 0;
+
+    moodycamel::ConsumerToken* ctok;
+    std::vector<moodycamel::ProducerToken*> ptoks;
 
     coloring* start_c;
     invariant start_I;
 
     com_pad* communicator_pad;
     int communicator_id;
+
+    int measure1 = 0;
+    int measure2 = 0;
 };
 
 class auto_blaster {

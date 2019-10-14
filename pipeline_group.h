@@ -9,15 +9,17 @@
 #include "pipeline_schreier.h"
 #include "bijection.h"
 #include "concurrentqueue.h"
+#include "blockingconcurrentqueue.h"
 
 class pipeline_group {
 public:
     // input and pipeline management
-    moodycamel::ConcurrentQueue<bijection> automorphisms;
+    moodycamel::ConcurrentQueue<bijection> automorphisms = moodycamel::ConcurrentQueue<bijection>(50, 4, 4);
     std::vector<moodycamel::ConcurrentQueue<filterstate>> pipeline_queues;
-    moodycamel::ConcurrentQueue<std::pair<bool, bool>> sift_results;
+    moodycamel::ConcurrentQueue<std::pair<bool, bool>> sift_results = moodycamel::ConcurrentQueue<std::pair<bool, bool>>(20, 1, 1);
     std::vector<int> intervals;
     std::vector<std::thread> work_threads;
+    moodycamel::ConsumerToken ctoken = moodycamel::ConsumerToken(automorphisms);
     int stages;
 
     // group structures

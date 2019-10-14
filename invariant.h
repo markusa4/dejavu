@@ -20,7 +20,7 @@ public:
         } else {
             vec_invariant->push_back(i);
             cur_pos += 1;
-            assert(cur_pos == vec_invariant.size() - 1);
+           // assert(cur_pos == vec_invariant.size() - 1);
             if (has_compare) {
                 if ((compareI->vec_invariant)->size() < vec_invariant->size())
                     return false;

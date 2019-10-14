@@ -14,55 +14,73 @@ int bijection::map_vertex(int v) {
 }
 
 void bijection::print() {
-    for(int i = 0; i < map.size(); ++i)
+    for(int i = 0; i < map_sz; ++i)
         std::cout << map[i] << " ";
     std::cout << std::endl;
 }
 
 void bijection::read_from_coloring(coloring *c) {
-    map.clear();
-    map.reserve(c->lab_sz);
+    if(init) {
+        delete[] map;
+    }
+    map = new int[c->lab_sz];
+    init = true;
+    map_sz = c->lab_sz;
     for(int i = 0; i < c->lab_sz; ++i) {
-        map.push_back(c->lab[i]);
+        map[i] = c->lab[i];
     }
 }
 
 void bijection::inverse() {
-    std::vector<int> old_map = map;
-    for(int i = 0; i < map.size(); ++i) {
+    int* old_map = map;
+    map = new int[map_sz];
+    for(int i = 0; i < map_sz; ++i) {
         map[old_map[i]] = i;
     }
+    delete[] old_map;
 }
 
 void bijection::compose(bijection* p) {
-    for(int i = 0; i < map.size(); ++i) {
+    for(int i = 0; i < map_sz; ++i) {
         map[i] = p->map[map[i]];
     }
 }
 
+void bijection::not_deletable() {
+    init = false;
+}
+
+
+void bijection::deletable() {
+    init = true;
+}
+
 bijection::bijection() {
-    map = std::vector<int>();
+    init = false;
+    //map = std::vector<int>();
 }
 
 bijection::~bijection() {
-
+    if(init)
+        delete[] map;
 }
 
 void bijection::random_bijection(bijection* p, int n) {
-    p->map = std::vector<int>();
-    p->map.reserve(n);
+    p->map = new int[n];
+    p->init = true;
+    p->map_sz = n;
     for(int i = 0; i < n; ++i) {
-        p->map.push_back(i);
+        p->map[i] = i;
     }
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine re = std::default_random_engine(seed);
-    std::shuffle(p->map.begin(), p->map.end(), re);
+    std::shuffle(p->map, p->map + p->map_sz, re);
 }
 
 void bijection::read_from_coloring_bucket(coloring_bucket *c) {
-    map.clear();
+   /* map.clear();
     map.reserve(c->lab_sz);
     for(int i = 0; i < c->lab_sz; ++i) {
         map.push_back(c->lab[i]);
-    }
+    }*/
 }

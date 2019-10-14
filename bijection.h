@@ -11,8 +11,10 @@
 #include "coloring_bucket.h"
 
 class bijection {
+    bool init = false;
 public:
-    std::vector<int> map;
+    int* map;
+    int map_sz;
     int map_vertex(int v);
     bijection();
     ~bijection();
@@ -23,6 +25,8 @@ public:
     static void random_bijection(bijection* p, int n);
 
     void print();
+    void not_deletable();
+    void deletable();
 };
 
 

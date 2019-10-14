@@ -310,7 +310,9 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-47", &g);
-     p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\ranreg\\ranreg\\Ranreg131072.bliss", &g);
+     p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
+    //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
@@ -351,7 +353,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&_g);
+    //bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 

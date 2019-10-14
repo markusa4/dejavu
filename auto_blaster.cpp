@@ -28,21 +28,27 @@
 extern long mmultcount;
 extern long mfiltercount;
 
+int intRand(const int & min, const int & max, int seed) {
+    static thread_local std::mt19937 generator(seed);
+    std::uniform_int_distribution<int> distribution(min,max);
+    return distribution(generator);
+}
+
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
         bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, auto_workspace* w) {
     bool backtrack = false;
     //std::list<std::pair<int, int>> changes;
 
-    refinement* R = &w->R;
-    selector* S = &w->S;
-    coloring* c = &w->c;
-    invariant* I = &w->I;
+    refinement *R = &w->R;
+    selector *S = &w->S;
+    coloring *c = &w->c;
+    invariant *I = &w->I;
 
-    work_set* first_level_fail = &w->first_level_fail;
-    work_set* first_level_succ = &w->first_level_succ;
+    work_set *first_level_fail = &w->first_level_fail;
+    work_set *first_level_succ = &w->first_level_succ;
 
-    coloring*  start_c = w->start_c;
-    invariant* start_I = &w->start_I;
+    coloring *start_c = w->start_c;
+    invariant *start_I = &w->start_I;
 
     S->empty_cache();
 
@@ -52,11 +58,15 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     int first_level_point = -1;
     int second_level_point = -1;
 
-    if(compare)
-        start_I->set_compare_invariant(canon_I);
-    else
-        start_I->create_vector();
+    int enqueue_fail_point_sz = 0;
 
+    if (compare) {
+        start_I->set_compare_invariant(canon_I);
+    } else {
+        start_I->create_vector();
+        automorphism->map = new int[g->v_size];
+        automorphism->map_sz = 0;
+    }
     ir_operation last_op = OP_R;
     *I = *start_I;
     c->copy(start_c);
@@ -66,23 +76,40 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
     while (true) {
         if(*done) return;
         if (backtrack) {
+            w->measure1 += 1;
             // check for new messages
+            size_t num = 1;
+            size_t max_repeat = 0;
             if(config.CONFIG_THREADS_COLLABORATE) {
-                std::tuple<int, int, bool> x;
-                bool d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
-                while (d) {
-                    if (std::get<0>(x) == w->first_level) {
-                        //std::cout << "communicated " << std::endl;
-                        if (std::get<2>(x)) {
-                            first_level_succ->set(std::get<1>(x));
-                        } else {
-                            first_level_fail->set(std::get<1>(x));
+                while(num > 0) {
+                   // max_repeat += 1;
+                    //if(max_repeat > 10 || *done) {
+                   //     break;
+                   // }
+                    num = (*w->communicator_pad)[w->communicator_id].try_dequeue_bulk(*w->ctok, w->dequeue_space,
+                                                                                      w->dequeue_space_sz);
+                    for (int j = 0; j < num; ++j) {
+                        if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
+                            //std::cout << "com" << std::endl;
+                            if (std::get<0>(w->dequeue_space[j]) > 0) {
+                                //first_level_succ->set(std::get<1>(w->dequeue_space[j]));
+                                if(!first_level_succ->get(std::get<1>(w->dequeue_space[j]))) {
+                                    int vertex = std::get<1>(w->dequeue_space[j]);
+                                    first_level_fail->set(vertex);
+                                    w->first_level_succ_point = vertex;
+                                    w->first_level_sz += 1;
+                                }
+                            } else {
+                                if(!first_level_fail->get(std::get<1>(w->dequeue_space[j]))) {
+                                    first_level_fail->set(std::get<1>(w->dequeue_space[j]));
+                                    w->first_level_sz += 1;
+                                }
+                            }
                         }
                     }
-                    d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
                 }
             }
-
+            if(*done) return;
             S->empty_cache();
             // initialize a search state
             *restarts += 1;
@@ -96,10 +123,22 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if (level == w->first_level + 1) {
                 if (!first_level_fail->get(base)) {
                     if(config.CONFIG_THREADS_COLLABORATE) {
-                        for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                        /*for (int i = 0; i < w->communicator_pad->size(); ++i) {
                             if (i != w->communicator_id)
-                                (*w->communicator_pad)[i].try_enqueue(
+                                (*w->communicator_pad)[i].try_enqueue(*w->ptoks[i],
                                         std::tuple<int, int, bool>(w->first_level, base, false));
+                        }*/
+                        if(enqueue_fail_point_sz < w->enqueue_space_sz) {
+                            w->enqueue_space[enqueue_fail_point_sz] = std::tuple<int, int>(-w->first_level, base);
+                            enqueue_fail_point_sz += 1;
+                        } else {
+                            for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                                if (i != w->communicator_id) {
+                                    //std::cout << enqueue_fail_point_sz << std::endl;
+                                    (*w->communicator_pad)[i].try_enqueue_bulk(*w->ptoks[i], w->enqueue_space, enqueue_fail_point_sz);
+                                    enqueue_fail_point_sz = 0;
+                                }
+                            }
                         }
                     }
 
@@ -116,7 +155,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //S->empty_cache();
             int s = S->select_color(g, c, selector_seed);
-            if(w->first_level_sz == c->ptn[s] + 1) {
+            if(w->first_level_sz == c->ptn[s] + 1 && w->first_level < w->base_size) {
                 assert(s != -1);
                 // proceed first level
                 assert(c->vertex_to_col[w->first_level_succ_point] == s);
@@ -148,12 +187,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             }
 
             // collect all elements of color s
-            int rpos = s + ((*re)() % (c->ptn[s] + 1));
+            int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
             int v = c->lab[rpos];
             //assert(rpos == c->vertex_to_lab[v]);
             // first level fail prevention
             while(first_level_fail->get(v)) {
-                rpos = s + ((*re)() % (c->ptn[s] + 1));
+                if(*done) return;
+                rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
                 v = c->lab[rpos];
             }
 
@@ -166,7 +206,9 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             assert(c->vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
-                automorphism->map.push_back(v);
+                automorphism->map[automorphism->map_sz] = v;
+                automorphism->map_sz += 1;
+                //automorphism->map.push_back(v);
             }
             base = v;
             level += 1;
@@ -174,8 +216,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             bool comp = I->write_top_and_compare(INT32_MIN);
             comp && I->write_top_and_compare(INT32_MIN);
             assert(comp);
-
-
         }
 
         int s;
@@ -184,17 +224,30 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if (s == -1) {
                 if (compare) {
                     // we can derive an automorphism!
+                    w->measure2 += 1;
                     bijection leaf;
                     leaf.read_from_coloring(c);
+                    leaf.not_deletable();
                     *automorphism = leaf;
                     automorphism->inverse();
-                    automorphism->compose(canon_leaf);
+                    automorphism->compose(canon_leaf);//enqueue_fail_point_sz
+                    if(enqueue_fail_point_sz > 0) {
+                        if(config.CONFIG_THREADS_COLLABORATE) {
+                            for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                                if (i != w->communicator_id) {
+                                    //std::cout << enqueue_fail_point_sz << std::endl;
+                                    (*w->communicator_pad)[i].try_enqueue_bulk(*w->ptoks[i], w->enqueue_space, enqueue_fail_point_sz);
+                                    enqueue_fail_point_sz = 0;
+                                }
+                            }
+                        }
+                    }
                     if(!first_level_succ->get(first_level_point)) {
                         if(config.CONFIG_THREADS_COLLABORATE) {
                             for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                                if (i != w->communicator_id)
-                                    (*w->communicator_pad)[i].try_enqueue(
-                                            std::tuple<int, int, bool>(w->first_level, first_level_point, true));
+                                if (i != w->communicator_id) {
+                                    (*w->communicator_pad)[i].try_enqueue(*w->ptoks[i], std::tuple<int, int>(w->first_level,first_level_point));
+                                }
                             }
                         }
                         w->first_level_succ_point = first_level_point;
@@ -240,7 +293,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
             // collect all elements of color s
             init_color_class = -1;
-            int rpos = s + ((*re)() % (c->ptn[s] + 1));
+            int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
             int v = c->lab[rpos];
             //assert(rpos == c->vertex_to_lab[v]);
 
@@ -258,7 +311,9 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             assert(c->vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
-                automorphism->map.push_back(v);
+                //automorphism->map.push_back(v);
+                automorphism->map[automorphism->map_sz] = v;
+                automorphism->map_sz += 1;
             }
             base = v;
             level += 1;
@@ -448,6 +503,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
 void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                                     com_pad* communicator_pad, int communicator_id) {
     // find comparison leaf
+    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph* g = g_;
 
     if(config.CONFIG_THREADS_COPYG && !master) {
@@ -459,9 +515,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     bijection base_points;
     bool trash_bool = false;
     int trash_int = 0;
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine re = std::default_random_engine(seed);
-    int selector_seed = re() % INT32_MAX;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id + 3)* 5135235);
+    //std::cout << seed << std::endl;
+    //std::default_random_engine re = std::default_random_engine(seed);
+    int selector_seed = seed;
     com_pad pad;
 
    // start_I.push_level();
@@ -471,28 +528,33 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     bool* p = new bool[g->v_size * 2];
     W.first_level_fail.initialize_from_array(p, g->v_size);
     W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
+    W.dequeue_space    = new std::tuple<int, int>[64];
+    W.dequeue_space_sz = 8;
+    W.enqueue_space    = new std::tuple<int, int>[64];
+    W.enqueue_space_sz = 8;
 
     if(master) {
         canon_I    = new invariant;
         canon_leaf = new bijection;
         start_c = new coloring;
-        std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(start_c);
         W.start_c = start_c;
         start_I.create_vector();
         W.R.refine_coloring(g, start_c, nullptr, &start_I, -1, false);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-        std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+        //std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
 
 
-        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
+        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, nullptr, &trash_int, &trash_bool, selector_seed, &W);
         G = new pipeline_group();
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int, bool>>(100));
+            pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(100, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_c, canon_leaf, canon_I, &pad, i));
-        std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
+        //std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        //std::cout << "Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
     }
     //std::cout << "Found canonical leaf." << std::endl;
 
@@ -507,6 +569,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         // initialize automorphism group
         G->initialize(g->v_size, &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
         G->launch_pipeline_threads(done);
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+       // std::cout << "Pipeline group created: " << cref / 1000000.0 << "ms" << std::endl;
         G->pipeline_stage(0, done);
         // run algorithm
         //std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
@@ -514,16 +578,18 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         //std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
         //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
         //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
+        malloc_lock.lock();
         std::cout << "Base size:  " << G->base_size << std::endl;
         std::cout << "Group size: ";
         G->print_group_size();
         std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+        malloc_lock.unlock();
         G->join_threads();
         while(!work_threads.empty()) {
             work_threads[work_threads.size()-1].join();
             work_threads.pop_back();
         }
-        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
         delete[] p;
         delete G;
@@ -543,23 +609,60 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         W.start_c->copy_force(start_c);
         W.communicator_pad = communicator_pad;
         W.communicator_id  = communicator_id;
+        W.ctok = new moodycamel::ConsumerToken((*communicator_pad)[communicator_id]);
+        W.base_size = G->base_size;
+        for(int i = 0; i < W.communicator_pad->size(); ++i) {
+            if (communicator_id != i) {
+                W.ptoks.emplace_back(new moodycamel::ProducerToken((*communicator_pad)[i]));
+            } else {
+                W.ptoks.emplace_back(nullptr);
+            }
+        }
+
+        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        //std::cout << "[" << communicator_id << "]: Startup: " << cref / 1000000.0 << "ms" << std::endl;
 
        // find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
 
         //double inner_t = 0;
+       // int counter = 0;
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
             if(config.CONFIG_IR_BACKTRACK) {
                 //find_automorphism_bt(g, true, canon_I, canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
             } else {
-                find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &W);
+                find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, done, selector_seed, &W);
             }
+            /*if(sampled_paths == 0) {
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                std::cout << "[" << communicator_id << "]: First automorphism (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
+            }
+            if(sampled_paths == 10) {
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                std::cout << "[" << communicator_id << "]: 10 automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
+            }
+            if(sampled_paths == 30) {
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                std::cout << "[" << communicator_id << "]: 30 automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
+            }*/
             //inner_t += (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - inner_timer).count());
+            automorphism.not_deletable();
             G->add_permutation(&automorphism, &idle_ms, done);
+            automorphism.map = new int[g->v_size];
+            if(sampled_paths == 0) {
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                //std::cout << "[" << communicator_id << "]: First automorphism (added): " << cref / 1000000.0 << "ms" << std::endl;
+            }
             sampled_paths += 1;
         }
 
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+        //std::cout << "[" << communicator_id << "]: " << sampled_paths << "automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
+
+       // malloc_lock.lock();
+      //  std::cout << W.measure1 << ", " << W.measure2 << std::endl;
+      //  malloc_lock.unlock();
         delete W.start_c;
         //double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "Refinement speed: " << sampled_paths / (cref / 1000000.0) << "l/s" << std::endl;

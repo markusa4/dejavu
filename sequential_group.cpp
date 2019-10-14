@@ -8,13 +8,13 @@
 
 bool sequential_group::add_permutation(bijection *p) {
     // copy to proper array
-    assert(p->map.size() == domain_size);
-    int* _p = new int[domain_size];
+    assert(p->map_sz == domain_size);
+    int* _p = p->map;//new int[domain_size];
     //std::cout << "perm: ";
-    for(int k = 0; k < p->map.size(); ++k) {
-        _p[k] = p->map[k];
-        //std::cout << p->map[k] << " ";
-    }
+    //for(int k = 0; k < p->map.size(); ++k) {
+   //     _p[k] = p->map[k];
+   //     //std::cout << p->map[k] << " ";
+   // }
     //std::cout << std::endl;
     mschreier_fails(1);
     mexpandschreier(gp, &gens, domain_size);
@@ -35,7 +35,7 @@ sequential_group::sequential_group(int domain_size, bijection* base_points) {
     std::cout << "Creating new group... " << std::endl;
     mnewgroup(&gp, &gens, domain_size);
     b = new int[domain_size];
-    for(int i = 0; i < base_points->map.size(); ++i) {
+    for(int i = 0; i < base_points->map_sz; ++i) {
         b[i] = base_points->map[i];
         base_size += 1;
     }

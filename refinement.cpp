@@ -27,9 +27,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
     if(!initialized) {
         //malloc_lock.lock();
-
         p = new std::pair<int, int>[g->v_size * 5];
-
         counting_array.initialize(g->v_size, g->max_degree);
         color_workset.initialize(g->v_size);
         vertex_worklist.initialize_from_array(p + (g->v_size) * 2, g->v_size);

@@ -10,7 +10,7 @@ void pipeline_group::launch_pipeline_threads(bool* done) {
     for(int i = 1; i < stages; ++i) {
         work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, done));
     }
-    std::cout << "Pipeline workers (" << stages << ")" << std::endl;
+    //std::cout << "Pipeline workers (" << stages << ")" << std::endl;
 }
 
 void pipeline_group::join_threads() {
@@ -26,6 +26,8 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     int abort_counter = 0;
     int leafs_considered = 0;
     int random_abort_counter = 0;
+    int bulk_deque_num = 8;
+    std::pair<bool, bool>* res = new std::pair<bool, bool>[bulk_deque_num];
 
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
 
@@ -47,25 +49,24 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         bool is_random = false;
 
         // context switch
-        std::this_thread::yield();
+        //std::this_thread::yield();
         if (is_first_stage) {
             // collect results and determine whether done
-            std::pair<bool, bool> res;
-            bool d = sift_results.try_dequeue(res);
-            while(d) {
-                if(!res.first) {
-                    if(leafs_considered == 0) {
-                        double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                        std::cout << "First leaf arrived: " << cref / 1000000.0 << "ms" << std::endl;
-                    }
+            int num = sift_results.try_dequeue_bulk(res, bulk_deque_num);
+            for(int j = 0; j < num; ++j) {
+                if(!res[j].first) {
+                   // if(leafs_considered == 0) {
+                   //     double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                        //std::cout << "First automorphism processed: " << cref / 1000000.0 << "ms" << std::endl;
+                  //  }
                     leafs_considered += 1;
-                    if(!res.second) {
+                    if(!res[j].second) {
                         abort_counter += 1;
                     } else {
                         abort_counter = 0;
                     }
                 } else {
-                    if(!res.second) {
+                    if(!res[j].second) {
                         random_abort_counter += 1;
                     } else {
                         random_abort_counter = 0;
@@ -76,34 +77,43 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                     break;
                 }
                 //std::cout << abort_counter << "; " << random_abort_counter << std::endl;
-                d = sift_results.try_dequeue(res);
+                //d = sift_results.try_dequeue(res);
             }
             if(*done) {break;}
 
             // not done, so choose next element for the pipeline
-            d = automorphisms.try_dequeue(p);
+            bool d = automorphisms.try_dequeue(ctoken, p);
             // automorphisms non-empty? take that element
             while(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND) {
                 //std::this_thread::yield();
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                //std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 //front_idle_ms += 1;
-                d = automorphisms.try_dequeue(p);
+                d = automorphisms.try_dequeue(ctoken, p);
                 /*if(front_idle_ms % 10000 == 0) {
                     std::cout << "Pipeline(" << n << ") front idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
                 }*/
             }
 
+            if(leafs_considered == 0 && d) {
+              //  double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+               // std::cout << "First automorphism arrived: " << cref / 1000000.0 << "ms" << std::endl;
+            }
+
+            //std::cout << automorphisms.size_approx() << std::endl;
+
             if (d) {
                 //std::cout << "automorphism in pipeline" << std::endl;
-                _p = new int[domain_size];
+                _p = p.map;
+                        /*new int[domain_size];
                 for (int k = 0; k < p.map.size(); ++k) {
                     _p[k] = p.map[k];
-                }
+                }*/
                 is_random = false;
                 state.ingroup = false;
                 state.level = -1;
                 random_abort_counter = 0;
             } else {
+                //std::cout << "gen ran" << std::endl;
                 // else generate random element and sift that
                 bool gen = generate_random_element(gp, &gens, domain_size, &re);
                 if (!gen) {continue;}
@@ -156,17 +166,20 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
     }
     if(n == 0 ){
         std::cout << "Leafs considered: " << leafs_considered << std::endl;
+        std::cout << "Leftover: " << automorphisms.size_approx() << std::endl;
     }
     //std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }
 
 bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
     //std::cout << "enqueued" << std::endl;
-    while(automorphisms.size_approx() > 50 && (!(*done))) {
+    static thread_local moodycamel::ProducerToken ptoken = moodycamel::ProducerToken(automorphisms);
+
+    while(automorphisms.size_approx() > 100 && (!(*done))) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
         *idle_ms += 1;
     }
-    automorphisms.enqueue(*p);
+    automorphisms.enqueue(ptoken, *p);
     return true;
 }
 
@@ -174,16 +187,16 @@ pipeline_group::pipeline_group() {
 }
 
 void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
-    mschreier_fails(1);
+    mschreier_fails(-1);
     added = 0;
     this->domain_size = domain_size;
     this->base_size = 0;
     this->stages = stages;
 
-    std::cout << "Creating new pipeline_group... " << std::endl;
+    //std::cout << "Creating new pipeline_group... " << std::endl;
     mnewgroup(&gp, &gens, domain_size);
     b = new int[domain_size];
-    for(int i = 0; i < base_points->map.size(); ++i) {
+    for(int i = 0; i < base_points->map_sz; ++i) {
         b[i] = base_points->map[i];
         base_size += 1;
     }
@@ -197,7 +210,7 @@ void pipeline_group::initialize(int domain_size, bijection *base_points, int sta
 // ToDo: do this better, more drastic towards start
 // ToDo: remove unncessary stages (size = 0)
 void pipeline_group::determine_stages() {
-    std::cout << "Pipeline: ";
+   // std::cout << "Pipeline: ";
     int ded = 0;
     for(int i = 0; i < stages; ++i) {
         int stage_pos = (base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2))));
@@ -209,12 +222,12 @@ void pipeline_group::determine_stages() {
             continue;
         }
 
-        pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>());
+        pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>(20));
         intervals.push_back(stage_pos);
-        std::cout << "/" << intervals[intervals.size() - 1];
+       // std::cout << "/" << intervals[intervals.size() - 1];
     }
     stages -= ded;
-    std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
+   // std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
     intervals[stages - 1] = domain_size + 1;
 }
 
