@@ -58,12 +58,13 @@ public:
     bool get(int index);
     void reset();
     ~work_set();
+    // std::bitset< s;
+    void initialize_from_array(bool *p, int size);
 private:
     work_queue reset_queue;
     //std::vector<bool> s;
     bool init = false;
     bool* s;
-  // std::bitset< s;
 };
 
 class work_list {
@@ -93,6 +94,10 @@ public:
     std::pair<int, int>* arr;
     bool init = false;
     int arr_sz = -1;
+
+    void initialize_from_array(int *p, int size);
+
+    void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
 class ring_pair {
@@ -109,6 +114,8 @@ public:
     int arr_sz = -1;
     int front_pos = -1;
     int back_pos = -1;
+
+    void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
 
@@ -149,6 +156,7 @@ private:
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
     ring_pair worklist_color_classes;
+    std::pair<int, int>* p;
 };
 
 

@@ -27,15 +27,18 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
     if(!initialized) {
         //malloc_lock.lock();
+
+        p = new std::pair<int, int>[g->v_size * 5];
+
         counting_array.initialize(g->v_size, g->max_degree);
         color_workset.initialize(g->v_size);
-        vertex_worklist.initialize(g->v_size);
-        old_color_classes.initialize(g->v_size);
+        vertex_worklist.initialize_from_array(p + (g->v_size) * 2, g->v_size);
+        old_color_classes.initialize_from_array(p, g->v_size);
         color_worklist_vertex.initialize(g->v_size);
-        color_worklist_color.initialize(g->v_size);
+        color_worklist_color.initialize_from_array(p + (g->v_size), g->v_size);
         color_class_splits.initialize(g->v_size);
         initialized = true;
-        worklist_color_classes.initialize(g->v_size * 2);
+        worklist_color_classes.initialize_from_array(p + (g->v_size) * 3, g->v_size * 2);
         //malloc_lock.unlock();
     }
 
@@ -371,12 +374,14 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
 }
 
 refinement::~refinement() {
+    if(initialized)
+        delete[] p;
 }
 
 void cumulative_counting::initialize(int size, int maxdegree) {
     m     = maxdegree + 1;
-    sizes = new int[size * m + 16];
-    count = new int[size + 16];
+    sizes = new int[size * m + 64];
+    count = new int[size + 64];
     init = true;
 
     for(int i = 0; i < size; ++i) {
@@ -454,7 +459,7 @@ cumulative_counting::~cumulative_counting() {
 }
 
 void work_set::initialize(int size) {
-    s = new bool[size + 16];
+    s = new bool[size + 64];
     //s.reserve(size);
     for(int i = 0; i < size; i++) {
         s[i] = false;
@@ -462,6 +467,17 @@ void work_set::initialize(int size) {
     }
     reset_queue.initialize(size);
     init = true;
+}
+
+void work_set::initialize_from_array(bool* p, int size) {
+    s = p;
+    //s.reserve(size);
+    for(int i = 0; i < size; i++) {
+        s[i] = false;
+        //s.push_back(false);
+    }
+    reset_queue.initialize(size);
+    //init = true;
 }
 
 void work_set::set(int index) {
@@ -489,7 +505,7 @@ work_set::~work_set() {
 }
 
 void work_list::initialize(int size) {
-    arr = new int[size + 16];
+    arr = new int[size + 64];
     arr_sz = size;
     cur_pos = 0;
 }
@@ -524,7 +540,7 @@ void work_queue::initialize(int size) {
     assert(!init);
     sz = size;
     pos = 0;
-    queue = new int[size + 16];
+    queue = new int[size + 64];
     init = true;
 }
 
@@ -564,7 +580,12 @@ std::pair<int, int> *work_list_pair::last() {
 
 void work_list_pair::initialize(int size) {
     init = true;
-    arr = new std::pair<int, int>[size + 16];
+    arr = new std::pair<int, int>[size + 64];
+    arr_sz = 0;
+}
+
+void work_list_pair::initialize_from_array(std::pair<int, int>* p, int size) {
+    arr = p;
     arr_sz = 0;
 }
 
@@ -602,7 +623,7 @@ std::pair<std::pair<int, int>, bool>* work_list_pair_bool::last() {
 
 void work_list_pair_bool::initialize(int size) {
     init = true;
-    arr = new std::pair<std::pair<int, int>, bool>[size + 16];
+    arr = new std::pair<std::pair<int, int>, bool>[size + 64];
     arr_sz = 0;
 }
 
@@ -630,11 +651,18 @@ void work_list_pair_bool::reset() {
 }
 
 void ring_pair::initialize(int size) {
-    arr = new std::pair<int, int>[size + 16];
+    arr = new std::pair<int, int>[size + 64];
     arr_sz = size;
     back_pos  = 0;
     front_pos = 0;
     init = true;
+}
+
+void ring_pair::initialize_from_array(std::pair<int, int>* p, int size) {
+    arr = p;
+    arr_sz    = size;
+    back_pos  = 0;
+    front_pos = 0;
 }
 
 void ring_pair::push_back(std::pair<int, int> value) {

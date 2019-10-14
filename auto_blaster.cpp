@@ -468,9 +468,9 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
 
     auto_workspace W;
     invariant start_I;
-
-    W.first_level_fail.initialize(g->v_size);
-    W.first_level_succ.initialize(g->v_size);
+    bool* p = new bool[g->v_size * 2];
+    W.first_level_fail.initialize_from_array(p, g->v_size);
+    W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
 
     if(master) {
         canon_I    = new invariant;
@@ -525,6 +525,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         }
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
+        delete[] p;
         delete G;
     } else {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -565,6 +566,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         //std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
         //std::cout << "Dif: " << sampled_paths / (inner_t / 1000000.0)  - sampled_paths / (cref / 1000000.0) << "d" << std::endl;
         //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
+        delete[] p;
         return;
     }
 }
