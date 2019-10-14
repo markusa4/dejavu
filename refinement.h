@@ -92,6 +92,23 @@ public:
     int arr_sz = -1;
 };
 
+class ring_pair {
+public:
+    void initialize(int size);
+    void push_back(std::pair<int, int> value);
+    std::pair<int, int>* front();
+    void pop();
+    bool empty();
+    void reset();
+    ~ring_pair();
+    std::pair<int, int>* arr;
+    bool init = false;
+    int arr_sz = -1;
+    int front_pos = -1;
+    int back_pos = -1;
+};
+
+
 class work_list_pair_bool {
 public:
     void initialize(int size);
@@ -128,6 +145,7 @@ private:
     work_list_pair vertex_worklist;
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
+    ring_pair worklist_color_classes;
 };
 
 

@@ -34,29 +34,32 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_worklist_color.initialize(g->v_size);
         color_class_splits.initialize(g->v_size);
         initialized = true;
+        worklist_color_classes.initialize(g->v_size * 2);
 
         int n = g->v_size;
     }
 
     //std::list<std::pair<int, int>> color_class_splits;
-    std::queue<std::pair<int, int>> worklist_color_classes;
+    //std::queue<std::pair<int, int>> worklist_color_classes;
+    //work_list_pair worklist_color_classes;
+    worklist_color_classes.reset();
 
     if(init_color_class->empty()) {
         // initialize queue with all classes (except for largest one)
         for (int i = 0; i < c->ptn_sz;) {
-                worklist_color_classes.push(std::pair<int, int>(i, c->ptn[i] + 1));
+                worklist_color_classes.push_back(std::pair<int, int>(i, c->ptn[i] + 1));
             i += c->ptn[i] + 1;
         }
     } else {
         for(auto it = init_color_class->begin(); it != init_color_class->end(); ++it) {
-            worklist_color_classes.push(std::pair<int, int>(*it, c->ptn[*it] + 1));
+            worklist_color_classes.push_back(std::pair<int, int>(*it, c->ptn[*it] + 1));
         }
     }
 
     while(!worklist_color_classes.empty()) {
         //color_class_splits.clear(); // <- 2%
         color_class_splits.reset();
-        std::pair<int, int> next_color_class = worklist_color_classes.front();
+        std::pair<int, int> next_color_class = *worklist_color_classes.front();
         worklist_color_classes.pop();
 
        //std::cout << "Refining color class " << next_color_class.first << ", size: " << next_color_class.second << std::endl;
@@ -88,7 +91,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
             color_class_splits.pop_back();
             int new_class_sz = c->ptn[new_class] + 1;
             if(skipped_largest || !is_largest) {
-                worklist_color_classes.push(std::pair<int, int>(new_class, new_class_sz));
+                worklist_color_classes.push_back(std::pair<int, int>(new_class, new_class_sz));
             } else {
                 skipped_largest = true;
                 skip += 1;
@@ -630,4 +633,38 @@ bool work_list_pair_bool::empty() {
 
 void work_list_pair_bool::reset() {
     arr_sz = 0;
+}
+
+void ring_pair::initialize(int size) {
+    arr = new std::pair<int, int>[size];
+    arr_sz = size;
+    back_pos  = 0;
+    front_pos = 0;
+    init = true;
+}
+
+void ring_pair::push_back(std::pair<int, int> value) {
+    arr[back_pos] = value;
+    back_pos = (back_pos + 1) % arr_sz;
+}
+
+std::pair<int, int> *ring_pair::front() {
+    return &arr[front_pos];
+}
+
+void ring_pair::pop() {
+    front_pos = (front_pos + 1) % arr_sz;
+}
+
+bool ring_pair::empty() {
+    return (front_pos == back_pos);
+}
+
+ring_pair::~ring_pair() {
+    if(init)
+        delete[] arr;
+}
+
+void ring_pair::reset() {
+    front_pos = back_pos;
 }
