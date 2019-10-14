@@ -43,7 +43,7 @@ int selector::select_color_largest(sgraph *g, coloring *c) {
         largest_cache.initialize(g->v_size);
         init = true;
     }
-    
+
     int largest_cell  = -1;
     int largest_cell_sz = -1;
     bool only_trivial = true;

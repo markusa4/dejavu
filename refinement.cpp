@@ -21,7 +21,7 @@ public:
     }
 };
 
-bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, std::list<int>* init_color_class, bool track_changes) {
+bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes, invariant* I, int init_color_class, bool track_changes) {
     //std::cout << "Refining..." << std::endl;
     bool comp = true;
     //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
@@ -43,16 +43,14 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     //work_list_pair worklist_color_classes;
     worklist_color_classes.reset();
 
-    if(init_color_class->empty()) {
+    if(init_color_class < 0) {
         // initialize queue with all classes (except for largest one)
         for (int i = 0; i < c->ptn_sz;) {
                 worklist_color_classes.push_back(std::pair<int, int>(i, c->ptn[i] + 1));
             i += c->ptn[i] + 1;
         }
     } else {
-        for(auto it = init_color_class->begin(); it != init_color_class->end(); ++it) {
-            worklist_color_classes.push_back(std::pair<int, int>(*it, c->ptn[*it] + 1));
-        }
+        worklist_color_classes.push_back(std::pair<int, int>(init_color_class, c->ptn[init_color_class] + 1));
     }
 
     while(!worklist_color_classes.empty()) {

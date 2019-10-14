@@ -138,7 +138,7 @@ extern long mfiltercount;
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
         bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, auto_workspace* w) {
     bool backtrack = false;
-    std::list<std::pair<int, int>> changes;
+    //std::list<std::pair<int, int>> changes;
 
     refinement* R = &w->R;
     selector* S = &w->S;
@@ -150,7 +150,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
     S->empty_cache();
 
-    std::list<int> init_color_class;
+    int init_color_class;
     *restarts = 0;
     int level = 1;
     ir_operation last_op = OP_R;
@@ -177,7 +177,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 I->set_compare_invariant(canon_I);
 
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-            init_color_class.clear();
+            init_color_class = -1;
             last_op = OP_R;
             if(level == 2) first_level_fail->set(base);
             //std::cout << "level " << level << "base " << base << std::endl;
@@ -215,10 +215,10 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //                                                REFINEMENT
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            changes.clear();
+            //changes.clear();
             bool comp = I->write_top_and_compare(INT32_MAX);
             //assert(init_color_class.size() == 2);
-            comp = comp && R->refine_coloring(g, c, &changes, I, &init_color_class, false);
+            comp = comp && R->refine_coloring(g, c, nullptr, I, init_color_class, false);
             comp = comp && I->write_top_and_compare(INT32_MAX);
             comp = comp && I->write_top_and_compare(INT32_MIN);
             //R.complete_colorclass_invariant(g, &c, &I);
@@ -237,7 +237,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             // collect all elements of color s
-            init_color_class.clear();
+            init_color_class = -1;
             int rpos = s + ((*re)() % (c->ptn[s] + 1));
             int v = c->lab[rpos];
             //assert(rpos == c->vertex_to_lab[v]);
@@ -253,7 +253,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             int newpos = R->individualize_vertex(g, c, v);
             last_op = OP_I;
             assert(init_color_class.empty());
-            init_color_class.push_back(newpos);
+            init_color_class = newpos;
             assert(c->vertex_to_col[v] > 0);
             //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
@@ -564,8 +564,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     std::default_random_engine re = std::default_random_engine(seed);
     int selector_seed = re() % INT32_MAX;
 
-    std::list<std::pair<int, int>> changes;
-
     invariant start_I;
    // start_I.push_level();
 
@@ -578,9 +576,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         start_c = new coloring;
         std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(start_c);
-        std::list<int> init_color_class;
         W.start_c = start_c;
-        W.R.refine_coloring(g, start_c, &changes, &start_I, &init_color_class, false);
+        W.R.refine_coloring(g, start_c, nullptr, &start_I, -1, false);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
         find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
