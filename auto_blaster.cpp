@@ -630,7 +630,12 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         int idle_ms = 0;
         W.start_c = start_c;
        // std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-        //find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
+
+       // make my own canonical leaf...
+        canon_I    = new invariant;
+        canon_leaf = new bijection;
+        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
+
         //double inner_t = 0;
         while(!(*done)) {
             bijection automorphism;
