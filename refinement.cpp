@@ -26,6 +26,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
     bool comp = true;
     //std::unordered_map<std::pair<int, int>, std::pair<int, int>, pairhash> reduce_class;
     if(!initialized) {
+        malloc_lock.lock();
         counting_array.initialize(g->v_size, g->max_degree);
         color_workset.initialize(g->v_size);
         vertex_worklist.initialize(g->v_size);
@@ -35,6 +36,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.initialize(g->v_size);
         initialized = true;
         worklist_color_classes.initialize(g->v_size * 2);
+        malloc_lock.unlock();
     }
 
     worklist_color_classes.reset();

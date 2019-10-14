@@ -28,114 +28,6 @@
 extern long mmultcount;
 extern long mfiltercount;
 
-/*void auto_blaster::find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
-                                          bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, refinement_bucket* R) {
-    bool backtrack = false;
-    std::list<std::pair<int, int>> changes;
-    selector S;
-    coloring_bucket c;
-    invariant I;
-    std::list<int> init_color_class;
-    *restarts = 0;
-    ir_operation last_op = OP_R;
-    I = start_I;
-    c.copy(&start_cb);
-    int level = 2;
-
-    if(compare)
-        I.set_compare_invariant(canon_I);
-    int startlevel = I.current_level();
-
-    while (true) {
-        if (backtrack) {
-            //std::cout << "backtrack" << std::endl;
-            // initialize a search state
-            //I.print();
-            //assert(false);
-            if(*done) {
-                return;
-            }
-            *restarts += 1;
-            c.copy(&start_cb);
-            while(I.current_level() != startlevel)
-                I.pop_level();
-            // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-            init_color_class.clear();
-            last_op = OP_R;
-            backtrack = false;
-            level = 2;
-        }
-
-        std::pair<int, int> s;
-        if (!backtrack) {
-            s = S.select_color_bucket(g, &c, selector_seed, level);
-            if (s.first == -1) {
-                if (compare) {
-                    // we can derive an automorphism!
-                    bijection leaf;
-                    leaf.read_from_coloring_bucket(&c);
-                    //I.print();
-                    //c.print();
-                    *automorphism = leaf;
-                    automorphism->inverse();
-                    automorphism->compose(*canon_leaf);
-                    if(!g->certify_automorphism(*automorphism)) {
-                        std::cout << "Restart (leaf)." << *restarts << std::endl;
-                        backtrack = true;
-                        continue;
-                    }
-                    std::cout << "Found automorphism." << *restarts << std::endl;
-                    return;
-                } else {
-                    I.push_level();//I.print();
-
-                    canon_leaf->read_from_coloring_bucket(&c);
-                    *canon_I = I;
-                    std::cout << "Finished first" << std::endl;
-                    return;
-                }
-            }
-        }
-
-        if (last_op == OP_I) { // add new operations to trail...
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //                                                REFINEMENT
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            changes.clear();
-            I.push_level();
-            //assert(init_color_class.size() == 2);
-            bool comp = R->refine_coloring(g, &c, &I, level);
-            last_op = OP_R;
-            if (compare) {
-                // compare invariant
-                if(!comp || !I.compare_sizes()) {
-                    backtrack = true;
-                    continue;
-                }
-                //if (I.level_is_eq(canon_I, I.current_level())) {
-                continue;
-            }
-        } else if (last_op == OP_R) {
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //                                             INDIVIDUALIZATION
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            // collect all elements of color s //
-            level += 1;
-            int rpos = s.first + ((*re)() % (s.second));
-            //std::cout << s.first << ", " << s.second << std::endl;
-            assert(rpos < c.lab_sz);
-            // cell size?
-            int v = c.lab[rpos];
-            // individualize random vertex of class
-            R->individualize_vertex(g, &c, s.first, v, level);
-            last_op = OP_I;
-            if (!compare) { // base points
-                automorphism->map.push_back(v);
-            }
-        }
-    }
-}*/
-
 void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
         bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed, auto_workspace* w) {
     bool backtrack = false;
@@ -173,18 +65,20 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
         if(*done) return;
         if (backtrack) {
             // check for new messages
-            std::tuple<int, int, bool> x;
-            bool d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
-            while(d) {
-                if(std::get<0>(x) == w->first_level) {
-                    //std::cout << "communicated " << std::endl;
-                    if(std::get<2>(x)) {
-                        first_level_succ->set(std::get<1>(x));
-                    } else {
-                        first_level_fail->set(std::get<1>(x));
+            if(config.CONFIG_THREADS_COLLABORATE) {
+                std::tuple<int, int, bool> x;
+                bool d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
+                while (d) {
+                    if (std::get<0>(x) == w->first_level) {
+                        //std::cout << "communicated " << std::endl;
+                        if (std::get<2>(x)) {
+                            first_level_succ->set(std::get<1>(x));
+                        } else {
+                            first_level_fail->set(std::get<1>(x));
+                        }
                     }
+                    d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
                 }
-                d = (*w->communicator_pad)[w->communicator_id].try_dequeue(x);
             }
 
             S->empty_cache();
@@ -199,10 +93,13 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             if (level == w->first_level + 1) {
                 if (!first_level_fail->get(base)) {
-                   /* for(int i = 0; i < w->communicator_pad->size(); ++i) {
-                        if(i != w->communicator_id)
-                            (*w->communicator_pad)[i].try_enqueue(std::tuple<int, int, bool>(w->first_level, base, false));
-                    }*/
+                    if(config.CONFIG_THREADS_COLLABORATE) {
+                        for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                            if (i != w->communicator_id)
+                                (*w->communicator_pad)[i].try_enqueue(
+                                        std::tuple<int, int, bool>(w->first_level, base, false));
+                        }
+                    }
 
                     //std::cout << "failed" << first_level_point << std::endl;
                     first_level_fail->set(base);
@@ -284,9 +181,6 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             s = S->select_color(g, c, selector_seed);
             if (s == -1) {
                 if (compare) {
-                    //assert(I.level_is_eq(canon_I, I.current_level()));
-                    //I->push_level();
-                    //I->write_top_and_compare(INT32_MAX);
                     // we can derive an automorphism!
                     bijection leaf;
                     leaf.read_from_coloring(c);
@@ -294,9 +188,12 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);
                     if(!first_level_succ->get(first_level_point)) {
-                        for(int i = 0; i < w->communicator_pad->size(); ++i) {
-                            if(i != w->communicator_id)
-                                (*w->communicator_pad)[i].try_enqueue(std::tuple<int, int, bool>(w->first_level, first_level_point, true));
+                        if(config.CONFIG_THREADS_COLLABORATE) {
+                            for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                                if (i != w->communicator_id)
+                                    (*w->communicator_pad)[i].try_enqueue(
+                                            std::tuple<int, int, bool>(w->first_level, first_level_point, true));
+                            }
                         }
                         w->first_level_succ_point = first_level_point;
                         w->first_level_sz += 1;
@@ -545,109 +442,6 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     }
     T.free_path();*/
 }
-
-
-/*void auto_blaster::sample(sgraph* g, bool master, bool* done) {
-    // find comparison leaf
-    invariant canon_I;
-    std::vector<std::thread> work_threads;
-    bijection canon_leaf;
-    bijection base_points;
-    bool trash_bool = false;
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::default_random_engine re = std::default_random_engine(seed);
-    int selector_seed = re() % INT32_MAX;
-
-    refinement R;
-    std::list<std::pair<int, int>> changes;
-    if(master) {
-        start_I.push_level();
-        g->initialize_coloring(&start_c);
-        std::list<int> init_color_class;
-        R.refine_coloring(g, &start_c, &changes, &start_I, &init_color_class, false);
-        //std::cout << "Launching workers..." << std::endl;
-        for(int i = 0; i < config.CONFIG_THREADS_NO_PIPELINE - 1; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample, this, g, false, done));
-    }
-    int trash_int = 0;
-    auto_workspace W;
-    W.first_level_fail.initialize(g->v_size);
-    find_automorphism_prob(g, false, &canon_I, &canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
-    //std::cout << "Found canonical leaf." << std::endl;
-
-    int abort_counter = 0;
-    int sampled_paths = 0;
-    int sampled_paths_all = 0;
-    int restarts = 0;
-
-    // sample for automorphisms
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //                                                      MASTER THREAD
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    if(master) {
-        // initialize automorphism group
-        sequential_group G(g->v_size, &base_points);
-        // run algorithm
-        while (abort_counter <= 4) {
-            sampled_paths += 1;
-            // sample myself
-            bijection automorphism;
-            bool added;
-            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, &trash_bool, selector_seed, &W);
-            added = G.add_permutation(&automorphism);
-            if (added) {
-                abort_counter = 0;
-            } else {
-                abort_counter += 1;
-            }
-
-            // add samples of other threads
-            bool d;
-            do {
-                d = Q.try_dequeue(automorphism);
-                if (d) {
-                    sampled_paths_all += 1;
-                    added = G.add_permutation(&automorphism);
-                    if (added) {
-                        abort_counter = 0;
-                    } else {
-                        abort_counter += 1;
-                    }
-                }
-            } while(d && abort_counter <= 3);
-        }
-        *done = true;
-        std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
-        std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
-        std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
-        //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
-        //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
-        std::cout << "Base size:  " << G.base_size << std::endl;
-        std::cout << "Group size: ";
-        G.print_group_size();
-        while(!work_threads.empty()) {
-            work_threads[work_threads.size()-1].join();
-            work_threads.pop_back();
-        }
-    } else {
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    //                                                      SLAVE THREAD
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        while(!(*done)) {
-            bijection automorphism;
-            find_automorphism_prob(g, true, &canon_I, &canon_leaf, &automorphism, &re, &restarts, done, selector_seed, &W);
-            Q.enqueue(automorphism);
-            if(Q.size_approx() > 20) {
-                if(Q.size_approx() < 100) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-                } else {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                }
-            }
-        }
-        return;
-    }
-}*/
 
 void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                                     com_pad* communicator_pad, int communicator_id) {

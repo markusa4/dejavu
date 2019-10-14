@@ -14,6 +14,9 @@
 #include <list>
 #include <iostream>
 #include <bitset>
+#include <mutex>
+
+static std::mutex malloc_lock;
 
 class work_queue {
 public:
