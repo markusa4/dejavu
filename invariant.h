@@ -11,8 +11,8 @@ class invariant {
     invariant* compareI;
     bool has_compare = false;
     bool no_write = false;
-    int cur_pos = -1;
 public:
+    int cur_pos = -1;
     inline bool write_top_and_compare(int i) {
         if(no_write) {
             cur_pos += 1;

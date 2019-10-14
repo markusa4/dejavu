@@ -35,12 +35,8 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.initialize(g->v_size);
         initialized = true;
         worklist_color_classes.initialize(g->v_size * 2);
-        //std::cout << "init" << std::endl;
     }
 
-    //std::list<std::pair<int, int>> color_class_splits;
-    //std::queue<std::pair<int, int>> worklist_color_classes;
-    //work_list_pair worklist_color_classes;
     worklist_color_classes.reset();
 
     if(init_color_class < 0) {

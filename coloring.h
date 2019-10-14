@@ -20,6 +20,8 @@ public:
     std::vector<int>  vertex_to_col;
     std::vector<int>  vertex_to_lab;
     ~coloring();
+
+    void copy_force(coloring *c);
 };
 
 #endif //BRUTUS_COLORING_H

@@ -38,6 +38,10 @@ void selector::empty_cache() {
     largest_cache.reset();
 }
 
+void selector::pop_cache() {
+    largest_cache.pop();
+}
+
 int selector::select_color_largest(sgraph *g, coloring *c) {
     if(!init) {
         largest_cache.initialize(g->v_size);
@@ -48,12 +52,14 @@ int selector::select_color_largest(sgraph *g, coloring *c) {
     int largest_cell_sz = -1;
     bool only_trivial = true;
 
+    //largest_cache.reset();
+
     while(!largest_cache.empty()) {
         auto it = largest_cache.front();
         if(it->second == c->ptn[it->first]) {
             largest_cell    = it->first;
             largest_cell_sz = it->second;
-            largest_cache.pop();
+            //largest_cache.pop();
             break;
         }
         largest_cache.pop();
@@ -125,7 +131,7 @@ int selector::seeded_select_color(sgraph *g, coloring *c, int seed) {
 
 
 int selector::select_color(sgraph *g, coloring *c, int seed) {
-    assert(config.CONFIG_IR_CELL_SELECTOR == 1);
+   // assert(config.CONFIG_IR_CELL_SELECTOR == 1);
 
     switch(config.CONFIG_IR_CELL_SELECTOR) {
         case 0:

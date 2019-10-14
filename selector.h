@@ -34,6 +34,8 @@ public:
     int select_color_largest_degseq2(sgraph *g, coloring *c);
 
     void empty_cache();
+
+    void pop_cache();
 };
 
 

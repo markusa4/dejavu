@@ -238,7 +238,7 @@ int commandline_mode(int argc, char** argv) {
             //A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
@@ -334,7 +334,7 @@ int main(int argc, char *argv[]) {
          //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr);
+                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
