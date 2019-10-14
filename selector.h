@@ -9,11 +9,14 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "configuration.h"
+#include "refinement.h"
 #include <list>
 
 class selector {
     int skipstart = 0;
-    std::list<std::pair<int, int>> largest_cache;
+    //std::list<std::pair<int, int>> largest_cache;
+    ring_pair largest_cache;
+    int init = false;
 
 public:
     std::pair<int, int> select_color_bucket(sgraph *g, coloring_bucket *c, int seed, int level);

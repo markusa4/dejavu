@@ -35,8 +35,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, std::list<std::pair<int
         color_class_splits.initialize(g->v_size);
         initialized = true;
         worklist_color_classes.initialize(g->v_size * 2);
-
-        int n = g->v_size;
+        //std::cout << "init" << std::endl;
     }
 
     //std::list<std::pair<int, int>> color_class_splits;
@@ -459,11 +458,11 @@ cumulative_counting::~cumulative_counting() {
 }
 
 void work_set::initialize(int size) {
-    //s = new bool[size];
-    s.reserve(size);
+    s = new bool[size];
+    //s.reserve(size);
     for(int i = 0; i < size; i++) {
-        //s[i] = false;
-        s.push_back(false);
+        s[i] = false;
+        //s.push_back(false);
     }
     reset_queue.initialize(size);
     init = true;
@@ -489,9 +488,8 @@ void work_set::reset() {
 }
 
 work_set::~work_set() {
-   // if(init)
-        //delete[] s;
-
+    if(init)
+        delete[] s;
 }
 
 void work_list::initialize(int size) {
