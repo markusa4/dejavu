@@ -54,6 +54,8 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
     if(compare)
         start_I->set_compare_invariant(canon_I);
+    else
+        start_I->create_vector();
 
     ir_operation last_op = OP_R;
     *I = *start_I;
@@ -476,11 +478,13 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
         g->initialize_coloring(start_c);
         W.start_c = start_c;
+        start_I.create_vector();
         W.R.refine_coloring(g, start_c, nullptr, &start_I, -1, false);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
-        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
 
+
+        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
         G = new pipeline_group();
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
