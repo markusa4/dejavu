@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    return commandline_mode(argc, argv);
+    //return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -323,7 +323,7 @@ int main(int argc, char *argv[]) {
     g.permute_graph(&_g, &pr); // permute graph
 
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 10;
+    int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {

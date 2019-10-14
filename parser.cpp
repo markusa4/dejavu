@@ -48,9 +48,14 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
 
     int epos = 0;
     int vpos = 0;
+
+    int maxd = 0;
+
     for(int i = 0; i < incidence_list.size(); ++i) {
         g->v[vpos] = epos;
         g->d[vpos] = incidence_list[i].size();
+        if(g->d[vpos] > maxd)
+            maxd = g->d[vpos];
         vpos += 1;
         for(int j = 0; j < incidence_list[i].size(); ++j) {
             g->e[epos] = incidence_list[i][j];
@@ -61,6 +66,8 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
     g->v_size = nv;
     g->d_size = nv;
     g->e_size = 2 * ne;
+
+    g->max_degree = maxd;
 
     std::cout << "Vertices: \t" << g->v_size << std::endl;
     std::cout << "Edges: \t\t" << g->e_size << std::endl;

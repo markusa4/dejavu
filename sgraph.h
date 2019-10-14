@@ -24,6 +24,8 @@ public:
     int d_size;
     int e_size;
 
+    int max_degree;
+
     void permute_graph(sgraph* ng, bijection* p);
     bool certify_automorphism(bijection p);
     void initialize_coloring(coloring* c);

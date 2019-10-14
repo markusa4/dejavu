@@ -31,7 +31,7 @@ private:
 
 class cumulative_counting {
 public:
-    void initialize(int size);
+    void initialize(int size, int maxdegree);
     void reset();
     void increment(int index, int color);
     void increment_r(int index, int color);
@@ -41,7 +41,9 @@ public:
 private:
     int* count;
     bool init = false;
-    std::vector<int>* sizes;
+    //std::vector<int>* sizes;
+    int* sizes;
+    int m;
     work_queue reset_queue;
     work_queue reset_queue_sizes;
 };

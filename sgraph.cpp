@@ -102,6 +102,7 @@ void sgraph::permute_graph(sgraph* ng, bijection* p) { // ToDo: broken
     ng->v_size = v_size;
     ng->d_size = d_size;
     ng->e_size = e_size;
+    ng->max_degree = max_degree;
 
     bijection p_inv;
     p_inv.map = p->map;
@@ -146,4 +147,5 @@ void sgraph::copy_graph(sgraph* g) {
     v_size = g->v_size;
     d_size = g->d_size;
     e_size = g->e_size;
+    max_degree = g->max_degree;
 }
