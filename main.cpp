@@ -305,13 +305,14 @@ int main(int argc, char *argv[]) {
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-47", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/ranreg/ranreg/Ranreg16384.bliss", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-z2-tar/cfi-rigid-z2/cfi-rigid-z2-0616-01-2", &g);
      //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);

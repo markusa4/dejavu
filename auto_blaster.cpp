@@ -780,7 +780,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
                 W.skiplevels = W.base_size / 16;
-            if(sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size / 1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size / 1.5)) { // detect when done
+                // ToDo: only do this is (once exhaustively) if failure rate is bad?
+            if(config.CONFIG_IR_FAST_AUTOPRE && sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size / 1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size / 1.5)) { // detect when done
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done, selector_seed, &W);
             } else {
                 find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, done, selector_seed, &W);
@@ -788,23 +789,14 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
 
 
             if(sampled_paths == 0) {
-                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
               //  std::cout << "[" << communicator_id << "]: First automorphism (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << ":" << W.skiplevels << std::endl;
-            }/*
-            if(sampled_paths == 10) {
-                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                std::cout << "[" << communicator_id << "]: 10 automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
             }
-            if(sampled_paths == 30) {
-                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                std::cout << "[" << communicator_id << "]: 30 automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
-            }*/
-            //inner_t += (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - inner_timer).count());
             automorphism.not_deletable();
             G->add_permutation(&automorphism, &idle_ms, done);
             automorphism.map = new int[g->v_size];
             if(sampled_paths == 0) {
-                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+               // cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                 //std::cout << "[" << communicator_id << "]: First automorphism (added): " << cref / 1000000.0 << "ms" << std::endl;
             }
             sampled_paths += 1;
