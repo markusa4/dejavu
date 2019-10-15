@@ -15,6 +15,7 @@ class bijection {
 public:
     int* map;
     int map_sz;
+    bool non_uniform = false;
     int map_vertex(int v);
     bijection();
     ~bijection();

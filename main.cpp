@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+   // return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -310,8 +310,9 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-47", &g);
-     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\ranreg\\ranreg\\Ranreg131072.bliss", &g);
-     p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/ranreg/ranreg/Ranreg16384.bliss", &g);
+    p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);

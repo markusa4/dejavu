@@ -24,7 +24,7 @@ public:
 
     // group structures
     int domain_size;
-    int base_size;
+    int  base_size;
     int* b;
     int added;
     mschreier *gp;

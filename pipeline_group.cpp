@@ -110,6 +110,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                 }*/
                 is_random = false;
                 state.ingroup = false;
+                state.counts_towards_abort = !p.non_uniform;
                 state.level = -1;
                 random_abort_counter = 0;
             } else {
@@ -120,6 +121,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
                 _p = re.perm;
                 is_random = true;
                 state.ingroup = true;
+                state.counts_towards_abort = true;
                 state.level = -1;
             }
         } else {
@@ -150,7 +152,7 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         }
 
         if (is_last_stage) {
-            sift_results.enqueue(std::pair<bool, bool>(state.ingroup, result));
+            sift_results.enqueue(std::pair<bool, bool>(state.ingroup || !state.counts_towards_abort, result));
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
                 /*if(back_idle_ms % 10000 == 0) {
@@ -190,17 +192,11 @@ void pipeline_group::initialize(int domain_size, bijection *base_points, int sta
     mschreier_fails(-1);
     added = 0;
     this->domain_size = domain_size;
-    this->base_size = 0;
+    //this->base_size = 0;
     this->stages = stages;
 
     //std::cout << "Creating new pipeline_group... " << std::endl;
     mnewgroup(&gp, &gens, domain_size);
-    b = new int[domain_size];
-    for(int i = 0; i < base_points->map_sz; ++i) {
-        b[i] = base_points->map[i];
-        base_size += 1;
-    }
-
     mgetorbits(b, base_size, gp, &gens, domain_size);
 
     // create pipeline
@@ -232,6 +228,7 @@ void pipeline_group::determine_stages() {
 }
 
 pipeline_group::~pipeline_group() {
+    delete[] b;
     mfreeschreier(&gp, &gens);
 }
 

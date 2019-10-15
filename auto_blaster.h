@@ -29,6 +29,7 @@ struct alignas(64) auto_workspace {
     int first_level = 1;
     int base_size = 0;
     int first_level_succ_point = -1;
+    int skiplevels = 1;
     std::tuple<int, int>* dequeue_space;
     int dequeue_space_sz = 0;
 
@@ -37,6 +38,8 @@ struct alignas(64) auto_workspace {
 
     moodycamel::ConsumerToken* ctok;
     std::vector<moodycamel::ProducerToken*> ptoks;
+
+    pipeline_group* G;
 
     coloring* start_c;
     invariant start_I;
@@ -72,6 +75,11 @@ public:
                          std::default_random_engine *re, int *restarts, bool *done, int selector_seed);
 
     void sample_pipelined_bucket(sgraph *g, bool master, bool *done, pipeline_group *G);
+
+    void fast_automorphism_non_uniform(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf,
+                                       bijection *automorphism, int *restarts,
+                                       bool *done,
+                                       int selector_seed, auto_workspace *w);
 };
 
 

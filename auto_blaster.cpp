@@ -54,6 +54,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
 
     int init_color_class;
     *restarts = 0;
+    int reguess = 0;
     int level = w->first_level;
     int first_level_point = -1;
     int second_level_point = -1;
@@ -184,6 +185,10 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 s  = S->select_color(g, c, selector_seed);
                 assert(s != -1);
                 assert(start_I->cur_pos == I->cur_pos);
+            } else if (w->first_level_sz == c->ptn[s] + 1) {
+                // I added all automorphisms!
+                std::cout << "Levels explored..." << std::endl;
+                *done = true;
             }
 
             // collect all elements of color s
@@ -193,7 +198,9 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             // first level fail prevention
             while(first_level_fail->get(v)) {
                 if(*done) return;
-                rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+                reguess += 1;
+                //rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+                rpos = s + ((rpos - s + 1) % (c->ptn[s] + 1));
                 v = c->lab[rpos];
             }
 
@@ -224,6 +231,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             if (s == -1) {
                 if (compare) {
                     // we can derive an automorphism!
+                    //std::cout << *restarts << ", " << reguess << ", " << w->first_level << std::endl;
                     w->measure2 += 1;
                     bijection leaf;
                     leaf.read_from_coloring(c);
@@ -327,6 +335,144 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
         }
     }
 }
+
+void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
+        bijection* automorphism, int *restarts, bool *done, int selector_seed, auto_workspace* w) {
+    bool backtrack = false;
+    bool skipped_level = false;
+    //std::list<std::pair<int, int>> changes;
+
+    refinement *R = &w->R;
+    selector *S = &w->S;
+    coloring *c = &w->c;
+    invariant *I = &w->I;
+
+    coloring *start_c = w->start_c;
+    invariant *start_I = &w->start_I;
+
+    S->empty_cache();
+    int init_color_class;
+
+    *restarts = 0;
+    int level = w->first_level;
+
+
+    if (compare) {
+        start_I->set_compare_invariant(canon_I);
+    } else {
+        start_I->create_vector();
+        automorphism->map = new int[g->v_size];
+        automorphism->map_sz = 0;
+    }
+    ir_operation last_op = OP_R;
+    *I = *start_I;
+    c->copy(start_c);
+
+    while (true) {
+        if(*done) return;
+        if (backtrack) {
+            if(*done) return;
+            S->empty_cache();
+            // initialize a search state
+            *restarts += 1;
+            c->copy(start_c);
+            *I = *start_I;
+
+            backtrack = false;
+            if(*restarts % 4 == 0)
+                w->skiplevels += 1;
+            level = w->first_level;
+        }
+
+        int s;
+        if (!backtrack) {
+            s = S->select_color(g, c, selector_seed);
+            if (s == -1) {
+                if (compare) {
+                    // we can derive an automorphism!
+                    //std::cout << *restarts << ", " << reguess << ", " << w->first_level << std::endl;
+                    w->measure2 += 1;
+                    bijection leaf;
+                    leaf.read_from_coloring(c);
+                    leaf.not_deletable();
+                    *automorphism = leaf;
+                    automorphism->inverse();
+                    automorphism->compose(canon_leaf);//enqueue_fail_point_sz
+                    automorphism->non_uniform = true;
+                    //std::cout << "Found automorphism." << *restarts << std::endl;
+                    assert(g->certify_automorphism(*automorphism));
+                    return;
+                } else {
+                    //I->push_level();
+                    canon_leaf->read_from_coloring(c);
+                    *canon_I = *I;
+                    return;
+                }
+            }
+        }
+
+        if (last_op == OP_I) { // add new operations to trail...
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                                REFINEMENT
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //changes.clear();
+            bool comp = I->write_top_and_compare(INT32_MAX);
+            //assert(init_color_class.size() == 2);
+            comp = comp && R->refine_coloring(g, c, nullptr, I, init_color_class, false);
+            comp = comp && I->write_top_and_compare(INT32_MAX);
+            comp = comp && I->write_top_and_compare(INT32_MIN);
+            //R.complete_colorclass_invariant(g, &c, &I);
+            last_op = OP_R;
+            assert(skipped_level?comp:true);
+            if (compare) {
+                // compare invariant
+                if(!comp) { // || !I->compare_sizes()
+                    backtrack = true;
+                    continue;
+                }
+                continue;
+            }
+        } else if (last_op == OP_R) {
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                             INDIVIDUALIZATION
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            // collect all elements of color s
+            int rpos;
+            int v;
+
+            if(level <= w->skiplevels) {
+                v = w->G->b[level - 1];
+                skipped_level = true;
+            } else {
+                rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+                v = c->lab[rpos];
+                skipped_level = false;
+            }
+
+            int newpos = R->individualize_vertex(g, c, v);
+            last_op = OP_I;
+//            assert(init_color_class >= 0);
+            init_color_class = newpos;
+            assert(c->vertex_to_col[v] > 0);
+            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+            if (!compare) { // base points
+                //automorphism->map.push_back(v);
+                automorphism->map[automorphism->map_sz] = v;
+                automorphism->map_sz += 1;
+            }
+            level += 1;
+
+            bool comp = I->write_top_and_compare(INT32_MIN);
+            comp && I->write_top_and_compare(INT32_MIN);
+            assert(skipped_level?comp:true);
+            if(!comp) {
+                backtrack = true;
+                continue;
+            }
+        }
+    }
+}
+
 
 void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
        bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed) {
@@ -547,6 +693,9 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
 
         find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, nullptr, &trash_int, &trash_bool, selector_seed, &W);
         G = new pipeline_group();
+        base_points.not_deletable();
+        G->base_size = base_points.map_sz;
+        G->b = base_points.map;
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(100, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
@@ -611,6 +760,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         W.communicator_id  = communicator_id;
         W.ctok = new moodycamel::ConsumerToken((*communicator_pad)[communicator_id]);
         W.base_size = G->base_size;
+        W.G = G;
         for(int i = 0; i < W.communicator_pad->size(); ++i) {
             if (communicator_id != i) {
                 W.ptoks.emplace_back(new moodycamel::ProducerToken((*communicator_pad)[i]));
@@ -629,15 +779,18 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
-            if(config.CONFIG_IR_BACKTRACK) {
-                //find_automorphism_bt(g, true, canon_I, canon_leaf, &automorphism, &re, &restarts, done, selector_seed);
+                W.skiplevels = W.base_size / 16;
+            if(sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size / 1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size / 1.5)) { // detect when done
+                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done, selector_seed, &W);
             } else {
                 find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, done, selector_seed, &W);
             }
-            /*if(sampled_paths == 0) {
+
+
+            if(sampled_paths == 0) {
                 cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                std::cout << "[" << communicator_id << "]: First automorphism (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
-            }
+              //  std::cout << "[" << communicator_id << "]: First automorphism (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << ":" << W.skiplevels << std::endl;
+            }/*
             if(sampled_paths == 10) {
                 cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                 std::cout << "[" << communicator_id << "]: 10 automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;

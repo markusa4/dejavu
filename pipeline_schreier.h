@@ -43,6 +43,7 @@ typedef struct filterstatestruct {
     mpermnode **vec, *curr;
     boolean changed, lchanged, ident;
     bool ingroup;
+    bool counts_towards_abort;
     int* workperm;
     size_t workperm_sz;
 } filterstate;
