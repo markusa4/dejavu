@@ -144,6 +144,7 @@ public:
     bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
+    bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool assert_is_equitable(sgraph *g, coloring *c);
     ~refinement();
 private:
@@ -156,7 +157,11 @@ private:
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
     ring_pair worklist_color_classes;
+
     std::pair<int, int>* p;
+
+    bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                  work_list_pair_bool *color_class_split_worklist);
 };
 
 

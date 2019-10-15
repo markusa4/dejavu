@@ -674,10 +674,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     bool* p = new bool[g->v_size * 2];
     W.first_level_fail.initialize_from_array(p, g->v_size);
     W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
-    W.dequeue_space    = new std::tuple<int, int>[64];
-    W.dequeue_space_sz = 8;
+    W.dequeue_space    = new std::tuple<int, int>[512];
+    W.dequeue_space_sz = 512;
     W.enqueue_space    = new std::tuple<int, int>[64];
-    W.enqueue_space_sz = 8;
+    W.enqueue_space_sz = 64; // <- choose this dynamic?
 
     if(master) {
         canon_I    = new invariant;
@@ -686,7 +686,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         g->initialize_coloring(start_c);
         W.start_c = start_c;
         start_I.create_vector();
-        W.R.refine_coloring(g, start_c, nullptr, &start_I, -1, false);
+        W.R.refine_coloring_first(g, start_c, -1);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "Color ref: " << cref / 1000000.0 << "ms" << std::endl;
 
@@ -781,7 +781,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
                 W.skiplevels = W.base_size / 16;
                 // ToDo: only do this is (once exhaustively) if failure rate is bad?
-            if(config.CONFIG_IR_FAST_AUTOPRE && sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size / 1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size / 1.5)) { // detect when done
+            if(config.CONFIG_IR_FAST_AUTOPRE && sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size /1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size /1.5)) { // detect when done
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done, selector_seed, &W);
             } else {
                 find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, done, selector_seed, &W);

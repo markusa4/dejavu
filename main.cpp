@@ -219,7 +219,7 @@ int commandline_mode(int argc, char** argv) {
     sgraph* g = new sgraph;
     p.parse_dimacs_file(filename, g);
 
-    sleep(1);
+    //sleep(1);
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
     sgraph _g;
     bijection pr;
@@ -299,18 +299,22 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-   // return commandline_mode(argc, argv);
+    //return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/lattice/lattice/lattice-30", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/ranreg/ranreg/Ranreg16384.bliss", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_6000_d.dmc", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-z2-tar/cfi-rigid-z2/cfi-rigid-z2-0616-01-2", &g);
      //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
@@ -325,9 +329,9 @@ int main(int argc, char *argv[]) {
     bijection pr;
     bijection::random_bijection(&pr, g.v_size);
     g.permute_graph(&_g, &pr); // permute graph
-
+   // _g = g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 1;
+    int repeat = 2;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {
