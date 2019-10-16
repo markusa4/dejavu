@@ -35,8 +35,8 @@ public:
     ~pipeline_group();
     bool add_permutation(bijection* p, int* idle_ms, bool* done);
     void print_group_size();
-    void pipeline_stage(int n, bool* done);
-    void launch_pipeline_threads(bool *done);
+    void pipeline_stage(int n, bool* done, bool* done_fast);
+    void launch_pipeline_threads(bool *done, bool* done_fast);
     void join_threads();
 
     void determine_stages();

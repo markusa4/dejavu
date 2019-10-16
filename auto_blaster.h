@@ -67,7 +67,7 @@ public:
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
                                                      bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed,  refinement_bucket* R);
 
-    void sample_pipelined(sgraph *g, bool master, bool *done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
+    void sample_pipelined(sgraph *g, bool master, bool *done, bool* done_fast, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                           com_pad* communicator_pad, int communicator_id);
 
     void

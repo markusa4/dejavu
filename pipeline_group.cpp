@@ -6,9 +6,9 @@
 #include "pipeline_group.h"
 #include "configuration.h"
 
-void pipeline_group::launch_pipeline_threads(bool* done) {
+void pipeline_group::launch_pipeline_threads(bool* done, bool* done_fast) {
     for(int i = 1; i < stages; ++i) {
-        work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, done));
+        work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, done, done_fast));
     }
     //std::cout << "Pipeline workers (" << stages << ")" << std::endl;
 }
@@ -20,7 +20,7 @@ void pipeline_group::join_threads() {
     }
 }
 
-void pipeline_group::pipeline_stage(int n, bool* done) {
+void pipeline_group::pipeline_stage(int n, bool* done, bool* done_fast) {
    // int front_idle_ms = 0;
    // int back_idle_ms  = 0;
     int abort_counter = 0;
@@ -55,10 +55,6 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
             int num = sift_results.try_dequeue_bulk(res, bulk_deque_num);
             for(int j = 0; j < num; ++j) {
                 if(!res[j].first) {
-                   // if(leafs_considered == 0) {
-                   //     double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                        //std::cout << "First automorphism processed: " << cref / 1000000.0 << "ms" << std::endl;
-                  //  }
                     leafs_considered += 1;
                     if(!res[j].second) {
                         abort_counter += 1;
@@ -152,7 +148,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         }
 
         if (is_last_stage) {
-            if(state.ingroup) {
+            if(!state.counts_towards_abort && !result && !state.ingroup && !(*done_fast)) {
+                //std::cout << "useless element" << result << std::endl;
+                *done_fast = true;
                // std::cout << "random element: " << result << std::endl;
             }
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup || !state.counts_towards_abort, result));

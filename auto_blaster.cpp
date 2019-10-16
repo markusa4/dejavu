@@ -350,6 +350,8 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     coloring *start_c = w->start_c;
     invariant *start_I = &w->start_I;
 
+    automorphism->non_uniform = false;
+
     S->empty_cache();
     int init_color_class;
 
@@ -366,20 +368,22 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     }
     ir_operation last_op = OP_R;
     *I = *start_I;
-    c->copy(start_c);
+    c->copy_force(start_c);
 
     while (true) {
         if(*done) return;
         if (backtrack) {
+            //if(w->skiplevels > 0)
+             //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
             S->empty_cache();
             // initialize a search state
             *restarts += 1;
-            c->copy(start_c);
+            c->copy_force(start_c);
             *I = *start_I;
 
             backtrack = false;
-            if(*restarts % 4 == 0)
+            if(*restarts % 2 == 0) // ToDo: why this?
                 w->skiplevels += 1;
             level = w->first_level;
         }
@@ -398,7 +402,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
                     *automorphism = leaf;
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);//enqueue_fail_point_sz
-                    automorphism->non_uniform = true;
+                    automorphism->non_uniform = (w->skiplevels > 0);
                     //std::cout << "Found automorphism." << *restarts << std::endl;
                     assert(g->certify_automorphism(*automorphism));
                     return;
@@ -442,6 +446,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
 
             if(level <= w->skiplevels) {
                 v = w->G->b[level - 1];
+                assert(c->vertex_to_col[v] == s);
                 skipped_level = true;
             } else {
                 rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
@@ -646,7 +651,7 @@ void auto_blaster::find_automorphism_bt(sgraph* g, bool compare, invariant* cano
     T.free_path();*/
 }
 
-void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
+void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, bool* done_fast, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                                     com_pad* communicator_pad, int communicator_id) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
@@ -700,7 +705,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(100, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, G, start_c, canon_leaf, canon_I, &pad, i));
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, done, done_fast, G, start_c, canon_leaf, canon_I, &pad, i));
         //std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
@@ -717,10 +722,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
     if(master) {
         // initialize automorphism group
         G->initialize(g->v_size, &base_points, config.CONFIG_THREADS_PIPELINE_DEPTH);
-        G->launch_pipeline_threads(done);
+        G->launch_pipeline_threads(done, done_fast);
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
        // std::cout << "Pipeline group created: " << cref / 1000000.0 << "ms" << std::endl;
-        G->pipeline_stage(0, done);
+        G->pipeline_stage(0, done, done_fast);
         // run algorithm
         //std::cout << "Sampled leaves (local thread): \t" << sampled_paths << std::endl;
         //std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
@@ -776,13 +781,14 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, bool* done, pipelin
 
         //double inner_t = 0;
        // int counter = 0;
+        W.skiplevels = 0;
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
-                W.skiplevels = W.base_size / 16;
                 // ToDo: only do this is (once exhaustively) if failure rate is bad?
-            if(config.CONFIG_IR_FAST_AUTOPRE && sampled_paths % 2 >= 0 && ((sampled_paths <= W.base_size /1.5 && communicator_id % 2 == 0) || sampled_paths <= W.base_size /1.5)) { // detect when done
-                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done, selector_seed, &W);
+            if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
+                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                if((*done_fast && !automorphism.non_uniform )) continue;
             } else {
                 find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, done, selector_seed, &W);
             }

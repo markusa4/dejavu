@@ -234,11 +234,12 @@ int commandline_mode(int argc, char** argv) {
         timer = Clock::now();
         auto_blaster A;
         bool done = false;
+        bool done_fast = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
             //A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
+                A.sample_pipelined(&_g, true, &done, &done_fast, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
@@ -339,11 +340,12 @@ int main(int argc, char *argv[]) {
         timer = Clock::now();
         auto_blaster A;
         bool done = false;
+        bool done_fast = false;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
          //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &done, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
+                A.sample_pipelined(&_g, true, &done, &done_fast, nullptr, nullptr, nullptr, nullptr, nullptr, -1);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
