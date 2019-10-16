@@ -152,6 +152,9 @@ void pipeline_group::pipeline_stage(int n, bool* done) {
         }
 
         if (is_last_stage) {
+            if(state.ingroup) {
+               // std::cout << "random element: " << result << std::endl;
+            }
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup || !state.counts_towards_abort, result));
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {

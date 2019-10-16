@@ -175,6 +175,7 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     // for all vertices of the color class...
     bool comp = true;
     int cc = color_class; // iterate over color class
+    counting_array.reset();
 
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
         int vc = c->lab[cc];
@@ -560,12 +561,13 @@ refinement::~refinement() {
 
 void cumulative_counting::initialize(int size, int maxdegree) {
     m     = maxdegree + 1;
+    sz    = size;
     sizes = new int[size * m + 64];
     count = new int[size + 64];
     init = true;
 
     for(int i = 0; i < size; ++i) {
-        count[i]       = 0;
+        count[i]           = 0;
         this->sizes[i * m] = 0;
     }
     reset_queue.initialize(size);
@@ -587,12 +589,16 @@ void cumulative_counting::reset() {
 }
 
 void inline cumulative_counting::increment(int index, int color) {
+    assert(count[index] > 0);
+    assert(index >= 0 && index < sz);
     //if(count[index] == 0) {
     count[index] += 1;
+    assert(count[index] <= m);
+
     int in = color * m;
     int sz = sizes[in];
     if(sz < count[index]) {
-        if(sz <= 1) {
+        if(sz == 0) {
             reset_queue_sizes.push(in);
         }
         sizes[in + count[index]] = 1;
@@ -604,12 +610,15 @@ void inline cumulative_counting::increment(int index, int color) {
 
 void inline cumulative_counting::increment_r(int index, int color) {
     //if(count[index] == 0) {
+    assert(index >= 0 && index < sz);
+    assert(count[index] == 0);
     count[index] += 1;
+    assert(count[index] <= m);
     reset_queue.push(index);
     int in = color * m;
     int sz = sizes[in];
     if(sz < count[index]) {
-        if(sz <= 1) {
+        if(sz == 0) {
             reset_queue_sizes.push(in);
         }
         sizes[in + count[index]] = 1;
@@ -628,6 +637,7 @@ int cumulative_counting::get_size(int index, int color) {
 
 int cumulative_counting::get_count(int index) {
     //assert(index < count);
+    assert(index >= 0 && index < sz);
     return count[index];
 }
 

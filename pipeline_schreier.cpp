@@ -806,7 +806,6 @@ bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_elem
  * Return true if it ever expanded. */
 {
     int i, j, wordlen, skips;
-    boolean changed;
     mpermnode *pn;
 
     circ_mutex.lock();
@@ -822,17 +821,16 @@ bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_elem
     element->perm    = mworkperm2;
     element->perm_sz = mworkperm2_sz;
 
-    changed = FALSE;
-
     for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
 
     memcpy(mworkperm2, pn->p, n * sizeof(int));
 
-
-    wordlen = 1 + KRAN(3);
-    for (j = 0; j < wordlen; ++j) {
-        for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
-        for (i = 0; i < n; ++i) mworkperm2[i] = pn->p[mworkperm2[i]];
+    for (int h = 0; h < 10; ++h) {
+        wordlen = 1 + KRAN(3);
+        for (j = 0; j < wordlen; ++j) {
+            for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
+            for (i = 0; i < n; ++i) mworkperm2[i] = pn->p[mworkperm2[i]];
+        }
     }
 
     circ_mutex.unlock();

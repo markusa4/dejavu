@@ -45,6 +45,7 @@ private:
     int* count;
     bool init = false;
     //std::vector<int>* sizes;
+    int sz;
     int* sizes;
     int m;
     work_queue reset_queue;
