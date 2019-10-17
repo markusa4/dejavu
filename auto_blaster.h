@@ -42,6 +42,7 @@ struct alignas(64) auto_workspace {
     int enqueue_space_sz = 0;
 
     moodycamel::ConsumerToken* ctok;
+    moodycamel::ProducerToken* ptok;
     std::vector<moodycamel::ProducerToken*> ptoks;
 
     pipeline_group* G;

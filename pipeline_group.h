@@ -36,7 +36,7 @@ public:
     mschreier *gp;
     mpermnode *gens;
 
-    pipeline_group();
+    pipeline_group(int domain_size);
     void initialize(int domain_size, bijection *base_points, int stages);
     ~pipeline_group();
     bool add_permutation(bijection* p, int* idle_ms, bool* done);

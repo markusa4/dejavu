@@ -94,18 +94,18 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
         if (backtrack) {
             w->measure1 += 1;
             // check for new messages
+            bool receive_advance = false;
             size_t num = 1;
             size_t max_repeat = 0;
             if(config.CONFIG_THREADS_COLLABORATE) {
                 while(num > 0) {
-                    num = (*w->communicator_pad)[w->communicator_id].try_dequeue_bulk(*w->ctok, w->dequeue_space,
-                                                                                      w->dequeue_space_sz);
+                    num = (*w->communicator_pad)[w->communicator_id].try_dequeue_bulk(*w->ctok, w->dequeue_space, w->dequeue_space_sz);
                     for (int j = 0; j < num; ++j) {
                         if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
                             if (std::get<0>(w->dequeue_space[j]) > 0) {
                                 if(!first_level_succ->get(std::get<1>(w->dequeue_space[j]))) {
                                     int vertex = std::get<1>(w->dequeue_space[j]);
-                                    first_level_fail->set(vertex);
+                                    first_level_succ->set(vertex);
                                     w->first_level_succ_point = vertex;
                                     w->first_level_sz += 1;
                                 }
@@ -114,6 +114,10 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                                     first_level_fail->set(std::get<1>(w->dequeue_space[j]));
                                     w->first_level_sz += 1;
                                 }
+                            }
+                        } else if (abs(std::get<0>(w->dequeue_space[j])) == 0) {
+                            if(w->first_level == 1) {
+                                receive_advance = true;
                             }
                         }
                     }
@@ -137,7 +141,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                             //for (int i = 0; i < w->communicator_pad->size(); ++i) {
                                 //if (i != w->communicator_id) {
                                     //(*w->communicator_pad)[i].try_enqueue_bulk(*w->ptoks[i], w->enqueue_space, enqueue_fail_point_sz);
-                                    w->G->first_level_points.try_enqueue_bulk(w->enqueue_space, enqueue_fail_point_sz);
+                                    w->G->first_level_points.try_enqueue_bulk(*w->ptok, w->enqueue_space, enqueue_fail_point_sz);
                                     enqueue_fail_point_sz = 0;
                                 //}
                             //}
@@ -157,7 +161,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
             //S->empty_cache();
             int s = S->select_color(g, c, selector_seed);
-            if(w->first_level_sz == c->ptn[s] + 1 && w->first_level < w->base_size) {
+            if((receive_advance || w->first_level_sz == c->ptn[s] + 1) && w->first_level < w->base_size) {
                 /*assert(s != -1);
                 // proceed first level
                 assert(c->vertex_to_col[w->first_level_succ_point] == s);
@@ -255,12 +259,12 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                     automorphism->compose(canon_leaf);//enqueue_fail_point_sz
                     if(enqueue_fail_point_sz > 0) {
                         if(config.CONFIG_THREADS_COLLABORATE) {
-                                    w->G->first_level_points.try_enqueue_bulk(w->enqueue_space, enqueue_fail_point_sz);
+                                    w->G->first_level_points.try_enqueue_bulk(*w->ptok, w->enqueue_space, enqueue_fail_point_sz);
                         }
                     }
                     if(!first_level_succ->get(first_level_point)) {
                         if(config.CONFIG_THREADS_COLLABORATE) {
-                                w->G->first_level_points.try_enqueue(std::tuple<int, int>(w->first_level,first_level_point));
+                                w->G->first_level_points.try_enqueue(*w->ptok, std::tuple<int, int>(w->first_level,first_level_point));
                         }
                         w->first_level_succ_point = first_level_point;
                         w->first_level_sz += 1;
@@ -518,13 +522,17 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
 
     auto_workspace W;
     invariant start_I;
-    bool* p = new bool[g->v_size * 2];
-    W.first_level_fail.initialize_from_array(p, g->v_size);
-    W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
+   // bool* p = new bool[g->v_size * 2];
+    //W.first_level_fail.initialize_from_array(p, g->v_size);
+    //W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
+
+    W.first_level_fail.initialize(g->v_size);
+    W.first_level_succ.initialize(g->v_size);
+
     W.dequeue_space    = new std::tuple<int, int>[512];
     W.dequeue_space_sz = 512;
-    W.enqueue_space    = new std::tuple<int, int>[32];
-    W.enqueue_space_sz = 32; // <- choose this dynamic?
+    W.enqueue_space    = new std::tuple<int, int>[128];
+    W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     int* shrd_orbit;
 
@@ -546,7 +554,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
 
 
         find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, nullptr, &trash_int, switches, selector_seed, &W);
-        G = new pipeline_group();
+        G = new pipeline_group(g->v_size);
         base_points.not_deletable();
         G->base_size = base_points.map_sz;
         G->b = base_points.map;
@@ -598,7 +606,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         }
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
-        delete[] p;
         delete G;
     } else {
         W.shared_orbit = shared_orbit;
@@ -620,15 +627,16 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         W.communicator_pad = communicator_pad;
         W.communicator_id  = communicator_id;
         W.ctok = new moodycamel::ConsumerToken((*communicator_pad)[communicator_id]);
+        W.ptok = new moodycamel::ProducerToken(G->first_level_points);
         W.base_size = G->base_size;
         W.G = G;
-        for(int i = 0; i < W.communicator_pad->size(); ++i) {
+        /*for(int i = 0; i < W.communicator_pad->size(); ++i) {
             if (communicator_id != i) {
                 W.ptoks.emplace_back(new moodycamel::ProducerToken((*communicator_pad)[i]));
             } else {
                 W.ptoks.emplace_back(nullptr);
             }
-        }
+        }*/
 
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "[" << communicator_id << "]: Startup: " << cref / 1000000.0 << "ms" << std::endl;
@@ -690,7 +698,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         //std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
         //std::cout << "Dif: " << sampled_paths / (inner_t / 1000000.0)  - sampled_paths / (cref / 1000000.0) << "d" << std::endl;
         //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
-        delete[] p;
         return;
     }
 }

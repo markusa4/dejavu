@@ -25,7 +25,7 @@ public:
 
     int seeded_select_color(sgraph *g, coloring *c, int seed);
 
-    int select_color_largest(sgraph *g, coloring *c);
+    int select_color_largest(coloring *c);
 
     int select_color_smallest(sgraph *g, coloring *c);
 

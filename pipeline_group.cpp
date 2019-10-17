@@ -40,13 +40,19 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     bool is_last_stage = (n == stages - 1);
     bool is_only_stage = is_first_stage && is_last_stage;
     int my_interval = intervals[n];
-    w->first_level = 1;
 
-    delete[] w->enqueue_space;
-    w->enqueue_space = new std::tuple<int, int>[4096];
-    w->enqueue_space_sz = 4096;
+    int first_cell_size = -1;
+
+    if(is_first_stage) {
+        delete[] w->enqueue_space;
+        w->enqueue_space = new std::tuple<int, int>[4096];
+        w->enqueue_space_sz = 4096;
+        w->first_level = 1;
+        int c = w->S.select_color_largest(w->start_c);
+        first_cell_size = w->start_c->ptn[c];
+        std::cout << first_cell_size << std::endl;
+    }
     int max_it = 0;
-
 
     while(!(*done)) {
         if(*done_fast && !(*done_shared_group)) {
@@ -61,7 +67,9 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         }
 
         if(is_first_stage) { // share information
-            if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group) {
+            if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group && w->first_level == 1) {
+                // we can only do it like this on first level! then we need notion of paths and BFS
+                // act as relay but filter information according to orbit, tell threads when to advance the level
                 // receive information
                 int enq_space_pos = 0;
                 int num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
@@ -69,41 +77,85 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                     for (int j = 0; j < num; ++j) {
                         if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
                             if (std::get<0>(w->dequeue_space[j]) > 0) {
-                                if(!w->first_level_succ.get(gp->orbits[std::get<1>(w->dequeue_space[j])])) {
-                                    int vertex = std::get<1>(w->dequeue_space[j]);
-                                    w->first_level_fail.set(gp->orbits[vertex]);
+                                int vertex = std::get<1>(w->dequeue_space[j]);
+                                if(!w->first_level_succ.get(gp->orbits[vertex])) {
+                                    w->first_level_succ.set(gp->orbits[vertex]);
                                     w->first_level_sz += 1;
                                     w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
-                                                                                           gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                                                                           gp->orbits[vertex]);
                                     enq_space_pos += 1;
                                 }
                             } else {
-                                if(!w->first_level_fail.get(gp->orbits[std::get<1>(w->dequeue_space[j])])) {
-                                    w->first_level_fail.set(gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                int vertex = std::get<1>(w->dequeue_space[j]);
+                                if(!w->first_level_fail.get(gp->orbits[vertex])) {
+                                    w->first_level_fail.set(gp->orbits[vertex]);
                                     w->first_level_sz += 1;
                                     w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
-                                                                                           gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                                                                           gp->orbits[vertex]);
                                     enq_space_pos += 1;
                                 }
                             }
                         }
                     }
                     max_it += 1;
-                    if(max_it > config.CONFIG_THREADS_REFINEMENT_WORKERS) break;
-                    if(enq_space_pos > w->enqueue_space_sz - 1024) break;
+                    if(max_it > config.CONFIG_THREADS_REFINEMENT_WORKERS * 5) break;
+                    if(enq_space_pos > w->enqueue_space_sz - w->dequeue_space_sz - 1) break;
                     num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
                 }
 
-                // enrich with my orbit
-
                 // send information
                 //if(enq_space_pos > 0) std::cout << enq_space_pos << std::endl;
-                for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                    (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space, enq_space_pos); // *w->ptoks[i],
-                }
 
                 enq_space_pos = 0;
                 // advance level
+                // test if level can be advanced and send the information (since threads have outdated firstlevel)
+                if(max_it > 0) {
+                    for (int i = 0; i < domain_size; ++i) {
+                        int map_i   = gp->orbits[i];
+                        if(i == map_i) continue;
+                        assert(map_i < domain_size);
+                        assert(map_i >= 0);
+                        assert(i < domain_size);
+                        assert(i >= 0);
+                        assert(!w->first_level_fail.get(i)     || !w->first_level_succ.get(i));
+                        assert(!w->first_level_fail.get(map_i) || !w->first_level_succ.get(map_i));
+                        bool bi     = w->first_level_fail.get(i);
+                        bool bmap_i = w->first_level_fail.get(map_i);
+
+                        if (bi && !bmap_i) {
+                            w->first_level_fail.set(map_i);
+                            w->first_level_sz += 1;
+                            continue;
+                        }
+                        if (!bi && bmap_i) {
+                            w->first_level_fail.set(i);
+                            w->first_level_sz += 1;
+                            continue;
+                        }
+                        bi     = w->first_level_succ.get(i);
+                        bmap_i = w->first_level_succ.get(map_i);
+                        if (bi && !bmap_i) {
+                            w->first_level_succ.set(map_i);
+                            w->first_level_sz += 1;
+                            continue;
+                        } else if (!bi && bmap_i) {
+                            w->first_level_succ.set(i);
+                            w->first_level_sz += 1;
+                            continue;
+                        }
+                    }
+                }
+                if(first_cell_size == w->first_level_sz) {
+                    for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                        (*w->communicator_pad)[i].enqueue(std::tuple<int, int>(0, 0)); // *w->ptoks[i],
+                    }
+                } else {
+                    for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                        (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space, enq_space_pos); // *w->ptoks[i],
+                    }
+                }
+            } else if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group && w->first_level > 1) {
+                // act as relay
             }
         }
 
@@ -245,14 +297,14 @@ bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
     return true;
 }
 
-pipeline_group::pipeline_group() {
+pipeline_group::pipeline_group(int domain_size) {
+    this->domain_size = domain_size;
+    first_level_points = moodycamel::ConcurrentQueue<std::tuple<int, int>>(domain_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS);
 }
 
 void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
     mschreier_fails(-1);
     added = 0;
-    first_level_points = moodycamel::ConcurrentQueue<std::tuple<int, int>>(domain_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS);
-    this->domain_size = domain_size;
     //this->base_size = 0;
     this->stages = stages;
 

@@ -42,9 +42,9 @@ void selector::pop_cache() {
     largest_cache.pop();
 }
 
-int selector::select_color_largest(sgraph *g, coloring *c) {
+int selector::select_color_largest(coloring *c) {
     if(!init) {
-        largest_cache.initialize(g->v_size);
+        largest_cache.initialize(c->lab_sz);
         init = true;
     }
 
@@ -137,7 +137,7 @@ int selector::select_color(sgraph *g, coloring *c, int seed) {
         case 0:
             return seeded_select_color(g, c, seed);
         case 1:
-            return select_color_largest(g, c);
+            return select_color_largest(c);
         case 2:
             return select_color_smallest(g, c);
         case 3:
