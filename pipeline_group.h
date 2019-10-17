@@ -10,11 +10,17 @@
 #include "bijection.h"
 #include "concurrentqueue.h"
 #include "blockingconcurrentqueue.h"
+#include "utility.h"
+#include "auto_blaster.h"
+
+// struct auto_workspace;
 
 class pipeline_group {
 public:
     // input and pipeline management
     moodycamel::ConcurrentQueue<bijection> automorphisms = moodycamel::ConcurrentQueue<bijection>(50, 4, 4);
+    moodycamel::ConcurrentQueue<std::tuple<int, int>> first_level_points;
+
     std::vector<moodycamel::ConcurrentQueue<filterstate>> pipeline_queues;
     moodycamel::ConcurrentQueue<std::pair<bool, bool>> sift_results = moodycamel::ConcurrentQueue<std::pair<bool, bool>>(20, 1, 1);
     std::vector<int> intervals;
@@ -35,8 +41,8 @@ public:
     ~pipeline_group();
     bool add_permutation(bijection* p, int* idle_ms, bool* done);
     void print_group_size();
-    void pipeline_stage(int n, bool* done, bool* done_fast);
-    void launch_pipeline_threads(bool *done, bool* done_fast);
+    void pipeline_stage(int n, shared_switches* switches, auto_workspace* w);
+    void launch_pipeline_threads(shared_switches* switches, auto_workspace* w);
     void join_threads();
 
     void determine_stages();

@@ -140,7 +140,7 @@ private:
 class refinement {
 public:
     bool refine_coloring(sgraph* g, coloring* c, std::list<std::pair<int, int>> *changes, invariant* I, int init_color_class, bool track_changes);
-    int  individualize_vertex(sgraph* g, coloring* c, int v);
+    int  individualize_vertex(coloring* c, int v);
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
     bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);

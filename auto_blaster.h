@@ -11,12 +11,12 @@
 #include "invariant.h"
 #include "concurrentqueue.h"
 #include "invariant_acc.h"
-#include "pipeline_group.h"
 #include "refinement_bucket.h"
 #include "selector.h"
 
 
 typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int>>> com_pad;
+class pipeline_group;
 
 struct alignas(64) auto_workspace {
     refinement R;
@@ -30,6 +30,11 @@ struct alignas(64) auto_workspace {
     int base_size = 0;
     int first_level_succ_point = -1;
     int skiplevels = 1;
+
+    int first_skiplevel = 1;
+    coloring  skip_c;
+    invariant skip_I;
+
     std::tuple<int, int>* dequeue_space;
     int dequeue_space_sz = 0;
 
@@ -49,7 +54,11 @@ struct alignas(64) auto_workspace {
 
     int measure1 = 0;
     int measure2 = 0;
+
+    int** shared_orbit;
 };
+
+#include "pipeline_group.h"
 
 class auto_blaster {
     //moodycamel::ConcurrentQueue<bijection> Q;
@@ -61,25 +70,24 @@ public:
 
     void
     find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts, bool* done, int selector_seed, auto_workspace* w);
+                           std::default_random_engine *re, int *restarts, shared_switches* switches, int selector_seed, auto_workspace* w);
 
     void
     find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
                                                      bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed,  refinement_bucket* R);
 
-    void sample_pipelined(sgraph *g, bool master, bool *done, bool* done_fast, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                          com_pad* communicator_pad, int communicator_id);
+    void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
+                          com_pad* communicator_pad, int communicator_id, int** shared_orbit);
 
     void
     find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
                          std::default_random_engine *re, int *restarts, bool *done, int selector_seed);
 
-    void sample_pipelined_bucket(sgraph *g, bool master, bool *done, pipeline_group *G);
+    void sample_pipelined_bucket(sgraph *g, bool master, shared_switches* switches, pipeline_group *G);
 
     void fast_automorphism_non_uniform(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf,
                                        bijection *automorphism, int *restarts,
-                                       bool *done,
-                                       int selector_seed, auto_workspace *w);
+                                       bool *done, int selector_seed, auto_workspace *w);
 };
 
 

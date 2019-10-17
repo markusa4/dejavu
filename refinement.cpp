@@ -408,7 +408,7 @@ bool refinement::refine_color_class_first(sgraph *g, coloring *c, int color_clas
     return comp;
 }
 
-int refinement::individualize_vertex(sgraph *g, coloring *c, int v) {
+int refinement::individualize_vertex(coloring *c, int v) {
     //assert(initialized);
 
     int color = c->vertex_to_col[v];

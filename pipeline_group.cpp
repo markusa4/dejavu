@@ -6,11 +6,11 @@
 #include "pipeline_group.h"
 #include "configuration.h"
 
-void pipeline_group::launch_pipeline_threads(bool* done, bool* done_fast) {
-    for(int i = 1; i < stages; ++i) {
-        work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, done, done_fast));
-    }
-    //std::cout << "Pipeline workers (" << stages << ")" << std::endl;
+extern std::mutex circ_mutex;
+
+void pipeline_group::launch_pipeline_threads(shared_switches* switches, auto_workspace* w) {
+    for(int i = 1; i < stages; ++i)
+        work_threads.emplace_back(std::thread(&pipeline_group::pipeline_stage, this, i, switches, w));
 }
 
 void pipeline_group::join_threads() {
@@ -20,9 +20,11 @@ void pipeline_group::join_threads() {
     }
 }
 
-void pipeline_group::pipeline_stage(int n, bool* done, bool* done_fast) {
-   // int front_idle_ms = 0;
-   // int back_idle_ms  = 0;
+void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_workspace* w) {
+   bool* done = &switches->done;
+   bool* done_fast = &switches->done_fast;
+   bool* done_shared_group = &switches->done_shared_group;
+
     int abort_counter = 0;
     int leafs_considered = 0;
     int random_abort_counter = 0;
@@ -34,13 +36,78 @@ void pipeline_group::pipeline_stage(int n, bool* done, bool* done_fast) {
     if(base_size == 0)
         *done = true;
 
+    bool is_first_stage = (n == 0);
+    bool is_last_stage = (n == stages - 1);
+    bool is_only_stage = is_first_stage && is_last_stage;
+    int my_interval = intervals[n];
+    w->first_level = 1;
+
+    delete[] w->enqueue_space;
+    w->enqueue_space = new std::tuple<int, int>[4096];
+    w->enqueue_space_sz = 4096;
+    int max_it = 0;
+
+
     while(!(*done)) {
-        // ToDo: load balancing
+        if(*done_fast && !(*done_shared_group)) {
+            // copy gens and first orbit for shared use!
+            circ_mutex.lock();
+            *w->shared_orbit = new int[domain_size];
+            mpermnode shared_gens;
+            memcpy(*w->shared_orbit, gp->orbits, domain_size * sizeof(int));
+            //std::cout << std::endl;
+            circ_mutex.unlock();
+            *done_shared_group = true;
+        }
+
+        if(is_first_stage) { // share information
+            if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group) {
+                // receive information
+                int enq_space_pos = 0;
+                int num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
+                while(num > 0) {
+                    for (int j = 0; j < num; ++j) {
+                        if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
+                            if (std::get<0>(w->dequeue_space[j]) > 0) {
+                                if(!w->first_level_succ.get(gp->orbits[std::get<1>(w->dequeue_space[j])])) {
+                                    int vertex = std::get<1>(w->dequeue_space[j]);
+                                    w->first_level_fail.set(gp->orbits[vertex]);
+                                    w->first_level_sz += 1;
+                                    w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
+                                                                                           gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                    enq_space_pos += 1;
+                                }
+                            } else {
+                                if(!w->first_level_fail.get(gp->orbits[std::get<1>(w->dequeue_space[j])])) {
+                                    w->first_level_fail.set(gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                    w->first_level_sz += 1;
+                                    w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
+                                                                                           gp->orbits[std::get<1>(w->dequeue_space[j])]);
+                                    enq_space_pos += 1;
+                                }
+                            }
+                        }
+                    }
+                    max_it += 1;
+                    if(max_it > config.CONFIG_THREADS_REFINEMENT_WORKERS) break;
+                    if(enq_space_pos > w->enqueue_space_sz - 1024) break;
+                    num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
+                }
+
+                // enrich with my orbit
+
+                // send information
+                //if(enq_space_pos > 0) std::cout << enq_space_pos << std::endl;
+                for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                    (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space, enq_space_pos); // *w->ptoks[i],
+                }
+
+                enq_space_pos = 0;
+                // advance level
+            }
+        }
+
         // work on pipeline_results and track
-        bool is_first_stage = (n == 0);
-        bool is_last_stage = (n == stages - 1);
-        bool is_only_stage = is_first_stage && is_last_stage;
-        int my_interval = intervals[n];
 
         filterstate state;
         bijection p;
@@ -49,12 +116,12 @@ void pipeline_group::pipeline_stage(int n, bool* done, bool* done_fast) {
         bool is_random = false;
 
         // context switch
-        //std::this_thread::yield();
         if (is_first_stage) {
             // collect results and determine whether done
             int num = sift_results.try_dequeue_bulk(res, bulk_deque_num);
             for(int j = 0; j < num; ++j) {
                 if(!res[j].first) {
+                   // std::cout << leafs_considered << std::endl;
                     leafs_considered += 1;
                     if(!res[j].second) {
                         abort_counter += 1;
@@ -80,22 +147,14 @@ void pipeline_group::pipeline_stage(int n, bool* done, bool* done_fast) {
             // not done, so choose next element for the pipeline
             bool d = automorphisms.try_dequeue(ctoken, p);
             // automorphisms non-empty? take that element
-            while(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND) {
-                //std::this_thread::yield();
-                //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                //front_idle_ms += 1;
-                d = automorphisms.try_dequeue(ctoken, p);
-                /*if(front_idle_ms % 10000 == 0) {
-                    std::cout << "Pipeline(" << n << ") front idle " << front_idle_ms << ", " << automorphisms.size_approx() << std::endl;
-                }*/
-            }
+            if(!d && random_abort_counter >= config.CONFIG_RAND_ABORT_RAND)  continue;
+                //d = automorphisms.try_dequeue(ctoken, p);
+            //}
 
             if(leafs_considered == 0 && d) {
               //  double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                // std::cout << "First automorphism arrived: " << cref / 1000000.0 << "ms" << std::endl;
             }
-
-            //std::cout << automorphisms.size_approx() << std::endl;
 
             if (d) {
                 //std::cout << "automorphism in pipeline" << std::endl;
@@ -192,6 +251,7 @@ pipeline_group::pipeline_group() {
 void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
     mschreier_fails(-1);
     added = 0;
+    first_level_points = moodycamel::ConcurrentQueue<std::tuple<int, int>>(domain_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS);
     this->domain_size = domain_size;
     //this->base_size = 0;
     this->stages = stages;

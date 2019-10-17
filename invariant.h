@@ -16,7 +16,7 @@ public:
     inline bool write_top_and_compare(int i) {
         if(no_write) {
             cur_pos += 1;
-            return ((*compareI->vec_invariant)[cur_pos]) == i;
+            return compareI->vec_invariant->at(cur_pos) == i;
         } else {
             vec_invariant->push_back(i);
             cur_pos += 1;
@@ -24,7 +24,7 @@ public:
             if (has_compare) {
                 if ((compareI->vec_invariant)->size() < vec_invariant->size())
                     return false;
-                return vec_invariant[cur_pos] == (compareI->vec_invariant)[cur_pos];
+                return vec_invariant->at(cur_pos) == (compareI->vec_invariant)->at(cur_pos);
             } else {
                 return true;
             }
