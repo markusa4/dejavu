@@ -530,10 +530,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
     W.first_level_fail.initialize(g->v_size);
     W.first_level_succ.initialize(g->v_size);
 
-    W.dequeue_space    = new std::tuple<int, int>[512];
-    W.dequeue_space_sz = 512;
-    W.enqueue_space    = new std::tuple<int, int>[128];
-    W.enqueue_space_sz = 128; // <- choose this dynamic?
+    W.dequeue_space    = new std::tuple<int, int>[1024];
+    W.dequeue_space_sz = 1024;
+    W.enqueue_space    = new std::tuple<int, int>[512];
+    W.enqueue_space_sz = 512; // <- choose this dynamic?
 
     int* shrd_orbit;
 

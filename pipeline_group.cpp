@@ -27,6 +27,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     int leafs_considered = 0;
     int random_abort_counter = 0;
     int bulk_deque_num = 8;
+    int gens_added = 0;
     std::pair<bool, bool>* res = new std::pair<bool, bool>[bulk_deque_num];
 
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
@@ -42,9 +43,12 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     int first_cell_size = -1;
 
     if(is_first_stage) {
+        delete[] w->dequeue_space;
         delete[] w->enqueue_space;
-        w->enqueue_space = new std::tuple<int, int>[4096];
-        w->enqueue_space_sz = 4096;
+        w->dequeue_space = new std::tuple<int, int>[1024];
+        w->dequeue_space_sz = 1024;
+        w->enqueue_space = new std::tuple<int, int>[2049];
+        w->enqueue_space_sz = 2049;
         w->first_level = 1;
         int c = w->S.select_color_largest(w->start_c);
         std::cout << c << std::endl;
@@ -73,6 +77,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                 int enq_space_pos = 0;
                 int num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
                 while(num > 0) {
+                    //std::cout << "received " << num << std::endl;
                     for (int j = 0; j < num; ++j) {
                         if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
                             if (std::get<0>(w->dequeue_space[j]) > 0) {
@@ -105,11 +110,11 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                 // send information
                 //if(enq_space_pos > 0) std::cout << enq_space_pos << std::endl;
 
-                enq_space_pos = 0;
                 // advance level
                 // test if level can be advanced and send the information (since threads have outdated firstlevel)
-                if(max_it > 0) {
-                    for (int i = 0; i < domain_size; ++i) {
+                if(enq_space_pos > 0 && gens_added > 0) {
+                    //std::cout << "doing it" << std::endl;
+                    for (int i = 0; i < domain_size; ++i) { // ToDo: too expensive if orbits trivial! make special case for asymmetric "so far"
                         int map_i   = gp->orbits[i];
                         if(i == map_i) continue;
                         assert(map_i < domain_size);
@@ -152,10 +157,15 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                         (*w->communicator_pad)[i].enqueue(std::tuple<int, int>(0, 0)); // *w->ptoks[i],
                     }
                 } else {
-                    for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                        (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space, enq_space_pos); // *w->ptoks[i],
+                    if(enq_space_pos > 0) {
+                        //std::cout << "sending " << enq_space_pos << std::endl;
+                        for (int i = 0; i < w->communicator_pad->size(); ++i) {
+                            (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space,
+                                                                       enq_space_pos); // *w->ptoks[i],
+                        }
                     }
                 }
+                enq_space_pos = 0;
             } else if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level > 1) {
                 // act as relay
             }
@@ -180,12 +190,14 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                     if(!res[j].second) {
                         abort_counter += 1;
                     } else {
+                        gens_added += 1;
                         abort_counter = 0;
                     }
                 } else {
                     if(!res[j].second) {
                         random_abort_counter += 1;
                     } else {
+                        gens_added += 1;
                         random_abort_counter = 0;
                     }
                 }
