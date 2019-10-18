@@ -23,8 +23,6 @@ void pipeline_group::join_threads() {
 void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_workspace* w) {
    bool* done = &switches->done;
    bool* done_fast = &switches->done_fast;
-   bool* done_shared_group = &switches->done_shared_group;
-
     int abort_counter = 0;
     int leafs_considered = 0;
     int random_abort_counter = 0;
@@ -49,13 +47,14 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         w->enqueue_space_sz = 4096;
         w->first_level = 1;
         int c = w->S.select_color_largest(w->start_c);
-        first_cell_size = w->start_c->ptn[c];
-        std::cout << first_cell_size << std::endl;
+        std::cout << c << std::endl;
+        first_cell_size = w->start_c->ptn[c] + 1;
+        //std::cout << first_cell_size << std::endl;
     }
     int max_it = 0;
 
     while(!(*done)) {
-        if(*done_fast && !(*done_shared_group)) {
+        if(*done_fast && !(switches->done_shared_group)) {
             // copy gens and first orbit for shared use!
             circ_mutex.lock();
             *w->shared_orbit = new int[domain_size];
@@ -63,11 +62,11 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
             memcpy(*w->shared_orbit, gp->orbits, domain_size * sizeof(int));
             //std::cout << std::endl;
             circ_mutex.unlock();
-            *done_shared_group = true;
+            switches->done_shared_group.store(true);
         }
 
         if(is_first_stage) { // share information
-            if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group && w->first_level == 1) {
+            if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level == 1) {
                 // we can only do it like this on first level! then we need notion of paths and BFS
                 // act as relay but filter information according to orbit, tell threads when to advance the level
                 // receive information
@@ -144,8 +143,11 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                             continue;
                         }
                     }
+                    //std::cout << w->first_level_sz << "/" << first_cell_size << std::endl;
                 }
                 if(first_cell_size == w->first_level_sz) {
+                    //std::cout << "proceed send" << std::endl;
+                    first_cell_size = -1;
                     for (int i = 0; i < w->communicator_pad->size(); ++i) {
                         (*w->communicator_pad)[i].enqueue(std::tuple<int, int>(0, 0)); // *w->ptoks[i],
                     }
@@ -154,7 +156,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                         (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space, enq_space_pos); // *w->ptoks[i],
                     }
                 }
-            } else if(config.CONFIG_THREADS_COLLABORATE && *done_shared_group && w->first_level > 1) {
+            } else if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level > 1) {
                 // act as relay
             }
         }

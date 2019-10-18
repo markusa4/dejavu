@@ -176,8 +176,9 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
                 comp = comp && R->refine_coloring(g, start_c, nullptr, start_I, init_color_class, false);
                 comp = comp && start_I->write_top_and_compare(INT32_MAX);
                 comp = comp && start_I->write_top_and_compare(INT32_MIN);*/
-
-                proceed_state(w, g, start_c, start_I, w->first_level_succ_point);
+                //std::cout << "proceed receive" << std::endl;
+                proceed_state(w, g, start_c, start_I, w->G->b[w->first_level - 1]);
+                w->first_level += 1;
 
                 first_level_fail->reset();
                 first_level_succ->reset();
