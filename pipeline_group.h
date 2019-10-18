@@ -33,6 +33,10 @@ public:
     int  base_size;
     int* b;
     int added;
+
+    std::atomic_int shared_group_todo;
+    std::atomic_bool shared_group_trigger;
+
     mschreier *gp;
     mpermnode *gens;
 
@@ -46,6 +50,8 @@ public:
     void join_threads();
 
     void determine_stages();
+
+    void skip_shared_group();
 };
 
 

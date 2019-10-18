@@ -34,7 +34,7 @@ int intRand(const int & min, const int & max, int seed) {
     return distribution(generator);
 }
 
-void proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v) {
+void auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v) {
     int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
@@ -48,8 +48,9 @@ void proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int 
     comp = comp && I->write_top_and_compare(INT32_MIN);
 }
 
-void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
-        bijection* automorphism, std::default_random_engine* re, int *restarts, shared_switches* switches, int selector_seed, auto_workspace* w) {
+void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                                          bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                          shared_switches *switches, int selector_seed) {
     bool backtrack = false;
     bool* done = &switches->done;
     //std::list<std::pair<int, int>> changes;
@@ -312,7 +313,7 @@ void auto_blaster::find_automorphism_prob(sgraph* g, bool compare, invariant* ca
             init_color_class = -1;
             int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
             int v = c->lab[rpos];
-            //if(switches->done_shared_group && config.CONFIG_THREADS_COLLABORATE) // problematic?
+           // if(switches->done_shared_group && config.CONFIG_THREADS_COLLABORATE) // ToDo why is this problematic?
             //    v = (*w->shared_orbit)[v];
 
             //assert(rpos == c->vertex_to_lab[v]);
@@ -530,10 +531,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
     W.first_level_fail.initialize(g->v_size);
     W.first_level_succ.initialize(g->v_size);
 
-    W.dequeue_space    = new std::tuple<int, int>[1024];
-    W.dequeue_space_sz = 1024;
-    W.enqueue_space    = new std::tuple<int, int>[512];
-    W.enqueue_space_sz = 512; // <- choose this dynamic?
+    W.dequeue_space    = new std::tuple<int, int>[2048];
+    W.dequeue_space_sz = 2048;
+    W.enqueue_space    = new std::tuple<int, int>[128];
+    W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     int* shrd_orbit;
 
@@ -554,11 +555,17 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
 
 
-        find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, nullptr, &trash_int, switches, selector_seed, &W);
+        find_automorphism_prob(&W, g, false, canon_I, canon_leaf, &base_points, &trash_int, switches,
+                               selector_seed);
         G = new pipeline_group(g->v_size);
         base_points.not_deletable();
         G->base_size = base_points.map_sz;
         G->b = base_points.map;
+
+        // initialize BFS
+  //      W.BW = new bfs();
+//        W.BW->initialize();
+
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(g->v_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
@@ -650,14 +657,20 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         bool switched1 = false;
         bool switched2 = false;
         bool done_fast_me = false;
+
+        if(W.skiplevels == G->base_size - 1) {
+            G->skip_shared_group();
+            *done_fast   = true;
+            done_fast_me = true;
+        }
+
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
-                // ToDo: skiplevels == base_size -> we can immediately stop
             if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast) && !done_fast_me) { // detect when done
-                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 if((*done_fast && !automorphism.non_uniform )) continue;
-                if(W.skiplevels >= W.G->base_size - 2) done_fast_me = true;
+                if(W.skiplevels >= W.G->base_size - 1) done_fast_me = true;
             } else {
                 if(!switched1 && communicator_id == 0) {
                     cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
@@ -669,7 +682,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                     switched2 = true;
                 }
                 switched1 = true;
-                find_automorphism_prob(g, true, canon_I, canon_leaf, &automorphism, nullptr, &restarts, switches, selector_seed, &W);
+                find_automorphism_prob(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
             }
 
 
@@ -678,7 +691,10 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
               //  std::cout << "[" << communicator_id << "]: First automorphism (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << ":" << W.skiplevels << std::endl;
             }
             automorphism.not_deletable();
-            G->add_permutation(&automorphism, &idle_ms, done);
+            bool test = G->add_permutation(&automorphism, &idle_ms, done);
+            if(!test && automorphism.non_uniform)
+                done_fast_me = true;
+
             automorphism.map = new int[g->v_size];
             if(sampled_paths == 0) {
                // cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
@@ -686,19 +702,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             }
             sampled_paths += 1;
         }
-
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-        //std::cout << "[" << communicator_id << "]: " << sampled_paths << "automorphisms (probed): " << cref / 1000000.0 << "ms, " << W.first_level << ":" << W.first_level_sz << std::endl;
-
-       // malloc_lock.lock();
-      //  std::cout << W.measure1 << ", " << W.measure2 << std::endl;
-      //  malloc_lock.unlock();
         delete W.start_c;
-        //double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-        //std::cout << "Refinement speed: " << sampled_paths / (cref / 1000000.0) << "l/s" << std::endl;
-        //std::cout << "Refinement speed (raw): " << sampled_paths / (inner_t / 1000000.0) << "l/s" << std::endl;
-        //std::cout << "Dif: " << sampled_paths / (inner_t / 1000000.0)  - sampled_paths / (cref / 1000000.0) << "d" << std::endl;
-        //std::cout << "Refinement worker idle: " << idle_ms << "ms" << std::endl;
         return;
     }
 }

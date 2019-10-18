@@ -13,6 +13,7 @@
 #include "invariant_acc.h"
 #include "refinement_bucket.h"
 #include "selector.h"
+#include "bfs.h"
 
 
 typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int>>> com_pad;
@@ -41,6 +42,10 @@ struct alignas(64) auto_workspace {
     std::tuple<int, int>* enqueue_space;
     int enqueue_space_sz = 0;
 
+    int measure1 = 0;
+    int measure2 = 0;
+
+    // shared state
     moodycamel::ConsumerToken* ctok;
     moodycamel::ProducerToken* ptok;
     std::vector<moodycamel::ProducerToken*> ptoks;
@@ -49,46 +54,29 @@ struct alignas(64) auto_workspace {
 
     coloring* start_c;
     invariant start_I;
-
     com_pad* communicator_pad;
     int communicator_id;
-
-    int measure1 = 0;
-    int measure2 = 0;
-
     int** shared_orbit;
+    bfs* BW;
 };
 
 #include "pipeline_group.h"
 
 class auto_blaster {
-    //moodycamel::ConcurrentQueue<bijection> Q;
-    //invariant start_I;
-    //coloring start_c;
-    //coloring_bucket start_cb;
 public:
-    void sample(sgraph* g, bool master, bool* done);
-
-    void
-    find_automorphism_prob(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                           std::default_random_engine *re, int *restarts, shared_switches* switches, int selector_seed, auto_workspace* w);
-
-    void
-    find_automorphism_prob_bucket(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
-                                                     bijection* automorphism, std::default_random_engine* re, int *restarts, bool *done, int selector_seed,  refinement_bucket* R);
-
     void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                           com_pad* communicator_pad, int communicator_id, int** shared_orbit);
 
-    void
-    find_automorphism_bt(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf, bijection *automorphism,
-                         std::default_random_engine *re, int *restarts, bool *done, int selector_seed);
-
-    void sample_pipelined_bucket(sgraph *g, bool master, shared_switches* switches, pipeline_group *G);
+private:
+    void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                                bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                shared_switches *switches, int selector_seed);
 
     void fast_automorphism_non_uniform(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf,
                                        bijection *automorphism, int *restarts,
                                        bool *done, int selector_seed, auto_workspace *w);
+
+    void proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v);
 };
 
 

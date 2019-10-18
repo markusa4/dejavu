@@ -51,7 +51,6 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         w->enqueue_space_sz = 2049;
         w->first_level = 1;
         int c = w->S.select_color_largest(w->start_c);
-        std::cout << c << std::endl;
         first_cell_size = w->start_c->ptn[c] + 1;
         //std::cout << first_cell_size << std::endl;
     }
@@ -148,7 +147,6 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                             continue;
                         }
                     }
-                    //std::cout << w->first_level_sz << "/" << first_cell_size << std::endl;
                 }
                 if(first_cell_size == w->first_level_sz) {
                     //std::cout << "proceed send" << std::endl;
@@ -273,7 +271,8 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         }
 
         if (is_last_stage) {
-            if(!state.counts_towards_abort && !result && !state.ingroup && !(*done_fast)) {
+            shared_group_todo -= 1;
+            if(!state.counts_towards_abort && !result && !state.ingroup && !(*done_fast) || (shared_group_trigger && shared_group_todo < 0)) {
                 //std::cout << "useless element" << result << std::endl;
                 *done_fast = true;
                // std::cout << "random element: " << result << std::endl;
@@ -299,9 +298,20 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     //std::cout << "Pipeline stage(" << n << ") idle: " << front_idle_ms << "ms / " << back_idle_ms << "ms" << std::endl;
 }
 
+void pipeline_group::skip_shared_group() {
+    shared_group_todo.store(-1);
+    shared_group_trigger.store(true);
+}
+
 bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
     //std::cout << "enqueued" << std::endl;
     static thread_local moodycamel::ProducerToken ptoken = moodycamel::ProducerToken(automorphisms);
+
+    if(p->non_uniform && automorphisms.size_approx() > 30) {
+        shared_group_todo.store(30);
+        shared_group_trigger.store(true);
+        return false;
+    }
 
     while(automorphisms.size_approx() > 100 && (!(*done))) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -319,6 +329,8 @@ pipeline_group::pipeline_group(int domain_size) {
 void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
     mschreier_fails(-1);
     added = 0;
+    shared_group_todo = -1;
+    shared_group_trigger = false;
     //this->base_size = 0;
     this->stages = stages;
 
