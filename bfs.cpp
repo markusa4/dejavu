@@ -23,7 +23,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
 
     BW.current_level = 1;
-    BW.target_level  = 2;
+    BW.target_level  = 11;
     BW.level_states  = new bfs_element**[base_size + 2];
     BW.level_sizes   = new int[base_size + 2];
     BW.level_expecting_finished = new int[base_size + 2];

@@ -76,13 +76,15 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
         automorphism->map    = new int[g->v_size];
         automorphism->map_sz = 0;
     }
-    ir_operation last_op = OP_R;
-    // ToDo: pick this from BFS level instead!
+    ir_operation last_op;
+
+    // Pick start from BFS level instead!
 
     int bfs_level    = w->BW->BW.current_level - 1;
     int bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
     int rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
     bfs_element* picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
+    //std::cout << "picking level " << bfs_level << " element " << rand_pos << std::endl;
     *I = *picked_elem->I;
     c->copy_force(picked_elem->c);
     I->set_compare_invariant(canon_I);
@@ -98,7 +100,6 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
             bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
             rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
             picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
-            //std::cout << "picking level " << bfs_level <<
             *I = *picked_elem->I;
             c->copy_force(picked_elem->c);
             I->set_compare_invariant(canon_I);
@@ -106,6 +107,10 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
             last_op = OP_R;
             level = bfs_level + 1;
             S->empty_cache();
+
+            *restarts += 1;
+            //if(*restarts % 1000 == 0)
+            //    std::cout << *restarts << ", " << reguess << ", " << level << std::endl;
         }
 
         int s;
@@ -114,7 +119,6 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
             if (s == -1) {
                 if (compare) {
                     // we can derive an automorphism!
-                    //std::cout << *restarts << ", " << reguess << ", " << w->first_level << std::endl;
                     w->measure2 += 1;
                     bijection leaf;
                     leaf.read_from_coloring(c);
@@ -656,7 +660,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
 
     if(!w->init_bfs) {
         w->todo_dequeue = new std::tuple<bfs_element*, int>[w->BW->BW.chunk_size];
-        w->todo_elements = new std::tuple<bfs_element *, int>[w->BW->BW.chunk_size];
+        w->todo_elements = new std::tuple<bfs_element *, int>[w->BW->BW.chunk_size * g->v_size]; // ToDo: make smaller, commit if full
         w->finished_elements = new std::pair<bfs_element *, int>[w->BW->BW.chunk_size];
         w->init_bfs = true;
     }
@@ -667,19 +671,22 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
 
     for(int i = 0; i < num; ++i) {
         bfs_element *elem = std::get<0>(w->todo_dequeue[i]);
-        int v = std::get<1>(w->todo_dequeue[i]);
+        int v             = std::get<1>(w->todo_dequeue[i]);
 
         // copy to workspace
-        if(w->prev_bfs_element != elem) {
+        //if(w->prev_bfs_element != elem) {
             w->work_c->copy_force(elem->c);
             w->prev_bfs_element = elem;
             *w->work_I = *elem->I;
             w->work_I->set_compare_invariant(canon_I);
-        } else {
+        //}
+        /* else {
             w->work_c->copy(elem->c);
-            w->work_I->cur_pos = elem->I->cur_pos;
+            *w->work_I = *elem->I;
             w->work_I->set_compare_invariant(canon_I);
-        }
+        }*/
+        // is identity?
+
         bool comp = proceed_state(w, g, w->work_c, w->work_I, v);
 
         if (!comp) {
@@ -697,15 +704,22 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         next_elem->init_c = true;
         next_elem->init_I = true;
         next_elem->level = level + 1;
+        next_elem->base_sz = elem->base_sz + 1;
+        next_elem->base = new int[next_elem->base_sz];
+        for(int j = 0; j < elem->base_sz; ++j)
+            next_elem->base[j] = elem->base[j];
+        next_elem->base[next_elem->base_sz - 1] = v;
 
         // create todos for this node
         w->S.empty_cache();
         int c = w->S.select_color(g, w->work_c, selector_seed);
+        //assert(c != -1);
         int sz = 0;
-        for (int i = c; i < c + w->work_c->ptn[c]; ++i) {
+        for (int i = c; i < c + w->work_c->ptn[c] + 1; ++i) {
             int next_v = w->work_c->lab[i];
             sz += 1;
             //BFS->BW.bfs_level_todo[level + 1].enqueue(std::tuple<bfs_element *, int>(next_elem, next_v));
+            //assert(todo_elements_sz < W->BW->BW.chunk_size);
             w->todo_elements[todo_elements_sz] = std::tuple<bfs_element *, int>(next_elem, next_v);
             todo_elements_sz += 1;
         }
@@ -799,6 +813,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         root_elem->c = new coloring;
         root_elem->I = new invariant;
         root_elem->c->copy_force(start_c);
+        root_elem->base_sz = 0;
         *root_elem->I = start_I;
         W.S.empty_cache();
         int init_c = W.S.select_color(g, start_c, selector_seed);
@@ -902,7 +917,9 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         bool done_fast_me = false;
 
         if(W.skiplevels == G->base_size - 1) {
+            if(communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search." << std::endl;
             G->skip_shared_group();
+            switched1 = true;
             *done_fast   = true;
             done_fast_me = true;
         }
@@ -913,13 +930,19 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 if((*done_fast && !automorphism.non_uniform )) continue;
-            }
-
-            if(W.BW->BW.current_level != W.BW->BW.target_level) {
+            } else if(W.BW->BW.current_level != W.BW->BW.target_level) {
+                if(communicator_id == 0 && !switched1) {
+                    switched1 = true;
+                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                    std::cout << "[N] Finished non-uniform automorphism search." << std::endl;
+                }
                 bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
                 continue;
             } else {
+                //std::cout << W.BW->BW.current_level << std::endl;
+                //std::cout << "Searching automorphism." << std::endl;
                 find_automorphism_from_bfs(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
+                //std::cout << "Found automorphism." << std::endl;
             }
             /*else {
                 if(!switched1 && communicator_id == 0) {

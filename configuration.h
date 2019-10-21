@@ -21,7 +21,7 @@ struct configstruct {
     int CONFIG_THREADS_PIPELINE_DEPTH = 1;
     int CONFIG_THREADS_PIPELINE_STAGE_MIN = 10;
     bool CONFIG_THREADS_COPYG = false;
-    bool CONFIG_THREADS_COLLABORATE = true;
+    bool CONFIG_THREADS_COLLABORATE = false;
 };
 
 extern configstruct config;
