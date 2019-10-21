@@ -55,7 +55,7 @@ public:
     // the level which was determined to be reached via BFS
     std::atomic_int target_level;
 
-    int chunk_size = 4;
+    int chunk_size = 8; // ToDo: dynamically adapt this
 };
 
 class bfs {

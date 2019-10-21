@@ -17,9 +17,9 @@
 //long mmultcount = 0;
 //long mfiltercount = 0;
 
-char pad1[64];
+char pad1[128];
 std::mutex circ_mutex;
-char pad2[64];
+char pad2[128];
 
 static mpermnode id_permnode;
 /* represents identity, no actual content, doesn't need TLS_ATTR */

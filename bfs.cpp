@@ -60,31 +60,37 @@ void bfs::work_queues() {
     }
 
     // dequeue and process on current level only
-    std::pair<bfs_element*, int> finished_elem;
-    bool d = BW.bfs_level_finished_elements[BW.current_level].try_dequeue(finished_elem);
-    if(!d) return;
+    std::pair<bfs_element*, int>* finished_elems = new std::pair<bfs_element*, int>[BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
+    size_t num = BW.bfs_level_finished_elements[BW.current_level].try_dequeue_bulk(finished_elems, BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS);
 
-    bfs_element* elem = finished_elem.first;
-    int todo          = finished_elem.second;
-    int lvl = BW.current_level;
-   // std::cout << "[B] Received level " << lvl << " elem " << elem << " todo " << todo << std::endl;
+    //if(num > 0) std::cout << "Chunk " << num << std::endl;
+    for(int i = 0; i < num; ++i) {
+        bfs_element *elem = finished_elems[i].first;
+        int todo = finished_elems[i].second;
+        int lvl = BW.current_level;
+        // std::cout << "[B] Received level " << lvl << " elem " << elem << " todo " << todo << std::endl;
 
-    BW.level_expecting_finished[lvl]     -= 1;
-    BW.level_expecting_finished[lvl + 1] += todo;
+        BW.level_expecting_finished[lvl] -= 1;
+        BW.level_expecting_finished[lvl + 1] += todo;
 
-    if(elem == nullptr) {
-        assert(todo == 0);
-    } else {
-        BW.level_states[lvl][BW.level_sizes[lvl]] = elem;
-        elem->id = BW.level_sizes[lvl];
-        BW.level_sizes[lvl] += 1;
+        if (elem == nullptr) {
+            assert(todo == 0);
+        } else {
+            BW.level_states[lvl][BW.level_sizes[lvl]] = elem;
+            elem->id = BW.level_sizes[lvl];
+            BW.level_sizes[lvl] += 1;
+        }
     }
 
     // advance level if possible
-    if(BW.level_expecting_finished[BW.current_level] == 0) {
-        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << BW.level_expecting_finished[BW.current_level + 1] << std::endl;
-        BW.level_states[BW.current_level + 1] = new bfs_element*[BW.level_expecting_finished[BW.current_level + 1]];
-        BW.level_sizes[BW.current_level + 1]  = 0;
+    if (BW.level_expecting_finished[BW.current_level] == 0) {
+        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting "
+                  << BW.level_expecting_finished[BW.current_level + 1] << std::endl;
+        BW.level_states[BW.current_level + 1] = new bfs_element *[BW.level_expecting_finished[BW.current_level +
+                                                                                              1]];
+        BW.level_sizes[BW.current_level + 1] = 0;
         BW.current_level += 1;
     }
+
+    delete[] finished_elems;
 }

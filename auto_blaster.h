@@ -61,7 +61,13 @@ struct alignas(64) auto_workspace {
     com_pad* communicator_pad;
     int communicator_id;
     int** shared_orbit;
+
+    // bfs workspace
     bfs* BW;
+    std::tuple<bfs_element*, int>* todo_dequeue;
+    std::pair<bfs_element *, int>* finished_elements;
+    std::tuple<bfs_element *, int>* todo_elements;
+    bool init_bfs = false;
 };
 
 #include "pipeline_group.h"
