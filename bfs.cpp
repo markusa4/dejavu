@@ -82,7 +82,7 @@ void bfs::work_queues() {
 
     // advance level if possible
     if(BW.level_expecting_finished[BW.current_level] == 0) {
-        //std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << BW.level_expecting_finished[BW.current_level + 1] << std::endl;
+        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << BW.level_expecting_finished[BW.current_level + 1] << std::endl;
         BW.level_states[BW.current_level + 1] = new bfs_element*[BW.level_expecting_finished[BW.current_level + 1]];
         BW.level_sizes[BW.current_level + 1]  = 0;
         BW.current_level += 1;
