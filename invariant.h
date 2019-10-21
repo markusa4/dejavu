@@ -8,10 +8,10 @@
 
 class alignas(64) invariant {
     std::vector<int>* vec_invariant = nullptr;
+public:
     invariant* compareI;
     bool has_compare = false;
     bool no_write = false;
-public:
     int cur_pos = -1;
     inline bool write_top_and_compare(int i) {
         if(no_write) {

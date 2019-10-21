@@ -67,6 +67,7 @@ struct alignas(64) auto_workspace {
     std::tuple<bfs_element*, int>* todo_dequeue;
     std::pair<bfs_element *, int>* finished_elements;
     std::tuple<bfs_element *, int>* todo_elements;
+    bfs_element* prev_bfs_element = nullptr;
     bool init_bfs = false;
 };
 

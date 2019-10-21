@@ -660,7 +660,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         w->finished_elements = new std::pair<bfs_element *, int>[w->BW->BW.chunk_size];
         w->init_bfs = true;
     }
-    
+
     size_t num = BFS->BW.bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->BW.chunk_size); // ToDo: try out next levels as well! (but should check target_level, though)
     int finished_elements_sz = 0;
     int todo_elements_sz = 0;
@@ -670,9 +670,16 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         int v = std::get<1>(w->todo_dequeue[i]);
 
         // copy to workspace
-        w->work_c->copy_force(elem->c);
-        *w->work_I = *elem->I;
-        w->work_I->set_compare_invariant(canon_I);
+        if(w->prev_bfs_element != elem) {
+            w->work_c->copy_force(elem->c);
+            w->prev_bfs_element = elem;
+            *w->work_I = *elem->I;
+            w->work_I->set_compare_invariant(canon_I);
+        } else {
+            w->work_c->copy(elem->c);
+            w->work_I->cur_pos = elem->I->cur_pos;
+            w->work_I->set_compare_invariant(canon_I);
+        }
         bool comp = proceed_state(w, g, w->work_c, w->work_I, v);
 
         if (!comp) {
