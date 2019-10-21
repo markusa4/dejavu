@@ -57,6 +57,8 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     int max_it = 0;
 
     while(!(*done)) {
+        w->BW->work_queues();
+
         if(*done_fast && !(switches->done_shared_group)) {
             // copy gens and first orbit for shared use!
             circ_mutex.lock();
@@ -69,7 +71,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         }
 
         if(is_first_stage) { // share information
-            if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level == 1) {
+        /*    if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level == 1) {
                 // we can only do it like this on first level! then we need notion of paths and BFS
                 // act as relay but filter information according to orbit, tell threads when to advance the level
                 // receive information
@@ -166,7 +168,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                 enq_space_pos = 0;
             } else if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level > 1) {
                 // act as relay
-            }
+            }*/
         }
 
         // work on pipeline_results and track
@@ -215,9 +217,9 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
                 //d = automorphisms.try_dequeue(ctoken, p);
             //}
 
-            if(leafs_considered == 0 && d) {
-              //  double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-               // std::cout << "First automorphism arrived: " << cref / 1000000.0 << "ms" << std::endl;
+            if(d) {
+                double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                //std::cout << "[T] Automorphism arrived: " << cref / 1000000.0 << "ms" << std::endl;
             }
 
             if (d) {

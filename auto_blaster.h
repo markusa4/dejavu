@@ -24,6 +24,10 @@ struct alignas(64) auto_workspace {
     selector S;
     coloring c;
     invariant I;
+
+    coloring* work_c;
+    invariant* work_I;
+
     work_set first_level_fail;
     work_set first_level_succ;
     int first_level_sz = 0;
@@ -65,7 +69,7 @@ struct alignas(64) auto_workspace {
 class auto_blaster {
 public:
     void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                          com_pad* communicator_pad, int communicator_id, int** shared_orbit);
+                          com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork);
 
 private:
     void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
@@ -76,7 +80,15 @@ private:
                                        bijection *automorphism, int *restarts,
                                        bool *done, int selector_seed, auto_workspace *w);
 
-    void proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v);
+    void find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                                                  bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                                  shared_switches *switches, int selector_seed);
+
+    bool proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v);
+
+    bool bfs_chunk(sgraph *g, invariant *canon_I, bijection *canon_leaf, bool *done,
+              int selector_seed,
+              auto_workspace *w);
 };
 
 

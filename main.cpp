@@ -238,7 +238,7 @@ int commandline_mode(int argc, char** argv) {
             //A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr);
+                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
@@ -310,8 +310,8 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/mz/mz/mz-50", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
@@ -332,7 +332,7 @@ int main(int argc, char *argv[]) {
     g.permute_graph(&_g, &pr); // permute graph
    // _g = g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
-    int repeat = 2;
+    int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
     for(int i = 0; i < repeat; ++i) {
@@ -343,7 +343,7 @@ int main(int argc, char *argv[]) {
          //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr);
+                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {

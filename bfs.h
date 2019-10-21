@@ -38,29 +38,32 @@ public:
     // bfs_element* is a pointer to the state where int has to be individualized
     moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int>>* bfs_level_todo;
 
-    // commit finished elements
-    moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int>>* bfs_level_finished_elements;
-
-    // commit the amount of finished elements, such that it can be detected if a level was finished
-    moodycamel::ConcurrentQueue<int>*                           bfs_commit_finished_work;
+    // commit finished elements (or nullptr if element was deleted)
+    // integer determines how many todos were added for this element
+    moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>* bfs_level_finished_elements;
 
     // elements of all levels
     // delete elements of level once work of level + 1 is fully commited, then it is safe
-    bfs_element** level_states;
+    bfs_element*** level_states;
     int*          level_sizes;
+    int*          level_expecting_finished;
+    bool done = false;
 
     // current level where work has to be done, and where experimential paths should probe
     std::atomic_int current_level;
 
     // the level which was determined to be reached via BFS
     std::atomic_int target_level;
+
+    int chunk_size = 4;
 };
 
 class bfs {
 public:
     bfs_workspace BW;
     bfs();
-    void initialize(bfs_element* root_node, int domain_size);
+    void initialize(bfs_element* root_node, int init_c, int domain_size, int base_size);
+    void work_queues();
 };
 
 

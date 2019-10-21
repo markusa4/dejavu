@@ -34,19 +34,171 @@ int intRand(const int & min, const int & max, int seed) {
     return distribution(generator);
 }
 
-void auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v) {
+bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v) {
     int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
-    assert(comp);
+    //assert(comp);
     //w->first_level += 1;
     //assert(init_color_class.size() == 2);
     comp = comp && I->write_top_and_compare(INT32_MAX);
-    assert(comp);
+    if(!comp) return comp;
+    //assert(comp);
     comp = comp && w->R.refine_coloring(g, c, nullptr, I, init_color_class, false);
     comp = comp && I->write_top_and_compare(INT32_MAX);
     comp = comp && I->write_top_and_compare(INT32_MIN);
+    return comp;
 }
+
+void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                                          bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                          shared_switches *switches, int selector_seed) {
+    bool backtrack = false;
+    bool* done = &switches->done;
+
+    refinement *R = &w->R;
+    selector *S = &w->S;
+    coloring *c = &w->c;
+    invariant *I = &w->I;
+
+    S->empty_cache();
+
+    int init_color_class;
+    *restarts = 0;
+    int reguess = 0;
+    int level = w->first_level;
+    int first_level_point = -1;
+    int second_level_point = -1;
+
+    int enqueue_fail_point_sz = 0;
+
+    if (compare) {
+        automorphism->map    = new int[g->v_size];
+        automorphism->map_sz = 0;
+    }
+    ir_operation last_op = OP_R;
+    // ToDo: pick this from BFS level instead!
+
+    int bfs_level    = w->BW->BW.current_level - 1;
+    int bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
+    int rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
+    bfs_element* picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
+    *I = *picked_elem->I;
+    c->copy_force(picked_elem->c);
+    I->set_compare_invariant(canon_I);
+    last_op = OP_R;
+    level = bfs_level + 1;
+    S->empty_cache();
+    int base;
+
+    while (true) {
+        if(*done) return;
+        if (backtrack) {
+            bfs_level    = w->BW->BW.current_level - 1;
+            bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
+            rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
+            picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
+            //std::cout << "picking level " << bfs_level <<
+            *I = *picked_elem->I;
+            c->copy_force(picked_elem->c);
+            I->set_compare_invariant(canon_I);
+            backtrack = false;
+            last_op = OP_R;
+            level = bfs_level + 1;
+            S->empty_cache();
+        }
+
+        int s;
+        if (!backtrack) {
+            s = S->select_color(g, c, selector_seed);
+            if (s == -1) {
+                if (compare) {
+                    // we can derive an automorphism!
+                    //std::cout << *restarts << ", " << reguess << ", " << w->first_level << std::endl;
+                    w->measure2 += 1;
+                    bijection leaf;
+                    leaf.read_from_coloring(c);
+                    leaf.not_deletable();
+                    *automorphism = leaf;
+                    automorphism->inverse();
+                    automorphism->compose(canon_leaf);//enqueue_fail_point_sz
+                    //std::cout << "Found automorphism." << *restarts << std::endl;
+                    assert(g->certify_automorphism(*automorphism));
+                    return;
+                } else {
+                    //I->push_level();
+                    canon_leaf->read_from_coloring(c);
+                    *canon_I = *I;
+                    return;
+                }
+            }
+        }
+
+        if (last_op == OP_I) { // add new operations to trail...
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                                REFINEMENT
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //changes.clear();
+            bool comp = I->write_top_and_compare(INT32_MAX);
+            //assert(init_color_class.size() == 2);
+            comp = comp && R->refine_coloring(g, c, nullptr, I, init_color_class, false);
+            comp = comp && I->write_top_and_compare(INT32_MAX);
+            comp = comp && I->write_top_and_compare(INT32_MIN);
+            //R.complete_colorclass_invariant(g, &c, &I);
+            last_op = OP_R;
+            if (compare) {
+                // compare invariant
+                if(!comp) { // || !I->compare_sizes()
+                    backtrack = true;
+                    continue;
+                }
+                continue;
+            }
+        } else if (last_op == OP_R) {
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+            //                                             INDIVIDUALIZATION
+            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            // collect all elements of color s
+            init_color_class = -1;
+            int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+            int v = c->lab[rpos];
+            // if(switches->done_shared_group && config.CONFIG_THREADS_COLLABORATE) // ToDo why is this problematic?
+            //    v = (*w->shared_orbit)[v];
+
+            //assert(rpos == c->vertex_to_lab[v]);
+
+            if(level == w->first_level)
+                first_level_point = v;
+
+            if(level == w->first_level + 1)
+                second_level_point = v;
+
+            // individualize random vertex of class
+            int newpos = R->individualize_vertex(c, v);
+            last_op = OP_I;
+//            assert(init_color_class >= 0);
+            init_color_class = newpos;
+            assert(c->vertex_to_col[v] > 0);
+            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+            if (!compare) { // base points
+                //automorphism->map.push_back(v);
+                automorphism->map[automorphism->map_sz] = v;
+                automorphism->map_sz += 1;
+            }
+            base = v;
+            level += 1;
+
+            bool comp = I->write_top_and_compare(INT32_MIN);
+            comp && I->write_top_and_compare(INT32_MIN);
+            if(!comp) {
+                backtrack = true;
+                continue;
+            }
+        }
+    }
+}
+
 
 void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                                           bijection *canon_leaf, bijection *automorphism, int *restarts,
@@ -496,8 +648,57 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     }
 }
 
+
+bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_leaf, bool *done, int selector_seed, auto_workspace* w) {
+    bfs* BFS = w->BW;
+    std::tuple<bfs_element*, int>* b = new std::tuple<bfs_element*, int>[w->BW->BW.chunk_size];
+    int level = BFS->BW.current_level;
+    size_t num = BFS->BW.bfs_level_todo[level].try_dequeue_bulk(b, w->BW->BW.chunk_size); // ToDo: try out next levels as well! (but should check target_level, though)
+
+    for(int i = 0; i < num; ++i) {
+        bfs_element *elem = std::get<0>(b[i]);
+        int v = std::get<1>(b[i]);
+
+        // copy to workspace
+        w->work_c->copy_force(elem->c);
+        *w->work_I = *elem->I;
+        w->work_I->set_compare_invariant(canon_I);
+        bool comp = proceed_state(w, g, w->work_c, w->work_I, v);
+
+        if (!comp) {
+            // throw this node away, but keep track of it!
+            BFS->BW.bfs_level_finished_elements[level].enqueue(std::pair<bfs_element *, int>(nullptr, 0));
+            continue;
+        }
+
+        // create node
+        bfs_element *next_elem = new bfs_element;
+        next_elem->c = w->work_c;
+        next_elem->I = w->work_I;
+        next_elem->init_c = true;
+        next_elem->init_I = true;
+        next_elem->level = level + 1;
+
+        // create todos for this node
+        w->S.empty_cache();
+        int c = w->S.select_color(g, w->work_c, selector_seed);
+        int sz = 0;
+        for (int i = c; i < c + w->work_c->ptn[c]; ++i) {
+            int next_v = w->work_c->lab[i];
+            sz += 1;
+            BFS->BW.bfs_level_todo[level + 1].enqueue(std::tuple<bfs_element *, int>(next_elem, next_v));
+        }
+
+        BFS->BW.bfs_level_finished_elements[level].enqueue(std::pair<bfs_element *, int>(next_elem, sz));
+        w->work_c = new coloring;
+        w->work_I = new invariant;
+    }
+    delete[] b;
+    return true;
+}
+
 void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit) {
+                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph* g = g_;
@@ -563,14 +764,23 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         G->b = base_points.map;
 
         // initialize BFS
-  //      W.BW = new bfs();
-//        W.BW->initialize();
+        bfs_element* root_elem = new bfs_element;
+        root_elem->id = 0;
+        root_elem->c = new coloring;
+        root_elem->I = new invariant;
+        root_elem->c->copy_force(start_c);
+        *root_elem->I = start_I;
+        W.S.empty_cache();
+        int init_c = W.S.select_color(g, start_c, selector_seed);
+
+        W.BW = new bfs();
+        W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
 
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(g->v_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, switches, G, start_c, canon_leaf, canon_I, &pad, i, &shrd_orbit));
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, switches, G, start_c, canon_leaf, canon_I, &pad, i, &shrd_orbit, W.BW));
         //std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
@@ -631,6 +841,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         W.start_c = new coloring;
         W.start_c->copy_force(start_c);
         W.skip_c.copy_force(start_c);
+        W.work_c = new coloring;
+        W.work_I = new invariant;
 
         W.communicator_pad = communicator_pad;
         W.communicator_id  = communicator_id;
@@ -638,6 +850,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         W.ptok = new moodycamel::ProducerToken(G->first_level_points);
         W.base_size = G->base_size;
         W.G = G;
+        W.BW = bwork;
         /*for(int i = 0; i < W.communicator_pad->size(); ++i) {
             if (communicator_id != i) {
                 W.ptoks.emplace_back(new moodycamel::ProducerToken((*communicator_pad)[i]));
@@ -667,7 +880,13 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
-            if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast) && !done_fast_me) { // detect when done
+            if(W.BW->BW.current_level != W.BW->BW.target_level) {
+                bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
+                continue;
+            } else {
+                find_automorphism_from_bfs(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
+            }
+            /*if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast) && !done_fast_me) { // detect when done
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 if((*done_fast && !automorphism.non_uniform )) continue;
                 if(W.skiplevels >= W.G->base_size - 1) done_fast_me = true;
@@ -683,7 +902,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                 }
                 switched1 = true;
                 find_automorphism_prob(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
-            }
+            }*/
 
 
             if(sampled_paths == 0) {
