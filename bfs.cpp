@@ -22,8 +22,9 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int>>[base_size + 2];
     BW.bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
 
+    BW.domain_size = domain_size;
     BW.current_level = 1;
-    BW.target_level  = 11;
+    BW.target_level  = -1;
     BW.level_states  = new bfs_element**[base_size + 2];
     BW.level_sizes   = new int[base_size + 2];
     BW.level_expecting_finished = new int[base_size + 2];
@@ -84,12 +85,18 @@ void bfs::work_queues() {
 
     // advance level if possible
     if (BW.level_expecting_finished[BW.current_level] == 0) {
-        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting "
-                  << BW.level_expecting_finished[BW.current_level + 1] << std::endl;
-        BW.level_states[BW.current_level + 1] = new bfs_element *[BW.level_expecting_finished[BW.current_level +
-                                                                                              1]];
-        BW.level_sizes[BW.current_level + 1] = 0;
-        BW.current_level += 1;
+        int expected_size = BW.level_expecting_finished[BW.current_level +1];
+
+        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
+        if(expected_size < 10 * BW.domain_size) {
+            BW.level_states[BW.current_level + 1] = new bfs_element *[expected_size];
+            BW.level_sizes[BW.current_level + 1] = 0;
+            BW.current_level += 1;
+        } else {
+            std::cout << "[B] Refusing to advance level (expected_size too large), setting target level to " << BW.current_level + 1 << std::endl;
+            BW.target_level   = BW.current_level + 1;
+            BW.current_level += 1;
+        }
     }
 
     delete[] finished_elems;

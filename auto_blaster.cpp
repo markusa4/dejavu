@@ -545,8 +545,10 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             //if(w->skiplevels > 0)
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
-            //if(*restarts % 2 == 0)
-            w->skiplevels += 1;
+            if(w->communicator_id == 0) {
+                if (*restarts % 5 == 0)
+                    w->skiplevels += 1;
+            }
             S->empty_cache();
             if(w->first_skiplevel <= w->skiplevels) {
                 proceed_state(w, g, start_c, start_I, w->G->b[w->first_skiplevel - 1]);
@@ -652,20 +654,116 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     }
 }
 
+// if canonical vertex is v, true is returned and orbit contains vertices of the orbit of v
+// if the canonical vertex is not v, false is returned
+
+bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, work_list* orbit, bool reuse_generators) {
+    orbit->reset();
+    // test if identity
+    if(*w->shared_generators_size == 0) {
+        orbit->push_back(v);
+        return true;
+    }
+
+    // if level == 1 we can return shared orbit
+    if(base_sz == 0) {
+        int map_v = (*w->shared_orbit)[v];
+        assert(v >= 0);
+        assert(v <= w->G->domain_size);
+        assert(map_v >= 0);
+        assert(map_v <= w->G->domain_size);
+
+        if(map_v != v)
+            return false;
+    } else { // if level > 1, we collect generators that fix base and perform orbit algorithm on v
+        // collect generators
+        if(!reuse_generators) {
+            w->generator_fix_base_size = 0;
+            mpermnode *it = *w->shared_generators;
+            do {
+                // does it fix base?
+                bool it_fixes_base = true; // do not need this variable
+                for (int i = 0; i < base_sz; ++i) {
+                    int b = base[i];
+                    if (it->p[b] != b) {
+                        it_fixes_base = false;
+                        break;
+                    }
+                }
+
+                if (it_fixes_base) {
+                    w->generator_fix_base[w->generator_fix_base_size] = it;
+                    w->generator_fix_base_size += 1;
+                }
+                it = it->next;
+            } while (it != *w->shared_generators);
+        } //else {
+          //  if(w->canonical_v != v)
+        //        return false;
+        //}
+
+        // do orbit algorithm on v
+        if(w->generator_fix_base_size > 0) {
+            int min_v = v; // find canonical v
+            w->orbit_vertex_worklist.reset();
+            w->orbit_considered.reset();
+            w->orbit_vertex_worklist.push_back(v);
+            w->orbit_considered.set(v);
+            orbit->push_back(v);
+
+            while(!w->orbit_vertex_worklist.empty()) {
+                int next_v = w->orbit_vertex_worklist.pop_back();
+                if(next_v < min_v)
+                    min_v = next_v;
+
+                // apply all generators exhaustively on v
+                for(int j = 0; j < w->generator_fix_base_size; ++j) {
+                    int mapped_v = w->generator_fix_base[j]->p[next_v];
+                    if(!w->orbit_considered.get(mapped_v)) {
+                        w->orbit_considered.set(mapped_v);
+                        w->orbit_vertex_worklist.push_back(mapped_v);
+                        orbit->push_back(mapped_v);
+                    }
+                }
+            }
+            w->canonical_v = min_v;
+            if(min_v == v)
+                return true;
+            //std::cout << "safed" << std::endl;
+            return false;
+        } // else is identity again (below)
+    }
+
+    // return identity
+    orbit->push_back(v);
+    return true;
+}
 
 bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_leaf, bool *done, int selector_seed, auto_workspace* w) {
     bfs* BFS = w->BW;
-    int level = BFS->BW.current_level;
-    if(level == BFS->BW.target_level) return false;
+    int level        = BFS->BW.current_level;
+    int target_level = BFS->BW.target_level;
+    if(level == target_level) return false; // we are done with BFS!
 
+    // initialize structures
     if(!w->init_bfs) {
-        w->todo_dequeue = new std::tuple<bfs_element*, int>[w->BW->BW.chunk_size];
-        w->todo_elements = new std::tuple<bfs_element *, int>[w->BW->BW.chunk_size * g->v_size]; // ToDo: make smaller, commit if full
-        w->finished_elements = new std::pair<bfs_element *, int>[w->BW->BW.chunk_size];
+        int chunk_sz = w->BW->BW.chunk_size;
+        w->todo_dequeue = new std::tuple<bfs_element*, int>[chunk_sz];
+        w->todo_deque_sz = chunk_sz;
+        w->todo_elements = new std::tuple<bfs_element *, int>[chunk_sz * 4];
+        w->todo_elements_sz = chunk_sz * 4;
+        w->finished_elements = new std::pair<bfs_element *, int>[chunk_sz];
+        w->finished_elements_sz = chunk_sz;
         w->init_bfs = true;
+        w->orbit.initialize(g->v_size);
+        w->orbit_considered.initialize(g->v_size);
+        w->orbit_vertex_worklist.initialize(g->v_size);
+        w->generator_fix_base = new mpermnode*[*w->shared_generators_size];
     }
 
-    size_t num = BFS->BW.bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->BW.chunk_size); // ToDo: try out next levels as well! (but should check target_level, though)
+    // try to dequeue a chunk of work
+    // ToDo: try out next levels as well! (but should check target_level, though)
+    size_t num = BFS->BW.bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->BW.chunk_size);
     int finished_elements_sz = 0;
     int todo_elements_sz = 0;
 
@@ -673,25 +771,30 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         bfs_element *elem = std::get<0>(w->todo_dequeue[i]);
         int v             = std::get<1>(w->todo_dequeue[i]);
 
-        // copy to workspace
-        //if(w->prev_bfs_element != elem) {
-            w->work_c->copy_force(elem->c);
-            w->prev_bfs_element = elem;
-            *w->work_I = *elem->I;
-            w->work_I->set_compare_invariant(canon_I);
-        //}
-        /* else {
-            w->work_c->copy(elem->c);
-            *w->work_I = *elem->I;
-            w->work_I->set_compare_invariant(canon_I);
-        }*/
-        // is identity?
+        // check orbit
+        bool comp = get_orbit(w, elem->base, elem->base_sz, v, &w->orbit, w->prev_bfs_element == elem); // todo: need to consider weights
+        // I could prune the todos relatively cheaply now (just a further restriction of generators, and they will not
+        // appear in queues at all)
 
-        bool comp = proceed_state(w, g, w->work_c, w->work_I, v);
+        if(comp) {
+            // copy to workspace
+            if (w->prev_bfs_element != elem) { // <-> last computed base is the same!
+                w->work_c->copy_force(elem->c);
+                w->prev_bfs_element = elem;
+                *w->work_I = *elem->I;
+                w->work_I->set_compare_invariant(canon_I);
+            } else {
+                w->work_c->copy(elem->c);
+                *w->work_I = *elem->I;
+                w->work_I->set_compare_invariant(canon_I);
+            }
 
+            // compute next coloring
+            comp = comp && proceed_state(w, g, w->work_c, w->work_I, v);
+        }
+        // not equal to canonical invariant?
         if (!comp) {
-            // throw this node away, but keep track of it!
-            //BFS->BW.bfs_level_finished_elements[level].enqueue(std::pair<bfs_element *, int>(nullptr, 0));
+            // throw this node away, but keep track of that we computed it!
             w->finished_elements[finished_elements_sz] = std::pair<bfs_element *, int>(nullptr, 0);
             finished_elements_sz += 1;
             continue;
@@ -711,20 +814,23 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         next_elem->base[next_elem->base_sz - 1] = v;
 
         // create todos for this node
-        w->S.empty_cache();
-        int c = w->S.select_color(g, w->work_c, selector_seed);
-        //assert(c != -1);
         int sz = 0;
-        for (int i = c; i < c + w->work_c->ptn[c] + 1; ++i) {
-            int next_v = w->work_c->lab[i];
-            sz += 1;
-            //BFS->BW.bfs_level_todo[level + 1].enqueue(std::tuple<bfs_element *, int>(next_elem, next_v));
-            //assert(todo_elements_sz < W->BW->BW.chunk_size);
-            w->todo_elements[todo_elements_sz] = std::tuple<bfs_element *, int>(next_elem, next_v);
-            todo_elements_sz += 1;
+        if(level != target_level - 1) {
+            w->S.empty_cache();
+            int c = w->S.select_color(g, w->work_c, selector_seed);
+            //assert(c != -1);
+            for (int i = c; i < c + w->work_c->ptn[c] + 1; ++i) {
+                int next_v = w->work_c->lab[i];
+                sz += 1;
+                if (todo_elements_sz == w->todo_elements_sz) {
+                    BFS->BW.bfs_level_todo[level + 1].enqueue_bulk(w->todo_elements, todo_elements_sz);
+                    todo_elements_sz = 0;
+                }
+                w->todo_elements[todo_elements_sz] = std::tuple<bfs_element *, int>(next_elem, next_v);
+                todo_elements_sz += 1;
+            }
         }
 
-        //BFS->BW.bfs_level_finished_elements[level].enqueue(std::pair<bfs_element *, int>(next_elem, sz));
         w->finished_elements[finished_elements_sz] = std::pair<bfs_element *, int>(next_elem, sz);
         finished_elements_sz += 1;
         w->work_c = new coloring;
@@ -738,13 +844,15 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
 }
 
 void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork) {
+                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_size) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph* g = g_;
 
     bool* done      = &switches->done;
     bool* done_fast = &switches->done_fast;
+    int _shared_group_size = false;
+    mpermnode* _gens = nullptr;
 
     if(config.CONFIG_THREADS_COPYG && !master) {
         g = new sgraph;
@@ -825,7 +933,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(g->v_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, switches, G, start_c, canon_leaf, canon_I, &pad, i, &shrd_orbit, W.BW));
+            work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, switches, G, start_c, canon_leaf, canon_I, &pad, i, &shrd_orbit, W.BW, &_gens, &_shared_group_size));
         //std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
@@ -833,6 +941,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         W.communicator_pad = &pad;
         W.communicator_id  = -1;
         W.shared_orbit = &shrd_orbit;
+        W.shared_generators = &_gens;
+        W.shared_generators_size = &_shared_group_size;
     }
     //std::cout << "Found canonical leaf." << std::endl;
 
@@ -855,7 +965,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         //std::cout << "Sampled leaves (all threads): \t"  << sampled_paths_all + sampled_paths << std::endl;
         //std::cout << "Restart probing (local thread):\t" << restarts << std::endl;
         //std::cout << "Schreier Filtercount: \t" << mfiltercount << std::endl;
-        //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl;
+        //std::cout << "Schreier Multcount: \t"   << mmultcount << std::endl; // <- ToDo: pick elements to minimize this?
         malloc_lock.lock();
         std::cout << "Base size:  " << G->base_size << std::endl;
         std::cout << "Group size: ";
@@ -896,6 +1006,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         W.base_size = G->base_size;
         W.G = G;
         W.BW = bwork;
+        W.shared_generators = gens;
+        W.shared_generators_size = shared_group_size;
         /*for(int i = 0; i < W.communicator_pad->size(); ++i) {
             if (communicator_id != i) {
                 W.ptoks.emplace_back(new moodycamel::ProducerToken((*communicator_pad)[i]));
@@ -909,20 +1021,17 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
 
        // find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
 
-        //double inner_t = 0;
-       // int counter = 0;
         W.skiplevels = 0;
         bool switched1 = false;
-        bool switched2 = false;
-        bool done_fast_me = false;
 
         if(W.skiplevels == G->base_size - 1) {
-            if(communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search." << std::endl;
+            if(communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search" << std::endl;
             G->skip_shared_group();
             switched1 = true;
             *done_fast   = true;
-            done_fast_me = true;
         }
+
+        int earliest_found = -1;
 
         while(!(*done)) {
             bijection automorphism;
@@ -930,13 +1039,30 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 if((*done_fast && !automorphism.non_uniform )) continue;
-            } else if(W.BW->BW.current_level != W.BW->BW.target_level) {
-                if(communicator_id == 0 && !switched1) {
-                    switched1 = true;
-                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                    std::cout << "[N] Finished non-uniform automorphism search." << std::endl;
+                // set target level to earliest found automorphism skiplevel
+                if(earliest_found < 0 && communicator_id == 0) {
+                    int proposed_level = W.skiplevels + 1;
+                    if(proposed_level == G->base_size)
+                        proposed_level += 1;
+                    W.BW->BW.target_level.store(proposed_level);
+                    earliest_found = W.skiplevels;
                 }
-                bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
+            } else if(W.BW->BW.current_level != W.BW->BW.target_level) {
+                if(communicator_id == 0 && W.BW->BW.target_level < 0) {
+                    int proposed_level = W.skiplevels + 1;
+                    if(proposed_level == G->base_size)
+                        proposed_level += 1;
+                    W.BW->BW.target_level.store(proposed_level);
+                }
+                if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
+                    if(W.communicator_id == 0 && !switched1) {
+                        switched1 = true;
+                        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                        std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
+                        std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
+                    }
+                    bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
+                }
                 continue;
             } else {
                 //std::cout << W.BW->BW.current_level << std::endl;
@@ -965,14 +1091,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             }
             automorphism.not_deletable();
             bool test = G->add_permutation(&automorphism, &idle_ms, done);
-            if(!test && automorphism.non_uniform)
-                done_fast_me = true;
 
             automorphism.map = new int[g->v_size];
-            if(sampled_paths == 0) {
-               // cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                //std::cout << "[" << communicator_id << "]: First automorphism (added): " << cref / 1000000.0 << "ms" << std::endl;
-            }
             sampled_paths += 1;
         }
         delete W.start_c;

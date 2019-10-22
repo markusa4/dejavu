@@ -238,7 +238,7 @@ int commandline_mode(int argc, char** argv) {
             //A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr);
+                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
@@ -313,17 +313,17 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
-   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
      //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/dac/dac/4pipe.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
@@ -344,7 +344,7 @@ int main(int argc, char *argv[]) {
          //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
-                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr);
+                A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {

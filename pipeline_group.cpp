@@ -57,18 +57,31 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     int max_it = 0;
 
     while(!(*done)) {
-        w->BW->work_queues();
-
         if(*done_fast && !(switches->done_shared_group)) {
             // copy gens and first orbit for shared use!
             circ_mutex.lock();
             *w->shared_orbit = new int[domain_size];
-            mpermnode shared_gens;
+
             memcpy(*w->shared_orbit, gp->orbits, domain_size * sizeof(int));
+
+            if(gens_added > 0) {
+                *w->shared_generators_size = 0;
+                mpermnode *it = gens;
+                do {
+                    maddpermutation(w->shared_generators, it->p, domain_size);
+                    *w->shared_generators_size += 1;
+                    it = it->next;
+                } while (it != gens);
+            } else {
+                *w->shared_generators_size = 0;
+            }
             //std::cout << std::endl;
             circ_mutex.unlock();
             switches->done_shared_group.store(true);
+            // need to determine target level!
         }
+
+        w->BW->work_queues();
 
         if(is_first_stage) { // share information
         /*    if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level == 1) {
@@ -331,7 +344,7 @@ pipeline_group::pipeline_group(int domain_size) {
 void pipeline_group::initialize(int domain_size, bijection *base_points, int stages) {
     mschreier_fails(-1);
     added = 0;
-    shared_group_todo = -1;
+    shared_group_todo = 5;
     shared_group_trigger = false;
     //this->base_size = 0;
     this->stages = stages;

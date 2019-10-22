@@ -14,6 +14,7 @@
 #include "refinement_bucket.h"
 #include "selector.h"
 #include "bfs.h"
+#include "pipeline_schreier.h"
 
 
 typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int>>> com_pad;
@@ -60,13 +61,28 @@ struct alignas(64) auto_workspace {
     invariant start_I;
     com_pad* communicator_pad;
     int communicator_id;
+
+    // shared orbit and generators
     int** shared_orbit;
+    mpermnode** shared_generators;
+    int* shared_generators_size;
+
+    //
+    work_set  orbit_considered;
+    work_list orbit_vertex_worklist;
+    work_list orbit;
+    int canonical_v;
+    mpermnode** generator_fix_base;
+    int generator_fix_base_size;
 
     // bfs workspace
     bfs* BW;
     std::tuple<bfs_element*, int>* todo_dequeue;
+    int todo_deque_sz        = -1;
     std::pair<bfs_element *, int>* finished_elements;
+    int finished_elements_sz = -1;
     std::tuple<bfs_element *, int>* todo_elements;
+    int todo_elements_sz     = -1;
     bfs_element* prev_bfs_element = nullptr;
     bool init_bfs = false;
 };
@@ -76,7 +92,7 @@ struct alignas(64) auto_workspace {
 class auto_blaster {
 public:
     void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                          com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork);
+                          com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_identity);
 
 private:
     void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
@@ -96,6 +112,8 @@ private:
     bool bfs_chunk(sgraph *g, invariant *canon_I, bijection *canon_leaf, bool *done,
               int selector_seed,
               auto_workspace *w);
+
+    bool get_orbit(auto_workspace *w, int *base, int base_sz, int v, work_list *orbit, bool reuse_generators);
 };
 
 

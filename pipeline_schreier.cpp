@@ -918,9 +918,9 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
     DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
 
-    mgetorbits(fix, nfix, gp, ring, n);
-    mexpandschreier(gp, ring, n);
-    mexpandschreier(gp, ring, n);
+    //mgetorbits(fix, nfix, gp, ring, n);
+    //mexpandschreier(gp, ring, n);
+    //mexpandschreier(gp, ring, n);
     *grpsize1 = 1.0;
     *grpsize2 = 0;
 
