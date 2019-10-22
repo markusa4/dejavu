@@ -546,7 +546,10 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
             if(w->communicator_id == 0) {
-                if (*restarts % 5 == 0)
+                if (*restarts % (g->v_size / 5) == 0)
+                    w->skiplevels += 1;
+            } else {
+                if (*restarts % (g->v_size / 10) == 0)
                     w->skiplevels += 1;
             }
             S->empty_cache();

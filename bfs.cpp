@@ -88,6 +88,14 @@ void bfs::work_queues() {
         int expected_size = BW.level_expecting_finished[BW.current_level +1];
 
         std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
+
+        if(BW.current_level == BW.target_level - 2) {
+            if(expected_size < BW.domain_size * 1) {
+                std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
+                BW.target_level += 1;
+            }
+        }
+
         if(expected_size < 10 * BW.domain_size) {
             BW.level_states[BW.current_level + 1] = new bfs_element *[expected_size];
             BW.level_sizes[BW.current_level + 1] = 0;
