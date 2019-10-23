@@ -14,11 +14,11 @@ struct configstruct {
     bool CONFIG_IR_FAST_AUTOPRE = true; // ToDo: option to stop this dynamically from group
 
     int CONFIG_RAND_ABORT = 5;
-    int CONFIG_RAND_ABORT_RAND = 5;
+    int CONFIG_RAND_ABORT_RAND = -1;
 
     int CONFIG_THREADS_NO_PIPELINE = 1;
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 1;
-    int CONFIG_THREADS_PIPELINE_DEPTH = 3;
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 2;
+    int CONFIG_THREADS_PIPELINE_DEPTH = 2;
     int CONFIG_THREADS_PIPELINE_STAGE_MIN = 10;
     bool CONFIG_THREADS_COPYG = false;
     bool CONFIG_THREADS_COLLABORATE = false;

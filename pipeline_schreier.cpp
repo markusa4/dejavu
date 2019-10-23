@@ -706,7 +706,6 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                     changed = TRUE;
                     ipwr = 0;
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
-
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
                         circ_mutex.lock();
                         if (!curr) {
@@ -716,7 +715,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                             curr = *ring;
                         }
                         vec[j] = curr;
-                        pwr[j] = ipwr--;
+                        pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
                         ++curr->refcount;
                         circ_mutex.unlock();
                         assert(sh->fixed_orbit_sz < n);
@@ -728,12 +727,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
             }
 
             j = mworkperm[sh->fixed];
-                //int test__ = 0;
             while (j != sh->fixed) {
-                /*test__ += 1;
-                if(test__ == 1000) {
-                    std::cout << "probably infinite loop" << std::endl;
-                }*/
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                 //++mmultcount;
                 curr = NULL;

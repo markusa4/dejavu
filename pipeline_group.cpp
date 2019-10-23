@@ -195,6 +195,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup || !state.counts_towards_abort, result));
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
+                //std::cout << "throttle" << n << std::endl;
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
             pipeline_queues[n + 1].enqueue(state);
@@ -259,8 +260,8 @@ void pipeline_group::determine_stages() {
     int ded = 0;
     for(int i = 0; i < stages; ++i) {
         int stage_pos = (base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2))));
-        if(i == 0)
-            stage_pos = stage_pos / 3;
+       // if(i == 0)
+        //    stage_pos = stage_pos / 2;
 
         // skip stage if too small
         if((!intervals.empty()) &&
