@@ -61,8 +61,9 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
             // copy gens and first orbit for shared use!
             circ_mutex.lock();
             *w->shared_orbit = new int[domain_size];
-
             memcpy(*w->shared_orbit, gp->orbits, domain_size * sizeof(int));
+
+
 
             if(gens_added > 0) {
                 *w->shared_generators_size = 0;

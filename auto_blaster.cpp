@@ -1027,12 +1027,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         invariant* _canon_I    = new invariant;
         _canon_I->create_vector();
         bijection* _canon_leaf = new bijection;
-        find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches,
-                               selector_seed);
-
-        W.my_base_points    = base_points.map;
-        W.my_base_points_sz = base_points.map_sz;
-        std::cout << "Found canonical leaf." << std::endl;
 
         W.skiplevels = 0;
         bool switched1 = false;
@@ -1043,16 +1037,25 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             G->skip_shared_group();
             switched1 = true;
             *done_fast   = true;
+        } else {
+            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches,
+                                   selector_seed);
+            W.my_base_points    = base_points.map;
+            W.my_base_points_sz = base_points.map_sz;
+            std::cout << "Found canonical leaf." << std::endl;
         }
 
         int earliest_found = -1;
-
+        int n_found = 0;
         while(!(*done)) {
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
             if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
                 fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 //std::cout << "Found automorphism." << std::endl;
+                n_found += 1;
+                if(n_found % 5 == 0 && W.skiplevels < W.my_base_points_sz)
+                    W.skiplevels += 1;
                 if((*done_fast && !automorphism.non_uniform )) continue;
                 // set target level to earliest found automorphism skiplevel
                 if(earliest_found < 0 && communicator_id == 0) {
@@ -1086,7 +1089,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                     switched2 = true;
                     cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::high_resolution_clock::now() - timer).count());
-                    std::cout << "[T] BFS finished: " << cref / 1000000.0 << "ms" << std::endl;
+                    std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                 }
                 //std::cout << W.BW->BW.current_level << std::endl;
                 //std::cout << "Searching automorphism." << std::endl;

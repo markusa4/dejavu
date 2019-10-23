@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
      //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);

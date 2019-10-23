@@ -635,9 +635,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
 
     if(startlevel == 0) {
         DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
-
         //++mfiltercount;
-
         memcpy(mworkperm, p, n * sizeof(int));
 
         if (*ring && p == (*ring)->p) {
@@ -674,20 +672,23 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
         orbits = sh->orbits;
         vec = sh->vec;
         pwr = sh->pwr;
-        for (i = 0; i < n; ++i) {
-            j1 = orbits[i];
-            while (orbits[j1] != j1) j1 = orbits[j1];
-            j2 = orbits[mworkperm[i]];
-            while (orbits[j2] != j2) j2 = orbits[j2];
 
-            if (j1 != j2) {
-                lchanged = TRUE;
-                if (j1 < j2) orbits[j2] = j1;
-                else orbits[j1] = j2;
+        if(lev == 0) { // orbit algorithm
+            for (i = 0; i < n; ++i) {
+                j1 = orbits[i];
+                while (orbits[j1] != j1) j1 = orbits[j1];
+                j2 = orbits[mworkperm[i]];
+                while (orbits[j2] != j2) j2 = orbits[j2];
+
+                if (j1 != j2) {
+                    lchanged = TRUE;
+                    if (j1 < j2) orbits[j2] = j1;
+                    else orbits[j1] = j2;
+                }
             }
+            if (lchanged)
+                for (i = 0; i < n; ++i) orbits[i] = orbits[orbits[i]];
         }
-        if (lchanged)
-            for (i = 0; i < n; ++i) orbits[i] = orbits[orbits[i]];
 
         if (lchanged) changed = TRUE;
 
