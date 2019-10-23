@@ -57,7 +57,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     int max_it = 0;
 
     while(!(*done)) {
-        if(*done_fast && !(switches->done_shared_group)) {
+        if(n == 0 && *done_fast && !(switches->done_shared_group)) {
             // copy gens and first orbit for shared use!
             circ_mutex.lock();
             *w->shared_orbit = new int[domain_size];
@@ -81,111 +81,10 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
             // need to determine target level!
         }
 
-        w->BW->work_queues();
-
-        if(is_first_stage) { // share information
-        /*    if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level == 1) {
-                // we can only do it like this on first level! then we need notion of paths and BFS
-                // act as relay but filter information according to orbit, tell threads when to advance the level
-                // receive information
-                int enq_space_pos = 0;
-                int num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
-                while(num > 0) {
-                    //std::cout << "received " << num << std::endl;
-                    for (int j = 0; j < num; ++j) {
-                        if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
-                            if (std::get<0>(w->dequeue_space[j]) > 0) {
-                                int vertex = std::get<1>(w->dequeue_space[j]);
-                                if(!w->first_level_succ.get(gp->orbits[vertex])) {
-                                    w->first_level_succ.set(gp->orbits[vertex]);
-                                    w->first_level_sz += 1;
-                                    w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
-                                                                                           gp->orbits[vertex]);
-                                    enq_space_pos += 1;
-                                }
-                            } else {
-                                int vertex = std::get<1>(w->dequeue_space[j]);
-                                if(!w->first_level_fail.get(gp->orbits[vertex])) {
-                                    w->first_level_fail.set(gp->orbits[vertex]);
-                                    w->first_level_sz += 1;
-                                    w->enqueue_space[enq_space_pos] = std::tuple<int, int>(std::get<0>(w->dequeue_space[j]),
-                                                                                           gp->orbits[vertex]);
-                                    enq_space_pos += 1;
-                                }
-                            }
-                        }
-                    }
-                    max_it += 1;
-                    if(max_it > config.CONFIG_THREADS_REFINEMENT_WORKERS * 5) break;
-                    if(enq_space_pos > w->enqueue_space_sz - w->dequeue_space_sz - 1) break;
-                    num = first_level_points.try_dequeue_bulk(w->dequeue_space, w->dequeue_space_sz);
-                }
-
-                // send information
-                //if(enq_space_pos > 0) std::cout << enq_space_pos << std::endl;
-
-                // advance level
-                // test if level can be advanced and send the information (since threads have outdated firstlevel)
-                if(enq_space_pos > 0 && gens_added > 0) {
-                    //std::cout << "doing it" << std::endl;
-                    for (int i = 0; i < domain_size; ++i) { // ToDo: too expensive if orbits trivial! make special case for asymmetric "so far"
-                        int map_i   = gp->orbits[i];
-                        if(i == map_i) continue;
-                        assert(map_i < domain_size);
-                        assert(map_i >= 0);
-                        assert(i < domain_size);
-                        assert(i >= 0);
-                        assert(!w->first_level_fail.get(i)     || !w->first_level_succ.get(i));
-                        assert(!w->first_level_fail.get(map_i) || !w->first_level_succ.get(map_i));
-                        bool bi     = w->first_level_fail.get(i);
-                        bool bmap_i = w->first_level_fail.get(map_i);
-
-                        if (bi && !bmap_i) {
-                            w->first_level_fail.set(map_i);
-                            w->first_level_sz += 1;
-                            continue;
-                        }
-                        if (!bi && bmap_i) {
-                            w->first_level_fail.set(i);
-                            w->first_level_sz += 1;
-                            continue;
-                        }
-                        bi     = w->first_level_succ.get(i);
-                        bmap_i = w->first_level_succ.get(map_i);
-                        if (bi && !bmap_i) {
-                            w->first_level_succ.set(map_i);
-                            w->first_level_sz += 1;
-                            continue;
-                        } else if (!bi && bmap_i) {
-                            w->first_level_succ.set(i);
-                            w->first_level_sz += 1;
-                            continue;
-                        }
-                    }
-                }
-                if(first_cell_size == w->first_level_sz) {
-                    //std::cout << "proceed send" << std::endl;
-                    first_cell_size = -1;
-                    for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                        (*w->communicator_pad)[i].enqueue(std::tuple<int, int>(0, 0)); // *w->ptoks[i],
-                    }
-                } else {
-                    if(enq_space_pos > 0) {
-                        //std::cout << "sending " << enq_space_pos << std::endl;
-                        for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                            (*w->communicator_pad)[i].try_enqueue_bulk(w->enqueue_space,
-                                                                       enq_space_pos); // *w->ptoks[i],
-                        }
-                    }
-                }
-                enq_space_pos = 0;
-            } else if(config.CONFIG_THREADS_COLLABORATE && switches->done_shared_group.load() && w->first_level > 1) {
-                // act as relay
-            }*/
-        }
+        if(n == 0)
+            w->BW->work_queues();
 
         // work on pipeline_results and track
-
         filterstate state;
         bijection p;
         random_element re;
@@ -287,7 +186,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
 
         if (is_last_stage) {
             shared_group_todo -= 1;
-            if(!state.counts_towards_abort && !result && !state.ingroup && !(*done_fast) || (shared_group_trigger && shared_group_todo < 0)) {
+            if((!state.counts_towards_abort && !result && !state.ingroup && !(*done_fast)) || (shared_group_trigger && shared_group_todo < 0)) {
                 //std::cout << "useless element" << result << std::endl;
                 *done_fast = true;
                // std::cout << "random element: " << result << std::endl;
@@ -295,13 +194,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
             sift_results.enqueue(std::pair<bool, bool>(state.ingroup || !state.counts_towards_abort, result));
         } else {
             while(pipeline_queues[n + 1].size_approx() > 50 && (!(*done))) {
-                /*if(back_idle_ms % 10000 == 0) {
-                    std::cout << "Pipeline(" << n << ") back idle " << back_idle_ms << ", "
-                              << pipeline_queues[n + 1].size_approx() << std::endl;
-                }*/
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                //std::this_thread::yield();
-                //back_idle_ms += 1;
             }
             pipeline_queues[n + 1].enqueue(state);
         }
@@ -322,13 +215,14 @@ bool pipeline_group::add_permutation(bijection *p, int* idle_ms, bool* done) {
     //std::cout << "enqueued" << std::endl;
     static thread_local moodycamel::ProducerToken ptoken = moodycamel::ProducerToken(automorphisms);
 
-    if(p->non_uniform && automorphisms.size_approx() > 30) {
-        shared_group_todo.store(30);
+    /*if(!shared_group_trigger && p->non_uniform && automorphisms.size_approx() > 20) {
+        shared_group_todo.store(20);
         shared_group_trigger.store(true);
         return false;
-    }
+    }*/
 
     while(automorphisms.size_approx() > 100 && (!(*done))) {
+        //std::cout << "throttle" << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
         *idle_ms += 1;
     }
@@ -360,10 +254,12 @@ void pipeline_group::initialize(int domain_size, bijection *base_points, int sta
 // ToDo: do this better, more drastic towards start
 // ToDo: remove unncessary stages (size = 0)
 void pipeline_group::determine_stages() {
-   // std::cout << "Pipeline: ";
+    std::cout << "Pipeline: ";
     int ded = 0;
     for(int i = 0; i < stages; ++i) {
         int stage_pos = (base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2))));
+        if(i == 0)
+            stage_pos = stage_pos / 4;
 
         // skip stage if too small
         if((!intervals.empty()) &&
@@ -374,10 +270,10 @@ void pipeline_group::determine_stages() {
 
         pipeline_queues.emplace_back(moodycamel::ConcurrentQueue<filterstate>(20));
         intervals.push_back(stage_pos);
-       // std::cout << "/" << intervals[intervals.size() - 1];
+        std::cout << "/" << intervals[intervals.size() - 1];
     }
     stages -= ded;
-   // std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
+     std::cout << "(" <<  domain_size + 1 << ")" << std::endl;
     intervals[stages - 1] = domain_size + 1;
 }
 

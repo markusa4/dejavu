@@ -546,15 +546,17 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
             if(w->communicator_id == 0) {
-                if (*restarts % (g->v_size / 5) == 0)
+               // if (*restarts % ((int) floor(sqrt(g->v_size / 2))) == 0)
+                if(*restarts % 5 == 0)
                     w->skiplevels += 1;
             } else {
-                if (*restarts % (g->v_size / 10) == 0)
+               // if (*restarts % ((int) floor(sqrt(g->v_size / 2))) == 0)
+                if(*restarts % 5 == 0)
                     w->skiplevels += 1;
             }
             S->empty_cache();
             if(w->first_skiplevel <= w->skiplevels) {
-                proceed_state(w, g, start_c, start_I, w->G->b[w->first_skiplevel - 1]);
+                proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1]);
                 w->first_skiplevel += 1;
             }
 
@@ -624,7 +626,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             int v;
 
             if(level <= w->skiplevels) {
-                v = w->G->b[level - 1];
+                v = w->my_base_points[level - 1];
                 assert(c->vertex_to_col[v] == s);
                 skipped_level = true;
             } else {
@@ -753,8 +755,8 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         int chunk_sz = w->BW->BW.chunk_size;
         w->todo_dequeue = new std::tuple<bfs_element*, int>[chunk_sz];
         w->todo_deque_sz = chunk_sz;
-        w->todo_elements = new std::tuple<bfs_element *, int>[chunk_sz * 4];
-        w->todo_elements_sz = chunk_sz * 4;
+        w->todo_elements = new std::tuple<bfs_element *, int>[chunk_sz * 8];
+        w->todo_elements_sz = chunk_sz * 8;
         w->finished_elements = new std::pair<bfs_element *, int>[chunk_sz];
         w->finished_elements_sz = chunk_sz;
         w->init_bfs = true;
@@ -818,7 +820,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
 
         // create todos for this node
         int sz = 0;
-        if(level != target_level - 1) {
+        //if(level != target_level - 1) {
             w->S.empty_cache();
             int c = w->S.select_color(g, w->work_c, selector_seed);
             //assert(c != -1);
@@ -832,7 +834,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
                 w->todo_elements[todo_elements_sz] = std::tuple<bfs_element *, int>(next_elem, next_v);
                 todo_elements_sz += 1;
             }
-        }
+        //}
 
         w->finished_elements[finished_elements_sz] = std::pair<bfs_element *, int>(next_elem, sz);
         finished_elements_sz += 1;
@@ -1022,10 +1024,19 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         double cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
         //std::cout << "[" << communicator_id << "]: Startup: " << cref / 1000000.0 << "ms" << std::endl;
 
-       // find_automorphism_prob(g, false, canon_I, canon_leaf, &base_points, &re, &trash_int, &trash_bool, selector_seed, &W);
+        invariant* _canon_I    = new invariant;
+        _canon_I->create_vector();
+        bijection* _canon_leaf = new bijection;
+        find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches,
+                               selector_seed);
+
+        W.my_base_points    = base_points.map;
+        W.my_base_points_sz = base_points.map_sz;
+        std::cout << "Found canonical leaf." << std::endl;
 
         W.skiplevels = 0;
         bool switched1 = false;
+        bool switched2 = false;
 
         if(W.skiplevels == G->base_size - 1) {
             if(communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search" << std::endl;
@@ -1040,7 +1051,8 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
             bijection automorphism;
             //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
             if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
-                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
+                fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
+                //std::cout << "Found automorphism." << std::endl;
                 if((*done_fast && !automorphism.non_uniform )) continue;
                 // set target level to earliest found automorphism skiplevel
                 if(earliest_found < 0 && communicator_id == 0) {
@@ -1060,14 +1072,22 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                 if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
                     if(W.communicator_id == 0 && !switched1) {
                         switched1 = true;
+
                         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                         std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
+                        std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                         std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
                     }
                     bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
                 }
                 continue;
             } else {
+                if(W.communicator_id == 0 && !switched2) {
+                    switched2 = true;
+                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::high_resolution_clock::now() - timer).count());
+                    std::cout << "[T] BFS finished: " << cref / 1000000.0 << "ms" << std::endl;
+                }
                 //std::cout << W.BW->BW.current_level << std::endl;
                 //std::cout << "Searching automorphism." << std::endl;
                 find_automorphism_from_bfs(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);

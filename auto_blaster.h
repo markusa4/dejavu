@@ -50,6 +50,9 @@ struct alignas(64) auto_workspace {
     int measure1 = 0;
     int measure2 = 0;
 
+    int* my_base_points;
+    int  my_base_points_sz;
+
     // shared state
     moodycamel::ConsumerToken* ctok;
     moodycamel::ProducerToken* ptok;

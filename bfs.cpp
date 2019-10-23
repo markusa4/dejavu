@@ -23,6 +23,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
 
     BW.domain_size = domain_size;
+    BW.base_size    = base_size;
     BW.current_level = 1;
     BW.target_level  = -1;
     BW.level_states  = new bfs_element**[base_size + 2];
@@ -87,11 +88,11 @@ void bfs::work_queues() {
     if (BW.level_expecting_finished[BW.current_level] == 0) {
         int expected_size = BW.level_expecting_finished[BW.current_level +1];
 
-        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
+        //std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
 
-        if(BW.current_level == BW.target_level - 2) {
-            if(expected_size < BW.domain_size * 1) {
-                std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
+        if(BW.current_level == BW.target_level - 1 && BW.target_level <= BW.base_size) {
+            if(expected_size < BW.domain_size / 100) {
+               // std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
                 BW.target_level += 1;
             }
         }

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <assert.h>
 #include <algorithm>
+#include <set>
 #include "parser.h"
 
 using std::string;
@@ -17,6 +18,7 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>> incidence_list;
+    vector<std::set<int>>    incidence_set;
     string line;
     int nv, ne;
     while (std::getline(infile, line)) {
@@ -75,4 +77,70 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
     assert(nv == g->v_size);
     assert(nv == g->d_size);
     assert(2 * ne == g->e_size);
+}
+
+void parser::parse_dimacs_file_digraph(std::string filename, sgraph* g) {
+    std::cout << "Graph: \t\t" << filename << std::endl;
+    std::ifstream infile(filename);
+    vector<vector<int>>      incidence_list;
+    vector<std::set<int>>    incidence_set;
+    string line;
+    int nv, ne;
+    while (std::getline(infile, line)) {
+        std::istringstream iss(line);
+        //std::cout << line << std::endl;
+        char m;
+        if (!(iss >> m)) break;
+        switch (m) {
+            case 'p':
+                iss.ignore(6);
+                iss >> nv >> ne;
+                g->v = new int[nv];
+                g->d = new int[nv];
+                g->e = new int[ne];
+                for(int i = 0; i < nv; ++i) {
+                    incidence_list.emplace_back(vector<int>());
+                    //incidence_set.emplace_back(std::set<int>());
+                }
+                break;
+            case 'e':
+                int nv1, nv2;
+                iss >> nv1 >> nv2;
+                incidence_list[nv1 - 1].push_back(nv2 - 1);
+                //incidence_list[nv2 - 1].push_back(nv1 - 1);
+                break;
+            default:
+                break;
+        }
+    }
+
+    int epos = 0;
+    int vpos = 0;
+
+    int maxd = 0;
+
+    for(int i = 0; i < incidence_list.size(); ++i) {
+        g->v[vpos] = epos;
+        g->d[vpos] = incidence_list[i].size();
+        if(g->d[vpos] > maxd)
+            maxd = g->d[vpos];
+        vpos += 1;
+        for(int j = 0; j < incidence_list[i].size(); ++j) {
+            g->e[epos] = incidence_list[i][j];
+            epos += 1;
+        }
+    }
+
+    g->v_size = nv;
+    g->d_size = nv;
+    g->e_size = ne;
+
+    g->max_degree = maxd;
+
+    std::cout << "Vertices: \t" << g->v_size << std::endl;
+    std::cout << "Edges: \t\t" << g->e_size << std::endl;
+
+    assert(nv == g->v_size);
+    assert(nv == g->d_size);
+    assert(ne == g->e_size);
 }
