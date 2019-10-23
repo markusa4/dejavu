@@ -260,7 +260,7 @@ void pipeline_group::determine_stages() {
     for(int i = 0; i < stages; ++i) {
         int stage_pos = (base_size / stages) * (i + 1) - (i + 1) * ((base_size / (stages* (i + 2))));
         if(i == 0)
-            stage_pos = stage_pos / 4;
+            stage_pos = stage_pos / 3;
 
         // skip stage if too small
         if((!intervals.empty()) &&

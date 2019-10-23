@@ -187,6 +187,9 @@ static mschreier
     sh->pwr = (int *) malloc(sizeof(int) * n);
     sh->orbits = (int *) malloc(sizeof(int) * n);
 
+    sh->fixed_orbit = new int[n];
+    sh->fixed_orbit_sz = 0;
+
     if (sh->vec == NULL || sh->pwr == NULL || sh->orbits == NULL) {
         fprintf(ERRFILE, ">E malloc failed in newschreier()\n");
         exit(1);
@@ -693,7 +696,12 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
         if (lchanged) changed = TRUE;
 
         if (sh->fixed >= 0) {
-            for (i = 0; i < n; ++i)
+            if(sh->fixed_orbit_sz == 0) {
+                sh->fixed_orbit[0] = sh->fixed;
+                sh->fixed_orbit_sz += 1;
+            }
+            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
+                int i = sh->fixed_orbit[ii];
                 if (vec[i] && !vec[mworkperm[i]]) {
                     changed = TRUE;
                     ipwr = 0;
@@ -711,8 +719,13 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
                         pwr[j] = ipwr--;
                         ++curr->refcount;
                         circ_mutex.unlock();
+                        assert(sh->fixed_orbit_sz < n);
+                        assert(sh->fixed_orbit_sz >= 0);
+                        sh->fixed_orbit[sh->fixed_orbit_sz] = j;
+                        sh->fixed_orbit_sz += 1;
                     }
                 }
+            }
 
             j = mworkperm[sh->fixed];
                 //int test__ = 0;
@@ -919,8 +932,9 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
     DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
 
-    //mgetorbits(fix, nfix, gp, ring, n);
+    //mschreier_fails(10);
     //mexpandschreier(gp, ring, n);
+    //mgetorbits(fix, nfix, gp, ring, n);
     //mexpandschreier(gp, ring, n);
     *grpsize1 = 1.0;
     *grpsize2 = 0;

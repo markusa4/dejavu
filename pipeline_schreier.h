@@ -31,6 +31,8 @@ typedef struct mschreierlevel
     mpermnode **vec;                /* vec[i]^pwr[i] is edge label, */
     int *pwr;                      /*  transitive closure maps i->fixed */
     int *orbits;                   /* vector of orbits */
+    int *fixed_orbit = nullptr;
+    int  fixed_orbit_sz = -1;
     mpermnode *marker;              /* points to marker for this level */
 } mschreier;
 

@@ -47,6 +47,9 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_expecting_finished[1] = sz;
     BW.level_states[1] = new bfs_element*[sz];
     BW.level_sizes[1] = 0;
+
+    BW.finished_elems = new std::pair<bfs_element*, int>[BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
+    BW.finished_elems_sz = BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS;
     //std::cout << "[B] BFS structure initialized" << std::endl;
     //std::cout << "[B] ToDo for level " << BW.current_level << " is " << BW.level_expecting_finished[BW.current_level] << std::endl;
 }
@@ -62,13 +65,12 @@ void bfs::work_queues() {
     }
 
     // dequeue and process on current level only
-    std::pair<bfs_element*, int>* finished_elems = new std::pair<bfs_element*, int>[BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
-    size_t num = BW.bfs_level_finished_elements[BW.current_level].try_dequeue_bulk(finished_elems, BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS);
+    size_t num = BW.bfs_level_finished_elements[BW.current_level].try_dequeue_bulk(BW.finished_elems, BW.finished_elems_sz);
 
     //if(num > 0) std::cout << "Chunk " << num << std::endl;
     for(int i = 0; i < num; ++i) {
-        bfs_element *elem = finished_elems[i].first;
-        int todo = finished_elems[i].second;
+        bfs_element *elem = BW.finished_elems[i].first;
+        int todo = BW.finished_elems[i].second;
         int lvl = BW.current_level;
         // std::cout << "[B] Received level " << lvl << " elem " << elem << " todo " << todo << std::endl;
 
@@ -91,9 +93,9 @@ void bfs::work_queues() {
         //std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
 
         if(BW.current_level == BW.target_level - 1 && BW.target_level <= BW.base_size) {
-            if(expected_size < BW.domain_size / 100) {
-               // std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
-                BW.target_level += 1;
+            if(expected_size < std::max(BW.domain_size / 100, 1)) {
+                //std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
+                //BW.target_level += 1;
             }
         }
 
@@ -107,6 +109,4 @@ void bfs::work_queues() {
             BW.current_level += 1;
         }
     }
-
-    delete[] finished_elems;
 }

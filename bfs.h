@@ -57,6 +57,9 @@ public:
     int domain_size;
     int base_size;
     int chunk_size = 64; // ToDo: dynamically adapt this
+
+    std::pair<bfs_element*, int>* finished_elems;
+    int finished_elems_sz = -1;
 };
 
 class bfs {
