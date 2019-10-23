@@ -93,9 +93,12 @@ void bfs::work_queues() {
         //std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
 
         if(BW.current_level == BW.target_level - 1 && BW.target_level <= BW.base_size) {
-            if(expected_size < std::max(BW.domain_size / 100, 1)) {
+            //if(expected_size < std::max(BW.domain_size / 100, 1)) {
+            if(BW.level_sizes[BW.current_level] == 1) { // ToDo: this should be very efficient! make it efficient! (ToDos and back-and-forth between threads are probably the culprit)
+                                                        // ToDo: once levels can be made cheaply high, prefer base points in canon such that no base points have to be fixed
+                                                        // ToDo: or save skipperm for BW level
                 //std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
-                //BW.target_level += 1;
+               // BW.target_level += 1;
             }
         }
 

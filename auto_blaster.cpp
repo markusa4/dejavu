@@ -1054,7 +1054,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                 fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 //std::cout << "Found automorphism." << std::endl;
                 n_found += 1;
-                if(n_found % 5 == 0 && W.skiplevels < W.my_base_points_sz)
+                if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
                     W.skiplevels += 1;
                 if((*done_fast && !automorphism.non_uniform )) continue;
                 // set target level to earliest found automorphism skiplevel
@@ -1078,6 +1078,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
 
                         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                         std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
+                        std::cout << "[N] Ended in skiplevel " << W.skiplevels << std::endl;
                         std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                         std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
                     }

@@ -703,6 +703,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
             for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
                 int i = sh->fixed_orbit[ii];
                 if (vec[i] && !vec[mworkperm[i]]) {
+                    // acquire sh->level lock here
                     changed = TRUE;
                     ipwr = 0;
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
