@@ -7,9 +7,12 @@
 
 #include "nauty/nauty.h"
 #include "nauty/naurng.h"
+#include <mutex>
 
 #define DYNALLSTAT_NOSTATIC(type,name,name_sz) \
 	type *name; size_t name_sz=0;
+
+enum sift_type {SIFT_UNIFORM, SIFT_NON_UNIFORM, SIFT_RANDOM};
 
 typedef struct mpermnodestruct
 {
@@ -33,6 +36,7 @@ typedef struct mschreierlevel
     int *orbits;                   /* vector of orbits */
     int *fixed_orbit = nullptr;
     int  fixed_orbit_sz = -1;
+    std::mutex* level_lock;
     mpermnode *marker;              /* points to marker for this level */
 } mschreier;
 
@@ -48,6 +52,7 @@ typedef struct filterstatestruct {
     bool counts_towards_abort;
     int* workperm;
     size_t workperm_sz;
+    sift_type stype;
 } filterstate;
 
 typedef struct randomelementstruct {
@@ -70,6 +75,7 @@ extern mpermnode *mfindpermutation(mpermnode *gens, int *p, int n);
 extern bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_element* element);
 extern boolean mfilterschreier(mschreier *, int *, mpermnode **, boolean, int, int);
 extern boolean mfilterschreier_interval(mschreier *, int *, mpermnode **, boolean, int, int, int, int, filterstate* state);
+extern boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring, boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state);
 void free_random_element(random_element* r);
 extern boolean maddgenerator(mschreier **gp, mpermnode **gens, int *p, int n);
 extern boolean

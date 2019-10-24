@@ -15,9 +15,10 @@
 #include "selector.h"
 #include "bfs.h"
 #include "pipeline_schreier.h"
+#include "diy_group.h"
 
 
-typedef std::vector<moodycamel::ConcurrentQueue<std::tuple<int, int>>> com_pad;
+typedef std::vector<moodycamel::ConcurrentQueue<std::pair<int, int>>> com_pad;
 class pipeline_group;
 
 struct alignas(64) auto_workspace {
@@ -41,10 +42,10 @@ struct alignas(64) auto_workspace {
     coloring  skip_c;
     invariant skip_I;
 
-    std::tuple<int, int>* dequeue_space;
+    std::pair<int, int>* dequeue_space;
     int dequeue_space_sz = 0;
 
-    std::tuple<int, int>* enqueue_space;
+    std::pair<int, int>* enqueue_space;
     int enqueue_space_sz = 0;
 
     int measure1 = 0;
@@ -59,6 +60,7 @@ struct alignas(64) auto_workspace {
     std::vector<moodycamel::ProducerToken*> ptoks;
 
     pipeline_group* G;
+    diy_group*      G_;
 
     coloring* start_c;
     invariant start_I;
@@ -96,6 +98,10 @@ class auto_blaster {
 public:
     void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
                           com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_identity);
+
+    void sample_shared(sgraph *g_, bool master, shared_switches *switches, diy_group *G, coloring *start_c,
+                       bijection *canon_leaf, invariant *canon_I, com_pad *communicator_pad, int communicator_id,
+                       int **shared_orbit, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
 private:
     void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,

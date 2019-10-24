@@ -190,6 +190,8 @@ static mschreier
     sh->fixed_orbit = new int[n];
     sh->fixed_orbit_sz = 0;
 
+    sh->level_lock = new std::mutex;
+
     if (sh->vec == NULL || sh->pwr == NULL || sh->orbits == NULL) {
         fprintf(ERRFILE, ">E malloc failed in newschreier()\n");
         exit(1);
@@ -769,6 +771,172 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
 
 /************************************************************************/
 
+
+boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
+                                 boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state)
+/* Interval version for pipelining:
+ * if startlevel = 0,        initialize all DS
+ * if endlevel   = maxlevel, delete all DS and return properly
+ * if endlevel  != maxlevel, return filter state (workperm, etc.), leave DS initialized
+ * */
+/* Filter permutation p up to level maxlevel of gp.
+ * Use ingroup=TRUE if p is known to be in the group, otherwise
+ * at least one equivalent generator is added unless it is proved
+ * (nondeterministically) that it is in the group already.
+ * maxlevel < 0 means no limit, maxlevel=0 means top level only, etc.
+ * Return TRUE iff some change is made. */
+{
+    int i, j, j1, j2, lev;
+    int ipwr;
+    mschreier *sh;
+    int *orbits, *pwr;
+    bool loop_break;
+    mpermnode **vec, *curr;
+    boolean changed, lchanged, ident;
+
+    DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
+    if (maxlevel < 0) maxlevel = n + 1;
+
+    if(startlevel == 0) {
+        //mworkperm = p;
+        DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
+        //++mfiltercount;
+        memcpy(mworkperm, p, n * sizeof(int));
+
+        if (*ring && p == (*ring)->p) {
+            ingroup = TRUE;
+            curr = *ring;
+        } else
+            curr = NULL;
+
+        sh = gp;
+        changed = FALSE;
+        loop_break = false;
+    } else {
+        sh = state->sh;
+        orbits = state->orbits;
+        pwr = state->pwr;
+        vec = state->vec;
+        curr = state->curr;
+        changed = state->changed;
+        lchanged = state->lchanged;
+        ident = state->ident ;
+        assert(state->level == startlevel - 1);
+        loop_break = state->loop_break;
+        mworkperm = state->workperm;
+        mworkperm_sz = state->workperm_sz;
+    }
+
+    for (lev = startlevel; lev <= endlevel; ++lev) {
+        if(loop_break) {break;}
+        for (i = 0; i < n; ++i) if (mworkperm[i] != i) {break;}
+        ident = (i == n);
+        if (ident) {loop_break = true;break;}
+
+        lchanged = FALSE;
+        orbits = sh->orbits;
+        vec = sh->vec;
+        pwr = sh->pwr;
+
+        if(lev == 0) { // orbit algorithm
+            sh->level_lock->lock();
+            for (i = 0; i < n; ++i) {
+                j1 = orbits[i];
+                while (orbits[j1] != j1) j1 = orbits[j1];
+                j2 = orbits[mworkperm[i]];
+                while (orbits[j2] != j2) j2 = orbits[j2];
+
+                if (j1 != j2) {
+                    lchanged = TRUE;
+                    if (j1 < j2) orbits[j2] = j1;
+                    else orbits[j1] = j2;
+                }
+            }
+            if (lchanged)
+                for (i = 0; i < n; ++i) orbits[i] = orbits[orbits[i]];
+            sh->level_lock->unlock();
+        }
+
+        if (lchanged) changed = TRUE;
+
+        if (sh->fixed >= 0) {
+            if(sh->fixed_orbit_sz == 0) {
+                sh->fixed_orbit[0] = sh->fixed;
+                sh->fixed_orbit_sz += 1;
+            }
+            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
+                int i = sh->fixed_orbit[ii];
+                if (vec[i] && !vec[mworkperm[i]]) {
+                    // acquire sh->level lock here
+                    sh->level_lock->lock();
+                    if (vec[i] && !vec[mworkperm[i]]) { // need to check again, though (data race possible)
+                        changed = TRUE;
+                        ipwr = 0;
+                        for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
+                        for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
+                            circ_mutex.lock();
+                            if (!curr) {
+                                if (!ingroup) maddpermutation(ring, mworkperm, n);
+                                else maddpermutationunmarked(ring, mworkperm, n);
+                                ingroup = TRUE;
+                                curr = *ring;
+                            }
+                            vec[j] = curr;
+                            pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
+                            ++curr->refcount;
+                            circ_mutex.unlock();
+                            assert(sh->fixed_orbit_sz < n);
+                            assert(sh->fixed_orbit_sz >= 0);
+                            sh->fixed_orbit[sh->fixed_orbit_sz] = j;
+                            sh->fixed_orbit_sz += 1;
+                        }
+                    }
+                    sh->level_lock->unlock();
+                }
+            }
+
+            j = mworkperm[sh->fixed];
+            while (j != sh->fixed) {
+                mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
+                //++mmultcount;
+                curr = NULL;
+                j = mworkperm[sh->fixed];
+            }
+            sh = sh->next;
+        } else {
+            loop_break = true;
+            break;
+        }
+    }
+
+    if(endlevel == maxlevel) {
+        if (!ident && !ingroup) {
+            changed = TRUE;
+            maddpermutation(ring, p, n);
+        }
+
+        DYNFREE(mworkperm, mworkperm_sz);
+        return changed;
+    } else {
+        //assert(false);
+        state->sh   = sh;
+        state->orbits = orbits;
+        state->pwr  = pwr;
+        state->vec  = vec;
+        state->curr = curr;
+        state->changed  = changed;
+        state->lchanged = lchanged;
+        state->ident    = ident;
+        state->level = endlevel;
+        state->loop_break = loop_break;
+        state->workperm = mworkperm;
+        state->workperm_sz = mworkperm_sz;
+        return true;
+    }
+}
+
+/************************************************************************/
+
 boolean
 mexpandschreier(mschreier *gp, mpermnode **ring, int n)
 /* filter random elements until schreierfails failures.
@@ -924,8 +1092,8 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
     int i, j, k, fx;
     int *orb;
 
-    DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
-    DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
+  //  DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
+  //  DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
 
     //mschreier_fails(10);
     //mexpandschreier(gp, ring, n);
@@ -937,22 +1105,22 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
     for (i = 0, sh = gp; i < nfix; ++i, sh = sh->next) {
         orb = sh->orbits;
         fx = orb[sh->fixed];
-        k = 0;
-        for (j = fx; j < n; ++j) if (orb[j] == fx) ++k;
+        k = sh->fixed_orbit_sz;
+       /* for (j = fx; j < n; ++j) if (orb[j] == fx) ++k;*/
         MULTIPLY(*grpsize1, *grpsize2, k);
     }
 
-    orb = sh->orbits;
+    //orb = sh->orbits;
     k = 1;
-    for (i = 0; i < n; ++i)
+    /*for (i = 0; i < n; ++i)
         if (orb[i] == i)
             mworkperm[i] = 1;
         else {
             ++mworkperm[orb[i]];
             if (mworkperm[orb[i]] > k) k = mworkperm[orb[i]];
-        }
+        }*/
     MULTIPLY(*grpsize1, *grpsize2, k);
-    DYNFREE(mworkperm, mworkperm_sz);
+ //   DYNFREE(mworkperm, mworkperm_sz);
 }
 
 /************************************************************************/

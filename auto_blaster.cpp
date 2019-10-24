@@ -21,6 +21,7 @@
 #include "invariant_acc.h"
 #include "pipeline_group.h"
 #include "refinement_bucket.h"
+#include "diy_group.h"
 #include <pthread.h>
 #include <chrono>
 #include <tuple>
@@ -292,7 +293,7 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
                 if (!first_level_fail->get(base)) {
                     if(config.CONFIG_THREADS_COLLABORATE) {
                         if(enqueue_fail_point_sz < w->enqueue_space_sz) {
-                            w->enqueue_space[enqueue_fail_point_sz] = std::tuple<int, int>(-w->first_level, base);
+                            w->enqueue_space[enqueue_fail_point_sz] = std::pair<int, int>(-w->first_level, base);
                             enqueue_fail_point_sz += 1;
                         } else {
                             //for (int i = 0; i < w->communicator_pad->size(); ++i) {
@@ -674,9 +675,9 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
     if(base_sz == 0) {
         int map_v = (*w->shared_orbit)[v];
         assert(v >= 0);
-        assert(v <= w->G->domain_size);
+        assert(v <= w->G_->domain_size);
         assert(map_v >= 0);
-        assert(map_v <= w->G->domain_size);
+        assert(map_v <= w->G_->domain_size);
 
         if(map_v != v)
             return false;
@@ -885,9 +886,9 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
     W.first_level_fail.initialize(g->v_size);
     W.first_level_succ.initialize(g->v_size);
 
-    W.dequeue_space    = new std::tuple<int, int>[2048];
+    W.dequeue_space    = new std::pair<int, int>[2048];
     W.dequeue_space_sz = 2048;
-    W.enqueue_space    = new std::tuple<int, int>[128];
+    W.enqueue_space    = new std::pair<int, int>[128];
     W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     int* shrd_orbit;
@@ -936,7 +937,7 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
 
         //std::cout << "Launching refinement worker..." << std::endl;
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
-            pad.emplace_back(moodycamel::ConcurrentQueue<std::tuple<int, int>>(g->v_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
+            pad.emplace_back(moodycamel::ConcurrentQueue<std::pair<int, int>>(g->v_size, config.CONFIG_THREADS_REFINEMENT_WORKERS, config.CONFIG_THREADS_REFINEMENT_WORKERS));
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(std::thread(&auto_blaster::sample_pipelined, auto_blaster(), g, false, switches, G, start_c, canon_leaf, canon_I, &pad, i, &shrd_orbit, W.BW, &_gens, &_shared_group_size));
         //std::cout << "Refinement workers (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << ")" << std::endl;
@@ -1075,7 +1076,6 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
                 if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
                     if(W.communicator_id == 0 && !switched1) {
                         switched1 = true;
-
                         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                         std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
                         std::cout << "[N] Ended in skiplevel " << W.skiplevels << std::endl;
@@ -1125,4 +1125,250 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
         delete W.start_c;
         return;
     }
+}
+
+void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
+                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_size) {
+    // find comparison leaf
+    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+    sgraph *g = g_;
+    double cref;
+
+    bool *done = &switches->done;
+    bool *done_fast = &switches->done_fast;
+    int _shared_group_size = false;
+    mpermnode *_gens = nullptr;
+
+    if (config.CONFIG_THREADS_COPYG && !master) {
+        g = new sgraph;
+        g->copy_graph(g_);
+    }
+
+    std::vector<std::thread> work_threads;
+    bijection base_points;
+    bool trash_bool = false;
+    int trash_int = 0;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id + 3) * 5135235);
+    //std::cout << seed << std::endl;
+    //std::default_random_engine re = std::default_random_engine(seed);
+    int selector_seed = seed;
+    com_pad pad;
+
+    // start_I.push_level();
+
+    auto_workspace W;
+    invariant start_I;
+    // bool* p = new bool[g->v_size * 2];
+    //W.first_level_fail.initialize_from_array(p, g->v_size);
+    //W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
+
+    W.first_level_fail.initialize(g->v_size);
+    W.first_level_succ.initialize(g->v_size);
+
+    W.dequeue_space = new std::pair<int, int>[2048];
+    W.dequeue_space_sz = 2048;
+    W.enqueue_space = new std::pair<int, int>[128];
+    W.enqueue_space_sz = 128; // <- choose this dynamic?
+
+    if (master) {
+        int** shrd_orbit_ = new (int*);
+        *shrd_orbit_ = nullptr;
+
+        canon_I = new invariant;
+        canon_leaf = new bijection;
+        start_c = new coloring;
+        g->initialize_coloring(start_c);
+        W.start_c = start_c;
+        start_I.create_vector();
+        W.R.refine_coloring_first(g, start_c, -1);
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+
+        find_automorphism_prob(&W, g, false, canon_I, canon_leaf, &base_points, &trash_int, switches,
+                               selector_seed);
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "[T] Canonical leaf found: " << cref / 1000000.0 << "ms" << std::endl;
+        G = new diy_group(g->v_size);
+        base_points.not_deletable();
+        W.my_base_points    = base_points.map;
+        W.my_base_points_sz = base_points.map_sz;
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - timer).count());
+        G->initialize(g->v_size, &base_points);
+        std::cout << "[T] Group created: " << cref / 1000000.0 << "ms" << std::endl;
+
+        // initialize BFS
+        bfs_element *root_elem = new bfs_element;
+        root_elem->id = 0;
+        root_elem->c = new coloring;
+        root_elem->I = new invariant;
+        root_elem->c->copy_force(start_c);
+        root_elem->base_sz = 0;
+        *root_elem->I = start_I;
+        W.S.empty_cache();
+        int init_c = W.S.select_color(g, start_c, selector_seed);
+
+        W.BW = new bfs();
+        W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
+        bwork = W.BW;
+
+        //std::cout << "Launching refinement worker..." << std::endl;
+        for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+            work_threads.emplace_back(
+                    std::thread(&auto_blaster::sample_shared, auto_blaster(), g, false, switches, G, start_c,
+                                canon_leaf, canon_I, &pad, i, shrd_orbit_, W.BW, &_gens, &_shared_group_size));
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - timer).count());
+        std::cout << "[T] Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
+
+        W.start_c = new coloring;
+        W.start_c->copy_force(start_c);
+        W.communicator_pad       = &pad;
+        W.communicator_id        = -1;
+        W.shared_orbit           = shrd_orbit_;
+        W.shared_generators      = &_gens;
+        W.shared_generators_size = &_shared_group_size;
+    }
+
+    int sampled_paths = 0;
+    int restarts = 0;
+    int idle_ms = 0;
+    invariant *_canon_I;
+    bijection *_canon_leaf;
+    bool switched1 = false;
+    bool switched2 = false;
+
+    W.skip_c.copy_force(start_c);
+    W.work_c = new coloring;
+    W.work_I = new invariant;
+    W.G_ = G;
+    W.BW = bwork;
+
+    if (!master) {
+        W.shared_orbit = shared_orbit;
+        W.start_c = new coloring;
+        W.start_c->copy_force(start_c);
+        W.communicator_pad = communicator_pad;
+        W.communicator_id = communicator_id;
+        W.base_size = G->base_size;
+        W.shared_generators = gens;
+        W.shared_generators_size = shared_group_size;
+
+        _canon_I = new invariant;
+        _canon_I->create_vector();
+        _canon_leaf = new bijection;
+
+        W.skiplevels = 0;
+
+        if (W.skiplevels == G->base_size - 1) {
+            if (communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search" << std::endl;
+            //G->skip_shared_group();
+            switched1 = true;
+            *done_fast = true;
+        } else {
+            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches, selector_seed);
+            W.my_base_points = base_points.map;
+            W.my_base_points_sz = base_points.map_sz;
+            std::cout << "Found canonical leaf." << std::endl;
+        }
+    } else {
+        _canon_I    = canon_I;
+        _canon_leaf = canon_leaf;
+    }
+
+    int earliest_found = -1;
+    int n_found = 0;
+    while(!(*done)) {
+        if(switches->done_fast)
+            G->ack_done_shared();
+        bijection automorphism;
+        //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
+        if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
+            fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
+            //std::cout << "Found automorphism." << std::endl;
+            n_found += 1;
+            if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
+                W.skiplevels += 1;
+            if((*done_fast && !automorphism.non_uniform )) continue;
+            // set target level to earliest found automorphism skiplevel
+            if(earliest_found < 0 && communicator_id == -1) {
+                int proposed_level = W.skiplevels + 1;
+                if(proposed_level == G->base_size)
+                    proposed_level += 1;
+                W.BW->BW.target_level.store(proposed_level);
+                earliest_found = W.skiplevels;
+            }
+        } else if(W.BW->BW.current_level != W.BW->BW.target_level) {
+            if(communicator_id == -1 && W.BW->BW.target_level < 0) {
+                int proposed_level = W.skiplevels + 1;
+                if(proposed_level == G->base_size)
+                    proposed_level += 1;
+                W.BW->BW.target_level.store(proposed_level);
+            }
+            if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
+                if(W.communicator_id == 0 && !switched1) {
+                    switched1 = true;
+
+                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                    std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
+                    std::cout << "[N] Ended in skiplevel " << W.skiplevels << std::endl;
+                    std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
+                    std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
+                }
+                bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
+                if(master)
+                    bwork->work_queues();
+            }
+            continue;
+        } else {
+            if(W.communicator_id == 0 && !switched2) {
+                switched2 = true;
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::high_resolution_clock::now() - timer).count());
+                std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
+            }
+            find_automorphism_from_bfs(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
+        }
+
+        if(switches->done)
+            return;
+
+        automorphism.not_deletable();
+        bool test = G->add_permutation(&automorphism, &idle_ms, done);
+        automorphism.map = new int[g->v_size];
+        sampled_paths += 1;
+
+        if(master) {
+            G->manage_results(switches);
+            if(switches->done_fast && !switches->done_shared_group) {
+                // ToDo: wait for ack of done_fast
+                G->ack_done_shared();
+                G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+                *W.shared_generators      = G->gens;
+                *W.shared_orbit           = G->gp->orbits;
+                *W.shared_generators_size = G->gens_added;
+                switches->done_shared_group = true;
+            }
+            if(switches->done) {
+                std::cout << "Base size:  " << G->base_size << std::endl;
+                while(!work_threads.empty()) {
+                    work_threads[work_threads.size()-1].join();
+                    work_threads.pop_back();
+                }
+                std::cout << "Group size: ";
+                G->print_group_size();
+                std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
+                break;
+            }
+        }
+    }
+
+    if(master)
+        delete G;
+    //delete W.start_c;
+    return;
 }

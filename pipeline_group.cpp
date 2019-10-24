@@ -45,9 +45,9 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
     if(is_first_stage) {
         delete[] w->dequeue_space;
         delete[] w->enqueue_space;
-        w->dequeue_space = new std::tuple<int, int>[1024];
+        w->dequeue_space = new std::pair<int, int>[1024];
         w->dequeue_space_sz = 1024;
-        w->enqueue_space = new std::tuple<int, int>[2049];
+        w->enqueue_space = new std::pair<int, int>[2049];
         w->enqueue_space_sz = 2049;
         w->first_level = 1;
         int c = w->S.select_color_largest(w->start_c);
