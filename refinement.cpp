@@ -176,12 +176,13 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     bool comp = true;
     int cc = color_class; // iterate over color class
     counting_array.reset();
+    int i, vc, pe, end_i;
 
     while (cc < color_class + class_size) { // increment value of neighbours of vc by 1
-        int vc = c->lab[cc];
-        int pe = g->v[vc];
-        int end_i = pe + g->d[vc];
-        for (int i = pe; i < end_i; i++) {
+        vc = c->lab[cc];
+        pe = g->v[vc];
+        end_i = pe + g->d[vc];
+        for (i = pe; i < end_i; i++) {
             // v is a neighbour of vc
             int v   = g->e[i];
             int col = c->vertex_to_col[v];

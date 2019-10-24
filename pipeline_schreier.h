@@ -75,7 +75,7 @@ extern mpermnode *mfindpermutation(mpermnode *gens, int *p, int n);
 extern bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_element* element);
 extern boolean mfilterschreier(mschreier *, int *, mpermnode **, boolean, int, int);
 extern boolean mfilterschreier_interval(mschreier *, int *, mpermnode **, boolean, int, int, int, int, filterstate* state);
-extern boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring, boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state);
+extern boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring, boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level);
 void free_random_element(random_element* r);
 extern boolean maddgenerator(mschreier **gp, mpermnode **gens, int *p, int n);
 extern boolean

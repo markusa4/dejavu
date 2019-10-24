@@ -773,7 +773,7 @@ boolean mfilterschreier_interval(mschreier *gp, int *p, mpermnode **ring,
 
 
 boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
-                                 boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state)
+                                 boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level)
 /* Interval version for pipelining:
  * if startlevel = 0,        initialize all DS
  * if endlevel   = maxlevel, delete all DS and return properly
@@ -793,6 +793,8 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
     bool loop_break;
     mpermnode **vec, *curr;
     boolean changed, lchanged, ident;
+
+    boolean report_changed = FALSE;
 
     DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     if (maxlevel < 0) maxlevel = n + 1;
@@ -905,20 +907,26 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
             sh = sh->next;
         } else {
             loop_break = true;
+            if(lev <= reported_change_level)
+                report_changed = changed;
             break;
         }
+        if(lev <= reported_change_level)
+            report_changed = changed;
     }
 
     if(endlevel == maxlevel) {
         if (!ident && !ingroup) {
             changed = TRUE;
+            report_changed = changed;
             maddpermutation(ring, p, n);
         }
 
         DYNFREE(mworkperm, mworkperm_sz);
-        return changed;
+        return report_changed;
     } else {
         //assert(false);
+        DYNFREE(mworkperm, mworkperm_sz);
         state->sh   = sh;
         state->orbits = orbits;
         state->pwr  = pwr;
@@ -931,7 +939,7 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
         state->loop_break = loop_break;
         state->workperm = mworkperm;
         state->workperm_sz = mworkperm_sz;
-        return true;
+        return report_changed;
     }
 }
 

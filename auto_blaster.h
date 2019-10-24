@@ -23,11 +23,11 @@ class pipeline_group;
 
 struct alignas(64) auto_workspace {
     refinement R;
-    selector S;
-    coloring c;
-    invariant I;
+    selector   S;
+    coloring   c;
+    invariant  I;
 
-    coloring* work_c;
+    coloring*  work_c;
     invariant* work_I;
 
     work_set first_level_fail;
@@ -38,9 +38,10 @@ struct alignas(64) auto_workspace {
     int first_level_succ_point = -1;
     int skiplevels = 1;
 
-    int first_skiplevel = 1;
-    coloring  skip_c;
-    invariant skip_I;
+    int        first_skiplevel = 1;
+    coloring   skip_c;
+    invariant  skip_I;
+    mschreier* skip_schreier_level;
 
     std::pair<int, int>* dequeue_space;
     int dequeue_space_sz = 0;
@@ -53,6 +54,7 @@ struct alignas(64) auto_workspace {
 
     int* my_base_points;
     int  my_base_points_sz;
+    bool is_foreign_base;
 
     // shared state
     moodycamel::ConsumerToken* ctok;
@@ -64,13 +66,13 @@ struct alignas(64) auto_workspace {
 
     coloring* start_c;
     invariant start_I;
-    com_pad* communicator_pad;
-    int communicator_id;
+    com_pad*  communicator_pad;
+    int       communicator_id;
 
     // shared orbit and generators
-    int** shared_orbit;
+    int**       shared_orbit;
     mpermnode** shared_generators;
-    int* shared_generators_size;
+    int*        shared_generators_size;
 
     //
     work_set  orbit_considered;
@@ -78,7 +80,7 @@ struct alignas(64) auto_workspace {
     work_list orbit;
     int canonical_v;
     mpermnode** generator_fix_base;
-    int generator_fix_base_size;
+    int         generator_fix_base_size;
 
     // bfs workspace
     bfs* BW;

@@ -3,6 +3,7 @@
 //
 
 #include <iostream>
+#include <tgmath.h>
 #include "diy_group.h"
 #include "configuration.h"
 
@@ -79,9 +80,18 @@ bool diy_group::add_permutation(bijection *p, int *idle_ms, bool *done) {
     state.counts_towards_abort = !p->non_uniform;
     state.level = -1;
     state.stype = p->non_uniform?SIFT_NON_UNIFORM:SIFT_UNIFORM;
-    bool result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup?TRUE:FALSE), domain_size + 1, domain_size, state.level + 1, domain_size + 1, &state);
-    sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
-    return false;
+    bool result;
+    if(!p->foreign_base) {
+        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
+                                             domain_size, state.level + 1, domain_size + 1, &state, domain_size + 1);
+        sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
+    } else {
+        // finish sift, but return change according to sqrt(base) first levels such that we can switch to mor efficient base
+        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
+                                             domain_size, state.level + 1, sqrt(base_size + 1) + 1, &state, domain_size + 1);
+        //sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
+    }
+    return result;
 }
 
 void diy_group::ack_done_shared() {
@@ -110,6 +120,8 @@ void diy_group::print_group_size() {
 int diy_group::number_of_generators() {
     int k = 0;
     mpermnode *it = gens;
+    if(it == NULL)
+        return k;
     do {
         k += 1;
         it = it->next;
