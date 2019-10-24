@@ -1337,18 +1337,19 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
 
         automorphism.not_deletable();
         bool test = G->add_permutation(&automorphism, &idle_ms, done);
+        delete[] automorphism.map;
         automorphism.map = new int[g->v_size];
         sampled_paths += 1;
 
         if(master) {
             G->manage_results(switches);
             if(switches->done_fast && !switches->done_shared_group) {
-                // ToDo: wait for ack of done_fast
+                // wait for ack of done_fast
                 G->ack_done_shared();
                 G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
                 *W.shared_generators      = G->gens;
                 *W.shared_orbit           = G->gp->orbits;
-                *W.shared_generators_size = G->gens_added;
+                *W.shared_generators_size = G->number_of_generators();
                 switches->done_shared_group = true;
             }
             if(switches->done) {

@@ -106,3 +106,14 @@ void diy_group::print_group_size() {
     //deleteunmarked(&gens);
     std::cout << "Generators: " << mschreier_gens(gens) << std::endl;
 }
+
+int diy_group::number_of_generators() {
+    int k = 0;
+    mpermnode *it = gens;
+    do {
+        k += 1;
+        it = it->next;
+    } while (it != gens);
+
+    return k;
+}

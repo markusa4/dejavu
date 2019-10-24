@@ -649,7 +649,7 @@ cumulative_counting::~cumulative_counting() {
 }
 
 void work_set::initialize(int size) {
-    s = new bool[size + 64];
+    s = new bool[size];
     //s.reserve(size);
     for(int i = 0; i < size; i++) {
         s[i] = false;
@@ -657,6 +657,7 @@ void work_set::initialize(int size) {
     }
     reset_queue.initialize(size);
     init = true;
+    sz = size;
 }
 
 void work_set::initialize_from_array(bool* p, int size) {
@@ -671,6 +672,9 @@ void work_set::initialize_from_array(bool* p, int size) {
 }
 
 void work_set::set(int index) {
+    assert(init);
+    assert(index >= 0);
+    assert(index < sz);
     if(!s[index]) {
         s[index] = true;
         reset_queue.push(index);
@@ -679,12 +683,18 @@ void work_set::set(int index) {
 }
 
 bool work_set::get(int index) {
+    assert(init);
+    assert(index >= 0);
+    assert(index < sz);
     return s[index];
 }
 
 void work_set::reset() {
     while(!reset_queue.empty()) {
         int index = reset_queue.pop();
+        assert(init);
+        assert(index >= 0);
+        assert(index < sz);
         s[index] = false;
     }
 }
@@ -803,6 +813,7 @@ void work_list_pair::reset() {
 }
 
 void work_list_pair_bool::push_back(std::pair<std::pair<int, int>, bool> value) {
+    assert(arr_sz >= 0);
     arr[arr_sz] = value;
     arr_sz += 1;
 }

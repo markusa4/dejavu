@@ -66,6 +66,7 @@ private:
     //std::vector<bool> s;
     bool init = false;
     bool* s;
+    int sz;
 };
 
 class work_list {

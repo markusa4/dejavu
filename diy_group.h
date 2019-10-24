@@ -48,7 +48,7 @@ public:
     bool add_permutation(bijection* p, int* idle_ms, bool* done);
     void print_group_size();
     void manage_results(shared_switches* switches);
-
+    int number_of_generators();
     void wait_for_ack_done_shared(int n);
 
     void ack_done_shared();
