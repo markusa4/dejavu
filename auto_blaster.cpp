@@ -549,14 +549,16 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             //if(w->skiplevels > 0)
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
-            if(*restarts % 10 == 0)
+            if(*restarts % 10 == 0) {
                 w->skiplevels += 1;
+            }
             S->empty_cache();
             if(w->first_skiplevel <= w->skiplevels) {
                 proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1]);
                 w->first_skiplevel += 1;
-                if(!w->is_foreign_base)
+                if(!w->is_foreign_base) {
                     w->skip_schreier_level = w->skip_schreier_level->next;
+                }
             }
 
             // initialize a search state
@@ -1294,6 +1296,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
 
     int earliest_found = -1;
     int n_found = 0;
+    int n_restarts = 0;
     bool foreign_base_done = master;
 
     while(!(*done)) {
@@ -1305,13 +1308,16 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             if(!foreign_base_done) {
                 fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
                 automorphism.foreign_base = true;
+                n_found += 1;
+                n_restarts += restarts;
             } else {
                 fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
                 automorphism.foreign_base = false;
+                n_restarts += restarts;
                 //std::cout << "found" << std::endl;
             }
             n_found += 1;
-            if(n_found % 5 == 0 && W.skiplevels < W.my_base_points_sz)
+            if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
                 W.skiplevels += 1;
             if((*done_fast && !automorphism.non_uniform )) continue;
             // set target level to earliest found automorphism skiplevel
@@ -1333,8 +1339,8 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 if(W.communicator_id == 0 && !switched1) {
                     switched1 = true;
                     cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                    std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators)" << std::endl;
-                    std::cout << "[N] Ended in skiplevel " << W.skiplevels << std::endl;
+                    std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators, " << n_restarts << " restarts)" << std::endl;
+                    std::cout << "[N] Ended in skiplevel " << W.skiplevels << ", found " << n_found << std::endl;
                     std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                     std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
                 }
@@ -1372,7 +1378,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             W.my_base_points_sz = G->base_size;
             W.is_foreign_base   = false;
             foreign_base_done = true;
-            std::cout << "[N] Switching to canonical search (" << W.communicator_id << ")" << std::endl;
+            std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
         }
         // ToDo: sift random elements!
         delete[] automorphism.map;

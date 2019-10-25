@@ -130,7 +130,7 @@ static mpermnode
 {
     mpermnode *p;
 
-    while (mpermnode_freelist) {
+    /*while (mpermnode_freelist) {
         p = mpermnode_freelist;
         mpermnode_freelist = p->next;
         if (p->nalloc >= n && p->nalloc <= n + 100) {
@@ -139,7 +139,7 @@ static mpermnode
             return p;
         } else
             free(p);
-    }
+    }*/
 
     p = (mpermnode *) malloc(sizeof(mpermnode) + (n - 2) * sizeof(int));
 
@@ -148,6 +148,7 @@ static mpermnode
         exit(1);
     }
 
+    p->next_lock = new std::mutex;
     p->next = p->prev = NULL;
     p->nalloc = n;
 
@@ -269,20 +270,28 @@ maddpermutation(mpermnode **ring, int *p, int n)
     mpermnode *pn, *rn;
 
     pn = mnewpermnode(n);
-    rn = *ring;
+    pn->next_lock->lock();
+    pn->next = NULL;
 
     memcpy(pn->p, p, n * sizeof(int));
-    if (!rn)
-        pn->next = pn->prev = pn;
-    else {
+
+    bool t = circ_mutex.try_lock();
+    if(!t) {
+        //std::cout << "lock contention circ" << std::endl;
+        circ_mutex.lock();
+    }
+    rn = *ring;
+    if (!rn) {
+        pn->next = pn;
+    } else {
         pn->next = rn->next;
-        pn->prev = rn;
-        rn->next = pn->next->prev = pn;
+        rn->next = pn;
     }
 
     pn->refcount = 0;
     pn->mark = 1;
     *ring = pn;
+    circ_mutex.unlock();
 }
 
 /************************************************************************/
@@ -793,8 +802,13 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
     bool loop_break;
     mpermnode **vec, *curr;
     boolean changed, lchanged, ident;
-
     boolean report_changed = FALSE;
+
+    mpermnode** r = ring;
+    //std::cout << r << std::endl;
+    //if(*r != NULL)
+    //    for(i = 0; i < KRAN(16); ++i)
+    //        r = &((*r)->next);
 
     DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     if (maxlevel < 0) maxlevel = n + 1;
@@ -841,22 +855,27 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
         pwr = sh->pwr;
 
         if(lev == 0) { // orbit algorithm
-            sh->level_lock->lock();
-            for (i = 0; i < n; ++i) {
-                j1 = orbits[i];
-                while (orbits[j1] != j1) j1 = orbits[j1];
-                j2 = orbits[mworkperm[i]];
-                while (orbits[j2] != j2) j2 = orbits[j2];
+            bool test = sh->level_lock->try_lock();
+           // if(!test)
+               // std::cout << "lock contention " << lev << std::endl;
+            if(test) {
+                //sh->level_lock->lock();
+                for (i = 0; i < n; ++i) {
+                    j1 = orbits[i];
+                    while (orbits[j1] != j1) j1 = orbits[j1];
+                    j2 = orbits[mworkperm[i]];
+                    while (orbits[j2] != j2) j2 = orbits[j2];
 
-                if (j1 != j2) {
-                    lchanged = TRUE;
-                    if (j1 < j2) orbits[j2] = j1;
-                    else orbits[j1] = j2;
+                    if (j1 != j2) {
+                        lchanged = TRUE;
+                        if (j1 < j2) orbits[j2] = j1;
+                        else orbits[j1] = j2;
+                    }
                 }
+                if (lchanged)
+                    for (i = 0; i < n; ++i) orbits[i] = orbits[orbits[i]];
+                sh->level_lock->unlock();
             }
-            if (lchanged)
-                for (i = 0; i < n; ++i) orbits[i] = orbits[orbits[i]];
-            sh->level_lock->unlock();
         }
 
         if (lchanged) changed = TRUE;
@@ -870,23 +889,39 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
                 int i = sh->fixed_orbit[ii];
                 if (vec[i] && !vec[mworkperm[i]]) {
                     // acquire sh->level lock here
-                    sh->level_lock->lock();
+                    bool test = sh->level_lock->try_lock();
+                  //  if(!test)
+                   //     std::cout << "lock contention " << lev << std::endl;
+                    if(!test)
+                        sh->level_lock->lock();
                     if (vec[i] && !vec[mworkperm[i]]) { // need to check again, though (data race possible)
                         changed = TRUE;
                         ipwr = 0;
                         for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
                         for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
-                            circ_mutex.lock();
                             if (!curr) {
-                                if (!ingroup) maddpermutation(ring, mworkperm, n);
-                                else maddpermutationunmarked(ring, mworkperm, n);
+                                //else
+                                //circ_mutex.lock();
+                                //mpermnode* lock_r = *r;
+                                /*if(lock_r != NULL) {
+                                    //std::cout << "lock " << lock_r->next_lock << std::endl;
+                                    lock_r->next_lock->lock();
+                                }*/
+                                if (!ingroup) maddpermutation(r, mworkperm, n);
+                                else maddpermutationunmarked(r, mworkperm, n);
                                 ingroup = TRUE;
-                                curr = *ring;
+                                curr = *r;
+                                //(*r)->next_lock->unlock();
+                                /*if(lock_r != NULL) {
+                                    //std::cout << "unlock " << lock_r->next_lock << std::endl;
+                                    lock_r->next_lock->unlock();
+                                }*/
+                                //else
+                                //circ_mutex.unlock();
                             }
                             vec[j] = curr;
                             pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
                             ++curr->refcount;
-                            circ_mutex.unlock();
                             assert(sh->fixed_orbit_sz < n);
                             assert(sh->fixed_orbit_sz >= 0);
                             sh->fixed_orbit[sh->fixed_orbit_sz] = j;
@@ -917,6 +952,8 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
 
     if(endlevel == maxlevel) {
         if (!ident && !ingroup) {
+            std::cout << "should not happen" << std::endl;
+            assert(false);
             changed = TRUE;
             report_changed = changed;
             maddpermutation(ring, p, n);

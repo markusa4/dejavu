@@ -8,6 +8,7 @@
 #include "nauty/nauty.h"
 #include "nauty/naurng.h"
 #include <mutex>
+#include <atomic>
 
 #define DYNALLSTAT_NOSTATIC(type,name,name_sz) \
 	type *name; size_t name_sz=0;
@@ -17,9 +18,10 @@ enum sift_type {SIFT_UNIFORM, SIFT_NON_UNIFORM, SIFT_RANDOM};
 typedef struct mpermnodestruct
 {
     struct mpermnodestruct *prev,*next;   /* prev&next in circular list */
-    unsigned long refcount;              /* number of references */
+    std::atomic<int> refcount;              /* number of references */
     int nalloc;                          /* size of p[] in ints,
                                             <= 0 for a perm marker */
+    std::mutex* next_lock;
     int mark;                            /* a mark, 0 unless changed */
     int p[2];                            /* actual vector, extended to
                                             nalloc enties */

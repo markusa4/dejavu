@@ -88,7 +88,7 @@ bool diy_group::add_permutation(bijection *p, int *idle_ms, bool *done) {
     } else {
         // finish sift, but return change according to sqrt(base) first levels such that we can switch to mor efficient base
         result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
-                                             domain_size, state.level + 1, sqrt(base_size + 1) + 1, &state, domain_size + 1);
+                                             domain_size, state.level + 1, sqrt(base_size + 1) + 1, &state, domain_size + 1); // sqrt(base_size + 1) + 1
         //sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
     }
     return result;
@@ -124,6 +124,7 @@ int diy_group::number_of_generators() {
         return k;
     do {
         k += 1;
+       // std::cout << it->next << std::endl;
         it = it->next;
     } while (it != gens);
 

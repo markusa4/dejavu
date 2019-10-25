@@ -5,9 +5,11 @@
 #include "ir_tools.h"
 #include "auto_blaster.h"
 #include <assert.h>
+
 extern "C" {
 #include "nauty/traces.h"
 }
+
 #include "nauty/naugroup.h"
 #include "configuration.h"
 #include <chrono>
@@ -15,10 +17,12 @@ extern "C" {
 #include <fstream>
 
 typedef std::chrono::high_resolution_clock Clock;
+
 class time_point;
+
 configstruct config;
 
-void label_graph(sgraph* g, bijection* canon_p) {
+void label_graph(sgraph *g, bijection *canon_p) {
     coloring c;
     g->initialize_coloring(&c);
     std::cout << "------------------" << std::endl;
@@ -27,21 +31,21 @@ void label_graph(sgraph* g, bijection* canon_p) {
     IR.label_graph(g, canon_p);
 }
 
-void bench_nauty(sgraph* g) {
+void bench_nauty(sgraph *g) {
     //TracesStats stats;
     statsblk stats;
     sparsegraph sg;
 
-    DYNALLSTAT(int,lab,lab_sz);
-    DYNALLSTAT(int,ptn,ptn_sz);
-    DYNALLSTAT(int,orbits,orbits_sz);
+    DYNALLSTAT(int, lab, lab_sz);
+    DYNALLSTAT(int, ptn, ptn_sz);
+    DYNALLSTAT(int, orbits, orbits_sz);
     //static DEFAULTOPTIONS_SPARSEGRAPH(options);
 
     SG_INIT(sg);
     int m = SETWORDSNEEDED(g->v_size);
-    nauty_check(WORDSIZE,m,g->v_size,NAUTYVERSIONID);
-    SG_ALLOC(sg,g->v_size,g->e_size,"malloc");
-    sg.nv  = g->v_size;
+    nauty_check(WORDSIZE, m, g->v_size, NAUTYVERSIONID);
+    SG_ALLOC(sg, g->v_size, g->e_size, "malloc");
+    sg.nv = g->v_size;
     sg.nde = g->e_size;
     //static DEFAULTOPTIONS_TRACES(options);
     static DEFAULTOPTIONS_SPARSEGRAPH(options);
@@ -50,11 +54,11 @@ void bench_nauty(sgraph* g) {
     options.defaultptn = false;
     //options.writeautoms = true;
 
-    DYNALLOC1(int,lab,lab_sz,sg.nv,"malloc");
-    DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
-    DYNALLOC1(int,orbits,orbits_sz,sg.nv,"malloc");
+    DYNALLOC1(int, lab, lab_sz, sg.nv, "malloc");
+    DYNALLOC1(int, ptn, ptn_sz, sg.nv, "malloc");
+    DYNALLOC1(int, orbits, orbits_sz, sg.nv, "malloc");
 
-    for(int i = 0; i < g->v_size; ++i) {
+    for (int i = 0; i < g->v_size; ++i) {
         lab[i] = i;
         ptn[i] = 1;
         sg.v[i] = g->v[i];
@@ -63,44 +67,44 @@ void bench_nauty(sgraph* g) {
 
     ptn[g->v_size - 1] = 0;
 
-    for(int i = 0; i < g->e_size; ++i) {
+    for (int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
     }
-    sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
+    sparsenauty(&sg, lab, ptn, orbits, &options, &stats, NULL);
     std::cout << "Group size: ";
-    writegroupsize(stdout,stats.grpsize1,stats.grpsize2);
+    writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
     std::cout << std::endl;
     //Traces(&sg,lab,ptn,orbits,&options,&stats,NULL);
 }
 
-void bench_traces(sgraph* g) {
+void bench_traces(sgraph *g) {
     TracesStats stats;
     //statsblk stats;
     sparsegraph sg;
 
-    DYNALLSTAT(int,lab,lab_sz);
-    DYNALLSTAT(int,ptn,ptn_sz);
-    DYNALLSTAT(int,orbits,orbits_sz);
+    DYNALLSTAT(int, lab, lab_sz);
+    DYNALLSTAT(int, ptn, ptn_sz);
+    DYNALLSTAT(int, orbits, orbits_sz);
     //static DEFAULTOPTIONS_SPARSEGRAPH(options);
 
     SG_INIT(sg);
     int m = SETWORDSNEEDED(g->v_size);
-    nauty_check(WORDSIZE,m,g->v_size,NAUTYVERSIONID);
-    SG_ALLOC(sg,g->v_size,g->e_size,"malloc");
-    sg.nv  = g->v_size;
+    nauty_check(WORDSIZE, m, g->v_size, NAUTYVERSIONID);
+    SG_ALLOC(sg, g->v_size, g->e_size, "malloc");
+    sg.nv = g->v_size;
     sg.nde = g->e_size;
     static DEFAULTOPTIONS_TRACES(options);
-   // static DEFAULTOPTIONS_SPARSEGRAPH(options);
+    // static DEFAULTOPTIONS_SPARSEGRAPH(options);
     //options.schreier = true;
     //options.writeautoms = true;
     schreier_fails(10);
     options.defaultptn = false;
 
-    DYNALLOC1(int,lab,lab_sz,sg.nv,"malloc");
-    DYNALLOC1(int,ptn,ptn_sz,sg.nv,"malloc");
-    DYNALLOC1(int,orbits,orbits_sz,sg.nv,"malloc");
+    DYNALLOC1(int, lab, lab_sz, sg.nv, "malloc");
+    DYNALLOC1(int, ptn, ptn_sz, sg.nv, "malloc");
+    DYNALLOC1(int, orbits, orbits_sz, sg.nv, "malloc");
 
-    for(int i = 0; i < g->v_size; ++i) {
+    for (int i = 0; i < g->v_size; ++i) {
         lab[i] = i;
         ptn[i] = 1;
         sg.v[i] = g->v[i];
@@ -109,17 +113,17 @@ void bench_traces(sgraph* g) {
 
     ptn[g->v_size - 1] = 0;
 
-    for(int i = 0; i < g->e_size; ++i) {
+    for (int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
     }
     //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
-    Traces(&sg,lab,ptn,orbits,&options,&stats,NULL);
+    Traces(&sg, lab, ptn, orbits, &options, &stats, NULL);
     std::cout << "Group size: ";
-    writegroupsize(stdout,stats.grpsize1,stats.grpsize2);
+    writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
     std::cout << std::endl;
 }
 
-int commandline_mode(int argc, char** argv) {
+int commandline_mode(int argc, char **argv) {
     std::string filename = "";
     bool entered_file = false;
     std::fstream stat_file;
@@ -211,12 +215,12 @@ int commandline_mode(int argc, char** argv) {
         }
     }
 
-    if(!entered_file) {
+    if (!entered_file) {
         std::cerr << "--file not specified" << std::endl;
         return 1;
     }
     parser p;
-    sgraph* g = new sgraph;
+    sgraph *g = new sgraph;
     p.parse_dimacs_file_digraph(filename, g);
 
     //sleep(1);
@@ -230,7 +234,7 @@ int commandline_mode(int argc, char** argv) {
     int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
-    for(int i = 0; i < repeat; ++i) {
+    for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
         auto_blaster A;
         shared_switches switches;
@@ -239,9 +243,10 @@ int commandline_mode(int argc, char** argv) {
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
                 //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
+                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr, nullptr,
+                                nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-               // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
+                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }
@@ -271,23 +276,23 @@ int commandline_mode(int argc, char** argv) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare (nauty): "  << nauty_solve_time / avg << std::endl;
+    std::cout << "Compare (nauty): " << nauty_solve_time / avg << std::endl;
     std::cout << "Compare (Traces): " << traces_solve_time / avg << std::endl;
 
-    if(entered_stat_file) {
+    if (entered_stat_file) {
         stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
 
         // If file does not exist, Create new file
-        if (!stat_file )
-        {
+        if (!stat_file) {
             std::cout << "Creating new stat_file..";
 
-            stat_file.open(stat_filename,  std::fstream::in | std::fstream::out | std::fstream::trunc);
-            stat_file <<"V dejavu nauty Traces\n";
+            stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::trunc);
+            stat_file << "V dejavu nauty Traces\n";
 
         }// use existing file
-        std::cout<<"Appending to " << stat_filename << ".\n";
-        stat_file << g->v_size << " " << avg / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " " << traces_solve_time / 1000000.0 << "\n";
+        std::cout << "Appending to " << stat_filename << ".\n";
+        stat_file << g->v_size << " " << avg / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " "
+                  << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
 
@@ -295,35 +300,34 @@ int commandline_mode(int argc, char** argv) {
 }
 
 
-
 int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-   // return commandline_mode(argc, argv);
+    // return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
-      p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz/mz/mz-50", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-   // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
-      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
-    //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-3000-3", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
+    //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz/mz/mz-50", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
+    p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-10000-3", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
-   // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-      //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
-   // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
-     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
+    //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
-      //p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
@@ -333,23 +337,24 @@ int main(int argc, char *argv[]) {
     bijection pr;
     bijection::random_bijection(&pr, g.v_size);
     g.permute_graph(&_g, &pr); // permute graph
-   // _g = g;
+     _g = g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
-    for(int i = 0; i < repeat; ++i) {
+    for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
         auto_blaster A;
         shared_switches switches;
         if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-         //   A.sample(&_g, true, &done);
+            //   A.sample(&_g, true, &done);
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
                 //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
+                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr, nullptr,
+                                nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
-               // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
+                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
             } else {
                 std::cout << "Unknown IR_REFINEMENT." << std::endl;
             }
@@ -378,7 +383,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare (nauty): "  << nauty_solve_time / avg << std::endl;
+    std::cout << "Compare (nauty): " << nauty_solve_time / avg << std::endl;
     std::cout << "Compare (Traces): " << traces_solve_time / avg << std::endl;
     return 0;
 }
