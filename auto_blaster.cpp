@@ -545,13 +545,35 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     *I = *start_I;
     c->copy_force(start_c);
 
+
+    {
+        S->empty_cache();
+        while(w->first_skiplevel <= w->skiplevels) {
+            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr);
+            w->first_skiplevel += 1;
+            if(!w->is_foreign_base) {
+                w->skip_schreier_level = w->skip_schreier_level->next;
+            }
+        }
+
+        // initialize a search state
+        c->copy_force(start_c);
+        *I = *start_I;
+
+        backtrack    = false;
+        base_aligned = true;
+        level = w->first_skiplevel;
+        if(!w->is_foreign_base)
+            group_level = w->skip_schreier_level;
+    }
+
     while (true) {
         if(*done) return;
         if (backtrack) {
             //if(w->skiplevels > 0)
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
-            if(*restarts % 5 == 0) {
+            if(*restarts % 3 == 0) {
                 w->skiplevels += 1;
             }
             S->empty_cache();
@@ -646,6 +668,13 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             if(!w->is_foreign_base) {
                 if (group_level->vec[v] && base_aligned) {
                     v = group_level->fixed;// choose base point
+                    if(level == w->skiplevels + 1) {
+                        bool total_orbit = true;
+                        for(int i = s; i < s + c->ptn[s] + 1; ++i)
+                            total_orbit = total_orbit && group_level->vec[c->lab[i]];
+                        if(total_orbit)
+                            w->skiplevels += 1;
+                    }
                 } else {
                     base_aligned = false;
                 }
