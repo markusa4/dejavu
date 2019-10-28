@@ -878,8 +878,12 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
 
         if (sh->fixed >= 0) {
             if(sh->fixed_orbit_sz == 0) {
-                sh->fixed_orbit[0] = sh->fixed;
-                sh->fixed_orbit_sz += 1;
+                sh->level_lock->lock();
+                if(sh->fixed_orbit_sz == 0) {
+                    sh->fixed_orbit[0] = sh->fixed;
+                    sh->fixed_orbit_sz += 1;
+                }
+                sh->level_lock->unlock();
             }
             for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
                 int i = sh->fixed_orbit[ii];
@@ -1149,6 +1153,8 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
         orb = sh->orbits;
         fx = orb[sh->fixed];
         k = sh->fixed_orbit_sz;
+        if(k == 0)
+            k = 1;
        /* for (j = fx; j < n; ++j) if (orb[j] == fx) ++k;*/
         MULTIPLY(*grpsize1, *grpsize2, k);
     }

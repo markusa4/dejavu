@@ -811,7 +811,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
             }
 
             // compute next coloring
-            // ToDo: 
+            // ToDo: track changes and undo if !comp
             comp = comp && proceed_state(w, g, w->work_c, w->work_I, v);
         }
         // not equal to canonical invariant?

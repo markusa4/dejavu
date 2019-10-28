@@ -138,6 +138,21 @@ private:
     int cur_pos;
 };
 
+class change_tracker {
+    work_queue l;
+    work_set   s;
+    int    limit   = -1;
+    int       sz   = -1;
+    bool  overflow = false;
+public:
+    void initialize(int limit);
+    void reset();
+    int  track(int oldcolor);
+    int  pop();
+    bool did_overflow();
+};
+
+
 class refinement {
 public:
     bool refine_coloring(sgraph* g, coloring* c, std::list<std::pair<int, int>> *changes, invariant* I, int init_color_class, bool track_changes);
@@ -165,6 +180,8 @@ private:
     bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool *color_class_split_worklist);
 };
+
+
 
 
 #endif //BRUTUS_REFINEMENT_H
