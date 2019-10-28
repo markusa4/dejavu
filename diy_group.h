@@ -52,6 +52,8 @@ public:
     void wait_for_ack_done_shared(int n);
 
     void ack_done_shared();
+
+    void reset_ack_done_shared();
 };
 
 

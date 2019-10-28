@@ -549,7 +549,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             //if(w->skiplevels > 0)
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
-            if(*restarts % 10 == 0) {
+            if(*restarts % 5 == 0) {
                 w->skiplevels += 1;
             }
             S->empty_cache();
@@ -811,6 +811,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
             }
 
             // compute next coloring
+            // ToDo: 
             comp = comp && proceed_state(w, g, w->work_c, w->work_I, v);
         }
         // not equal to canonical invariant?
@@ -1142,40 +1143,28 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
     }
 }
 
-void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
+void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, bijection** canon_leaf, invariant** canon_I,
                                     com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_size) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
     double cref;
 
-    bool *done = &switches->done;
+    bool *done      = &switches->done;
     bool *done_fast = &switches->done_fast;
     int _shared_group_size = false;
-    mpermnode *_gens = nullptr;
+    mpermnode *_gens       = nullptr;
 
-    if (config.CONFIG_THREADS_COPYG && !master) {
-        g = new sgraph;
-        g->copy_graph(g_);
-    }
-
+    int* shrd_orbit;
     std::vector<std::thread> work_threads;
     bijection base_points;
-    bool trash_bool = false;
     int trash_int = 0;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id * 5) * 5135235);
-    //std::cout << seed << std::endl;
-    //std::default_random_engine re = std::default_random_engine(seed);
     int selector_seed = seed;
     com_pad pad;
 
-    // start_I.push_level();
-
     auto_workspace W;
     invariant start_I;
-    // bool* p = new bool[g->v_size * 2];
-    //W.first_level_fail.initialize_from_array(p, g->v_size);
-    //W.first_level_succ.initialize_from_array(p + g->v_size, g->v_size);
 
     W.first_level_fail.initialize(g->v_size);
     W.first_level_succ.initialize(g->v_size);
@@ -1186,12 +1175,19 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     if (master) {
-        int** shrd_orbit_ = new (int*);
-        *shrd_orbit_ = nullptr;
+        shrd_orbit = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i) {
+            shrd_orbit[i] = i;
+        }
 
-        canon_I = new invariant;
-        canon_leaf = new bijection;
-        start_c = new coloring;
+        int** shrd_orbit_ = new (int*);
+        *shrd_orbit_ = shrd_orbit;
+
+        switches->current_mode = modes::MODE_LEAF_TOURNAMENT;
+
+        canon_I    = new invariant*;
+        canon_leaf = new bijection*;
+        start_c    = new coloring;
         g->initialize_coloring(start_c);
         W.start_c = start_c;
         start_I.create_vector();
@@ -1200,37 +1196,12 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
 
-        find_automorphism_prob(&W, g, false, canon_I, canon_leaf, &base_points, &trash_int, switches,
-                               selector_seed);
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - timer).count());
-        std::cout << "[T] Canonical leaf found: " << cref / 1000000.0 << "ms" << std::endl;
+        // create some objects that are initialized after tournament
         G = new diy_group(g->v_size);
-        base_points.not_deletable();
-        W.my_base_points    = base_points.map;
-        W.my_base_points_sz = base_points.map_sz;
-        W.is_foreign_base   = false;
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - timer).count());
-        G->initialize(g->v_size, &base_points);
-        std::cout << "[T] Group created: " << cref / 1000000.0 << "ms" << std::endl;
-
-        // initialize BFS
-        bfs_element *root_elem = new bfs_element;
-        root_elem->id = 0;
-        root_elem->c = new coloring;
-        root_elem->I = new invariant;
-        root_elem->c->copy_force(start_c);
-        root_elem->base_sz = 0;
-        *root_elem->I = start_I;
-        W.S.empty_cache();
-        int init_c = W.S.select_color(g, start_c, selector_seed);
-
         W.BW = new bfs();
-        W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
         bwork = W.BW;
 
-        //std::cout << "Launching refinement worker..." << std::endl;
+        // launch worker threads
         for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(
                     std::thread(&auto_blaster::sample_shared, auto_blaster(), g, false, switches, G, start_c,
@@ -1239,6 +1210,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
 
+        // set some workspace variables
         W.start_c = new coloring;
         W.start_c->copy_force(start_c);
         W.communicator_pad       = &pad;
@@ -1270,93 +1242,175 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         W.start_c->copy_force(start_c);
         W.communicator_pad = communicator_pad;
         W.communicator_id = communicator_id;
-        W.base_size = G->base_size;
         W.shared_generators = gens;
         W.shared_generators_size = shared_group_size;
+    }
 
+    {
+        //W.base_size = G->base_size;
         _canon_I = new invariant;
         _canon_I->create_vector();
         _canon_leaf = new bijection;
-        if (W.skiplevels == G->base_size - 1) {
-            if (communicator_id == 0) std::cout << "[N] Skipped non-uniform automorphism search" << std::endl;
-            //G->skip_shared_group();
-            switched1 = true;
-            *done_fast = true;
-        } else {
+        {
             find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches, selector_seed);
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
-            std::cout << "[N] Experimental leaf computed." << std::endl;
         }
-    } else {
-        _canon_I    = canon_I;
-        _canon_leaf = canon_leaf;
+
+        // skip immediately if base size is 1
+        if(master && W.my_base_points_sz == 1) {
+            *canon_I    = _canon_I;
+            *canon_leaf = _canon_leaf;
+            G->initialize(g->v_size, &base_points);
+            bfs_element *root_elem = new bfs_element;
+            root_elem->id = 0;
+            root_elem->c = new coloring;
+            root_elem->I = new invariant;
+            root_elem->c->copy_force(start_c);
+            root_elem->base_sz = 0;
+            *root_elem->I = start_I;
+            W.S.empty_cache();
+            int init_c = W.S.select_color(g, start_c, selector_seed);
+            W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
+            switches->done_created_group = true;
+            int proposed_level = W.skiplevels + 1;
+            if(proposed_level == G->base_size)
+                proposed_level += 1;
+            W.BW->BW.target_level.store(proposed_level);
+            W.is_foreign_base = false;
+            W.skip_schreier_level = G->gp;
+            for(int i = 0; i < W.skiplevels; ++i)
+                W.skip_schreier_level = W.skip_schreier_level->next;
+            W.base_size = G->base_size;
+            *W.shared_generators_size = 0;
+            switches->done_shared_group = true;
+            switches->current_mode = modes::MODE_BFS;
+            std::cout << "[T] No tournament, created group by " << communicator_id << " with restarts " << restarts << std::endl;
+            // ToDo: create BFS and group here
+        } else if(W.my_base_points_sz == 1) {
+            // wait until shared group created
+            while(!switches->done_shared_group) continue;
+        }
     }
 
     int earliest_found = -1;
     int n_found = 0;
     int n_restarts = 0;
-    bool foreign_base_done = master;
+    bool foreign_base_done = false;
 
     while(!(*done)) {
         if(switches->done_fast)
             G->ack_done_shared();
         bijection automorphism;
         //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
-        if(config.CONFIG_IR_FAST_AUTOPRE && !(*done_fast)) { // detect when done
-            if(!foreign_base_done) {
+
+
+        switch(switches->current_mode) {
+            case modes::MODE_LEAF_TOURNAMENT:
                 fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
-                automorphism.foreign_base = true;
-                n_found += 1;
-                n_restarts += restarts;
-            } else {
-                fast_automorphism_non_uniform(g, true, canon_I, canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
-                automorphism.foreign_base = false;
-                n_restarts += restarts;
-                //std::cout << "found" << std::endl;
-            }
-            n_found += 1;
-            if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
-                W.skiplevels += 1;
-            if((*done_fast && !automorphism.non_uniform )) continue;
-            // set target level to earliest found automorphism skiplevel
-            if(earliest_found < 0 && communicator_id == -1) {
-                int proposed_level = W.skiplevels + 1;
-                if(proposed_level == G->base_size)
-                    proposed_level += 1;
-                W.BW->BW.target_level.store(proposed_level);
-                earliest_found = W.skiplevels;
-            }
-        } else if(W.BW->BW.current_level != W.BW->BW.target_level) {
-            if(communicator_id == -1 && W.BW->BW.target_level < 0) {
-                int proposed_level = W.skiplevels + 1;
-                if(proposed_level == G->base_size)
-                    proposed_level += 1;
-                W.BW->BW.target_level.store(proposed_level);
-            }
-            if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
-                if(W.communicator_id == 0 && !switched1) {
-                    switched1 = true;
-                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-                    std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators, " << n_restarts << " restarts)" << std::endl;
-                    std::cout << "[N] Ended in skiplevel " << W.skiplevels << ", found " << n_found << std::endl;
-                    std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
-                    std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
+                if(n_found == 0) { // check if I won
+                    // wait until everyone checked
+                    while(!switches->check_leaf_tournament(communicator_id, restarts) && !switches->done_created_group) continue;
+                    // check if I won, if yes: create group
+                    if(switches->done_created_group) continue;
+                    if(switches->win_id == communicator_id) {
+                        *canon_I    = _canon_I;
+                        *canon_leaf = _canon_leaf;
+                        G->initialize(g->v_size, &base_points);
+                        bfs_element *root_elem = new bfs_element;
+                        root_elem->id = 0;
+                        root_elem->c = new coloring;
+                        root_elem->I = new invariant;
+                        root_elem->c->copy_force(start_c);
+                        root_elem->base_sz = 0;
+                        *root_elem->I = start_I;
+                        W.S.empty_cache();
+                        int init_c = W.S.select_color(g, start_c, selector_seed);
+                        W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
+                        switches->done_created_group = true;
+                        int proposed_level = W.skiplevels + 1;
+                        if(proposed_level == G->base_size)
+                            proposed_level += 1;
+                        W.BW->BW.target_level.store(proposed_level);
+                        W.is_foreign_base = false;
+
+                        W.skip_schreier_level = G->gp;
+                        for(int i = 0; i < W.skiplevels; ++i)
+                            W.skip_schreier_level = W.skip_schreier_level->next;
+
+                        W.base_size = G->base_size;
+                        foreign_base_done = true;
+                        switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
+                        std::cout << "[T] Created group by " << communicator_id << " with restarts " << restarts << std::endl;
+                    }
+
+                    while(!(switches->done_created_group)) continue;
                 }
-                bfs_chunk(g, canon_I, canon_leaf, done, selector_seed, &W);
-                if(master)
-                    bwork->work_queues();
-            }
-            continue;
-        } else {
-            if(W.communicator_id == 0 && !switched2) {
-                switched2 = true;
-                cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::high_resolution_clock::now() - timer).count());
-                std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
-            }
-            find_automorphism_from_bfs(&W, g, true, canon_I, canon_leaf, &automorphism, &restarts, switches, selector_seed);
+                automorphism.foreign_base = true;
+                n_restarts += restarts;
+                n_found += 1;
+                if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
+                    W.skiplevels += 1;
+                if((*done_fast && !automorphism.non_uniform )) continue;
+                break;
+
+            case modes::MODE_NON_UNIFORM_PROBE:
+                if(!foreign_base_done) {
+                    fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                    automorphism.foreign_base = true;
+                    n_restarts += restarts;
+                } else {
+                    fast_automorphism_non_uniform(g, true, *canon_I, *canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                    automorphism.foreign_base = false;
+                    n_restarts += restarts;
+                }
+                n_found += 1;
+                if(n_found % 3 == 0 && W.skiplevels < W.my_base_points_sz)
+                    W.skiplevels += 1;
+                if((*done_fast && !automorphism.non_uniform )) continue;
+                    break;
+
+            case modes::MODE_BFS:
+                if(W.BW->BW.current_level != W.BW->BW.target_level) {
+                    if (communicator_id == -1 && W.BW->BW.target_level < 0) {
+                        int proposed_level = W.skiplevels + 1;
+                        if (proposed_level == G->base_size)
+                            proposed_level += 1;
+                        W.BW->BW.target_level.store(proposed_level);
+                    }
+                    if(switches->done_shared_group && W.BW->BW.target_level >= 0) {
+                        if(W.communicator_id == 0 && !switched1) {
+                            switched1 = true;
+                            cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                            std::cout << "[N] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators, " << n_restarts << " restarts)" << std::endl;
+                            std::cout << "[N] Ended in skiplevel " << W.skiplevels << ", found " << n_found << std::endl;
+                            std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
+                            std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
+                        }
+                        bfs_chunk(g, *canon_I, *canon_leaf, done, selector_seed, &W);
+                        if(master)
+                            bwork->work_queues();
+                    }
+                } else {
+                    if(master)
+                        switches->current_mode = modes::MODE_UNIFORM_PROBE;
+                }
+                continue;
+                break;
+
+            case modes::MODE_UNIFORM_PROBE:
+                if(W.communicator_id == 0 && !switched2) {
+                    switched2 = true;
+                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::high_resolution_clock::now() - timer).count());
+                    std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
+                }
+                find_automorphism_from_bfs(&W, g, true, *canon_I, *canon_leaf, &automorphism, &restarts, switches, selector_seed);
+                break;
+
+            case modes::MODE_WAIT:
+                continue;
         }
 
         if(switches->done)
@@ -1364,7 +1418,11 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
 
         automorphism.not_deletable();
         //std::cout << automorphism.foreign_base << std::endl;
-        bool test = G->add_permutation(&automorphism, &idle_ms, done);
+        bool test = true;
+        if(switches->done_created_group) {
+            test = G->add_permutation(&automorphism, &idle_ms, done);
+        }
+
         if(!test && !foreign_base_done) {
             //std::cout << "foreign base done" << std::endl;
             W.skip_c.copy_force(start_c);
@@ -1378,9 +1436,11 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             W.my_base_points_sz = G->base_size;
             W.is_foreign_base   = false;
             foreign_base_done = true;
-            std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
+            //std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
         }
-        // ToDo: sift random elements!
+
+        // ToDo: sift some random elements!
+
         delete[] automorphism.map;
         automorphism.map = new int[g->v_size];
         automorphism.foreign_base = false;
@@ -1392,12 +1452,14 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             if(switches->done_fast && !switches->done_shared_group) {
                 // wait for ack of done_fast
                 std::cout << "[N] Waiting for ACK" << std::endl;
+                switches->current_mode = modes::MODE_WAIT;
                 G->ack_done_shared();
                 G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
                 *W.shared_generators      = G->gens;
                 *W.shared_orbit           = G->gp->orbits;
                 *W.shared_generators_size = G->number_of_generators();
                 switches->done_shared_group = true;
+                switches->current_mode = modes::MODE_BFS;
             }
             if(switches->done) {
                 std::cout << "Base size:  " << G->base_size << std::endl;

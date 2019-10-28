@@ -102,6 +102,10 @@ void diy_group::ack_done_shared() {
     }
 }
 
+void diy_group::reset_ack_done_shared() {
+    _ack_done_shared_group = 0;
+}
+
 void diy_group::wait_for_ack_done_shared(int n) {
     while(_ack_done_shared_group != n)
         continue;

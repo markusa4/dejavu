@@ -275,11 +275,6 @@ maddpermutation(mpermnode **ring, int *p, int n)
 
     memcpy(pn->p, p, n * sizeof(int));
 
-    bool t = circ_mutex.try_lock();
-    if(!t) {
-        //std::cout << "lock contention circ" << std::endl;
-        circ_mutex.lock();
-    }
     rn = *ring;
     if (!rn) {
         pn->next = pn;
@@ -291,7 +286,6 @@ maddpermutation(mpermnode **ring, int *p, int n)
     pn->refcount = 0;
     pn->mark = 1;
     *ring = pn;
-    circ_mutex.unlock();
 }
 
 /************************************************************************/
@@ -586,10 +580,12 @@ boolean mfilterschreier(mschreier *gp, int *p, mpermnode **ring,
 
                     for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
                         if (!curr) {
+                            circ_mutex.lock();
                             if (!ingroup) maddpermutation(ring, mworkperm, n);
                             else maddpermutationunmarked(ring, mworkperm, n);
                             ingroup = TRUE;
                             curr = *ring;
+                            circ_mutex.unlock();
                         }
                         vec[j] = curr;
                         pwr[j] = ipwr--;
@@ -907,10 +903,12 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
                                     //std::cout << "lock " << lock_r->next_lock << std::endl;
                                     lock_r->next_lock->lock();
                                 }*/
+                                circ_mutex.lock();
                                 if (!ingroup) maddpermutation(r, mworkperm, n);
                                 else maddpermutationunmarked(r, mworkperm, n);
                                 ingroup = TRUE;
                                 curr = *r;
+                                circ_mutex.unlock(); // ToDo: create permnode BEFORE locking mutex!
                                 //(*r)->next_lock->unlock();
                                 /*if(lock_r != NULL) {
                                     //std::cout << "unlock " << lock_r->next_lock << std::endl;
@@ -919,9 +917,9 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
                                 //else
                                 //circ_mutex.unlock();
                             }
-                            vec[j] = curr;
                             pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
                             ++curr->refcount;
+                            vec[j] = curr;
                             assert(sh->fixed_orbit_sz < n);
                             assert(sh->fixed_orbit_sz >= 0);
                             sh->fixed_orbit[sh->fixed_orbit_sz] = j;

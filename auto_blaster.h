@@ -102,7 +102,7 @@ public:
                           com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_identity);
 
     void sample_shared(sgraph *g_, bool master, shared_switches *switches, diy_group *G, coloring *start_c,
-                       bijection *canon_leaf, invariant *canon_I, com_pad *communicator_pad, int communicator_id,
+                       bijection **canon_leaf, invariant **canon_I, com_pad *communicator_pad, int communicator_id,
                        int **shared_orbit, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
 private:
