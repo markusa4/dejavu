@@ -91,6 +91,7 @@ struct alignas(64) auto_workspace {
     std::tuple<bfs_element *, int>* todo_elements;
     int todo_elements_sz     = -1;
     bfs_element* prev_bfs_element = nullptr;
+    change_tracker changes;
     bool init_bfs = false;
 };
 
@@ -118,7 +119,7 @@ private:
                                                   bijection *canon_leaf, bijection *automorphism, int *restarts,
                                                   shared_switches *switches, int selector_seed);
 
-    bool proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v);
+    bool proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes);
 
     bool bfs_chunk(sgraph *g, invariant *canon_I, bijection *canon_leaf, bool *done,
               int selector_seed,

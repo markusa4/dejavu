@@ -35,7 +35,9 @@ int intRand(const int & min, const int & max, int seed) {
     return distribution(generator);
 }
 
-bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v) {
+bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes) {
+    if(changes != nullptr)
+        changes->track(c->vertex_to_col[v]);
     int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
@@ -45,7 +47,7 @@ bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, inva
     comp = comp && I->write_top_and_compare(INT32_MAX);
     if(!comp) return comp;
     //assert(comp);
-    comp = comp && w->R.refine_coloring(g, c, nullptr, I, init_color_class, false);
+    comp = comp && w->R.refine_coloring(g, c, changes, I, init_color_class, changes != nullptr);
     comp = comp && I->write_top_and_compare(INT32_MAX);
     comp = comp && I->write_top_and_compare(INT32_MIN);
     return comp;
@@ -335,7 +337,7 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
                 comp = comp && start_I->write_top_and_compare(INT32_MAX);
                 comp = comp && start_I->write_top_and_compare(INT32_MIN);*/
                 //std::cout << "proceed receive" << std::endl;
-                proceed_state(w, g, start_c, start_I, w->G->b[w->first_level - 1]);
+                proceed_state(w, g, start_c, start_I, w->G->b[w->first_level - 1], nullptr);
                 w->first_level += 1;
 
                 first_level_fail->reset();
@@ -554,7 +556,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             }
             S->empty_cache();
             if(w->first_skiplevel <= w->skiplevels) {
-                proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1]);
+                proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr);
                 w->first_skiplevel += 1;
                 if(!w->is_foreign_base) {
                     w->skip_schreier_level = w->skip_schreier_level->next;
@@ -780,6 +782,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         w->orbit_considered.initialize(g->v_size);
         w->orbit_vertex_worklist.initialize(g->v_size);
         w->generator_fix_base = new mpermnode*[*w->shared_generators_size];
+        w->changes.initialize((int) floor(sqrt(g->v_size)) + 1, g->v_size);
     }
 
     // try to dequeue a chunk of work
@@ -805,14 +808,20 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
                 *w->work_I = *elem->I;
                 w->work_I->set_compare_invariant(canon_I);
             } else {
-                w->work_c->copy(elem->c);
+                // ToDo: check if w->changes did not overflow
                 *w->work_I = *elem->I;
                 w->work_I->set_compare_invariant(canon_I);
+                //if(w->changes.did_overflow()) {
+                    w->work_c->copy(elem->c);
+                //} else {
+                  // w->R.undo_changes_with_reference(&w->changes, w->work_c, elem->c);
+                //};
             }
 
             // compute next coloring
             // ToDo: track changes and undo if !comp
-            comp = comp && proceed_state(w, g, w->work_c, w->work_I, v);
+            w->changes.reset();
+            comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr); // &w->changes
         }
         // not equal to canonical invariant?
         if (!comp) {
@@ -1291,6 +1300,10 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         } else if(W.my_base_points_sz == 1) {
             // wait until shared group created
             while(!switches->done_shared_group) continue;
+            while(!switches->current_mode == modes::MODE_BFS || !switches->current_mode == modes::MODE_UNIFORM_PROBE) continue;
+        } else {
+            // why is fast_automorphism called in ranreg?
+            //std::cout << W.my_base_points_sz << std::endl;
         }
     }
 

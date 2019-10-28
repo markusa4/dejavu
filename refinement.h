@@ -23,6 +23,7 @@ public:
     void initialize(int size);
     void push(int val);
     int pop();
+    void reset();
     bool empty();
     ~work_queue();
 private:
@@ -69,6 +70,19 @@ private:
     int sz;
 };
 
+class work_set_int {
+public:
+    void initialize(int size);
+    void set(int index, int value);
+    int  get(int index);
+    void reset();
+    ~work_set_int();
+private:
+    bool  init = false;
+    int*  s;
+    int   sz;
+};
+
 class work_list {
 public:
     void initialize(int size);
@@ -98,7 +112,6 @@ public:
     int arr_sz = -1;
 
     void initialize_from_array(int *p, int size);
-
     void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
@@ -139,23 +152,24 @@ private:
 };
 
 class change_tracker {
-    work_queue l;
+    work_list l;
     work_set   s;
     int    limit   = -1;
     int       sz   = -1;
     bool  overflow = false;
 public:
-    void initialize(int limit);
+    void initialize(int limit, int domain_size);
     void reset();
-    int  track(int oldcolor);
+    void track(int oldcolor);
     int  pop();
+    bool empty();
     bool did_overflow();
 };
 
 
 class refinement {
 public:
-    bool refine_coloring(sgraph* g, coloring* c, std::list<std::pair<int, int>> *changes, invariant* I, int init_color_class, bool track_changes);
+    bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes);
     int  individualize_vertex(coloring* c, int v);
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
     bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
@@ -163,11 +177,13 @@ public:
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool assert_is_equitable(sgraph *g, coloring *c);
+    void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
     ~refinement();
 private:
     bool initialized = false;
     cumulative_counting counting_array;
-    work_set  color_workset;
+    work_set     color_workset;
+    work_set_int queue_pointer;
     work_list color_worklist_vertex;
     work_list_pair color_worklist_color;
     work_list_pair vertex_worklist;
