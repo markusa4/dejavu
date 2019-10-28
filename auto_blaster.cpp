@@ -669,9 +669,10 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
                 if (group_level->vec[v] && base_aligned) {
                     v = group_level->fixed;// choose base point
                     if(level == w->skiplevels + 1) {
-                        bool total_orbit = true;
-                        for(int i = s; i < s + c->ptn[s] + 1; ++i)
-                            total_orbit = total_orbit && group_level->vec[c->lab[i]];
+                        bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
+                        //bool total_orbit = true;
+                        /*for(int i = s; i < s + c->ptn[s] + 1; ++i)
+                            total_orbit = total_orbit && group_level->vec[c->lab[i]];*/
                         if(total_orbit)
                             w->skiplevels += 1;
                     }
