@@ -166,6 +166,14 @@ public:
     bool did_overflow();
 };
 
+class cell_worklist {
+public:
+    void initialize(int domain_size);
+    int add_cell(work_set_int* queue_pointer, int i);
+    std::pair<int, int> next_cell(work_set_int* queue_pointer);
+    void replace_cell();
+};
+
 
 class refinement {
 public:
@@ -186,10 +194,12 @@ private:
     work_set_int queue_pointer;
     work_list color_worklist_vertex;
     work_list_pair color_worklist_color;
-    work_list_pair vertex_worklist;
+    work_list vertex_worklist;
     work_list_pair old_color_classes;
     work_list_pair_bool color_class_splits;
     ring_pair worklist_color_classes;
+
+    cell_worklist cell_todo;
 
     std::pair<int, int>* p;
 

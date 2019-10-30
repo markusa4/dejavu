@@ -19,7 +19,7 @@ bfs::bfs() {
 }
 
 void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int base_size) {
-    BW.bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int>>[base_size + 2];
+    BW.bfs_level_todo              = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
     BW.bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
 
     BW.domain_size = domain_size;
@@ -29,8 +29,11 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_states  = new bfs_element**[base_size + 2];
     BW.level_sizes   = new int[base_size + 2];
     BW.level_expecting_finished = new int[base_size + 2];
-    for(int i = 0; i < base_size + 2; ++i)
+    for(int i = 0; i < base_size + 2; ++i) {
+        BW.bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
+        BW.bfs_level_finished_elements[i] = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
         BW.level_expecting_finished[i] = 0;
+    }
 
     BW.level_states[0]    = new bfs_element*[1];
     BW.level_states[0][0] = root_elem;
@@ -39,7 +42,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     for(int i = init_c; i < init_c + root_elem->c->ptn[init_c] + 1; ++i) {
         int next_v = root_elem->c->lab[i];
         sz += 1;
-        BW.bfs_level_todo[BW.current_level].enqueue(std::tuple<bfs_element*, int>(root_elem, next_v));
+        BW.bfs_level_todo[BW.current_level].enqueue(std::pair<bfs_element*, int>(root_elem, next_v));
     }
 
     BW.level_expecting_finished[0] = 0;
@@ -74,15 +77,14 @@ void bfs::work_queues() {
         int lvl = BW.current_level;
         // std::cout << "[B] Received level " << lvl << " elem " << elem << " todo " << todo << std::endl;
 
-        BW.level_expecting_finished[lvl] -= 1;
-        BW.level_expecting_finished[lvl + 1] += todo;
-
         if (elem == nullptr) {
-            assert(todo == 0);
+            BW.level_expecting_finished[lvl] -= todo;
         } else {
             BW.level_states[lvl][BW.level_sizes[lvl]] = elem;
             elem->id = BW.level_sizes[lvl];
             BW.level_sizes[lvl] += 1;
+            BW.level_expecting_finished[lvl] -= 1;
+            BW.level_expecting_finished[lvl + 1] += todo;
         }
     }
 
@@ -90,20 +92,20 @@ void bfs::work_queues() {
     if (BW.level_expecting_finished[BW.current_level] == 0) {
         int expected_size = BW.level_expecting_finished[BW.current_level +1];
 
-        //std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
+        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
 
         if(BW.current_level == BW.target_level - 1 && BW.target_level <= BW.base_size) {
             //if(expected_size < std::max(BW.domain_size / 100, 1)) {
-            if(BW.level_sizes[BW.current_level] == 1) { // ToDo: this should be very efficient! make it efficient! (ToDos and back-and-forth between threads are probably the culprit)
+            if(BW.level_sizes[BW.current_level] == 1 && BW.level_expecting_finished[BW.current_level + 1] < BW.chunk_size) { // ToDo: this should be very efficient! make it efficient! (ToDos and back-and-forth between threads are probably the culprit)
                                                         // ToDo: once levels can be made cheaply high, prefer base points in canon such that no base points have to be fixed
                                                         // ToDo: or save skipperm for BW level
-                //std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
-               // BW.target_level += 1;
+                 //std::cout << "[B] Increasing target level (expected_size small), setting target level to " << BW.current_level + 1 << std::endl;
+                 //BW.target_level += 1;
             }
         }
 
-        if(expected_size < 10 * BW.domain_size) {
-            BW.level_states[BW.current_level + 1] = new bfs_element *[expected_size];
+        if(expected_size < 1000 * BW.domain_size) {
+            BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size];
             BW.level_sizes[BW.current_level + 1] = 0;
             BW.current_level += 1;
         } else {

@@ -221,8 +221,8 @@ int commandline_mode(int argc, char **argv) {
     }
     parser p;
     sgraph *g = new sgraph;
-    p.parse_dimacs_file_digraph(filename, g);
-
+    //p.parse_dimacs_file_digraph(filename, g);
+    p.parse_dimacs_file(filename, g);
     //sleep(1);
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
     sgraph _g;
@@ -262,7 +262,7 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&_g);
+    //bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -304,7 +304,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    // return commandline_mode(argc, argv);
+    //return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -314,15 +314,16 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
     //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz/mz/mz-50", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
-    p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-5000-2", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g);
+    //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g); // skiplevels / base_size thing
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
+    p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-20-11", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/cfi/cfi/cfi-200", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0408-03-2", &g); // <- significantly faster here!
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
@@ -330,7 +331,7 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/ran2/ran2/ran2_3000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/15cube.bliss", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/4pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
@@ -338,7 +339,7 @@ int main(int argc, char *argv[]) {
     bijection pr;
     bijection::random_bijection(&pr, g.v_size);
     g.permute_graph(&_g, &pr); // permute graph
-     _g = g;
+     //_g = g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     int repeat = 1;
     double avg = 0;

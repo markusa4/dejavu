@@ -84,11 +84,11 @@ struct alignas(64) auto_workspace {
 
     // bfs workspace
     bfs* BW;
-    std::tuple<bfs_element*, int>* todo_dequeue;
+    std::pair<bfs_element*, int>* todo_dequeue;
     int todo_deque_sz        = -1;
     std::pair<bfs_element *, int>* finished_elements;
     int finished_elements_sz = -1;
-    std::tuple<bfs_element *, int>* todo_elements;
+    std::pair<bfs_element *, int>* todo_elements;
     int todo_elements_sz     = -1;
     bfs_element* prev_bfs_element = nullptr;
     change_tracker changes;
@@ -126,6 +126,11 @@ private:
               auto_workspace *w);
 
     bool get_orbit(auto_workspace *w, int *base, int base_sz, int v, work_list *orbit, bool reuse_generators);
+
+    void fast_automorphism_non_uniform_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                                                bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                                bool *done,
+                                                int selector_seed);
 };
 
 

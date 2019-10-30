@@ -8,8 +8,11 @@
 
 int selector::select_color_first(sgraph *g, coloring *c) {
     int first_cell  = -1;
-    for(int i = 0; i < c->ptn_sz;){
+    bool only_trivial = true;
+
+    for(int i = skipstart; i < c->ptn_sz;){
         if(c->ptn[i] > 0) {
+            skipstart = i;
             first_cell = i;
             break;
         }
@@ -23,7 +26,7 @@ int selector::select_color_first(sgraph *g, coloring *c) {
 int selector::select_color_smallest(sgraph *g, coloring *c) {
     int smallest_cell  = -1;
     int smallest_cell_sz = c->lab_sz + 1;
-    for(int i = 0; i < c->ptn_sz;){
+    for(int i = skipstart; i < c->ptn_sz;){
         if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
             smallest_cell = i;
             smallest_cell_sz = c->ptn[i];
@@ -69,10 +72,12 @@ int selector::select_color_largest(coloring *c) {
         return largest_cell;
     }
 
+    int choices = 0;
     assert(skipstart < c->ptn_sz);
     for(int i = skipstart; i < c->ptn_sz;) { // c->ptn[i] > largest_cell_sz &&
         assert(i < c->ptn_sz);
-
+        if (c->ptn[i] != 0)
+            choices++;
         if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
             largest_cell = i;
             largest_cell_sz = c->ptn[i];
@@ -80,15 +85,12 @@ int selector::select_color_largest(coloring *c) {
         } else if(c->ptn[i] == largest_cell_sz) {
             largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
         }
-
         if (c->ptn[i] != 0 && only_trivial) {
             skipstart = i;
             only_trivial = false;
         }
-
         i += c->ptn[i] + 1;
     }
-
     return largest_cell;
 }
 
