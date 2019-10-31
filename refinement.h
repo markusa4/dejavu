@@ -169,9 +169,17 @@ public:
 class cell_worklist {
 public:
     void initialize(int domain_size);
-    int add_cell(work_set_int* queue_pointer, int i);
+    int add_cell(work_set_int* queue_pointer, int col, int col_sz);
     std::pair<int, int> next_cell(work_set_int* queue_pointer);
-    void replace_cell();
+    void replace_cell(work_set_int* queue_pointer, int col_old, int col, int col_sz);
+    void reset(work_set_int* queue_pointer);
+    bool empty();
+
+private:
+    std::pair<int, int>* arr = nullptr;
+    int  arr_sz  = -1;
+    int  cur_pos = -1;
+    bool init    = false;
 };
 
 
@@ -205,6 +213,9 @@ private:
 
     bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool *color_class_split_worklist);
+
+    bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
+                                      work_list_pair_bool *color_class_split_worklist, invariant *I);
 };
 
 
