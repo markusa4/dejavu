@@ -202,10 +202,12 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     vertex_worklist.reset();
     color_worklist_vertex.reset();
 
-    if(class_size == 1)
-        return refine_color_class_singleton(g, c, color_class, class_size, color_class_split_worklist, I);
+  //  if(class_size == 1)
+ //       return refine_color_class_singleton(g, c, color_class, class_size, color_class_split_worklist, I);
 
     end_cc = color_class + class_size;
+    int acc_sz = 0;
+    int acc_in = 0;
     while (cc < end_cc) { // increment value of neighbours of vc by 1
         vc = c->lab[cc];
         pe = g->v[vc];
@@ -215,6 +217,8 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             col = c->vertex_to_col[v];
             if (!color_workset.get(col)) {
                 old_color_classes.push_back(std::pair<int, int>(col, c->ptn[col] + 1));
+                acc_sz += (c->ptn[col] + 1) * 663822424;
+                acc_in += col * 5352352324;
                 color_workset.set(col);
             }
         }
@@ -223,10 +227,14 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
 
     old_color_classes.sort();
     comp = comp && I->write_top_and_compare(old_color_classes.arr_sz);
+    comp = comp && I->write_top_and_compare(acc_sz);
+    comp = comp && I->write_top_and_compare(acc_in);
 
     if(!comp) {
-        //std::cout << "early out" << std::endl;
+       // std::cout << "early out" << std::endl;
         return comp;
+    } else {
+       // std::cout << "not" << std::endl;
     }
 
     cc = color_class;
