@@ -36,6 +36,10 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         color_worklist_color.initialize_from_array(p + (g->v_size), g->v_size);
         color_class_splits.initialize(g->v_size);
         queue_pointer.initialize(g->v_size);
+        degrees_worklist.initialize(g->max_degree + 1);
+        neighbours.initialize(g->v_size);
+        neighbour_sizes.initialize(g->v_size);
+        dense_old_color_classes.initialize(g->v_size);
         //worklist_color_classes.initialize_from_array(p + (g->v_size) * 3, g->v_size * 2);
         cell_todo.initialize(g->v_size * 2);
         initialized = true;
@@ -64,7 +68,8 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         //comp = comp && I->write_top_and_compare(-1);
         comp = comp && I->write_top_and_compare(next_color_class.first);
         comp = comp && I->write_top_and_compare(next_color_class.second);
-        comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
+        //comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
+        comp = comp && refine_color_class_dense(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
         //std::cout << "sz: " << next_color_class.second << std::endl;
 
         if(!comp)
@@ -121,18 +126,22 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
     //std::cout << "Refining..." << std::endl;
     bool comp = true;
     if(!initialized) {
-        p = new std::pair<int, int>[g->v_size * 5];
-        counting_array.initialize(g->v_size, g->max_degree);
+        //p = new std::pair<int, int>[g->v_size * 5];
+        neighbours.initialize(g->v_size);
+        neighbour_sizes.initialize(g->v_size);
         color_workset.initialize(g->v_size);
         vertex_worklist.initialize(g->v_size);
-        old_color_classes.initialize_from_array(p, g->v_size);
+        degrees_worklist.initialize(g->max_degree + 1);
         color_worklist_vertex.initialize(g->v_size);
-        color_worklist_color.initialize_from_array(p + (g->v_size), g->v_size);
-        color_class_splits.initialize(g->v_size);
+        color_worklist_color.initialize(g->v_size);
+        old_color_classes.initialize(g->v_size);
+        worklist_color_classes.initialize(g->v_size * 2);
+        dense_old_color_classes.initialize(g->v_size);
         queue_pointer.initialize(g->v_size);
-        worklist_color_classes.initialize_from_array(p + (g->v_size) * 3, g->v_size * 2);
         cell_todo.initialize(g->v_size * 2);
         initialized = true;
+        counting_array.initialize(g->v_size, g->max_degree);
+        color_class_splits.initialize(g->v_size);
     }
 
     worklist_color_classes.reset();
@@ -191,23 +200,21 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
 //__attribute__((optimize("unroll-loops")))
 bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
-    thread_local bool comp, mark_as_largest;
-    thread_local int i, cc, vc, pe, end_i, end_cc, v, col, v_old_color, v_class_size, v_new_color, vertex_old_pos, vertex_at_pos, color, v_color, v_degree, fst, snd, largest_color_class_size;
+    // thread_local?
+    bool comp, mark_as_largest;
+    int i, cc, vc, pe, end_i, end_cc, v, col, col_sz, v_old_color, v_class_size, v_new_color, vertex_old_pos, vertex_at_pos, v_color, v_degree, largest_color_class_size, acc_sz, acc_in;
     cc = color_class; // iterate over color class
     comp = true;
 
     old_color_classes.reset();
-    counting_array.reset();
     color_workset.reset();
-    vertex_worklist.reset();
-    color_worklist_vertex.reset();
 
   //  if(class_size == 1)
  //       return refine_color_class_singleton(g, c, color_class, class_size, color_class_split_worklist, I);
 
     end_cc = color_class + class_size;
-    int acc_sz = 0;
-    int acc_in = 0;
+    acc_sz = 0;
+    acc_in = 0;
     while (cc < end_cc) { // increment value of neighbours of vc by 1
         vc = c->lab[cc];
         pe = g->v[vc];
@@ -217,25 +224,24 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             col = c->vertex_to_col[v];
             if (!color_workset.get(col)) {
                 old_color_classes.push_back(std::pair<int, int>(col, c->ptn[col] + 1));
-                acc_sz += (c->ptn[col] + 1) * 663822424;
-                acc_in += col * 5352352324;
+                //acc_sz += (c->ptn[col] + 1);
+                acc_in += col;
                 color_workset.set(col);
             }
         }
         cc += 1;
     }
 
-    old_color_classes.sort();
     comp = comp && I->write_top_and_compare(old_color_classes.arr_sz);
-    comp = comp && I->write_top_and_compare(acc_sz);
+    //comp = comp && I->write_top_and_compare(acc_sz);
     comp = comp && I->write_top_and_compare(acc_in);
 
-    if(!comp) {
-       // std::cout << "early out" << std::endl;
+    if(!comp)
         return comp;
-    } else {
-       // std::cout << "not" << std::endl;
-    }
+
+    old_color_classes.sort();
+    counting_array.reset();
+    vertex_worklist.reset();
 
     cc = color_class;
     while (cc < end_cc) { // increment value of neighbours of vc by 1
@@ -256,18 +262,14 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
         cc += 1;
     }
 
-    // split color classes according to count in counting array
-    // care: does not respect lab order
-    // ToDo: consider catching the case where vertices old_color does not appear (color degree = 0)
-    // ToDo: then we can immediately assign instead of swapping
-    // Problem: how do we get all "other vertices" of the color, though?
+    color_worklist_vertex.reset();
 
+    // split color classes according to count in counting array
     while(!vertex_worklist.empty()) {
-        v            = vertex_worklist.pop_back();
-        v_old_color  = c->vertex_to_col[v];
+        v           = vertex_worklist.pop_back();
+        v_old_color = c->vertex_to_col[v];
 
         v_class_size = c->ptn[v_old_color] + 1;
-        v_new_color;
         if (counting_array.get_count(v) == 0) {
             v_new_color = v_old_color;
         } else {
@@ -284,36 +286,33 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
     while(!color_worklist_vertex.empty()) {
         assert(!color_worklist_color.empty());
         v    = color_worklist_vertex.pop_back();
-        color     = color_worklist_color.last()->second;
+        col  = color_worklist_color.last()->second;
         v_old_color = color_worklist_color.last()->first;
         color_worklist_color.pop_back();
 
         vertex_old_pos = c->vertex_to_lab[v];
-        vertex_at_pos = c->lab[color + c->ptn[color] + 1];
+        vertex_at_pos  = c->lab[col + c->ptn[col] + 1];
         c->lab[vertex_old_pos] = vertex_at_pos;
         c->vertex_to_lab[vertex_at_pos] = vertex_old_pos;
 
-        c->lab[color + c->ptn[color] + 1] = v;
-        c->vertex_to_col[v] = color;
-        c->vertex_to_lab[v] = color + c->ptn[color] + 1;
-        c->ptn[color] += 1;
+        c->lab[col + c->ptn[col] + 1] = v;
+        c->vertex_to_col[v] = col;
+        c->vertex_to_lab[v] = col + c->ptn[col] + 1;
+        c->ptn[col] += 1;
 
-        if (v_old_color != color) {
+        if (v_old_color != col) {
            // assert(color > old_color);
             c->ptn[v_old_color] -= 1;
         }
     }
 
-    //std::sort(old_color_classes_.begin(), old_color_classes_.end());
-
-    //for(auto it = old_color_classes_.begin(); it != old_color_classes_.end(); ++it) {
     while(!old_color_classes.empty()) {
-        fst = old_color_classes.last()->first;
-        snd = old_color_classes.last()->second;
+        col = old_color_classes.last()->first;
+        col_sz = old_color_classes.last()->second;
         old_color_classes.pop_back();
         largest_color_class_size = -1;
 
-        for(i = fst; i < fst + snd;){
+        for(i = col; i < col + col_sz;){
             assert(i >= 0 && i < c->ptn_sz);
             assert(c->ptn[i] + 1 > 0);
             v_color  = i;
@@ -323,27 +322,172 @@ bool refinement::refine_color_class(sgraph *g, coloring *c, int color_class, int
             comp = comp && I->write_top_and_compare(c->ptn[i] + 1);
 
             mark_as_largest = false;
-            if(!(i == fst && c->ptn[i] + 1== snd)) {
+            if(!(i == col && c->ptn[i] + 1== col_sz)) {
                 if(largest_color_class_size < c->ptn[i] + 1) {
                     mark_as_largest = true;
                     largest_color_class_size = c->ptn[i] + 1;
                 }
-                color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(std::pair<int, int>(fst, i), mark_as_largest));
+                color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(std::pair<int, int>(col, i), mark_as_largest));
             } else {
                 break;
             }
 
-            /* */
-            if(v_color != 0) {
+            if(v_color != 0)
                 c->ptn[v_color - 1] = 0;
-            }
-            /* */
 
             i += c->ptn[i] + 1;
         }
+    }
 
-        //if(!comp)
-        //    break;
+    return comp;
+}
+
+bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
+    // for all vertices of the color class...
+    // thread_local?
+    bool comp, mark_as_largest;
+    int i, j, cc, vc, pe, end_i, end_cc, v, col, _col, acc, val, col_sz, v_new_color, vertex_old_pos, vertex_at_pos, v_color, v_degree, largest_color_class_size;
+    cc = color_class; // iterate over color class
+    comp = true;
+
+    neighbours.reset_hard();
+    color_workset.reset();
+    dense_old_color_classes.reset();
+
+    end_cc = color_class + class_size;
+    while (cc < end_cc) { // increment value of neighbours of vc by 1
+        vc = c->lab[cc];
+        pe = g->v[vc];
+        end_i = pe + g->d[vc];
+        for (i = pe; i < end_i; i++) {
+            v   = g->e[i];
+            neighbours.inc_nr(v);
+            col = c->vertex_to_col[v];
+            if(!color_workset.get(col)) {
+                color_workset.set_nr(col);
+                dense_old_color_classes.push_back(col);
+            }
+        }
+        cc += 1;
+    }
+
+    color_workset.reset_hard();
+
+    comp = comp && I->write_top_and_compare(INT32_MAX - 3);
+    comp = comp && I->write_top_and_compare(dense_old_color_classes.cur_pos);
+    if(!comp) return comp;
+
+
+    // DENSE-DENSE: dont sort, just iterate over all cells
+    dense_old_color_classes.sort();
+    // for every cell to be split...
+    //for(j = 0; j < g->v_size;) {
+        //col    = j;
+    while(!dense_old_color_classes.empty()) {
+        col = dense_old_color_classes.pop_back();
+        //j     += c->ptn[j] + 1;
+        col_sz = c->ptn[col] + 1;
+
+        if(col_sz == 1) {
+            v_degree = neighbours.get(c->lab[col]) + 1;
+            if(v_degree == -1)
+                continue;
+            comp = comp && I->write_top_and_compare(INT32_MAX - 2);
+            comp = comp && I->write_top_and_compare(-col);
+            comp = comp && I->write_top_and_compare(v_degree);
+            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            if(!comp) return comp;
+            continue;
+        }
+
+        neighbour_sizes.reset();
+        degrees_worklist.reset();
+
+        int first_index = neighbours.get(c->lab[col]) + 1;
+        degrees_worklist.push_back(first_index);
+        int total = 0;
+        for(i = col; i < col + col_sz; ++i) {
+            v = c->lab[i];
+            int index = neighbours.get(v) + 1;
+            if(index == first_index)
+                continue;
+            total += 1;
+            if(neighbour_sizes.inc(index) == 0)
+                degrees_worklist.push_back(index);
+        }
+
+        neighbour_sizes.inc(first_index);
+        neighbour_sizes.set(first_index, col_sz - total - 1);
+
+        comp = comp && I->write_top_and_compare(degrees_worklist.cur_pos);
+        if(!comp) return comp;
+
+        if(degrees_worklist.cur_pos == 1) {
+            // no split
+            v_degree = neighbours.get(c->lab[col]);
+            comp = comp && I->write_top_and_compare(INT32_MAX - 4);
+            comp = comp && I->write_top_and_compare(-col);
+            comp = comp && I->write_top_and_compare(v_degree);
+            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            if(!comp) return comp;
+            continue;
+        }
+
+        degrees_worklist.sort();
+        // enrich neighbour_sizes to accumulative counting array
+        acc = 0;
+        comp = comp && I->write_top_and_compare(INT32_MAX - 5);
+        while(!degrees_worklist.empty()) {
+            i   = degrees_worklist.pop_back();
+            val = neighbour_sizes.get(i) + 1;
+            if(val >= 1) {
+                neighbour_sizes.set(i, val + acc);
+                acc += val;
+                _col = col + col_sz - (neighbour_sizes.get(i)); // use new color here to remove color_workset?
+                c->ptn[_col] = -1; // this is val - 1, actually...
+
+                v_degree = i;
+                comp = comp && I->write_top_and_compare(-_col);
+                comp = comp && I->write_top_and_compare(v_degree);
+                comp = comp && I->write_top_and_compare(val + 1);
+                if(!comp) return comp;
+            }
+        }
+
+        // copy cell for rearranging
+        memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(int));
+        vertex_worklist.cur_pos = col_sz;
+
+        // determine colors and rearrange
+        // split color classes according to count in counting array
+        while(!vertex_worklist.empty()) {
+            v = vertex_worklist.pop_back();
+            v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
+            // i could immediately determine size of v_new_color here and write invariant before rearrange?
+            assert(v_new_color >= col);
+            assert(v_new_color < col + col_sz);
+
+            c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
+            c->vertex_to_col[v] = v_new_color;
+            c->vertex_to_lab[v] = v_new_color + c->ptn[v_new_color] + 1;
+            c->ptn[v_new_color] += 1;
+        }
+
+        largest_color_class_size = -1;
+
+        // determine largest class to throw away and finish (fourth iteration)
+        for(i = col; i < col + col_sz;) {
+            assert(i >= 0 && i < c->ptn_sz);
+            assert(c->ptn[i] + 1 > 0);
+            v_color  = i;
+            mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
+            largest_color_class_size = mark_as_largest?c->ptn[i] + 1:largest_color_class_size;
+
+            color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(std::pair<int, int>(col, i), mark_as_largest));
+            if(v_color != 0)
+                c->ptn[v_color - 1] = 0;
+            i += c->ptn[i] + 1;
+        }
     }
 
     return comp;
@@ -387,7 +531,6 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         v_old_color = c->vertex_to_col[v];
 
         v_class_size = c->ptn[v_old_color] + 1;
-        v_new_color;
         if (counting_array.get_count(v) == 0) {
             v_new_color = v_old_color;
         } else {
@@ -726,8 +869,8 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
 }
 
 refinement::~refinement() {
-    if(initialized)
-        delete[] p;
+    //if(initialized)
+       // delete[] p;
 }
 
 void refinement::undo_changes_with_reference(change_tracker *changes, coloring *changed_c, coloring *old_c) {
@@ -753,8 +896,8 @@ void refinement::undo_changes_with_reference(change_tracker *changes, coloring *
 void cumulative_counting::initialize(int size, int maxdegree) {
     m     = maxdegree + 1;
     sz    = size;
-    sizes = new int[size * m + 64];
-    count = new int[size + 64];
+    sizes = new int[size * m];
+    count = new int[size];
     init = true;
 
     for(int i = 0; i < size; ++i) {
@@ -873,7 +1016,10 @@ void work_set::set(int index) {
         s[index] = true;
         reset_queue.push(index);
     }
+}
 
+void work_set::set_nr(int index) {
+    s[index] = true;
 }
 
 bool work_set::get(int index) {
@@ -893,6 +1039,11 @@ void work_set::reset() {
     }
 }
 
+void work_set::reset_hard() {
+    reset_queue.pos = 0;
+    memset(s, false, sz*sizeof(bool));
+}
+
 work_set::~work_set() {
     if(init)
         delete[] s;
@@ -900,6 +1051,7 @@ work_set::~work_set() {
 
 void work_set_int::initialize(int size) {
     s = new int[size];
+    reset_queue.initialize(size);
     for(int i = 0; i < size; i++) {
         s[i] = -1;
     }
@@ -911,7 +1063,18 @@ void work_set_int::set(int index, int value) {
     assert(init);
     assert(index >= 0);
     assert(index < sz);
+    //if(s[index] == -1 && value != -1)
+    //    reset_queue.push(index);
     s[index] = value;
+}
+
+int work_set_int::inc(int index) {
+    assert(init);
+    assert(index >= 0);
+    assert(index < sz);
+    if(s[index]++ == -1)
+        reset_queue.push(index);
+    return s[index];
 }
 
 int work_set_int::get(int index) {
@@ -922,7 +1085,8 @@ int work_set_int::get(int index) {
 }
 
 void work_set_int::reset() {
-    assert(false);
+    while(!reset_queue.empty())
+        s[reset_queue.pop()] = -1;
 }
 
 work_set_int::~work_set_int() {
@@ -930,9 +1094,18 @@ work_set_int::~work_set_int() {
         delete[] s;
 }
 
+void work_set_int::inc_nr(int index) {
+    ++s[index];
+}
+
+void work_set_int::reset_hard() {
+    memset(s, -1, sz*sizeof(int));
+    reset_queue.pos = 0;
+}
+
 void work_list::initialize(int size) {
-    arr = new int[size + 64];
-    arr_sz = size;
+    arr     = new int[size];
+    arr_sz  = size;
     cur_pos = 0;
 }
 
@@ -943,9 +1116,8 @@ void work_list::push_back(int value) {
 }
 
 int work_list::pop_back() {
-    cur_pos -= 1;
-    assert(cur_pos >= 0 && cur_pos < arr_sz);
-    return arr[cur_pos];
+    //assert(cur_pos >= 0 && cur_pos < arr_sz);
+    return arr[--cur_pos];
 }
 
 void work_list::reset() {
@@ -954,6 +1126,18 @@ void work_list::reset() {
 
 bool work_list::empty() {
     return cur_pos == 0;
+}
+
+void work_list::sort() {
+    if(cur_pos == 2) {
+        if(arr[0] > arr[1]) {
+            int s  = arr[0];
+            arr[0] = arr[1];
+            arr[1] = s;
+        }
+    } else if(cur_pos > 2) {
+        std::sort(arr, arr + cur_pos);
+    }
 }
 
 work_list::~work_list() {
@@ -966,7 +1150,7 @@ void work_queue::initialize(int size) {
     assert(!init);
     sz = size;
     pos = 0;
-    queue = new int[size + 64];
+    queue = new int[size];
     init = true;
 }
 
@@ -1010,7 +1194,7 @@ std::pair<int, int> *work_list_pair::last() {
 
 void work_list_pair::initialize(int size) {
     init = true;
-    arr = new std::pair<int, int>[size + 64];
+    arr = new std::pair<int, int>[size];
     arr_sz = 0;
 }
 
@@ -1054,7 +1238,7 @@ std::pair<std::pair<int, int>, bool>* work_list_pair_bool::last() {
 
 void work_list_pair_bool::initialize(int size) {
     init = true;
-    arr = new std::pair<std::pair<int, int>, bool>[size + 64];
+    arr = new std::pair<std::pair<int, int>, bool>[size];
     arr_sz = 0;
 }
 
@@ -1082,7 +1266,7 @@ void work_list_pair_bool::reset() {
 }
 
 void ring_pair::initialize(int size) {
-    arr = new std::pair<int, int>[size + 64];
+    arr = new std::pair<int, int>[size];
     arr_sz = size;
     back_pos  = 0;
     front_pos = 0;
@@ -1179,7 +1363,7 @@ int cell_worklist::add_cell(work_set_int *queue_pointer, int col, int col_sz) {
 std::pair<int, int> cell_worklist::next_cell(work_set_int *queue_pointer) {
     // look at first 12 positions and scramble if possible
     int sm_j = cur_pos - 1;
-    for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
+    for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 14); --j) {
         if(arr[j].second < arr[sm_j].second)
             sm_j = j;
         if(arr[sm_j].second == 1)

@@ -26,6 +26,7 @@ int selector::select_color_first(sgraph *g, coloring *c) {
 int selector::select_color_smallest(sgraph *g, coloring *c) {
     int smallest_cell  = -1;
     int smallest_cell_sz = c->lab_sz + 1;
+
     for(int i = skipstart; i < c->ptn_sz;){
         if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
             smallest_cell = i;

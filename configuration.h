@@ -8,7 +8,7 @@
 struct configstruct {
     bool CONFIG_IR_BACKTRACK = false;
     bool CONFIG_IR_BACKTRACK_RANDOM  = false;
-    int  CONFIG_IR_CELL_SELECTOR = 1; // 0 = random, 1 = first largest, 2 = first smallest, 3 = first
+    int  CONFIG_IR_CELL_SELECTOR = 2; // 0 = random, 1 = first largest, 2 = first smallest, 3 = first
     int  CONFIG_IR_INVARIANT = 0;
     int  CONFIG_IR_REFINEMENT = 0;
     bool CONFIG_IR_FAST_AUTOPRE = true; // ToDo: option to stop this dynamically from group

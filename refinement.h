@@ -26,11 +26,11 @@ public:
     void reset();
     bool empty();
     ~work_queue();
-private:
     int* queue;
+    int  pos;
+private:
     bool init = false;
     int  sz;
-    int  pos;
 };
 
 class cumulative_counting {
@@ -61,6 +61,8 @@ public:
     void reset();
     ~work_set();
     // std::bitset< s;
+    void reset_hard();
+    void set_nr(int index);
     void initialize_from_array(bool *p, int size);
 private:
     work_queue reset_queue;
@@ -68,6 +70,7 @@ private:
     bool init = false;
     bool* s;
     int sz;
+
 };
 
 class work_set_int {
@@ -76,7 +79,11 @@ public:
     void set(int index, int value);
     int  get(int index);
     void reset();
+    void reset_hard();
+    int inc(int index);
+    void inc_nr(int index);
     ~work_set_int();
+    work_queue reset_queue;
 private:
     bool  init = false;
     int*  s;
@@ -91,10 +98,12 @@ public:
     bool empty();
     void reset();
     ~work_list();
-private:
-    int* arr;
-    int arr_sz = -1;
+    void sort();
     int cur_pos;
+    int* arr;
+private:
+
+    int arr_sz = -1;
 };
 
 class work_list_pair {
@@ -192,24 +201,27 @@ public:
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
+    bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     bool assert_is_equitable(sgraph *g, coloring *c);
     void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
     ~refinement();
 private:
     bool initialized = false;
-    cumulative_counting counting_array;
-    work_set     color_workset;
     work_set_int queue_pointer;
+    cell_worklist cell_todo;
     work_list color_worklist_vertex;
     work_list_pair color_worklist_color;
+    work_set    color_workset;
     work_list vertex_worklist;
-    work_list_pair old_color_classes;
-    work_list_pair_bool color_class_splits;
+    work_list degrees_worklist;
     ring_pair worklist_color_classes;
-
-    cell_worklist cell_todo;
-
+    work_set_int neighbours;
+    work_set_int neighbour_sizes;
     std::pair<int, int>* p;
+    work_list_pair old_color_classes;
+    cumulative_counting counting_array;
+    work_list_pair_bool color_class_splits;
+    work_list dense_old_color_classes;
 
     bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool *color_class_split_worklist);

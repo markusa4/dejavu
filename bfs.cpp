@@ -53,6 +53,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
 
     BW.finished_elems = new std::pair<bfs_element*, int>[BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
     BW.finished_elems_sz = BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS;
+    std::cout << "[B] BFS structure initialized, expecting " << sz << " on first level" << std::endl;
     //std::cout << "[B] BFS structure initialized" << std::endl;
     //std::cout << "[B] ToDo for level " << BW.current_level << " is " << BW.level_expecting_finished[BW.current_level] << std::endl;
 }

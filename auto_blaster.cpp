@@ -1081,6 +1081,12 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         //if(level != target_level - 1) {
             w->S.empty_cache();
             int c = w->S.select_color(g, w->work_c, selector_seed);
+
+            // ToDo: sort lab?
+            std::sort(w->work_c->lab + c, w->work_c->lab + c + w->work_c->ptn[c]);
+            for(int ii = c; ii < c + w->work_c->ptn[c]; ++ii)
+                w->work_c->vertex_to_lab[w->work_c->lab[ii]] = ii;
+
             //assert(c != -1);
             for (int i = c; i < c + w->work_c->ptn[c] + 1; ++i) {
                 int next_v = w->work_c->lab[i];
