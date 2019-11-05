@@ -223,6 +223,7 @@ private:
     cumulative_counting counting_array;
     work_list_pair_bool color_class_splits;
     work_list dense_old_color_classes;
+    int* singleton_scratch;
 
     bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool *color_class_split_worklist);
