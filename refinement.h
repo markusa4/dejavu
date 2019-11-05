@@ -202,6 +202,7 @@ public:
     void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
+    bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     bool assert_is_equitable(sgraph *g, coloring *c);
     void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
     ~refinement();

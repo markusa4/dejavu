@@ -1083,9 +1083,9 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
             int c = w->S.select_color(g, w->work_c, selector_seed);
 
             // ToDo: sort lab?
-            std::sort(w->work_c->lab + c, w->work_c->lab + c + w->work_c->ptn[c]);
-            for(int ii = c; ii < c + w->work_c->ptn[c]; ++ii)
-                w->work_c->vertex_to_lab[w->work_c->lab[ii]] = ii;
+            //std::sort(w->work_c->lab + c, w->work_c->lab + c + w->work_c->ptn[c]);
+            //for(int ii = c; ii < c + w->work_c->ptn[c]; ++ii)
+            //    w->work_c->vertex_to_lab[w->work_c->lab[ii]] = ii;
 
             //assert(c != -1);
             for (int i = c; i < c + w->work_c->ptn[c] + 1; ++i) {
@@ -1414,6 +1414,9 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     if (master) {
+        config.CONFIG_IR_DENSE = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
+        std::cout << "[R] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false") << std::endl;
+
         shrd_orbit = new int[g->v_size];
         for(int i = 0; i < g->v_size; ++i) {
             shrd_orbit[i] = i;
