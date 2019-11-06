@@ -83,7 +83,7 @@ void pipeline_group::pipeline_stage(int n, shared_switches* switches, auto_works
         }
 
         if(n == 0)
-            w->BW->work_queues();
+            w->BW->work_queues(1);
 
         // work on pipeline_results and track
         filterstate state;

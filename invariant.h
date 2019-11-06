@@ -9,14 +9,14 @@
 class alignas(64) invariant {
     std::vector<int>* vec_invariant = nullptr;
 public:
-    invariant* compareI;
+    invariant*   compareI;
+    std::vector<int>* compare_vec;
     bool has_compare = false;
     bool no_write = false;
     int cur_pos = -1;
     inline bool write_top_and_compare(int i) {
         if(no_write) {
-            cur_pos += 1;
-            return (*compareI->vec_invariant)[cur_pos] == i;
+            return (*compare_vec)[++cur_pos] == i;
         } else {
             vec_invariant->push_back(i);
             cur_pos += 1;

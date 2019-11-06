@@ -76,7 +76,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         bool dense_dense = (g->d[c->lab[next_color_class.first]] > (g->v_size / (next_color_class.second + 1)));
 
 
-        if(next_color_class.second == 1) {
+        if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
             // SINGLETON
             comp = comp && refine_color_class_singleton(g, c, next_color_class.first, next_color_class.second,
                                                           &color_class_splits,
@@ -381,14 +381,11 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     pe = g->v[vc];
     end_i = pe + g->d[vc];
     for (i = pe; i < end_i; i++) {
-        // ToDo: leave out singleton classes somehow, they can not be split anyway...
-        // ToDo: could also sort /treat them separately
-
         v   = g->e[i];
         col = c->vertex_to_col[v];
 
         if(c->ptn[col] == 0) {
-            vertex_worklist.push_back(col);
+            vertex_worklist.push_back(col); // treat singletons in separate list
             continue;
         }
 
@@ -422,11 +419,11 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         // should contain information about color degree
     }
 
+    // sort and write down singletons in invariant
     if(comp)
         vertex_worklist.sort();
 
     for(i = 0; i < vertex_worklist.cur_pos && comp; ++i) {
-        //comp = comp && I->write_top_and_compare(dense_old_color_classes.arr[i]); // color class
         comp = comp && I->write_top_and_compare(vertex_worklist.arr[i]); // size
         // should contain information about color degree
     }
@@ -844,7 +841,6 @@ bool refinement::refine_color_class_first(sgraph *g, coloring *c, int color_clas
         }
     }
 
-    //for(auto it = old_color_classes_.begin(); it != old_color_classes_.end(); ++it) {
     while(!old_color_classes.empty()) {
         int fst = old_color_classes.last()->first;
         int snd = old_color_classes.last()->second;
@@ -867,11 +863,9 @@ bool refinement::refine_color_class_first(sgraph *g, coloring *c, int color_clas
                 break;
             }
 
-            /* */
             if(v_color != 0) {
                 c->ptn[v_color - 1] = 0;
             }
-            /* */
 
             i += c->ptn[i] + 1;
         }
@@ -906,80 +900,6 @@ int refinement::individualize_vertex(coloring *c, int v) {
     c->ptn[color] -= 1;
     c->ptn[color + color_class_size - 1] = 0;
     return color + color_class_size;
-}
-
-void refinement::undo_individualize_vertex(sgraph *g, coloring *c, int v) {
-    assert(false);
-    /*int color = c->vertex_to_col[v];
-    int pos   = c->vertex_to_lab[v];
-    assert(color == pos);
-    assert(pos > 0);
-    assert(c->ptn[pos] == 0);
-    int new_color = c->vertex_to_col[c->lab[pos - 1]];
-
-    c->ptn[new_color] += 1;
-    c->vertex_to_col[v] = new_color;
-    assert(c->ptn[new_color] > 0);
-    if(c->ptn[pos - 1] == 0) {
-        c->ptn[pos - 1] = 1;
-    }*/
-}
-
-void refinement::undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes) {
-    std::queue<int> reset_ends;
-    for(auto p = changes->begin(); p != changes->end(); ++p) {
-        int old_color = c->vertex_to_col[c->lab[p->first]];
-        int new_color = p->second;
-        //std::cout << new_color << " back to " << old_color << std::endl;
-        if(old_color < new_color && c->vertex_to_col[c->lab[new_color]] == new_color) {
-            reset_ends.push(new_color - 1);
-            for (int j = new_color; j <= new_color + c->ptn[new_color]; ++j) {
-                c->vertex_to_col[c->lab[j]] = old_color;
-                c->ptn[old_color] += 1;
-            }
-        }
-    }
-
-    while(!reset_ends.empty()) {
-        int i = reset_ends.front();
-        reset_ends.pop();
-        if(i >= 0 && c->ptn[i] == 0) {
-            c->ptn[i] = 1;
-        }
-    }
-
-    // sanity check
-    int expect0 = 0;
-    bool expectsize = true;
-    for(int i = 0; i < c->lab_sz; ++i) {
-        if(expectsize) {
-            expectsize = false;
-            expect0 = c->ptn[i];
-        }
-        if(expect0 == 0) {
-            assert(c->ptn[i] == 0);
-            expectsize = true;
-        } else {
-            assert(c->ptn[i] > 0);
-        }
-        expect0 -= 1;
-    }
-}
-
-void refinement::complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I) {
-    for(int i = 0; i < g->v_size; ++i) {
-        std::list<int> neighbour_col;
-        int v = c->lab[i];
-        I->write_top(-5);
-        I->write_top(c->vertex_to_col[v]);
-        for(int j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
-            neighbour_col.push_back(c->vertex_to_col[g->e[j]]);
-        }
-        neighbour_col.sort();
-        for(auto n = neighbour_col.begin(); n != neighbour_col.end(); ++n) {
-            I->write_top(*n);
-        }
-    }
 }
 
 bool refinement::assert_is_equitable(sgraph *g, coloring *c) {

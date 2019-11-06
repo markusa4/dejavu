@@ -28,15 +28,18 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.target_level  = -1;
     BW.level_states  = new bfs_element**[base_size + 2];
     BW.level_sizes   = new int[base_size + 2];
+    BW.level_maxweight = new int[base_size + 2];
     BW.level_expecting_finished = new int[base_size + 2];
     for(int i = 0; i < base_size + 2; ++i) {
         BW.bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
         BW.bfs_level_finished_elements[i] = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
         BW.level_expecting_finished[i] = 0;
+        BW.level_maxweight[i] = 1;
     }
 
     BW.level_states[0]    = new bfs_element*[1];
     BW.level_states[0][0] = root_elem;
+    root_elem->weight = 1;
 
     int sz = 0;
     for(int i = init_c; i < init_c + root_elem->c->ptn[init_c] + 1; ++i) {
@@ -58,12 +61,12 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     //std::cout << "[B] ToDo for level " << BW.current_level << " is " << BW.level_expecting_finished[BW.current_level] << std::endl;
 }
 
-void bfs::work_queues() {
+void bfs::work_queues(int tolerance) {
     // no work left!
     if(BW.current_level == BW.target_level) {
         if(!BW.done) {
             BW.done = true;
-            std::cout << "[B] Finished BFS at " << BW.current_level - 1 << " with " << BW.level_sizes[BW.current_level - 1] << " elements." << std::endl;
+            std::cout << "[B] Finished BFS at " << BW.current_level - 1 << " with " << BW.level_sizes[BW.current_level - 1] << " elements, maxweight " << BW.level_maxweight[BW.current_level - 1] << "" << std::endl;
         }
         return;
     }
@@ -83,6 +86,8 @@ void bfs::work_queues() {
         } else {
             BW.level_states[lvl][BW.level_sizes[lvl]] = elem;
             elem->id = BW.level_sizes[lvl];
+            if(elem->weight > BW.level_maxweight[lvl])
+                BW.level_maxweight[lvl] = elem->weight;
             BW.level_sizes[lvl] += 1;
             BW.level_expecting_finished[lvl] -= 1;
             BW.level_expecting_finished[lvl + 1] += todo;
@@ -93,7 +98,7 @@ void bfs::work_queues() {
     if (BW.level_expecting_finished[BW.current_level] == 0) {
         int expected_size = BW.level_expecting_finished[BW.current_level +1];
 
-        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << std::endl;
+        std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << expected_size << ", maxweight " << BW.level_maxweight[BW.current_level] << std::endl;
 
         if(BW.current_level == BW.target_level - 1 && BW.target_level <= BW.base_size) {
             //if(expected_size < std::max(BW.domain_size / 100, 1)) {
@@ -105,14 +110,23 @@ void bfs::work_queues() {
             }
         }
 
-        if(expected_size < 1000 * BW.domain_size) {
+        if(expected_size < 10 * BW.domain_size * tolerance) {
             BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size];
             BW.level_sizes[BW.current_level + 1] = 0;
             BW.current_level += 1;
         } else {
             std::cout << "[B] Refusing to advance level (expected_size too large), setting target level to " << BW.current_level + 1 << std::endl;
+
+            BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size]; // maybe do this only if tolerance is increased?
+            BW.level_sizes[BW.current_level + 1] = 0;
+
             BW.target_level   = BW.current_level + 1;
+            BW.reached_initial_target = false;
             BW.current_level += 1;
         }
     }
+}
+
+void bfs::reset_initial_target() {
+    BW.reached_initial_target = true;
 }

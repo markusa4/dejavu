@@ -8,7 +8,7 @@
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
 
-enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_TOURNAMENT_IT, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
 
 class shared_switches {
 public:
@@ -24,6 +24,10 @@ public:
     std::atomic_int    win_id;
     std::mutex         tournament_mutex;
 
+    int tolerance = 1;
+
+    void iterate_tolerance();
+    void reset_leaf_tournament();
     bool check_leaf_tournament(int id, int restarts);
 };
 

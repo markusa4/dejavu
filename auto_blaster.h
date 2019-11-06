@@ -125,12 +125,14 @@ private:
               int selector_seed,
               auto_workspace *w);
 
-    bool get_orbit(auto_workspace *w, int *base, int base_sz, int v, work_list *orbit, bool reuse_generators);
+    bool get_orbit(auto_workspace *w, int *base, int base_sz, int v, int v_base, work_list *orbit, bool reuse_generators);
 
     void fast_automorphism_non_uniform_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                                                 bijection *canon_leaf, bijection *automorphism, int *restarts,
                                                 bool *done,
                                                 int selector_seed);
+
+    void reset_skiplevels(auto_workspace *w);
 };
 
 

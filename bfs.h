@@ -45,8 +45,9 @@ public:
     // elements of all levels
     // delete elements of level once work of level + 1 is fully commited, then it is safe
     bfs_element*** level_states;
-    int*          level_sizes;
-    int*          level_expecting_finished;
+    int*           level_sizes;
+    int*           level_expecting_finished;
+    int*           level_maxweight;
     bool done = false;
 
     // current level where work has to be done, and where experimential paths should probe
@@ -57,6 +58,8 @@ public:
     int domain_size;
     int base_size;
     int chunk_size = 32; // ToDo: dynamically adapt this
+    bool reached_initial_target = true;
+    int initial_target_level;
 
     std::pair<bfs_element*, int>* finished_elems;
     int finished_elems_sz = -1;
@@ -67,7 +70,9 @@ public:
     bfs_workspace BW;
     bfs();
     void initialize(bfs_element* root_node, int init_c, int domain_size, int base_size);
-    void work_queues();
+    void work_queues(int tolerance);
+
+    void reset_initial_target();
 };
 
 

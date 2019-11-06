@@ -28,3 +28,14 @@ bool shared_switches::check_leaf_tournament(int id, int restarts) {
     ichecked = true;
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
+
+void shared_switches::reset_leaf_tournament() {
+    done_shared_group.store(false);
+    done_created_group.store(false);
+    win_id.store(-2);
+    checked.store(0);
+}
+
+void shared_switches::iterate_tolerance() {
+    tolerance *= 2;
+}

@@ -255,34 +255,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
             w->measure1 += 1;
             // check for new messages
             bool receive_advance = false;
-            size_t num = 1;
-            size_t max_repeat = 0;
-            if(config.CONFIG_THREADS_COLLABORATE) {
-                while(num > 0) {
-                    num = (*w->communicator_pad)[w->communicator_id].try_dequeue_bulk(*w->ctok, w->dequeue_space, w->dequeue_space_sz);
-                    for (int j = 0; j < num; ++j) {
-                        if (abs(std::get<0>(w->dequeue_space[j])) == w->first_level) {
-                            if (std::get<0>(w->dequeue_space[j]) > 0) {
-                                if(!first_level_succ->get(std::get<1>(w->dequeue_space[j]))) {
-                                    int vertex = std::get<1>(w->dequeue_space[j]);
-                                    first_level_succ->set(vertex);
-                                    w->first_level_succ_point = vertex;
-                                    w->first_level_sz += 1;
-                                }
-                            } else {
-                                if(!first_level_fail->get(std::get<1>(w->dequeue_space[j]))) {
-                                    first_level_fail->set(std::get<1>(w->dequeue_space[j]));
-                                    w->first_level_sz += 1;
-                                }
-                            }
-                        } else if (abs(std::get<0>(w->dequeue_space[j])) == 0) {
-                            if(w->first_level == 1) {
-                                receive_advance = true;
-                            }
-                        }
-                    }
-                }
-            }
             if(*done) return;
             S->empty_cache();
             // initialize a search state
@@ -293,21 +265,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             if (level == w->first_level + 1) {
                 if (!first_level_fail->get(base)) {
-                    if(config.CONFIG_THREADS_COLLABORATE) {
-                        if(enqueue_fail_point_sz < w->enqueue_space_sz) {
-                            w->enqueue_space[enqueue_fail_point_sz] = std::pair<int, int>(-w->first_level, base);
-                            enqueue_fail_point_sz += 1;
-                        } else {
-                            //for (int i = 0; i < w->communicator_pad->size(); ++i) {
-                                //if (i != w->communicator_id) {
-                                    //(*w->communicator_pad)[i].try_enqueue_bulk(*w->ptoks[i], w->enqueue_space, enqueue_fail_point_sz);
-                                    w->G->first_level_points.try_enqueue_bulk(*w->ptok, w->enqueue_space, enqueue_fail_point_sz);
-                                    enqueue_fail_point_sz = 0;
-                                //}
-                            //}
-                        }
-                    }
-
                     //std::cout << "failed" << first_level_point << std::endl;
                     first_level_fail->set(base);
                     w->first_level_sz += 1;
@@ -322,21 +279,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
             //S->empty_cache();
             int s = S->select_color(g, c, selector_seed);
             if((receive_advance || w->first_level_sz == c->ptn[s] + 1) && w->first_level < w->base_size) {
-                /*assert(s != -1);
-                // proceed first level
-                assert(c->vertex_to_col[w->first_level_succ_point] == s);
-                init_color_class = R->individualize_vertex(start_c, w->first_level_succ_point);
-                bool comp = start_I->write_top_and_compare(INT32_MIN);
-                comp && start_I->write_top_and_compare(INT32_MIN);
-                assert(comp);
-                w->first_level += 1;
-                //assert(init_color_class.size() == 2);
-                comp = comp && start_I->write_top_and_compare(INT32_MAX);
-                assert(comp);
-                comp = comp && R->refine_coloring(g, start_c, nullptr, start_I, init_color_class, false);
-                comp = comp && start_I->write_top_and_compare(INT32_MAX);
-                comp = comp && start_I->write_top_and_compare(INT32_MIN);*/
-                //std::cout << "proceed receive" << std::endl;
                 proceed_state(w, g, start_c, start_I, w->G->b[w->first_level - 1], nullptr);
                 w->first_level += 1;
 
@@ -683,12 +625,10 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
 
             int newpos = R->individualize_vertex(c, v);
             last_op = OP_I;
-//            assert(init_color_class >= 0);
             init_color_class = newpos;
             assert(c->vertex_to_col[v] > 0);
-            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
+
             if (!compare) { // base points
-                //automorphism->map.push_back(v);
                 automorphism->map[automorphism->map_sz] = v;
                 automorphism->map_sz += 1;
             }
@@ -706,210 +646,11 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
         }
     }
 }
-
-
-
-void auto_blaster::fast_automorphism_non_uniform_from_bfs(auto_workspace* w, sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf, bijection* automorphism, int *restarts, bool *done, int selector_seed) {
-    bool backtrack = false;
-    bool skipped_level = false;
-    //std::list<std::pair<int, int>> changes;
-
-    refinement *R = &w->R;
-    selector *S = &w->S;
-    coloring *c = &w->c;
-    invariant *I = &w->I;
-
-    coloring  *start_c     = &w->skip_c;
-    invariant *start_I     = &w->skip_I;
-    mschreier *group_level = w->skip_schreier_level;
-
-    automorphism->non_uniform = false;
-
-    bool base_aligned = true;
-
-    S->empty_cache();
-    int init_color_class;
-
-    *restarts = 0;
-    int level = w->first_skiplevel;
-
-
-    if (compare) {
-        start_I->set_compare_invariant(canon_I);
-    } else {
-        start_I->create_vector();
-        automorphism->map = new int[g->v_size];
-        automorphism->map_sz = 0;
-    }
-    ir_operation last_op = OP_R;
-    *I = *start_I;
-    c->copy_force(start_c);
-
-    if(w->skiplevels > w->my_base_points_sz)
-        w->skiplevels = w->my_base_points_sz;
-
-    {
-        S->empty_cache();
-        while(w->first_skiplevel <= w->skiplevels) {
-            if(*done) return;
-            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr);
-            w->first_skiplevel += 1;
-            if(!w->is_foreign_base) {
-                w->skip_schreier_level = w->skip_schreier_level->next;
-            }
-        }
-
-        // initialize a search state
-        c->copy_force(start_c);
-        *I = *start_I;
-
-        backtrack    = false;
-        base_aligned = true;
-        level = w->first_skiplevel;
-        if(!w->is_foreign_base)
-            group_level = w->skip_schreier_level;
-    }
-
-    while (true) {
-        if(*done) return;
-        if (backtrack) {
-            //if(w->skiplevels > 0)
-            //   std::cout << "wrong guess" << w->skiplevels << std::endl;
-            if(*done) return;
-            if(*restarts % 3 == 0 && w->skiplevels < w->my_base_points_sz - 1) {
-                w->skiplevels += 1;
-            }
-            S->empty_cache();
-            if(w->first_skiplevel <= w->skiplevels) {
-                proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr);
-                w->first_skiplevel += 1;
-                if(!w->is_foreign_base) {
-                    w->skip_schreier_level = w->skip_schreier_level->next;
-                }
-            }
-
-            // initialize a search state
-            *restarts += 1;
-            c->copy_force(start_c);
-            *I = *start_I;
-
-            backtrack    = false;
-            base_aligned = true;
-            level = w->first_skiplevel;
-            if(!w->is_foreign_base)
-                group_level = w->skip_schreier_level;
-        }
-
-        int s;
-        if (!backtrack) {
-            s = S->select_color(g, c, selector_seed);
-            if (s == -1) {
-                if (compare) {
-                    // we can derive an automorphism!
-                    //std::cout << *restarts << ", " << reguess << ", " << w->first_level << std::endl;
-                    w->measure2 += 1;
-                    bijection leaf;
-                    leaf.read_from_coloring(c);
-                    leaf.not_deletable();
-                    *automorphism = leaf;
-                    automorphism->inverse();
-                    automorphism->compose(canon_leaf);//enqueue_fail_point_sz
-                    automorphism->non_uniform = (w->skiplevels > 0);
-                    //std::cout << "Found automorphism." << *restarts << std::endl;
-                    assert(g->certify_automorphism(*automorphism));
-                    return;
-                } else {
-                    //I->push_level();
-                    canon_leaf->read_from_coloring(c);
-                    *canon_I = *I;
-                    return;
-                }
-            }
-        }
-
-        if (last_op == OP_I) { // add new operations to trail...
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //                                                REFINEMENT
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //changes.clear();
-            bool comp = I->write_top_and_compare(INT32_MAX);
-            //assert(init_color_class.size() == 2);
-            comp = comp && R->refine_coloring(g, c, nullptr, I, init_color_class, false);
-            comp = comp && I->write_top_and_compare(INT32_MAX);
-            comp = comp && I->write_top_and_compare(INT32_MIN);
-            //R.complete_colorclass_invariant(g, &c, &I);
-            last_op = OP_R;
-            assert(skipped_level?comp:true);
-            if (compare) {
-                // compare invariant
-                if(!comp) { // || !I->compare_sizes()
-                    backtrack = true;
-                    continue;
-                }
-                continue;
-            }
-        } else if (last_op == OP_R) {
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //                                             INDIVIDUALIZATION
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            // collect all elements of color s
-            int rpos;
-            int v;
-
-            if(level <= w->skiplevels) {
-                v = w->my_base_points[level - 1];
-                assert(c->vertex_to_col[v] == s);
-                skipped_level = true;
-                base_aligned  = true;
-            } else {
-                rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-                v = c->lab[rpos];
-                skipped_level = false;
-            }
-
-            // check if base point can be chosen instead
-            if(!w->is_foreign_base) {
-                if (group_level->vec[v] && base_aligned) {
-                    v = group_level->fixed;// choose base point
-                    if(level == w->skiplevels + 1 &&  w->skiplevels < w->my_base_points_sz - 1) {
-                        bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
-                        if(total_orbit)
-                            w->skiplevels += 1;
-                    }
-                } else {
-                    base_aligned = false;
-                }
-            }
-
-            int newpos = R->individualize_vertex(c, v);
-            last_op = OP_I;
-            init_color_class = newpos;
-            assert(c->vertex_to_col[v] > 0);
-            if (!compare) { // collect base points
-                automorphism->map[automorphism->map_sz] = v;
-                automorphism->map_sz += 1;
-            }
-            level += 1;
-
-            bool comp = I->write_top_and_compare(INT32_MIN);
-            comp && I->write_top_and_compare(INT32_MIN);
-            assert(skipped_level?comp:true);
-            if(!comp) {
-                backtrack = true;
-                continue;
-            }
-            if(!w->is_foreign_base)
-                group_level = group_level->next;
-        }
-    }
-}
-
-
 
 // if canonical vertex is v, true is returned and orbit contains vertices of the orbit of v
 // if the canonical vertex is not v, false is returned
 
-bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, work_list* orbit, bool reuse_generators) {
+bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, int v_base, work_list* orbit, bool reuse_generators) {
     orbit->reset();
     // test if identity
     if(*w->shared_generators_size == 0) {
@@ -919,6 +660,8 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
 
     // if level == 1 we can return shared orbit
     if(base_sz == 0) {
+        // ToDo: difficult with weights here, actually... need one pass of orbits to create orbit sizes
+        // ToDo: and also map the orbit of base_v to base_v...
         int map_v = (*w->shared_orbit)[v];
         assert(v >= 0);
         assert(v <= w->G_->domain_size);
@@ -934,16 +677,16 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
             mpermnode *it = *w->shared_generators;
             do {
                 // does it fix base?
-                bool it_fixes_base = true; // do not need this variable
-                for (int i = 0; i < base_sz; ++i) {
+                // do not need this variable
+                int i;
+                for (i = 0; i < base_sz; ++i) {
                     int b = base[i];
                     if (it->p[b] != b) {
-                        it_fixes_base = false;
                         break;
                     }
                 }
 
-                if (it_fixes_base) {
+                if (i == base_sz) {
                     w->generator_fix_base[w->generator_fix_base_size] = it;
                     w->generator_fix_base_size += 1;
                 }
@@ -956,7 +699,7 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
 
         // do orbit algorithm on v
         if(w->generator_fix_base_size > 0) {
-            int min_v = v; // find canonical v
+            int  min_v = v; // find canonical v
             w->orbit_vertex_worklist.reset();
             w->orbit_considered.reset();
             w->orbit_vertex_worklist.push_back(v);
@@ -965,7 +708,7 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
 
             while(!w->orbit_vertex_worklist.empty()) {
                 int next_v = w->orbit_vertex_worklist.pop_back();
-                if(next_v < min_v)
+                if((next_v < min_v && min_v != v_base) || next_v == v_base)
                     min_v = next_v;
 
                 // apply all generators exhaustively on v
@@ -979,10 +722,7 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, w
                 }
             }
             w->canonical_v = min_v;
-            if(min_v == v)
-                return true;
-            //std::cout << "safed" << std::endl;
-            return false;
+            return (min_v == v);
         } // else is identity again (below)
     }
 
@@ -1029,7 +769,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         int v             = w->todo_dequeue[i].second;
 
         // check orbit
-        bool comp = get_orbit(w, elem->base, elem->base_sz, v, &w->orbit, w->prev_bfs_element == elem); // todo: need to consider weights
+        bool comp = get_orbit(w, elem->base, elem->base_sz, v, w->my_base_points[elem->base_sz], &w->orbit, w->prev_bfs_element == elem); // todo: need to consider weights
         // I could prune the todos relatively cheaply now (just a further restriction of generators, and they will not
         // appear in queues at all)
 
@@ -1075,6 +815,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         for(int j = 0; j < elem->base_sz; ++j)
             next_elem->base[j] = elem->base[j];
         next_elem->base[next_elem->base_sz - 1] = v;
+        next_elem->weight = elem->weight * w->orbit.cur_pos;
 
         // create todos for this node
         int sz = 0;
@@ -1382,6 +1123,19 @@ void auto_blaster::sample_pipelined(sgraph* g_, bool master, shared_switches* sw
     }
 }
 
+void auto_blaster::reset_skiplevels(auto_workspace* w) {
+    w->skip_c.copy_force(w->start_c);
+    w->skip_I = w->start_I;
+    w->skiplevels = 0;
+    if(w->BW->BW.target_level > 0)
+        w->skiplevels = w->BW->BW.target_level;
+    w->skip_schreier_level = w->G_->gp;
+    w->first_skiplevel = 1;
+    w->my_base_points    = w->G_->b;
+    w->my_base_points_sz = w->G_->base_size;
+    w->is_foreign_base   = false;
+}
+
 void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, bijection** canon_leaf, invariant** canon_I,
                                     com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_size) {
     // find comparison leaf
@@ -1405,8 +1159,8 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     auto_workspace W;
     invariant start_I;
 
-    W.first_level_fail.initialize(g->v_size);
-    W.first_level_succ.initialize(g->v_size);
+    //W.first_level_fail.initialize(g->v_size);
+    //W.first_level_succ.initialize(g->v_size);
 
     W.dequeue_space = new std::pair<int, int>[2048];
     W.dequeue_space_sz = 2048;
@@ -1418,15 +1172,15 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         std::cout << "[R] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false") << std::endl;
 
         shrd_orbit = new int[g->v_size];
-        for(int i = 0; i < g->v_size; ++i) {
+        for(int i = 0; i < g->v_size; ++i)
             shrd_orbit[i] = i;
-        }
 
         int** shrd_orbit_ = new (int*);
         *shrd_orbit_ = shrd_orbit;
 
         switches->current_mode = modes::MODE_TOURNAMENT;
 
+        // first color refinement
         canon_I    = new invariant*;
         canon_leaf = new bijection*;
         start_c    = new coloring;
@@ -1437,6 +1191,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
+        // ToDo: check if start_c now discrete
 
         // create some objects that are initialized after tournament
         G = new diy_group(g->v_size);
@@ -1534,9 +1289,6 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             // wait until shared group created
             while(!switches->done_shared_group) continue;
             while(!switches->current_mode == modes::MODE_BFS || !switches->current_mode == modes::MODE_UNIFORM_PROBE) continue;
-        } else {
-            // why is fast_automorphism called in ranreg?
-            //std::cout << W.my_base_points_sz << std::endl;
         }
     }
 
@@ -1544,14 +1296,15 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     int n_found = 0;
     int n_restarts = 0;
     bool foreign_base_done = false;
+    bool reset_non_uniform_switch = true;
 
+    // main loop...
     while(!(*done)) {
         if(switches->done_fast)
             G->ack_done_shared();
         bijection automorphism;
-        //std::chrono::high_resolution_clock::time_point inner_timer = std::chrono::high_resolution_clock::now();
 
-
+        // in what phase are we in?
         switch(switches->current_mode) {
             case modes::MODE_TOURNAMENT:
                 fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W); // <- we should already safe unsuccessfull / succ first level stuff here
@@ -1576,7 +1329,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                         W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
                         switches->done_created_group = true;
                         int proposed_level = W.skiplevels + 1;
-                        if(proposed_level == G->base_size)
+                        if(proposed_level == G->base_size) // ToDo: do this better...
                             proposed_level += 1;
                         W.BW->BW.target_level.store(proposed_level);
                         W.is_foreign_base = false;
@@ -1617,7 +1370,39 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 if((*done_fast && !automorphism.non_uniform )) continue;
                     break;
 
+            case modes::MODE_NON_UNIFORM_PROBE_IT:
+                // fast automorphism search, but from initial bfs pieces
+                if(reset_non_uniform_switch) {
+                    reset_skiplevels(&W);
+                    reset_non_uniform_switch = false;
+                }
+
+                if(!foreign_base_done) {
+                    fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                    automorphism.foreign_base = true;
+                    n_restarts += restarts;
+                } else {
+                    fast_automorphism_non_uniform(g, true, *canon_I, *canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W);
+                    automorphism.foreign_base = false;
+                    n_restarts += restarts;
+                }
+
+                if(master && n_found == 0) {
+                    int proposed_level = W.skiplevels + 1;
+                    if(proposed_level == G->base_size)
+                        proposed_level += 1;
+                    if(proposed_level > W.BW->BW.target_level)
+                        W.BW->BW.target_level.store(proposed_level);
+                }
+
+                n_found += 1;
+                if(n_found % (3 * switches->tolerance) == 0 && W.skiplevels < W.my_base_points_sz - 1)
+                    W.skiplevels += 1;
+                if((*done_fast && !automorphism.non_uniform )) continue;
+                break;
+
             case modes::MODE_BFS:
+                reset_non_uniform_switch = true;
                 if(W.BW->BW.current_level != W.BW->BW.target_level) {
                     if (communicator_id == -1 && W.BW->BW.target_level < 0) {
                         int proposed_level = W.skiplevels + 1;
@@ -1636,12 +1421,27 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                         }
                         bfs_chunk(g, *canon_I, *canon_leaf, done, selector_seed, &W);
                         if(master)
-                            bwork->work_queues();
+                            bwork->work_queues(switches->tolerance);
                     }
                 } else {
                     if(master) {
-                        bwork->work_queues();
-                        switches->current_mode = modes::MODE_UNIFORM_PROBE;
+                        bwork->work_queues(switches->tolerance);
+                        if(bwork->BW.reached_initial_target) {
+                            // reached the desired target level? go to next phase!
+                            std::cout << "[A] Starting uniform probe, tolerance: " << switches->tolerance << std::endl;
+                            switches->current_mode = modes::MODE_UNIFORM_PROBE;
+                        } else {
+                            // did not reach the target level within tolerance? iterate!
+                            switches->iterate_tolerance();
+                            switches->done_fast = false;
+                            switches->done_shared_group = false;
+                            G->non_uniform_abort_counter = 0;
+                            n_found = 0;
+                            bwork->reset_initial_target();
+                            std::cout << "[A] Iterating, tolerance: " << switches->tolerance << std::endl;
+                            // switches->reset_leaf_tournament();
+                            switches->current_mode = modes::MODE_NON_UNIFORM_PROBE_IT; // ToDo: actually should go to leaf tournament
+                        }
                     }
                 }
                 continue;
@@ -1672,17 +1472,8 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         }
 
         if(!test && !foreign_base_done) {
-            //std::cout << "foreign base done" << std::endl;
-            W.skip_c.copy_force(start_c);
-            W.skip_I = W.start_I;
-            W.skiplevels = 0;
-            if(W.BW->BW.target_level > 0)
-                W.skiplevels = W.BW->BW.target_level;
-            W.skip_schreier_level = G->gp;
-            W.first_skiplevel = 1;
-            W.my_base_points    = G->b;
-            W.my_base_points_sz = G->base_size;
-            W.is_foreign_base   = false;
+            // switch this worker to canonical search
+            reset_skiplevels(&W);
             foreign_base_done = true;
             //std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
         }
@@ -1699,15 +1490,29 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             G->manage_results(switches);
             if(switches->done_fast && !switches->done_shared_group) {
                 // wait for ack of done_fast
+                // ToDo: if current_level != 0, re-filter elements according to orbits
+                // ToDo: need one pass of orbits to create orbit sizes for bfs_element weights (array orbit weights)
                 std::cout << "[N] Waiting for ACK" << std::endl;
                 switches->current_mode = modes::MODE_WAIT;
+
                 G->ack_done_shared();
                 G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
-                *W.shared_generators      = G->gens;
-                *W.shared_orbit           = G->gp->orbits;
-                *W.shared_generators_size = G->number_of_generators();
+
+                std::cout << "[N] Creating shared orbit and generators" << std::endl;
+                *W.shared_generators        = G->gens;
+
+                int base_v_orbit = G->gp->orbits[G->b[0]];
+
+                for(int i = 0; i < g->v_size; ++i)
+                    if(G->gp->orbits[i] != base_v_orbit)
+                        (*W.shared_orbit)[i] = G->gp->orbits[i];
+                    else
+                        (*W.shared_orbit)[i] = base_v_orbit;
+
+                *W.shared_generators_size   = G->number_of_generators();
+
                 switches->done_shared_group = true;
-                switches->current_mode = modes::MODE_BFS;
+                switches->current_mode      = modes::MODE_BFS;
             }
             if(switches->done) {
                 std::cout << "Base size:  " << G->base_size << std::endl;
