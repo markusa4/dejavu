@@ -13,17 +13,21 @@
 class bfs_element {
 public:
     // coloring and invariant for the specified path / base
+    bfs_element* parent = nullptr;
     coloring*  c = nullptr;
     invariant* I = nullptr;
     int* base = nullptr;
     int  base_sz = -1;
 
     // position of element in level_states of workspace
-    int level = -1;
-    int id = -1;
+    int level        = -1;
+    int id           = -1;
+    int in_orbit_id  = -1;
+    int target_color = -1;
 
     // probability weight for probing in level
-    int weight = -1;
+    double weight        = -1;
+    double parent_weight = -1;
 
     // memory management
     bool init_c = false;
@@ -47,7 +51,8 @@ public:
     bfs_element*** level_states;
     int*           level_sizes;
     int*           level_expecting_finished;
-    int*           level_maxweight;
+    double*           level_maxweight;
+    double*           level_minweight;
     bool done = false;
 
     // current level where work has to be done, and where experimential paths should probe
@@ -73,6 +78,8 @@ public:
     void work_queues(int tolerance);
 
     void reset_initial_target();
+
+    void reduce_tree();
 };
 
 

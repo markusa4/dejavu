@@ -1209,16 +1209,70 @@ bool work_list::empty() {
     return cur_pos == 0;
 }
 
-void work_list::sort() {
-    if(cur_pos == 2) {
-        if(arr[0] > arr[1]) {
-            int s  = arr[0];
-            arr[0] = arr[1];
-            arr[1] = s;
-        }
-    } else if(cur_pos > 2) {
-        std::sort(arr, arr + cur_pos);
+inline void sort_int(int* arr, int sz) {
+    thread_local int k, value, i;
+#define min(x, y) (x<y?x:y)
+#define max(x, y) (x<y?y:x)
+#define SWAP(x,y) { const int a = min(arr[x], arr[y]); \
+                    const int b = max(arr[x], arr[y]); \
+                    arr[x] = a; arr[y] = b; }
+    switch(sz) {
+        case 0:
+        case 1:
+            break;
+        case 2:
+            SWAP(0, 1);
+            break;
+        case 3:
+            SWAP(0, 1);
+            SWAP(0, 2);
+            SWAP(1, 2);
+            break;
+        case 4:
+            SWAP(0, 1);
+            SWAP(2, 3);
+            SWAP(0, 2);
+            SWAP(1, 3);
+            SWAP(1,2);
+            break;
+        case 6:
+            SWAP(1, 2);
+            SWAP(4, 5);
+            SWAP(0, 2);
+            SWAP(3, 5);
+            SWAP(0, 1);
+            SWAP(3, 4);
+            SWAP(1, 4);
+            SWAP(0, 3);
+            SWAP(2, 5);
+            SWAP(1, 3);
+            SWAP(2, 4);
+            SWAP(2, 3);
+            break;
+        case 5:
+        case 7:
+        case 8:
+            for (k = 1; k < sz; ++k) {
+                value = arr[k];
+                i = k - 1;
+                while ((i >= 0) && (value < arr[i])) {
+                    arr[i + 1] = arr[i];
+                    --i;
+                }
+                arr[i + 1] = value;
+            }
+            break;
+        default:
+            std::sort(arr, arr + sz);
     }
+#undef SWAP
+#undef min
+#undef max
+}
+
+void work_list::sort() {
+        //sort_int(arr, cur_pos);
+        std::sort(arr, arr + cur_pos);
 }
 
 work_list::~work_list() {

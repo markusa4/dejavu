@@ -1076,7 +1076,7 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
  * MUST NOT BE MODIFIED by the calling program.
  */
 {
-    circ_mutex.lock();
+    //circ_mutex.lock();
     int k;
     mschreier *sh, *sha;
 
@@ -1087,7 +1087,7 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
     }
 
     if (k == nfix)  {
-        circ_mutex.unlock();
+        //circ_mutex.unlock();
         return sh->orbits;
     }
 
@@ -1109,7 +1109,7 @@ mgetorbits(int *fix, int nfix, mschreier *gp, mpermnode **ring, int n)
     }
 
     if (*ring) mexpandschreier(gp, ring, n);
-    circ_mutex.unlock();
+    //circ_mutex.unlock();
     return sh->orbits;
 }
 

@@ -58,7 +58,7 @@ void diy_group::manage_results(shared_switches *switches) {
             }
             break;
         }
-        if(non_uniform_abort_counter > 0 && !switches->done_fast) {
+        if(non_uniform_abort_counter > (std::max(switches->tolerance - 1, 10))  && !switches->done_fast) {
             switches->done_fast = true;
             break;
         }

@@ -71,6 +71,7 @@ struct alignas(64) auto_workspace {
 
     // shared orbit and generators
     int**       shared_orbit;
+    int**       shared_orbit_weights;
     mpermnode** shared_generators;
     int*        shared_generators_size;
 
@@ -104,7 +105,7 @@ public:
 
     void sample_shared(sgraph *g_, bool master, shared_switches *switches, diy_group *G, coloring *start_c,
                        bijection **canon_leaf, invariant **canon_I, com_pad *communicator_pad, int communicator_id,
-                       int **shared_orbit, bfs *bwork, mpermnode **gens, int *shared_group_size);
+                       int **shared_orbit, int** shared_orbit_weights, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
 private:
     void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
@@ -113,7 +114,7 @@ private:
 
     void fast_automorphism_non_uniform(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf,
                                        bijection *automorphism, int *restarts,
-                                       bool *done, int selector_seed, auto_workspace *w);
+                                       bool *done, int selector_seed, auto_workspace *w, int tolerance);
 
     void find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                                                   bijection *canon_leaf, bijection *automorphism, int *restarts,
@@ -133,6 +134,8 @@ private:
                                                 int selector_seed);
 
     void reset_skiplevels(auto_workspace *w);
+
+    void bfs_reduce_tree(auto_workspace *w);
 };
 
 
