@@ -102,6 +102,23 @@ void diy_group::ack_done_shared() {
     }
 }
 
+void diy_group::sift_random() {
+    bool result = true;
+    while(result) {
+        random_element re;
+        filterstate state;
+        state.ingroup = true;
+        state.counts_towards_abort = false;
+        state.level = -1;
+        state.stype = SIFT_RANDOM;
+        bool generated = generate_random_element(gp, &gens, domain_size, &re);
+        if(!generated) break;
+        result = mfilterschreier_shared(gp, re.perm, &gens, TRUE, domain_size + 1,
+                                            domain_size, state.level + 1, domain_size + 1, &state, domain_size + 1);
+        delete[] re.perm;
+    }
+}
+
 void diy_group::reset_ack_done_shared() {
     _ack_done_shared_group = 0;
 }

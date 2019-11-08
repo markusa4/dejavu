@@ -859,6 +859,7 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
                 for (i = 0; i < n; ++i) {
                     j1 = orbits[i];
                     while (orbits[j1] != j1) j1 = orbits[j1];
+                    assert(i < n && i >= 0);
                     j2 = orbits[mworkperm[i]];
                     while (orbits[j2] != j2) j2 = orbits[j2];
 
@@ -1040,6 +1041,7 @@ bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_elem
     }
 
     DYNALLSTAT_NOSTATIC(int, mworkperm2, mworkperm2_sz);
+    mworkperm2 = NULL;
     DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
 
     element->perm    = mworkperm2;

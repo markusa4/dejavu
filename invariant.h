@@ -7,9 +7,9 @@
 #include "assert.h"
 
 class alignas(64) invariant {
-    std::vector<int>* vec_invariant = nullptr;
 public:
-    invariant*   compareI;
+    std::vector<int>* vec_invariant = nullptr;
+    invariant*        compareI;
     std::vector<int>* compare_vec;
     bool has_compare = false;
     bool no_write = false;

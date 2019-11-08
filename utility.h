@@ -22,6 +22,8 @@ public:
     std::atomic_int    checked;
     std::atomic_int    win_num;
     std::atomic_int    win_id;
+    std::atomic_int    _ack_done;
+
     std::mutex         tournament_mutex;
 
     int tolerance = 1;
@@ -29,6 +31,7 @@ public:
     void iterate_tolerance();
     void reset_leaf_tournament();
     bool check_leaf_tournament(int id, int restarts);
+    bool ack_done();
 };
 
 #endif //DEJAVU_UTILITY_H

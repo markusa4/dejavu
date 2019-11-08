@@ -1144,8 +1144,6 @@ void work_set_int::set(int index, int value) {
     assert(init);
     assert(index >= 0);
     assert(index < sz);
-    //if(s[index] == -1 && value != -1)
-    //    reset_queue.push(index);
     s[index] = value;
 }
 
@@ -1176,6 +1174,7 @@ work_set_int::~work_set_int() {
 }
 
 void work_set_int::inc_nr(int index) {
+    assert(index >= 0 && index < sz);
     ++s[index];
 }
 

@@ -54,6 +54,8 @@ public:
     void ack_done_shared();
 
     void reset_ack_done_shared();
+
+    void sift_random();
 };
 
 

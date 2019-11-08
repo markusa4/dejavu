@@ -24,6 +24,7 @@ public:
     int id           = -1;
     int in_orbit_id  = -1;
     int target_color = -1;
+    bool is_identity = false;
 
     // probability weight for probing in level
     double weight        = -1;
@@ -50,6 +51,7 @@ public:
     // delete elements of level once work of level + 1 is fully commited, then it is safe
     bfs_element*** level_states;
     int*           level_sizes;
+    int*           level_reserved_sizes;
     int*           level_expecting_finished;
     double*           level_maxweight;
     double*           level_minweight;

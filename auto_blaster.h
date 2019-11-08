@@ -74,6 +74,7 @@ struct alignas(64) auto_workspace {
     int**       shared_orbit_weights;
     mpermnode** shared_generators;
     int*        shared_generators_size;
+    int         generator_fix_base_alloc = -1;
 
     //
     work_set  orbit_considered;
@@ -92,7 +93,6 @@ struct alignas(64) auto_workspace {
     std::pair<bfs_element *, int>* todo_elements;
     int todo_elements_sz     = -1;
     bfs_element* prev_bfs_element = nullptr;
-    change_tracker changes;
     bool init_bfs = false;
 };
 

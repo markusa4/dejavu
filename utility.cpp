@@ -8,6 +8,7 @@
 shared_switches::shared_switches() {
     done_shared_group.store(false);
     done_created_group.store(false);
+    _ack_done.store(0);
     win_id.store(-2);
     checked.store(0);
 }
@@ -23,6 +24,17 @@ bool shared_switches::check_leaf_tournament(int id, int restarts) {
         }
         checked++;
         tournament_mutex.unlock();
+    }
+
+    ichecked = true;
+    return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+}
+
+bool shared_switches::ack_done() {
+    thread_local bool ichecked = false;
+
+    if(!ichecked) {
+        _ack_done++;
     }
 
     ichecked = true;

@@ -11,7 +11,7 @@
 #include <atomic>
 
 #define DYNALLSTAT_NOSTATIC(type,name,name_sz) \
-	type *name; size_t name_sz=0;
+	type *name = NULL; size_t name_sz=0;
 
 enum sift_type {SIFT_UNIFORM, SIFT_NON_UNIFORM, SIFT_RANDOM};
 

@@ -28,6 +28,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.target_level  = -1;
     BW.level_states  = new bfs_element**[base_size + 2];
     BW.level_sizes   = new int[base_size + 2];
+    BW.level_reserved_sizes = new int[base_size + 2];
     BW.level_maxweight = new double[base_size + 2];
     BW.level_minweight = new double[base_size + 2];
 
@@ -53,8 +54,11 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
 
     BW.level_expecting_finished[0] = 0;
     BW.level_sizes[0] = 1;
+    BW.level_reserved_sizes[0] = 1;
+
     BW.level_expecting_finished[1] = sz;
     BW.level_states[1] = new bfs_element*[sz];
+    BW.level_reserved_sizes[1] = sz;
     BW.level_sizes[1] = 0;
 
     BW.finished_elems = new std::pair<bfs_element*, int>[BW.chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
@@ -95,6 +99,12 @@ void bfs::work_queues(int tolerance) {
                 BW.level_maxweight[lvl] = elem->weight;
             if(elem->weight < BW.level_minweight[lvl] && elem->weight >= 1)
                 BW.level_minweight[lvl] = elem->weight;
+
+            for(int j = 0; j < elem->base_sz; ++j)
+                assert(elem->base[j] >= 0 && elem->base[j] < BW.domain_size);
+
+            elem->level = lvl;
+            assert(BW.level_sizes[lvl] < BW.level_reserved_sizes[lvl]);
             BW.level_sizes[lvl] += 1;
             BW.level_expecting_finished[lvl] -= 1;
             BW.level_expecting_finished[lvl + 1] += todo;
@@ -103,7 +113,7 @@ void bfs::work_queues(int tolerance) {
 
     // advance level if possible
     if (BW.level_expecting_finished[BW.current_level] == 0) {
-        int expected_size = BW.level_expecting_finished[BW.current_level +1];
+        int expected_size = BW.level_expecting_finished[BW.current_level + 1];
 
         std::cout << "[B] BFS advancing to level " << BW.current_level + 1 << " expecting " << BW.level_sizes[BW.current_level] << " -> " << expected_size << ", maxweight " << BW.level_maxweight[BW.current_level] << ", minweight " << BW.level_minweight[BW.current_level] << std::endl;
 
@@ -118,6 +128,7 @@ void bfs::work_queues(int tolerance) {
         }
 
         if(expected_size < config.CONFIG_IR_SIZE_FACTOR * BW.domain_size * tolerance) {
+            BW.level_reserved_sizes[BW.current_level + 1] = expected_size;
             BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size];
             BW.level_sizes[BW.current_level + 1] = 0;
 
@@ -134,6 +145,8 @@ void bfs::work_queues(int tolerance) {
                 }
             }
 
+            assert(expected_size > 0);
+            assert(check_expected > 0);
             if(expected_size != check_expected) {
                 std::cout << "expected_size != actual_todo" << std::endl;
                 assert(false);
@@ -143,6 +156,7 @@ void bfs::work_queues(int tolerance) {
         } else {
             std::cout << "[B] Refusing to advance level (expected_size too large), setting target level to " << BW.current_level + 1 << std::endl;
 
+            BW.level_reserved_sizes[BW.current_level + 1] = expected_size;
             BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size]; // maybe do this only if tolerance is increased?
             BW.level_sizes[BW.current_level + 1] = 0;
 
