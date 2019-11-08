@@ -1461,6 +1461,8 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 
                 std::cout << "[N] Creating shared orbit and generators" << std::endl;
+                G->sift_random();
+
                 *W.shared_generators        = G->gens;
 
                 memset(shrd_orbit_weights, 0, g->v_size * sizeof(int));
