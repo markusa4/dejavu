@@ -48,22 +48,6 @@ void sgraph::initialize_coloring(coloring *c) {
     //std::cout << "Cells: " << cells << std::endl;
 }
 
-void sgraph::initialize_coloring_bucket(coloring_bucket *c) {
-    int n = this->v_size;
-    std::cout << "n:" << n << std::endl;
-    c->lab = new int[n];
-    c->ptn = new int[n];
-    c->lab_sz = n;
-    c->ptn_sz = n;
-
-    for(int i = 0; i < n; i++) {
-        c->lab[i] = i;
-        c->ptn[i] = n + 1;
-    }
-    c->ptn[n - 1] = 0;
-    c->init = true;
-}
-
 // certify that a permutation is an automorphism of the sgraph
 bool sgraph::certify_automorphism(bijection p) {
     assert(p.map_sz == v_size);

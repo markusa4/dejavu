@@ -10,8 +10,6 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
-#include "invariant_acc.h"
-#include "refinement_bucket.h"
 #include "selector.h"
 #include "bfs.h"
 #include "pipeline_schreier.h"

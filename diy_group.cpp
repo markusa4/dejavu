@@ -81,7 +81,7 @@ bool diy_group::add_permutation(bijection *p, int *idle_ms, bool *done) {
     state.level = -1;
     state.stype = p->non_uniform?SIFT_NON_UNIFORM:SIFT_UNIFORM;
     bool result;
-    if(!p->foreign_base) {
+    if(!p->foreign_base || base_size < 10) {
         result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
                                              domain_size, state.level + 1, domain_size + 1, &state, domain_size + 1);
         sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));

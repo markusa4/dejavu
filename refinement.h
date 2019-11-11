@@ -10,7 +10,7 @@
 #include <set>
 #include "coloring.h"
 #include "sgraph.h"
-#include "invariant_acc.h"
+#include "invariant.h"
 #include <list>
 #include <iostream>
 #include <bitset>
@@ -199,15 +199,18 @@ public:
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
     bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
-    void complete_colorclass_invariant(sgraph *g, coloring *c, invariant_acc *I);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     bool assert_is_equitable(sgraph *g, coloring *c);
     void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
+    bool old_refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                      work_list_pair_bool *color_class_split_worklist);
+    bool old_refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     ~refinement();
 private:
     bool initialized = false;
+    bool counting_initialized = false;
     work_set_int queue_pointer;
     cell_worklist cell_todo;
     work_list color_worklist_vertex;
@@ -230,6 +233,20 @@ private:
 
     bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I);
+
+    void assure_initialized(sgraph *g);
+
+    bool refine_color_class_singleton_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                            work_list_pair_bool *color_class_split_worklist);
+
+    bool refine_color_class_dense_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                        work_list_pair_bool *color_class_split_worklist);
+
+    bool refine_color_class_dense_dense_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                              work_list_pair_bool *color_class_split_worklist);
+
+    void assure_initialized_accumulate_counting(sgraph *g);
+
 };
 
 

@@ -8,7 +8,6 @@
 
 #include <vector>
 #include "coloring.h"
-#include "coloring_bucket.h"
 
 class bijection {
     bool init = false;
@@ -21,7 +20,6 @@ public:
     bijection();
     ~bijection();
     void read_from_coloring(coloring *c);
-    void read_from_coloring_bucket(coloring_bucket *c);
     void compose(bijection* p);
     void inverse();
     static void random_bijection(bijection* p, int n);

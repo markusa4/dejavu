@@ -18,12 +18,9 @@
 #include "configuration.h"
 #include "sequential_group.h"
 #include "concurrentqueue.h"
-#include "invariant_acc.h"
-#include "pipeline_group.h"
-#include "refinement_bucket.h"
 #include "diy_group.h"
+#include "lowdeg.h"
 #include <pthread.h>
-#include <chrono>
 #include <tuple>
 
 extern long mmultcount;
@@ -75,12 +72,7 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
 
     int init_color_class;
     *restarts = 0;
-    int reguess = 0;
     int level = w->first_level;
-    int first_level_point = -1;
-    int second_level_point = -1;
-
-    int enqueue_fail_point_sz = 0;
 
     if (compare) {
         automorphism->map    = new int[g->v_size];
@@ -89,12 +81,18 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
     ir_operation last_op;
 
     // Pick start from BFS level instead!
-
     int bfs_level    = w->BW->BW.current_level - 1;
     int bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
+
+    mschreier* start_group_level = w->G_->gp;
+    for(int i = 0; i < bfs_level; i++)
+        start_group_level = start_group_level->next;
+    mschreier* group_level = start_group_level;
+
     int rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
     bfs_element* picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
-    //std::cout << "picking level " << bfs_level << " element " << rand_pos << std::endl;
+    bool base_aligned = picked_elem->is_identity;
+
     *I = *picked_elem->I;
     c->copy_force(picked_elem->c);
     I->set_compare_invariant(canon_I);
@@ -111,6 +109,8 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
             bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
             rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
             picked_elem = w->BW->BW.level_states[bfs_level][rand_pos];
+            group_level = start_group_level;
+            base_aligned = picked_elem->is_identity;
 
             // consider the weight by redrawing
             picked_weight = picked_elem->weight;
@@ -186,30 +186,30 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
             init_color_class = -1;
             int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
             int v = c->lab[rpos];
-            // if(switches->done_shared_group && config.CONFIG_THREADS_COLLABORATE) // ToDo why is this problematic?
-            //    v = (*w->shared_orbit)[v];
 
-            //assert(rpos == c->vertex_to_lab[v]);
+            if (group_level->vec[v] && base_aligned) {
+                v = group_level->fixed;// choose base point
+                if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz - 1)) {
+                    bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
+                    if(total_orbit)
+                        w->skiplevels += 1;
+                }
+            } else {
+                base_aligned = false;
+            }
 
-            if(level == w->first_level)
-                first_level_point = v;
-
-            if(level == w->first_level + 1)
-                second_level_point = v;
 
             // individualize random vertex of class
             int newpos = R->individualize_vertex(c, v);
             last_op = OP_I;
-//            assert(init_color_class >= 0);
             init_color_class = newpos;
             assert(c->vertex_to_col[v] > 0);
-            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
-                //automorphism->map.push_back(v);
                 automorphism->map[automorphism->map_sz] = v;
                 automorphism->map_sz += 1;
             }
-            base = v;
+
+            group_level = group_level->next;
             level += 1;
 
             bool comp = I->write_top_and_compare(INT32_MIN);
@@ -281,7 +281,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
             // invariant, hopefully becomes complete in leafs such that automorphisms can be found
             if (level == w->first_level + 1) {
                 if (!first_level_fail->get(base)) {
-                    //std::cout << "failed" << first_level_point << std::endl;
                     first_level_fail->set(base);
                     w->first_level_sz += 1;
                 }
@@ -617,12 +616,10 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             if(level <= w->skiplevels) {
                 v = w->my_base_points[level - 1];
                 assert(c->vertex_to_col[v] == s);
-                skipped_level = true;
                 base_aligned  = true;
             } else {
                 rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
                 v = c->lab[rpos];
-                skipped_level = false;
             }
 
             // check if base point can be chosen instead
@@ -1048,6 +1045,14 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
+    lowdeg* L;
+
+    if(master) {
+        L = new lowdeg();
+        std::pair<sgraph*, coloring*> preprocessed_graph = L->preprocess(g);
+        g = preprocessed_graph.first;
+    }
+
     double cref;
 
     bool *done      = &switches->done;
@@ -1103,7 +1108,11 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         g->initialize_coloring(start_c);
         W.start_c = start_c;
         start_I.create_vector();
-        W.R.refine_coloring_first(g, start_c, -1);
+        //W.R.old_refine_coloring_first(g, start_c, -1);
+        //invariant trashi;
+        //trashi.create_vector();
+        W.R.old_refine_coloring_first(g, start_c, -1); // ToDo: why does new color ref not work properly on rantree-2000?
+        //W.R.refine_coloring(g, start_c, nullptr, &trashi, -1, false);
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
@@ -1114,6 +1123,15 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         W.BW = new bfs();
         bwork = W.BW;
 
+        int init_c = W.S.select_color(g, start_c, selector_seed);
+        if(init_c == -1) {
+            *done = true;
+            std::cout << "First coloring discrete." << std::endl;
+            std::cout << "Base size: 0" << std::endl;
+            std::cout << "Group size: 1" << std::endl;
+            return;
+        }
+        W.S.empty_cache();
         // launch worker threads
         for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(
@@ -1170,6 +1188,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         _canon_I->compareI    = nullptr;
         _canon_leaf = new bijection;
         {
+            W.S.empty_cache();
             find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches, selector_seed);
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
