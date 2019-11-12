@@ -57,7 +57,7 @@ int selector::select_color_largest(coloring *c) {
     bool only_trivial = true;
 
     //largest_cache.reset();
-
+/*
     while(!largest_cache.empty()) {
         auto it = largest_cache.front();
         if(it->second == c->ptn[it->first]) {
@@ -71,7 +71,9 @@ int selector::select_color_largest(coloring *c) {
 
     if(largest_cell >= 0) {
         return largest_cell;
-    }
+    }*/
+
+    skipstart = 0;
 
     int choices = 0;
     assert(skipstart < c->ptn_sz);

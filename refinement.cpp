@@ -30,6 +30,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
     assure_initialized(g);
 
     cell_todo.reset(&queue_pointer);
+    //queue_pointer.reset_hard(); // ToDo: should not be necessary
 
     if(init_color_class < 0) {
         // initialize queue with all classes (except for largest one)
@@ -52,9 +53,6 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         //comp = comp && I->write_top_and_compare(-1);
         comp = comp && I->write_top_and_compare(next_color_class.first);
         comp = comp && I->write_top_and_compare(next_color_class.second);
-
-        //if(!comp)
-            //std::cout << "very early out" << its << std::endl;
 
         //comp = comp && refine_color_class(g, c, next_color_class.first, next_color_class.second, &color_class_splits, I);
 
@@ -128,7 +126,7 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         if(!comp) break;
     }
 
-    //std::cout << "its: " << its << std::endl;
+    assert(comp?assert_is_equitable(g, c):true);
 
     return comp;
 }
@@ -143,7 +141,8 @@ void refinement::assure_initialized(sgraph *g) {
         color_worklist_color.initialize_from_array(p + (g->v_size), g->v_size);
         color_class_splits.initialize(g->v_size);
         queue_pointer.initialize(g->v_size);
-        degrees_worklist.initialize(g->max_degree + 1);
+        //degrees_worklist.initialize(g->max_degree + 1);
+        degrees_worklist.initialize(g->v_size);
         neighbours.initialize(g->v_size);
         neighbour_sizes.initialize(g->v_size);
         dense_old_color_classes.initialize(g->v_size);
@@ -250,14 +249,16 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
                 skip += 1;
 
                 // since old color class will always appear last, the queue pointer of old color class is still valid!
-                //int i = queue_pointer.get(old_class); // ToDo: why is this a problem?
-                //if(i >= 0) {
-                //    cell_todo.replace_cell(&queue_pointer, old_class, new_class, new_class_sz);
-                //}
+                int i = queue_pointer.get(old_class); // ToDo: why is this a problem?
+                if(i >= 0) {
+                    cell_todo.replace_cell(&queue_pointer, old_class, new_class, new_class_sz);
+                }
             }
         }
         if(!comp) break;
     }
+
+    assert(c->check());
 
     //std::cout << "its: " << its << std::endl;
 
@@ -1001,7 +1002,7 @@ bool refinement::refine_color_class_singleton_first(sgraph *g, coloring *c, int 
         col = c->vertex_to_col[v];
 
         if(c->ptn[col] == 0) {
-            vertex_worklist.push_back(col); // treat singletons in separate list
+            //vertex_worklist.push_back(col); // treat singletons in separate list
             continue;
         }
 
@@ -1018,23 +1019,9 @@ bool refinement::refine_color_class_singleton_first(sgraph *g, coloring *c, int 
         // dense_old_color_classes can be used as reset information
     }
 
-    if(!comp) {
-        while(!dense_old_color_classes.empty())
-            neighbours.set(dense_old_color_classes.pop_back(), -1);
-        return comp;
-    }
-
-    dense_old_color_classes.sort();
+    //dense_old_color_classes.sort();
 
     // sort and write down singletons in invariant
-    if(comp)
-        vertex_worklist.sort();
-
-    if(!comp) {
-        while(!dense_old_color_classes.empty())
-            neighbours.set(dense_old_color_classes.pop_back(), -1);
-        return comp;
-    }
 
     while(!dense_old_color_classes.empty()) {
         deg0_col    = dense_old_color_classes.pop_back();
@@ -1115,10 +1102,6 @@ bool refinement::refine_color_class_dense_first(sgraph *g, coloring *c, int colo
     color_workset.reset_hard();
 
     // DENSE-DENSE: dont sort, just iterate over all cells
-    // dense_old_color_classes.sort();
-    // for every cell to be split...
-    //for(j = 0; j < g->v_size;) {
-    //col    = j;
     while(!dense_old_color_classes.empty()) {
         col = dense_old_color_classes.pop_back();
         //j     += c->ptn[j] + 1;
@@ -1381,7 +1364,7 @@ bool refinement::old_refine_coloring_first(sgraph *g, coloring *c, int init_colo
                                                &color_class_splits);
             }
         } else { // SPARSE
-            refine_color_class_first(g, c, next_color_class.first, next_color_class.second, &color_class_splits);
+                refine_color_class_first(g, c, next_color_class.first, next_color_class.second, &color_class_splits);
         }
 
         int skip = 0;
@@ -1408,7 +1391,9 @@ bool refinement::old_refine_coloring_first(sgraph *g, coloring *c, int init_colo
             }
         }
     }
-    //assert(assert_is_equitable(g, c));
+
+    assert(c->check());
+    assert(assert_is_equitable(g, c));
     return comp;
 }
 

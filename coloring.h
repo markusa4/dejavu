@@ -22,6 +22,10 @@ public:
     ~coloring();
 
     void copy_force(coloring *c);
+
+    void initialize(int domain_size);
+
+    bool check();
 };
 
 #endif //BRUTUS_COLORING_H

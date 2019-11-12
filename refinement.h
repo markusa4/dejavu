@@ -208,7 +208,7 @@ public:
                                       work_list_pair_bool *color_class_split_worklist);
     bool old_refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     ~refinement();
-private:
+
     bool initialized = false;
     bool counting_initialized = false;
     work_set_int queue_pointer;

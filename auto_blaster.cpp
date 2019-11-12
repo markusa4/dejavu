@@ -39,21 +39,20 @@ double doubleRand(const double & min, const double & max, int seed) {
 }
 
 bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes) {
+    //std::cout << "proc" << std::endl;
     if(changes != nullptr)
         changes->track(c->vertex_to_col[v]);
 
     int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
+
     comp = comp && I->write_top_and_compare(INT32_MAX);
-
-    if(!comp) return comp;
-
+    //if(!comp) return comp;
     comp = comp && w->R.refine_coloring(g, c, changes, I, init_color_class, changes != nullptr);
-    bool tempcomp = comp;
     comp = comp && I->write_top_and_compare(INT32_MAX);
     comp = comp && I->write_top_and_compare(INT32_MIN);
-    assert(tempcomp == comp);
+    //assert(tempcomp == comp);
     return comp;
 }
 
@@ -235,9 +234,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
     coloring *c = &w->c;
     invariant *I = &w->I;
 
-    work_set *first_level_fail = &w->first_level_fail;
-    work_set *first_level_succ = &w->first_level_succ;
-
     coloring *start_c = w->start_c;
     invariant *start_I = &w->start_I;
 
@@ -245,12 +241,7 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
 
     int init_color_class;
     *restarts = 0;
-    int reguess = 0;
-    int level = w->first_level;
-    int first_level_point = -1;
-    int second_level_point = -1;
-
-    int enqueue_fail_point_sz = 0;
+    int level = 1;
 
     if (compare) {
         start_I->set_compare_invariant(canon_I);
@@ -262,106 +253,10 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
     ir_operation last_op = OP_R;
     *I = *start_I;
     c->copy(start_c);
-    int base;
-
+    int s;
 
     while (true) {
         if(*done) return;
-        if (backtrack) {
-            w->measure1 += 1;
-            // check for new messages
-            bool receive_advance = false;
-            if(*done) return;
-            S->empty_cache();
-            // initialize a search state
-            *restarts += 1;
-            c->copy(start_c);
-            *I = *start_I;
-
-            // invariant, hopefully becomes complete in leafs such that automorphisms can be found
-            if (level == w->first_level + 1) {
-                if (!first_level_fail->get(base)) {
-                    first_level_fail->set(base);
-                    w->first_level_sz += 1;
-                }
-            }
-
-            backtrack = false;
-            level = w->first_level;
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //                                             INDIVIDUALIZATION (1)
-            ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-            //S->empty_cache();
-            int s = S->select_color(g, c, selector_seed);
-            if((receive_advance || w->first_level_sz == c->ptn[s] + 1) && w->first_level < w->base_size) {
-                proceed_state(w, g, start_c, start_I, w->G->b[w->first_level - 1], nullptr);
-                w->first_level += 1;
-
-                first_level_fail->reset();
-                first_level_succ->reset();
-                w->first_level_succ_point = -1;
-                w->first_level_sz = 0;
-
-                level = w->first_level;
-                c->copy_force(start_c);
-                *I = *start_I;
-                //S->empty_cache();
-                s  = S->select_color(g, c, selector_seed);
-                assert(s != -1);
-                assert(start_I->cur_pos == I->cur_pos);
-            } else if (w->first_level_sz == c->ptn[s] + 1) {
-                // I added all automorphisms!
-                std::cout << "Levels explored..." << std::endl;
-                *done = true;
-            }
-
-            // collect all elements of color s
-            int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-            int v = c->lab[rpos];
-            //assert(rpos == c->vertex_to_lab[v]);
-            // first level fail prevention done_shared_group
-            if(!switches->done_shared_group) {
-                while (first_level_fail->get(v)) {
-                    if (*done) return;
-                    reguess += 1;
-                    //rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-                    rpos = s + ((rpos - s + 1) % (c->ptn[s] + 1));
-                    v = c->lab[rpos];
-                }
-            } else {
-               // std::cout << "using shared orbit " << std::endl;
-                v = (*w->shared_orbit)[v];
-                while (first_level_fail->get(v)) {
-                    if (*done) return;
-                    reguess += 1;
-                    //rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-                    rpos = s + ((rpos - s + 1) % (c->ptn[s] + 1));
-                    v = (*w->shared_orbit)[c->lab[rpos]];
-                }
-            }
-
-            first_level_point = v;
-            // individualize random vertex of class
-            int newpos = R->individualize_vertex(c, v);
-            last_op = OP_I;
-            assert(init_color_class >= 0);
-            init_color_class = newpos;
-            assert(c->vertex_to_col[v] > 0);
-            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
-            if (!compare) { // base points
-                automorphism->map[automorphism->map_sz] = v;
-                automorphism->map_sz += 1;
-                //automorphism->map.push_back(v);
-            }
-            base = v;
-            level += 1;
-
-            bool comp = I->write_top_and_compare(INT32_MIN);
-            comp && I->write_top_and_compare(INT32_MIN);
-            assert(comp);
-        }
-
-        int s;
         if (!backtrack) {
             s = S->select_color(g, c, selector_seed);
             if (s == -1 && last_op == OP_R) {
@@ -375,19 +270,6 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
                     *automorphism = leaf;
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);//enqueue_fail_point_sz
-                    if(enqueue_fail_point_sz > 0) {
-                        if(config.CONFIG_THREADS_COLLABORATE) {
-                                    w->G->first_level_points.try_enqueue_bulk(*w->ptok, w->enqueue_space, enqueue_fail_point_sz);
-                        }
-                    }
-                    if(!first_level_succ->get(first_level_point)) {
-                        if(config.CONFIG_THREADS_COLLABORATE) {
-                                w->G->first_level_points.try_enqueue(*w->ptok, std::tuple<int, int>(w->first_level,first_level_point));
-                        }
-                        w->first_level_succ_point = first_level_point;
-                        w->first_level_sz += 1;
-                        first_level_succ->set(first_level_point);
-                    }
                     //std::cout << "Found automorphism." << *restarts << std::endl;
                     assert(g->certify_automorphism(*automorphism));
                     return;
@@ -426,33 +308,18 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
             ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
             // collect all elements of color s
-            init_color_class = -1;
             int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
             int v = c->lab[rpos];
-           // if(switches->done_shared_group && config.CONFIG_THREADS_COLLABORATE) // ToDo why is this problematic?
-            //    v = (*w->shared_orbit)[v];
-
-            //assert(rpos == c->vertex_to_lab[v]);
-
-            if(level == w->first_level)
-                first_level_point = v;
-
-            if(level == w->first_level + 1)
-                second_level_point = v;
 
             // individualize random vertex of class
             int newpos = R->individualize_vertex(c, v);
             last_op = OP_I;
-//            assert(init_color_class >= 0);
             init_color_class = newpos;
             assert(c->vertex_to_col[v] > 0);
-            //init_color_class.push_back(c.vertex_to_col[c.lab[labpos - 1]]);
             if (!compare) { // base points
-                //automorphism->map.push_back(v);
                 automorphism->map[automorphism->map_sz] = v;
                 automorphism->map_sz += 1;
             }
-            base = v;
             level += 1;
 
             bool comp = I->write_top_and_compare(INT32_MIN);
@@ -534,6 +401,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
              //   std::cout << "wrong guess" << w->skiplevels << std::endl;
             if(*done) return;
             if((*restarts % (5 * tolerance) == 0) && (w->skiplevels < w->my_base_points_sz - 1)) {
+                //std::cout << "(restarts)" << std::endl;
                 w->skiplevels += 1;
             }
             S->empty_cache();
@@ -555,6 +423,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
             level = w->first_skiplevel;
             if(!w->is_foreign_base)
                 group_level = w->skip_schreier_level;
+            last_op = OP_R;
         }
 
         int s;
@@ -837,6 +706,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         next_elem->base_sz = elem->base_sz + 1;
         next_elem->base = new int[next_elem->base_sz];
         next_elem->init_base = true;
+        // ToDo: use memcpy
         for(int j = 0; j < elem->base_sz; ++j) {
             assert(elem->base[j] >= 0 && elem->base[j] < g->v_size);
             next_elem->base[j] = elem->base[j];
@@ -1046,11 +916,17 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
     lowdeg* L;
+    auto_workspace W;
 
     if(master) {
+        config.CONFIG_IR_DENSE = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
         L = new lowdeg();
-        std::pair<sgraph*, coloring*> preprocessed_graph = L->preprocess(g);
-        g = preprocessed_graph.first;
+        start_c = new coloring;
+        g->initialize_coloring(start_c);
+        std::pair<sgraph*, coloring*> preprocessed_graph = L->preprocess(start_c, g, &W.R);
+        g       = preprocessed_graph.first;
+        start_c = preprocessed_graph.second;
+        assert(start_c->check());
     }
 
     double cref;
@@ -1071,7 +947,6 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     int selector_seed = seed;
     com_pad pad;
 
-    auto_workspace W;
     invariant start_I;
 
     //W.first_level_fail.initialize(g->v_size);
@@ -1083,7 +958,6 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
     W.enqueue_space_sz = 128; // <- choose this dynamic?
 
     if (master) {
-        config.CONFIG_IR_DENSE = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
         std::cout << "[R] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false") << std::endl;
 
         shrd_orbit = new int[g->v_size];
@@ -1104,14 +978,12 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         // first color refinement
         canon_I    = new invariant*;
         canon_leaf = new bijection*;
-        start_c    = new coloring;
-        g->initialize_coloring(start_c);
         W.start_c = start_c;
         start_I.create_vector();
         //W.R.old_refine_coloring_first(g, start_c, -1);
         //invariant trashi;
         //trashi.create_vector();
-        W.R.old_refine_coloring_first(g, start_c, -1); // ToDo: why does new color ref not work properly on rantree-2000?
+        W.R.refine_coloring_first(g, start_c, -1); // ToDo: why does new color ref not work properly on rantree-2000?
         //W.R.refine_coloring(g, start_c, nullptr, &trashi, -1, false);
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
@@ -1129,6 +1001,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             std::cout << "First coloring discrete." << std::endl;
             std::cout << "Base size: 0" << std::endl;
             std::cout << "Group size: 1" << std::endl;
+            L->postprocess(nullptr);
             return;
         }
         W.S.empty_cache();
@@ -1274,6 +1147,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                         actual_base = base_points;
                         base_points.not_deletable();
                         G->initialize(g->v_size, &actual_base);
+                        std::cout << "Base size: " << actual_base.map_sz << std::endl;
                         bfs_element *root_elem = new bfs_element;
                         root_elem->id = 0;
                         root_elem->c = new coloring;
@@ -1446,6 +1320,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         //std::cout << automorphism.foreign_base << std::endl;
         bool test = true;
         if(switches->done_created_group) {
+           // std::cout << "found auto" << std::endl;
             test = G->add_permutation(&automorphism, &idle_ms, done);
             if(test && foreign_base_done) {
                 G->sift_random();
@@ -1547,6 +1422,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                 std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
                 cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                 std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
+                L->postprocess(G);
                 break;
             }
         }

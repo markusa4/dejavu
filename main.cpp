@@ -96,7 +96,7 @@ void bench_traces(sgraph *g) {
     static DEFAULTOPTIONS_TRACES(options);
     // static DEFAULTOPTIONS_SPARSEGRAPH(options);
     //options.schreier = true;
-    //options.writeautoms = true;
+    // options.writeautoms = true;
     schreier_fails(10);
     options.defaultptn = false;
 
@@ -263,7 +263,7 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&_g);
+    //bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -305,7 +305,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+   //  return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -318,14 +318,14 @@ int main(int argc, char *argv[]) {
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-32", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-    // /p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-7", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-2", &g);
      //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-3000-2", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g); // skiplevels / base_size thing
-      p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-2000.bliss", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-20", &g); // skiplevels / base_size thing
+      // p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-100000.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-16-8", &g);
@@ -335,18 +335,23 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\cfi\\cfi-200", &g);
     //p.parse_dimacs_file("C:\\Users\\Markus\\Downloads\\undirected_dim\\undirected_dim\\mz-aug2\\mz-aug2\\mz-aug2-22", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
-   //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/17cube.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/6pipe.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/hypercubes/17cube.bliss", &g);
+     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/7pipe.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/hole12.bliss", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pret150_25_ms.bliss", &g); // smallest is crazy here...
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/s4-4-3-9.bliss", &g);
+    p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
     sgraph _g;
     bijection pr;
     bijection::random_bijection(&pr, g.v_size);
     g.permute_graph(&_g, &pr); // permute graph
+    //sgraph backup_graph;
+    //backup_graph.copy_graph(&_g);
      //_g = g;
     std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
     int repeat = 1;
@@ -379,7 +384,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
 
     timer = Clock::now();
-    bench_nauty(&_g);
+    //bench_nauty(&_g);
     double nauty_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 

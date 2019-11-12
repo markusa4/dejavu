@@ -75,3 +75,34 @@ void coloring::copy_force(coloring *c) {
 
     init = true;
 }
+
+void coloring::initialize(int domain_size) {
+    lab = new int[domain_size];
+    ptn = new int[domain_size];
+
+    vertex_to_col.resize(domain_size);
+    vertex_to_lab.resize(domain_size);
+
+    init = true;
+
+    lab_sz = domain_size;
+    ptn_sz = domain_size;
+}
+
+bool coloring::check() {
+    bool comp = true;
+
+    for(int i = 0; i < lab_sz;++i) {
+        comp = comp && (lab[i] >= 0 && lab[i] < lab_sz);
+        comp = comp && (lab[vertex_to_lab[i]] == i);
+    }
+
+    // assert proper ptn
+    for(int i = 0; i < lab_sz;) {
+        if(i != 0)
+            comp = comp && (ptn[i - 1] == 0);
+        i += ptn[i] + 1;
+    }
+
+    return comp;
+}
