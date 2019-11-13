@@ -98,29 +98,26 @@ struct alignas(64) auto_workspace {
 
 class auto_blaster {
 public:
-    void sample_pipelined(sgraph *g, bool master, shared_switches* switches, pipeline_group* G, coloring* start_c, bijection* canon_leaf, invariant* canon_I,
-                          com_pad* communicator_pad, int communicator_id, int** shared_orbit, bfs* bwork, mpermnode** gens, int* shared_group_identity);
 
     void sample_shared(sgraph *g_, bool master, shared_switches *switches, diy_group *G, coloring *start_c,
-                       bijection **canon_leaf, invariant **canon_I, com_pad *communicator_pad, int communicator_id,
+                       strategy* canon_strategy, int communicator_id,
                        int **shared_orbit, int** shared_orbit_weights, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
 private:
     void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                 shared_switches *switches, int selector_seed);
 
-    void fast_automorphism_non_uniform(sgraph *g, bool compare, invariant *canon_I, bijection *canon_leaf,
+    void fast_automorphism_non_uniform(sgraph *g, bool compare, strategy* canon_strategy,
                                        bijection *automorphism, int *restarts,
                                        bool *done, int selector_seed, auto_workspace *w, int tolerance);
 
-    void find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                                  bijection *canon_leaf, bijection *automorphism, int *restarts,
+    void find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                                   shared_switches *switches, int selector_seed);
 
     bool proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes);
 
-    bool bfs_chunk(sgraph *g, invariant *canon_I, bijection *canon_leaf, bool *done,
+    bool bfs_chunk(sgraph *g, strategy* canon_strategy, bool *done,
               int selector_seed,
               auto_workspace *w);
 

@@ -26,8 +26,12 @@ int selector::select_color_first(sgraph *g, coloring *c) {
 int selector::select_color_smallest(sgraph *g, coloring *c) {
     int smallest_cell  = -1;
     int smallest_cell_sz = c->lab_sz + 1;
-
+    bool only_trivial = true;
     for(int i = skipstart; i < c->ptn_sz;){
+        if (c->ptn[i] != 0 && only_trivial) {
+            skipstart = i;
+            only_trivial = false;
+        }
         if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
             smallest_cell = i;
             smallest_cell_sz = c->ptn[i];
@@ -39,6 +43,8 @@ int selector::select_color_smallest(sgraph *g, coloring *c) {
 
 void selector::empty_cache() {
     skipstart = 0;
+    hint      = -1;
+    hint_sz   = -1;
     largest_cache.reset();
 }
 
@@ -52,46 +58,39 @@ int selector::select_color_largest(coloring *c) {
         init = true;
     }
 
+    //if(hint != -1 && c->ptn[hint] == hint_sz)
+    //    return hint;
+
+    while(!largest_cache.empty()) {
+        std::pair<int, int>* elem = largest_cache.front();
+        if(c->ptn[elem->first] == elem->second)
+            return elem->first;
+        largest_cache.pop();
+    }
+
     int largest_cell  = -1;
     int largest_cell_sz = -1;
     bool only_trivial = true;
 
-    //largest_cache.reset();
-/*
-    while(!largest_cache.empty()) {
-        auto it = largest_cache.front();
-        if(it->second == c->ptn[it->first]) {
-            largest_cell    = it->first;
-            largest_cell_sz = it->second;
-            //largest_cache.pop();
-            break;
-        }
-        largest_cache.pop();
-    }
-
-    if(largest_cell >= 0) {
-        return largest_cell;
-    }*/
-
-    skipstart = 0;
-
-    int choices = 0;
     assert(skipstart < c->ptn_sz);
     for(int i = skipstart; i < c->ptn_sz;) { // c->ptn[i] > largest_cell_sz &&
         assert(i < c->ptn_sz);
-        if (c->ptn[i] != 0)
-            choices++;
-        if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
-            largest_cell = i;
-            largest_cell_sz = c->ptn[i];
-            largest_cache.reset();
-        } else if(c->ptn[i] == largest_cell_sz) {
-            largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
-        }
         if (c->ptn[i] != 0 && only_trivial) {
             skipstart = i;
             only_trivial = false;
         }
+        if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
+            largest_cell = i;
+            largest_cell_sz = c->ptn[i];
+            largest_cache.reset();
+            //hint      = -1;
+            //hint_sz   = -1;
+        } else if(c->ptn[i] == largest_cell_sz) {
+            largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
+            //hint    = i;
+            //hint_sz = c->ptn[i];
+        }
+
         i += c->ptn[i] + 1;
     }
     return largest_cell;
@@ -134,7 +133,6 @@ int selector::seeded_select_color(sgraph *g, coloring *c, int seed) {
     }
 }
 
-
 int selector::select_color(sgraph *g, coloring *c, int seed) {
    // assert(config.CONFIG_IR_CELL_SELECTOR == 1);
 
@@ -151,3 +149,16 @@ int selector::select_color(sgraph *g, coloring *c, int seed) {
     }
 }
 
+int selector::select_color_dynamic(sgraph *g, coloring *c, strategy* s) {
+    switch(s->cell_selector_type) {
+        case SELECTOR_RANDOM:
+            return seeded_select_color(g, c, s->cell_selector_seed);
+        case SELECTOR_LARGEST:
+            return select_color_largest(c);
+        case SELECTOR_SMALLEST:
+            return select_color_smallest(g, c);
+        case SELECTOR_FIRST:
+        default:
+            return select_color_first(g, c);
+    }
+}

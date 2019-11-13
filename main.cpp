@@ -244,8 +244,7 @@ int commandline_mode(int argc, char **argv) {
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
                 //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr,
-                                nullptr, nullptr);
+                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr, nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                 // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
             } else {
@@ -312,11 +311,11 @@ int main(int argc, char *argv[]) {
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-20", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-20", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
       //  p.parse_dimacs_file("/home/markus/CLionProjects/dejavu/graph_tools/k2000.dimacs", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-32", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
+      p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-50", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
@@ -339,11 +338,11 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/ransq/ransq/ransq_2000_a.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/hypercubes/17cube.bliss", &g);
-     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/7pipe.bliss", &g);
+     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/7pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/hole12.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pret150_25_ms.bliss", &g); // smallest is crazy here...
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/s4-4-3-9.bliss", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
     sgraph _g;
@@ -366,7 +365,7 @@ int main(int argc, char *argv[]) {
         } else {
             if (config.CONFIG_IR_REFINEMENT == 0) {
                 //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr,
+                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr,
                                 nullptr, nullptr);
             } else if (config.CONFIG_IR_REFINEMENT == 1) {
                 // A.sample_pipelined_bucket(&_g, true, &done, nullptr);

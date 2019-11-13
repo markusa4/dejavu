@@ -12,8 +12,35 @@
 #include "refinement.h"
 #include <list>
 
+enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_RANDOM};
+
+struct strategy {
+    bijection* leaf = nullptr;
+    invariant* I    = nullptr;
+    selector_type cell_selector_type = SELECTOR_FIRST;
+    int           cell_selector_seed = 0;
+
+    strategy() = default;
+    strategy(bijection* leaf, invariant* I, selector_type cell_selector_type, int seed) {
+        this->leaf = leaf;
+        this->I    = I;
+        this->cell_selector_type = cell_selector_type;
+        this->cell_selector_seed = seed;
+    }
+
+    void replace(strategy* s) {
+        leaf = s->leaf;
+        I    = s->I;
+        cell_selector_type = s->cell_selector_type;
+        cell_selector_seed = s->cell_selector_seed;
+    }
+};
+
 class selector {
     int skipstart = 0;
+    int hint      = -1;
+    int hint_sz   = -1;
+
     //std::list<std::pair<int, int>> largest_cache;
     ring_pair largest_cache;
     int init = false;
@@ -34,7 +61,8 @@ public:
     void empty_cache();
 
     void pop_cache();
-};
 
+    int select_color_dynamic(sgraph *g, coloring *c, strategy *s);
+};
 
 #endif //BRUTUS_SELECTOR_H

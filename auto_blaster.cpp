@@ -56,8 +56,8 @@ bool auto_blaster::proceed_state(auto_workspace* w, sgraph* g, coloring* c, inva
     return comp;
 }
 
-void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                          bijection *canon_leaf, bijection *automorphism, int *restarts,
+
+void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                           shared_switches *switches, int selector_seed) {
     bool backtrack = false;
     bool* done = &switches->done;
@@ -66,6 +66,9 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
     selector *S = &w->S;
     coloring *c = &w->c;
     invariant *I = &w->I;
+
+    invariant* canon_I    = canon_strategy->I;
+    bijection* canon_leaf = canon_strategy->leaf;
 
     S->empty_cache();
 
@@ -133,7 +136,7 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
 
         int s;
         if (!backtrack) {
-            s = S->select_color(g, c, selector_seed);
+            s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 if (compare) {
                     // we can derive an automorphism!
@@ -223,7 +226,7 @@ void auto_blaster::find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool
 
 
 void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                          bijection *canon_leaf, bijection *automorphism, int *restarts,
+                                          bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                           shared_switches *switches, int selector_seed) {
     bool backtrack = false;
     bool* done = &switches->done;
@@ -258,7 +261,7 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
     while (true) {
         if(*done) return;
         if (!backtrack) {
-            s = S->select_color(g, c, selector_seed);
+            s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1 && last_op == OP_R) {
                 if (compare) {
                     // we can derive an automorphism!
@@ -332,7 +335,7 @@ void auto_blaster::find_automorphism_prob(auto_workspace *w, sgraph *g, bool com
     }
 }
 
-void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invariant* canon_I, bijection* canon_leaf,
+void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* canon_s,
         bijection* automorphism, int *restarts, bool *done, int selector_seed, auto_workspace* w, int tolerance) {
     bool backtrack = false;
     bool skipped_level = false;
@@ -346,6 +349,9 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
     coloring  *start_c     = &w->skip_c;
     invariant *start_I     = &w->skip_I;
     mschreier *group_level = w->skip_schreier_level;
+
+    invariant* canon_I    = canon_s->I;
+    bijection* canon_leaf = canon_s->leaf;
 
     automorphism->non_uniform = false;
 
@@ -428,7 +434,7 @@ void auto_blaster::fast_automorphism_non_uniform(sgraph* g, bool compare, invari
 
         int s;
         if (!backtrack) {
-            s = S->select_color(g, c, selector_seed);
+            s = S->select_color_dynamic(g, c, canon_s);
             if (s == -1 && last_op == OP_R) {
                 if (compare) {
                     // we can derive an automorphism!
@@ -617,7 +623,7 @@ bool auto_blaster::get_orbit(auto_workspace* w, int* base, int base_sz, int v, i
     return true;
 }
 
-bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_leaf, bool *done, int selector_seed, auto_workspace* w) {
+bool auto_blaster::bfs_chunk(sgraph* g, strategy* canon_strategy, bool *done, int selector_seed, auto_workspace* w) {
     thread_local bool done_test = false;
 
     bfs* BFS = w->BW;
@@ -674,10 +680,10 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
                 w->work_c->copy_force(elem->c);
                 w->prev_bfs_element = elem;
                 *w->work_I = *elem->I;
-                w->work_I->set_compare_invariant(canon_I);
+                w->work_I->set_compare_invariant(canon_strategy->I);
             } else {
                 *w->work_I = *elem->I;
-                w->work_I->set_compare_invariant(canon_I);
+                w->work_I->set_compare_invariant(canon_strategy->I);
                 w->work_c->copy(elem->c);
             }
 
@@ -721,7 +727,7 @@ bool auto_blaster::bfs_chunk(sgraph* g, invariant* canon_I, bijection* canon_lea
         int sz = 0;
         //if(level != target_level - 1) {
             w->S.empty_cache();
-            int c = w->S.select_color(g, w->work_c, selector_seed);
+            int c = w->S.select_color_dynamic(g, w->work_c, canon_strategy);
             next_elem->target_color = c;
             // ToDo: sort lab?
             //std::sort(w->work_c->lab + c, w->work_c->lab + c + w->work_c->ptn[c]);
@@ -910,8 +916,8 @@ void auto_blaster::reset_skiplevels(auto_workspace* w) {
     w->is_foreign_base   = false;
 }
 
-void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, bijection** canon_leaf, invariant** canon_I,
-                                    com_pad* communicator_pad, int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs* bwork, mpermnode** gens, int* shared_group_size) {
+void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switches, diy_group* G, coloring* start_c, strategy* canon_strategy,
+                                int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs* bwork, mpermnode** gens, int* shared_group_size) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
@@ -976,8 +982,10 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         switches->current_mode = modes::MODE_TOURNAMENT;
 
         // first color refinement
-        canon_I    = new invariant*;
-        canon_leaf = new bijection*;
+        //canon_I    = new invariant*;
+        //canon_leaf = new bijection*;
+        canon_strategy = new strategy;
+
         W.start_c = start_c;
         start_I.create_vector();
         //W.R.old_refine_coloring_first(g, start_c, -1);
@@ -1009,7 +1017,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
             work_threads.emplace_back(
                     std::thread(&auto_blaster::sample_shared, auto_blaster(), g, false, switches, G, start_c,
-                                canon_leaf, canon_I, &pad, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens, &_shared_group_size));
+                                canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens, &_shared_group_size));
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Refinement workers created: " << cref / 1000000.0 << "ms" << std::endl;
@@ -1046,12 +1054,12 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         W.shared_orbit_weights = shared_orbit_weights;
         W.start_c = new coloring;
         W.start_c->copy_force(start_c);
-        W.communicator_pad = communicator_pad;
         W.communicator_id = communicator_id;
         W.shared_generators = gens;
         W.shared_generators_size = shared_group_size;
     }
 
+    strategy* my_strategy;
     {
         //W.base_size = G->base_size;
         _canon_I = new invariant;
@@ -1060,9 +1068,12 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         _canon_I->compare_vec = nullptr;
         _canon_I->compareI    = nullptr;
         _canon_leaf = new bijection;
+        selector_type rst = (selector_type) intRand(0, 2, selector_seed);
+        my_strategy = new strategy(_canon_leaf, _canon_I, rst, -1);
+
         {
             W.S.empty_cache();
-            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches, selector_seed);
+            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, my_strategy, &base_points, &trash_int, switches, selector_seed);
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
@@ -1071,8 +1082,9 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         // skip immediately if base size is 1
         if(master && W.my_base_points_sz == 1) {
             std::cout << "[N] Base size 1 skip" << std::endl;
-            *canon_I    = _canon_I;
-            *canon_leaf = _canon_leaf;
+            //*canon_I    = _canon_I;
+            //*canon_leaf = _canon_leaf;
+            canon_strategy->replace(my_strategy);
             actual_base = base_points;
             base_points.not_deletable();
             G->initialize(g->v_size, &actual_base);
@@ -1085,7 +1097,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
             root_elem->is_identity = true;
             *root_elem->I = start_I;
             W.S.empty_cache();
-            int init_c = W.S.select_color(g, start_c, selector_seed);
+            int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
             W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
             switches->done_created_group = true;
             int proposed_level = W.skiplevels + 1;
@@ -1135,18 +1147,20 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
         // in what phase are we in?
         switch(switches->current_mode) {
             case modes::MODE_TOURNAMENT:
-                fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance); // <- we should already safe unsuccessfull / succ first level stuff here
+                fast_automorphism_non_uniform(g, true, my_strategy, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance); // <- we should already safe unsuccessfull / succ first level stuff here
                 if(n_found == 0) { // check if I won
                     // wait until everyone checked
                     while(!switches->check_leaf_tournament(communicator_id, restarts) && !switches->done_created_group) continue;
                     // check if I won, if yes: create group
                     if(switches->done_created_group) continue;
                     if(switches->win_id == communicator_id) {
-                        *canon_I    = _canon_I;
-                        *canon_leaf = _canon_leaf;
+                        //*canon_I    = _canon_I;
+                        //*canon_leaf = _canon_leaf;
+                        canon_strategy->replace(my_strategy);
                         actual_base = base_points;
                         base_points.not_deletable();
                         G->initialize(g->v_size, &actual_base);
+                        std::cout << "Strategy: " << canon_strategy->cell_selector_type << std::endl;
                         std::cout << "Base size: " << actual_base.map_sz << std::endl;
                         bfs_element *root_elem = new bfs_element;
                         root_elem->id = 0;
@@ -1157,7 +1171,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                         root_elem->is_identity = true;
                         *root_elem->I = start_I;
                         W.S.empty_cache();
-                        int init_c = W.S.select_color(g, start_c, selector_seed);
+                        int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
                         W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
                         switches->done_created_group = true;
                         int proposed_level = W.skiplevels + 1;
@@ -1188,11 +1202,11 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
 
             case modes::MODE_NON_UNIFORM_PROBE:
                 if(!foreign_base_done) {
-                    fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance);
+                    fast_automorphism_non_uniform(g, true, my_strategy, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance);
                     automorphism.foreign_base = true;
                     n_restarts += restarts;
                 } else {
-                    fast_automorphism_non_uniform(g, true, *canon_I, *canon_leaf, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance);
+                    fast_automorphism_non_uniform(g, true, canon_strategy, &automorphism, &restarts, done_fast, selector_seed, &W, switches->tolerance);
                     automorphism.foreign_base = false;
                     n_restarts += restarts;
                 }
@@ -1214,7 +1228,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                             //delete _canon_leaf;
                             _canon_leaf = new bijection;
                             base_points = bijection();
-                            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, &base_points, &trash_int, switches, selector_seed);
+                            find_automorphism_prob(&W, g, false, _canon_I, _canon_leaf, my_strategy, &base_points, &trash_int, switches, selector_seed);
                             W.my_base_points    = base_points.map;
                             W.my_base_points_sz = base_points.map_sz;
                             W.is_foreign_base   = true;
@@ -1224,12 +1238,12 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                     }
 
                     if (!foreign_base_done) {
-                        fast_automorphism_non_uniform(g, true, _canon_I, _canon_leaf, &automorphism, &restarts,
+                        fast_automorphism_non_uniform(g, true, my_strategy, &automorphism, &restarts,
                                                       done_fast, selector_seed, &W, switches->tolerance);
                         automorphism.foreign_base = true;
                         n_restarts += restarts;
                     } else {
-                        fast_automorphism_non_uniform(g, true, *canon_I, *canon_leaf, &automorphism, &restarts,
+                        fast_automorphism_non_uniform(g, true, canon_strategy, &automorphism, &restarts,
                                                       done_fast, selector_seed, &W, switches->tolerance);
                         automorphism.foreign_base = false;
                         n_restarts += restarts;
@@ -1252,6 +1266,8 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
 
             case modes::MODE_BFS:
                 reset_non_uniform_switch = true;
+                if(W.is_foreign_base)
+                    reset_skiplevels(&W);
                 if(W.BW->BW.current_level != W.BW->BW.target_level) {
                     if (communicator_id == -1 && W.BW->BW.target_level < 0) {
                         int proposed_level = W.skiplevels + 1;
@@ -1268,7 +1284,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                             std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                             std::cout << "[B] Determined target level: " << W.BW->BW.target_level << "" << std::endl;
                         }
-                        bfs_chunk(g, *canon_I, *canon_leaf, done, selector_seed, &W);
+                        bfs_chunk(g, canon_strategy, done, selector_seed, &W);
                         if(master)
                             bwork->work_queues(switches->tolerance);
                     }
@@ -1305,7 +1321,7 @@ void auto_blaster::sample_shared(sgraph* g_, bool master, shared_switches* switc
                             std::chrono::high_resolution_clock::now() - timer).count());
                     std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                 }
-                find_automorphism_from_bfs(&W, g, true, *canon_I, *canon_leaf, &automorphism, &restarts, switches, selector_seed);
+                find_automorphism_from_bfs(&W, g, true, canon_strategy, &automorphism, &restarts, switches, selector_seed);
                 break;
 
             case modes::MODE_WAIT:
