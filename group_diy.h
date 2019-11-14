@@ -2,19 +2,19 @@
 // Created by markus on 24/10/2019.
 //
 
-#ifndef DEJAVU_DIY_GROUP_H
-#define DEJAVU_DIY_GROUP_H
+#ifndef DEJAVU_GROUP_DIY_H
+#define DEJAVU_GROUP_DIY_H
 
 
-#include "pipeline_schreier.h"
+#include "schreier_shared.h"
 #include "bijection.h"
 #include "concurrentqueue.h"
 #include "blockingconcurrentqueue.h"
 #include "utility.h"
 
-struct auto_workspace;
+struct dejavu_workspace;
 
-class diy_group {
+class group_diy {
 public:
     // input and pipeline management
     moodycamel::ConcurrentQueue<std::pair<sift_type, bool>> sift_results        = moodycamel::ConcurrentQueue<std::pair<sift_type, bool>>(20, 16, 1);
@@ -42,9 +42,9 @@ public:
     mschreier *gp;
     mpermnode *gens;
 
-    diy_group(int domain_size);
+    group_diy(int domain_size);
     void initialize(int domain_size, bijection *base_points);
-    ~diy_group();
+    ~group_diy();
     bool add_permutation(bijection* p, int* idle_ms, bool* done);
     void print_group_size();
     void manage_results(shared_switches* switches);
@@ -60,4 +60,4 @@ public:
 
 
 
-#endif //DEJAVU_DIY_GROUP_H
+#endif //DEJAVU_GROUP_DIY_H

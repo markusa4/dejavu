@@ -41,7 +41,7 @@ class bfs_workspace {
 public:
     // level array that keeps a queue with tasks
     // bfs_element* is a pointer to the state where int has to be individualized
-    moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>* bfs_level_todo;
+    moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int, int>>* bfs_level_todo;
 
     // commit finished elements (or nullptr if element was deleted)
     // integer determines how many todos were added for this element

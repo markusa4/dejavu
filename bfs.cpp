@@ -3,7 +3,7 @@
 //
 
 #include "bfs.h"
-#include "auto_blaster.h"
+#include "dejavu.h"
 
 bfs_element::~bfs_element() {
     if(init_c)
@@ -19,7 +19,7 @@ bfs::bfs() {
 }
 
 void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int base_size) {
-    BW.bfs_level_todo              = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
+    BW.bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int, int>>[base_size + 2];
     BW.bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>[base_size + 2];
 
     BW.domain_size = domain_size;
@@ -34,7 +34,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
 
     BW.level_expecting_finished = new int[base_size + 2];
     for(int i = 0; i < base_size + 2; ++i) {
-        BW.bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
+        BW.bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
         BW.bfs_level_finished_elements[i] = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
         BW.level_expecting_finished[i] = 0;
         BW.level_maxweight[i] = 1;
@@ -49,7 +49,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     for(int i = init_c; i < init_c + root_elem->c->ptn[init_c] + 1; ++i) {
         int next_v = root_elem->c->lab[i];
         sz += 1;
-        BW.bfs_level_todo[BW.current_level].enqueue(std::pair<bfs_element*, int>(root_elem, next_v));
+        BW.bfs_level_todo[BW.current_level].enqueue(std::tuple<bfs_element*, int, int>(root_elem, next_v, -1));
     }
 
     BW.level_expecting_finished[0] = 0;
@@ -139,7 +139,7 @@ void bfs::work_queues(int tolerance) {
                     int c = elem->target_color;
                     int c_size = elem->c->ptn[c] + 1;
                     for (int i = c; i < c + c_size; ++i) {
-                        BW.bfs_level_todo[BW.current_level + 1].enqueue(std::pair<bfs_element *, int>(elem, elem->c->lab[i]));
+                        BW.bfs_level_todo[BW.current_level + 1].enqueue(std::tuple<bfs_element *, int, int>(elem, elem->c->lab[i], -1));
                         check_expected += 1;
                     }
                 }

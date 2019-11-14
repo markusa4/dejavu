@@ -1,18 +1,15 @@
-//
-// Created by markus on 01.10.19.
-//
-
 /* schreier.c - procedures for manipulating a permutation group using
  * the random schreier algorithm.  There is a separate file schreier.txt
  * which describes the usage.
  *
  * Written for nauty and traces, Brendan McKay 2010-2013.
  */
+// adapted for dejavu
 
 #include <assert.h>
 #include <iostream>
 #include <mutex>
-#include "pipeline_schreier.h"
+#include "schreier_shared.h"
 
 //long mmultcount = 0;
 //long mfiltercount = 0;
@@ -285,6 +282,7 @@ maddpermutation(mpermnode **ring, int *p, int n)
 
     pn->refcount = 0;
     pn->mark = 1;
+    pn->copied = 0;
     *ring = pn;
 }
 

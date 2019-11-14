@@ -2,8 +2,8 @@
 // Created by markus on 23.09.19.
 //
 
-#ifndef DEJAVU_AUTO_BLASTER_H
-#define DEJAVU_AUTO_BLASTER_H
+#ifndef DEJAVU_DEJAVU_H
+#define DEJAVU_DEJAVU_H
 
 
 #include <random>
@@ -12,14 +12,10 @@
 #include "concurrentqueue.h"
 #include "selector.h"
 #include "bfs.h"
-#include "pipeline_schreier.h"
-#include "diy_group.h"
+#include "schreier_shared.h"
+#include "group_diy.h"
 
-
-typedef std::vector<moodycamel::ConcurrentQueue<std::pair<int, int>>> com_pad;
-class pipeline_group;
-
-struct alignas(64) auto_workspace {
+struct alignas(64) dejavu_workspace {
     refinement R;
     selector   S;
     coloring   c;
@@ -59,12 +55,10 @@ struct alignas(64) auto_workspace {
     moodycamel::ProducerToken* ptok;
     std::vector<moodycamel::ProducerToken*> ptoks;
 
-    pipeline_group* G;
-    diy_group*      G_;
+    group_diy*      G_;
 
     coloring* start_c;
     invariant start_I;
-    com_pad*  communicator_pad;
     int       communicator_id;
 
     // shared orbit and generators
@@ -84,7 +78,7 @@ struct alignas(64) auto_workspace {
 
     // bfs workspace
     bfs* BW;
-    std::pair<bfs_element*, int>* todo_dequeue;
+    std::tuple<bfs_element*, int, int>* todo_dequeue;
     int todo_deque_sz        = -1;
     std::pair<bfs_element *, int>* finished_elements;
     int finished_elements_sz = -1;
@@ -94,44 +88,41 @@ struct alignas(64) auto_workspace {
     bool init_bfs = false;
 };
 
-#include "pipeline_group.h"
-
-class auto_blaster {
+class dejavu {
 public:
 
-    void sample_shared(sgraph *g_, bool master, shared_switches *switches, diy_group *G, coloring *start_c,
+    void sample_shared(sgraph *g_, bool master, shared_switches *switches, group_diy *G, coloring *start_c,
                        strategy* canon_strategy, int communicator_id,
                        int **shared_orbit, int** shared_orbit_weights, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
 private:
-    void find_automorphism_prob(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+    void find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                                 bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                 shared_switches *switches, int selector_seed);
 
     void fast_automorphism_non_uniform(sgraph *g, bool compare, strategy* canon_strategy,
-                                       bijection *automorphism, int *restarts,
-                                       bool *done, int selector_seed, auto_workspace *w, int tolerance);
+                                       bijection *automorphism, strategy_metrics *m,
+                                       bool *done, int selector_seed, dejavu_workspace *w, int tolerance);
 
-    void find_automorphism_from_bfs(auto_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
-                                                  shared_switches *switches, int selector_seed);
+    void find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
+                                    shared_switches *switches, int selector_seed);
 
-    bool proceed_state(auto_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes);
+    bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes);
 
     bool bfs_chunk(sgraph *g, strategy* canon_strategy, bool *done,
-              int selector_seed,
-              auto_workspace *w);
+                   int selector_seed,
+                   dejavu_workspace *w);
 
-    bool get_orbit(auto_workspace *w, int *base, int base_sz, int v, int v_base, work_list *orbit, bool reuse_generators);
+    bool get_orbit(dejavu_workspace *w, int *base, int base_sz, int v, int v_base, work_list *orbit, bool reuse_generators);
 
-    void fast_automorphism_non_uniform_from_bfs(auto_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                                bijection *canon_leaf, bijection *automorphism, int *restarts,
-                                                bool *done,
-                                                int selector_seed);
+    void reset_skiplevels(dejavu_workspace *w);
 
-    void reset_skiplevels(auto_workspace *w);
+    void bfs_reduce_tree(dejavu_workspace *w);
 
-    void bfs_reduce_tree(auto_workspace *w);
+    void bfs_fill_queue(dejavu_workspace *w);
+
+    void bfs_assure_init(dejavu_workspace *w);
 };
 
 
-#endif //DEJAVU_AUTO_BLASTER_H
+#endif //DEJAVU_DEJAVU_H

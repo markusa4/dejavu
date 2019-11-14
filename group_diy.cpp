@@ -1,17 +1,13 @@
-//
-// Created by markus on 24/10/2019.
-//
-
 #include <iostream>
 #include <tgmath.h>
-#include "diy_group.h"
+#include "group_diy.h"
 #include "configuration.h"
 
-diy_group::diy_group(int domain_size) {
+group_diy::group_diy(int domain_size) {
     this->domain_size = domain_size;
 }
 
-void diy_group::initialize(int domain_size, bijection *base_points) {
+void group_diy::initialize(int domain_size, bijection *base_points) {
     mschreier_fails(-1);
     added = 0;
     shared_group_todo = 5;
@@ -29,7 +25,7 @@ void diy_group::initialize(int domain_size, bijection *base_points) {
     mgetorbits(b, base_size, gp, &gens, domain_size);
 }
 
-void diy_group::manage_results(shared_switches *switches) {
+void group_diy::manage_results(shared_switches *switches) {
     int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
     for(int j = 0; j < num; ++j) {
         switch(dequeue_space[j].first) {
@@ -63,18 +59,19 @@ void diy_group::manage_results(shared_switches *switches) {
             break;
         }
         if(abort_counter >= config.CONFIG_RAND_ABORT) {
+            std::cout << "proper abort" << std::endl;
             switches->done = true;
             break;
         }
     }
 }
 
-diy_group::~diy_group() {
+group_diy::~group_diy() {
     delete[] b;
     mfreeschreier(&gp, &gens);
 }
 
-bool diy_group::add_permutation(bijection *p, int *idle_ms, bool *done) {
+bool group_diy::add_permutation(bijection *p, int *idle_ms, bool *done) {
     filterstate state;
     state.ingroup = false;
     state.counts_towards_abort = !p->non_uniform;
@@ -94,7 +91,7 @@ bool diy_group::add_permutation(bijection *p, int *idle_ms, bool *done) {
     return result;
 }
 
-void diy_group::ack_done_shared() {
+void group_diy::ack_done_shared() {
     thread_local bool seen = false;
     if(!seen) {
         ++_ack_done_shared_group;
@@ -102,7 +99,7 @@ void diy_group::ack_done_shared() {
     }
 }
 
-void diy_group::sift_random() {
+void group_diy::sift_random() {
     bool result = true;
     while(result) {
         random_element re;
@@ -119,17 +116,17 @@ void diy_group::sift_random() {
     }
 }
 
-void diy_group::reset_ack_done_shared() {
+void group_diy::reset_ack_done_shared() {
     _ack_done_shared_group = 0;
 }
 
-void diy_group::wait_for_ack_done_shared(int n) {
+void group_diy::wait_for_ack_done_shared(int n) {
     while(_ack_done_shared_group != n)
         continue;
     return;
 }
 
-void diy_group::print_group_size() {
+void group_diy::print_group_size() {
     double grpsize1;
     int grpsize2;
     mgrouporder(b, base_size, gp,&gens, &grpsize1, &grpsize2, domain_size);
@@ -138,7 +135,7 @@ void diy_group::print_group_size() {
     std::cout << "Generators: " << mschreier_gens(gens) << std::endl;
 }
 
-int diy_group::number_of_generators() {
+int group_diy::number_of_generators() {
     int k = 0;
     mpermnode *it = gens;
     if(it == NULL)

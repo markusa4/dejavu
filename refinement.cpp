@@ -1596,12 +1596,14 @@ void cumulative_counting::initialize(int size, int maxdegree) {
 }
 
 void cumulative_counting::reset() {
+    thread_local int index;
+
     while(!reset_queue.empty()) {
-        int index = reset_queue.pop();
+        index = reset_queue.pop();
         count[index] = 0;
     }
     while(!reset_queue_sizes.empty()) {
-        int index = reset_queue_sizes.pop();
+        index = reset_queue_sizes.pop();
         sizes[index] = 0;
         //sizes[index].push_back(-1);
     }
@@ -1610,6 +1612,7 @@ void cumulative_counting::reset() {
 void inline cumulative_counting::increment(int index, int color) {
     thread_local int in;
     thread_local int _sz;
+
     assert(count[index] > 0);
     assert(index >= 0 && index < sz);
     //if(count[index] == 0) {
@@ -1631,7 +1634,7 @@ void inline cumulative_counting::increment(int index, int color) {
 void inline cumulative_counting::increment_r(int index, int color) {
     thread_local int in;
     thread_local int _sz;
-    //if(count[index] == 0) {
+
     assert(index >= 0 && index < sz);
     assert(count[index] == 0);
     count[index]++;

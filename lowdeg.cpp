@@ -6,7 +6,7 @@
 #include <cmath>
 #include "lowdeg.h"
 #include "refinement.h"
-#include "diy_group.h"
+#include "group_diy.h"
 
 
 void split_with_respect_to_array(coloring* c, int col, int col_sz, refinement* R, work_set_int* A) {
@@ -686,7 +686,7 @@ double factorial(int n) {
     return (res == 0)?1:res;
 }
 
-long double lowdeg::postprocess(diy_group* G) {
+long double lowdeg::postprocess(group_diy* G) {
     //std::cout << "dejavu_lowdeg_post------------------------------------------------" << std::endl;
     double grpsize1 = 1;
     long double addsize = 1;

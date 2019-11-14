@@ -2,8 +2,22 @@
 // Created by markus on 14.10.19.
 //
 
+#include <iostream>
 #include "utility.h"
 #include "configuration.h"
+
+int intRand(const int & min, const int & max, int seed) {
+    static thread_local std::mt19937 generator(seed);
+    std::uniform_int_distribution<int> distribution(min,max);
+    return distribution(generator);
+}
+
+double doubleRand(const double & min, const double & max, int seed) {
+    static thread_local std::mt19937 generator(seed);
+    std::uniform_real_distribution<double> distribution(min,max);
+    return floor(distribution(generator));
+}
+
 
 shared_switches::shared_switches() {
     done_shared_group.store(false);
@@ -13,13 +27,14 @@ shared_switches::shared_switches() {
     checked.store(0);
 }
 
-bool shared_switches::check_leaf_tournament(int id, int restarts) {
+bool shared_switches::check_leaf_tournament(int id, strategy_metrics* m) {
     thread_local bool ichecked = false;
 
     if(!ichecked) {
         tournament_mutex.lock();
-        if(restarts < win_num || win_id == -2) {
-            win_num = restarts;
+        if((m->restarts < win_metrics.restarts) || (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) || win_id == -2) {
+            std::cout << m->restarts << ", " << m->expected_bfs_size << std::endl;
+            win_metrics = *m;
             win_id  = id;
         }
         checked++;

@@ -1,9 +1,8 @@
-//
-// Created by markus on 01.10.19.
-//
+/* schreier.h - Version 1.2 (January 2013) */
+// adapted for dejavu
 
-#ifndef DEJAVU_PIPELINE_SCHREIER_H
-#define DEJAVU_PIPELINE_SCHREIER_H
+#ifndef DEJAVU_SCHREIER_SHARED_H
+#define DEJAVU_SCHREIER_SHARED_H
 
 #include "nauty/nauty.h"
 #include "nauty/naurng.h"
@@ -21,6 +20,7 @@ typedef struct mpermnodestruct
     std::atomic<int> refcount;              /* number of references */
     int nalloc;                          /* size of p[] in ints,
                                             <= 0 for a perm marker */
+    int copied;
     std::mutex* next_lock;
     int mark;                            /* a mark, 0 unless changed */
     int p[2];                            /* actual vector, extended to
@@ -103,4 +103,4 @@ extern void mschreier_check(int wordsize, int m, int n, int version);
 }
 #endif
 
-#endif //DEJAVU_PIPELINE_SCHREIER_H
+#endif //DEJAVU_SCHREIER_SHARED_H

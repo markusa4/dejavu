@@ -4,18 +4,11 @@
 
 #include <assert.h>
 #include <iostream>
-#include "sequential_group.h"
+#include "group_sequential.h"
 
-bool sequential_group::add_permutation(bijection *p) {
-    // copy to proper array
+bool group_sequential::add_permutation(bijection *p) {
     assert(p->map_sz == domain_size);
     int* _p = p->map;//new int[domain_size];
-    //std::cout << "perm: ";
-    //for(int k = 0; k < p->map.size(); ++k) {
-   //     _p[k] = p->map[k];
-   //     //std::cout << p->map[k] << " ";
-   // }
-    //std::cout << std::endl;
     mschreier_fails(1);
     mexpandschreier(gp, &gens, domain_size);
     bool was_added = maddgenerator(&gp, &gens, _p, domain_size);
@@ -27,7 +20,7 @@ bool sequential_group::add_permutation(bijection *p) {
     return was_added;
 }
 
-sequential_group::sequential_group(int domain_size, bijection* base_points) {
+group_sequential::group_sequential(int domain_size, bijection* base_points) {
     mschreier_fails(0);
     added = 0;
     this->domain_size = domain_size;
@@ -42,11 +35,11 @@ sequential_group::sequential_group(int domain_size, bijection* base_points) {
     mgetorbits(b, base_size, gp, &gens, domain_size);
 }
 
-sequential_group::~sequential_group() {
+group_sequential::~group_sequential() {
     mfreeschreier(&gp, &gens);
 }
 
-void sequential_group::print_group_size() {
+void group_sequential::print_group_size() {
     double grpsize1;
     int grpsize2;
     mgrouporder(b, base_size, gp,&gens, &grpsize1, &grpsize2, domain_size);

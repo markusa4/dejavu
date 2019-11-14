@@ -10,8 +10,9 @@
 #include "coloring.h"
 
 class bijection {
-    bool init = false;
 public:
+    bool init = false;
+    bool mark = false;
     int* map;
     int map_sz;
     bool non_uniform  = false;

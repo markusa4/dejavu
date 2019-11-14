@@ -7,9 +7,9 @@
 
 
 #include "sgraph.h"
-#include "pipeline_schreier.h"
+#include "schreier_shared.h"
 #include "refinement.h"
-#include "diy_group.h"
+#include "group_diy.h"
 
 class lowdeg {
     lowdeg* nest = nullptr;
@@ -25,7 +25,7 @@ class lowdeg {
     int counters_sz;
 public:
     std::pair<sgraph*, coloring*> preprocess(coloring* c, sgraph* g, refinement* R);
-    long double postprocess(diy_group* G);
+    long double postprocess(group_diy* G);
 
     std::pair<sgraph *, coloring *> preprocess2(coloring *c, sgraph *g, refinement *R);
 };

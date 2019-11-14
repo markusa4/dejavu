@@ -10,11 +10,10 @@
 // #include "nauty/traces.h"
 //#include "nauty/schreier.h"
 
-#include "pipeline_schreier.h"
+#include "schreier_shared.h"
 #include "concurrentqueue.h"
 
-
-class sequential_group {
+class group_sequential {
 public:
     int domain_size;
     int base_size;
@@ -22,8 +21,8 @@ public:
     int added;
     mschreier *gp;
     mpermnode *gens;
-    sequential_group(int domain_size, bijection* base_points);
-    ~sequential_group();
+    group_sequential(int domain_size, bijection* base_points);
+    ~group_sequential();
     bool add_permutation(bijection* p);
     void print_group_size();
 };

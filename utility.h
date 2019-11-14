@@ -4,11 +4,27 @@
 
 #include <atomic>
 #include <mutex>
+#include <algorithm>
+#include <random>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
 
+int intRand(const int & min, const int & max, int seed);
+double doubleRand(const double & min, const double & max, int seed);
+
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_TOURNAMENT_IT, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+
+struct strategy_metrics {
+    int    restarts              = 0;
+    double expected_bfs_size     = 0;
+    int    expected_level        = 0;
+    int    color_refinement_cost = 0;
+};
+
+enum ir_operation {
+    OP_I, OP_R, OP_END
+};
 
 class shared_switches {
 public:
@@ -20,7 +36,7 @@ public:
 
     std::atomic<modes> current_mode;
     std::atomic_int    checked;
-    std::atomic_int    win_num;
+    strategy_metrics   win_metrics;
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;
 
@@ -30,7 +46,7 @@ public:
 
     void iterate_tolerance();
     void reset_leaf_tournament();
-    bool check_leaf_tournament(int id, int restarts);
+    bool check_leaf_tournament(int id, strategy_metrics* m);
     bool ack_done();
 };
 
