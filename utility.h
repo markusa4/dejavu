@@ -46,7 +46,7 @@ public:
 
     void iterate_tolerance();
     void reset_leaf_tournament();
-    bool check_leaf_tournament(int id, strategy_metrics* m);
+    bool check_strategy_tournament(int id, strategy_metrics* m);
     bool ack_done();
 };
 

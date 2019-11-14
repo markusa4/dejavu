@@ -27,7 +27,7 @@ shared_switches::shared_switches() {
     checked.store(0);
 }
 
-bool shared_switches::check_leaf_tournament(int id, strategy_metrics* m) {
+bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m) {
     thread_local bool ichecked = false;
 
     if(!ichecked) {

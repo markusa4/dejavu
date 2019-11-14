@@ -24,24 +24,14 @@ struct alignas(64) dejavu_workspace {
     coloring*  work_c;
     invariant* work_I;
 
-    work_set first_level_fail;
-    work_set first_level_succ;
-    int first_level_sz = 0;
     int first_level = 1;
     int base_size = 0;
-    int first_level_succ_point = -1;
     int skiplevels = 1;
 
     int        first_skiplevel = 1;
     coloring   skip_c;
     invariant  skip_I;
     mschreier* skip_schreier_level;
-
-    std::pair<int, int>* dequeue_space;
-    int dequeue_space_sz = 0;
-
-    std::pair<int, int>* enqueue_space;
-    int enqueue_space_sz = 0;
 
     int measure1 = 0;
     int measure2 = 0;
@@ -50,12 +40,7 @@ struct alignas(64) dejavu_workspace {
     int  my_base_points_sz;
     bool is_foreign_base;
 
-    // shared state
-    moodycamel::ConsumerToken* ctok;
-    moodycamel::ProducerToken* ptok;
-    std::vector<moodycamel::ProducerToken*> ptoks;
-
-    group_diy*      G_;
+    group_diy*      G;
 
     coloring* start_c;
     invariant start_I;

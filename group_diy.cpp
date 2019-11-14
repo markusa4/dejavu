@@ -68,6 +68,7 @@ void group_diy::manage_results(shared_switches *switches) {
 
 group_diy::~group_diy() {
     delete[] b;
+    delete[] dequeue_space;
     mfreeschreier(&gp, &gens);
 }
 

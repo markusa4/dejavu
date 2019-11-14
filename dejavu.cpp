@@ -68,7 +68,7 @@ void dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool com
     int bfs_level    = w->BW->BW.current_level - 1;
     int bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
 
-    mschreier* start_group_level = w->G_->gp;
+    mschreier* start_group_level = w->G->gp;
     for(int i = 0; i < bfs_level; i++)
         start_group_level = start_group_level->next;
     mschreier* group_level = start_group_level;
@@ -534,9 +534,9 @@ bool dejavu::get_orbit(dejavu_workspace* w, int* base, int base_sz, int v, int v
         // ToDo: and also map the orbit of base_v to base_v...
         int map_v = (*w->shared_orbit)[v];
         assert(v >= 0);
-        assert(v <= w->G_->domain_size);
+        assert(v <= w->G->domain_size);
         assert(map_v >= 0);
-        assert(map_v <= w->G_->domain_size);
+        assert(map_v <= w->G->domain_size);
 
         orbit->push_back(v);
         orbit->cur_pos = (*w->shared_orbit_weights)[map_v];
@@ -553,7 +553,7 @@ bool dejavu::get_orbit(dejavu_workspace* w, int* base, int base_sz, int v, int v
                 int i;
                 for (i = 0; i < base_sz; ++i) {
                     int b = base[i];
-                    assert(b < w->G_->domain_size && b >= 0);
+                    assert(b < w->G->domain_size && b >= 0);
                     if (it->p[b] != b) {
                         break;
                     }
@@ -612,9 +612,9 @@ void dejavu::bfs_assure_init(dejavu_workspace* w) {
         w->finished_elements = new std::pair<bfs_element *, int>[chunk_sz + 1];
         w->finished_elements_sz = chunk_sz;
         w->init_bfs = true;
-        w->orbit.initialize(w->G_->domain_size);
-        w->orbit_considered.initialize(w->G_->domain_size);
-        w->orbit_vertex_worklist.initialize(w->G_->domain_size);
+        w->orbit.initialize(w->G->domain_size);
+        w->orbit_considered.initialize(w->G->domain_size);
+        w->orbit_vertex_worklist.initialize(w->G->domain_size);
         w->generator_fix_base = new mpermnode*[*w->shared_generators_size];
         w->generator_fix_base_alloc = *w->shared_generators_size;
     }
@@ -678,7 +678,7 @@ bool dejavu::bfs_chunk(sgraph* g, strategy* canon_strategy, bool *done, int sele
             comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr); // &w->changes
         }
 
-        assert(elem->base_sz < w->G_->base_size);
+        assert(elem->base_sz < w->G->base_size);
         assert(!comp?(!is_identity) : true);
 
         // not equal to canonical invariant?
@@ -745,21 +745,21 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
 
     bfs_assure_init(w);
 
-    int domain_size = w->G_->domain_size;
+    int domain_size = w->G->domain_size;
     if(!init_group) {
         _newgroup(&gp, &gens, domain_size);
         init_group = true;
     }
 
     // copy generators that have not been copied yet
-    mpermnode *it = w->G_->gens;
+    mpermnode *it = w->G->gens;
     do {
         if(it->copied == 0) {
             _addpermutation(&gens, it->p, domain_size);
             it->copied = 1;
         }
         it = it->next;
-    } while (it != w->G_->gens);
+    } while (it != w->G->gens);
 
     if(w->generator_fix_base_alloc < *w->shared_generators_size) {
         delete[] w->generator_fix_base;
@@ -776,7 +776,7 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
     for (int j = 0; j < BW->level_sizes[BW->current_level - 1]; ++j) {
         bfs_element *elem = BW->level_states[BW->current_level - 1][j];
         active += (elem->weight > 0);
-        found_canon = found_canon || (elem->base[elem->base_sz - 1] == w->G_->b[elem->base_sz - 1]);
+        found_canon = found_canon || (elem->base[elem->base_sz - 1] == w->G->b[elem->base_sz - 1]);
     }
     assert(found_canon);
     std::cout << "[B] op level active (before): " << active << std::endl;
@@ -789,10 +789,10 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
                 bfs_element* elem = BW->level_states[i][j];
                 if(elem->weight > 0) {
                     v = elem->base[elem->base_sz - 1];
-                    assert(v >= 0 && v < w->G_->domain_size);
+                    assert(v >= 0 && v < w->G->domain_size);
                     if ((*w->shared_orbit)[v] != v) {
                         elem->weight = 0;
-                        assert(v != w->G_->b[elem->base_sz - 1]);
+                        assert(v != w->G->b[elem->base_sz - 1]);
                         //std::cout << "reducing " << elem->weight << " " << std::endl;
                     } else {
                         if (elem->weight != (*w->shared_orbit_weights)[v]) {
@@ -823,7 +823,7 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
                 if(elem->weight != 0) {
                     int* orbits_sz = nullptr;
                     // ToDo: find all other elements with same base -1 and prune using exactly this orbit, then its fine
-                    int* orbits = _getorbits(elem->base, elem->base_sz - 1, gp, &gens, domain_size, w->G_->b, &orbits_sz); // ToDo: weights incorrect?
+                    int* orbits = _getorbits(elem->base, elem->base_sz - 1, gp, &gens, domain_size, w->G->b, &orbits_sz); // ToDo: weights incorrect?
 
                     int calc_sz = 0;
                     for(int ii = 0; ii < domain_size; ++ii) {
@@ -838,10 +838,10 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
                     assert(elem->level == i);
                     assert(i > 1);
                     v = elem->base[elem->base_sz - 1];
-                    assert((v >= 0) && (v < w->G_->domain_size));
+                    assert((v >= 0) && (v < w->G->domain_size));
                     assert(elem->base_sz - 1 > 0);
                     if(orbits[v] != v) {
-                        assert(v != w->G_->b[elem->base_sz - 1]);
+                        assert(v != w->G->b[elem->base_sz - 1]);
                         elem->weight = 0;
                     } else {
                         elem->weight = elem->parent_weight * orbits_sz[v];
@@ -874,7 +874,7 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
             int c      = elem->target_color;
             int c_size = elem->c->ptn[c] + 1;
             int* orbits_sz = nullptr;
-            int* orbits = _getorbits(elem->base, elem->base_sz, gp, &gens, domain_size, w->G_->b, &orbits_sz);
+            int* orbits = _getorbits(elem->base, elem->base_sz, gp, &gens, domain_size, w->G->b, &orbits_sz);
             for (i = c; i < c + c_size; ++i) {
                 if(orbits[elem->c->lab[i]] == elem->c->lab[i]) {
                     BW->bfs_level_todo[BW->current_level].enqueue(std::tuple<bfs_element *, int, int>(elem, elem->c->lab[i], orbits_sz[i])); // ToDo: weights!
@@ -890,20 +890,16 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
     w->orbit.reset();
     w->orbit_vertex_worklist.reset();
     w->orbit_considered.reset();
-
-    //mgetorbits(w->G_->b, w->G_->base_size, w->G_->gp, &w->G_->gens, w->G_->domain_size);
 }
 
 void dejavu::reset_skiplevels(dejavu_workspace* w) {
     w->skip_c.copy_force(w->start_c);
     w->skip_I = w->start_I;
     w->skiplevels = 0;
-    //if(w->BW->BW.target_level > 0)
-    //    w->skiplevels = w->BW->BW.target_level;
-    w->skip_schreier_level = w->G_->gp;
+    w->skip_schreier_level = w->G->gp;
     w->first_skiplevel = 1;
-    w->my_base_points    = w->G_->b;
-    w->my_base_points_sz = w->G_->base_size;
+    w->my_base_points    = w->G->b;
+    w->my_base_points_sz = w->G->base_size;
     w->is_foreign_base   = false;
 }
 
@@ -963,14 +959,6 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
     invariant start_I;
 
-    //W.first_level_fail.initialize(g->v_size);
-    //W.first_level_succ.initialize(g->v_size);
-
-    W.dequeue_space = new std::pair<int, int>[2048];
-    W.dequeue_space_sz = 2048;
-    W.enqueue_space = new std::pair<int, int>[128];
-    W.enqueue_space_sz = 128; // <- choose this dynamic?
-
     if (master) {
         std::cout << "[R] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false") << std::endl;
 
@@ -990,17 +978,11 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         switches->current_mode = modes::MODE_TOURNAMENT;
 
         // first color refinement
-        //canon_I    = new invariant*;
-        //canon_leaf = new bijection*;
         canon_strategy = new strategy;
 
         W.start_c = start_c;
         start_I.create_vector();
-        //W.R.old_refine_coloring_first(g, start_c, -1);
-        //invariant trashi;
-        //trashi.create_vector();
         W.R.refine_coloring_first(g, start_c, -1); // ToDo: why does new color ref not work properly on rantree-2000?
-        //W.R.refine_coloring(g, start_c, nullptr, &trashi, -1, false);
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
         std::cout << "[T] Color ref: " << cref / 1000000.0 << "ms" << std::endl;
@@ -1051,7 +1033,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
     W.skip_c.copy_force(start_c);
     W.work_c = new coloring;
     W.work_I = new invariant;
-    W.G_ = G;
+    W.G = G;
     W.BW = bwork;
     W.skiplevels = 0;
     W.skip_schreier_level = G->gp;
@@ -1125,8 +1107,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             // wait until shared group created
             while(!switches->done_shared_group) continue;
             while(!switches->current_mode == modes::MODE_BFS || !switches->current_mode == modes::MODE_UNIFORM_PROBE) continue;
-            W.my_base_points    = W.G_->b;
-            W.my_base_points_sz = W.G_->base_size;
+            W.my_base_points    = W.G->b;
+            W.my_base_points_sz = W.G->base_size;
             W.is_foreign_base   = false;
         }
     }
@@ -1161,7 +1143,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                 fast_automorphism_non_uniform(g, true, my_strategy, &automorphism, &m, done_fast, selector_seed, &W, switches->tolerance); // <- we should already safe unsuccessfull / succ first level stuff here
                 if(n_found == 0) { // check if I won
                     // wait until everyone checked
-                    while(!switches->check_leaf_tournament(communicator_id, &m) && !switches->done_created_group) continue;
+                    while(!switches->check_strategy_tournament(communicator_id, &m) && !switches->done_created_group) continue;
                     // check if I won, if yes: create group
                     if(switches->done_created_group) continue;
                     if(switches->win_id == communicator_id) {
@@ -1374,20 +1356,22 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
         if(!test && !foreign_base_done) {
             // switch this worker to canonical search
-            //std::cout << "switching" << std::endl;
             reset_skiplevels(&W);
             foreign_base_done = true;
-            std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
+            // std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
         }
-        // ToDo: sift some random elements!
 
         delete[] automorphism.map;
         automorphism.map = new int[g->v_size];
         automorphism.foreign_base = false;
         sampled_paths += 1;
 
+        // master thread managing sifting results, bfs, ...
         if(master) {
+            // sifting results
             G->manage_results(switches);
+
+            // non-uniform search over, fix a group state for collaborative bfs
             if(switches->done_fast && !switches->done_shared_group) {
                 // wait for ack of done_fast
                 std::cout << "[N] Waiting for ACK" << std::endl;
@@ -1437,6 +1421,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                 switches->done_shared_group = true;
                 switches->current_mode      = modes::MODE_BFS;
             }
+
+            // search is done
             if(switches->done) {
                 std::cout << "Base size:  " << G->base_size << std::endl;
 
