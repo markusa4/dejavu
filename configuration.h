@@ -13,8 +13,10 @@ struct configstruct {
     int  CONFIG_IR_REFINEMENT = 0;
     bool CONFIG_IR_FAST_AUTOPRE = true; // ToDo: option to stop this dynamically from group
     bool CONFIG_IR_DENSE = true; // ToDo: first color reifnement needs to use dense / sparse, too!
-    int  CONFIG_IR_SIZE_FACTOR = 4;
+    int  CONFIG_IR_SIZE_FACTOR = 2;
     bool CONFIG_BFS_OVERRIDE = true;
+
+    bool CONFIG_IR_FULLBFS = false;
 
     int CONFIG_RAND_ABORT = 5;
     int CONFIG_RAND_ABORT_RAND = -1;

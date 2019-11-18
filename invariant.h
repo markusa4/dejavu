@@ -13,10 +13,18 @@ public:
     std::vector<int>* compare_vec;
     bool has_compare = false;
     bool no_write = false;
+    bool comp = true;
+    int comp_fail_pos = -1;
+    int comp_fail_val = -1;
     int cur_pos = -1;
     inline bool write_top_and_compare(int i) {
         if(no_write) {
-            return (*compare_vec)[++cur_pos] == i;
+            comp = ((*compare_vec)[++cur_pos] == i);
+            if(!comp && comp_fail_pos == -1) {
+                comp_fail_pos = cur_pos;
+                comp_fail_val = i;
+            }
+            return comp;
         } else {
             vec_invariant->push_back(i);
             cur_pos += 1;

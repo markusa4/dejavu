@@ -11,6 +11,7 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "invariant.h"
+#include "utility.h"
 #include <list>
 #include <iostream>
 #include <bitset>
@@ -194,10 +195,10 @@ private:
 
 class refinement {
 public:
-    bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes);
+    bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes, strategy_metrics* m);
     int  individualize_vertex(coloring* c, int v);
     void undo_individualize_vertex(sgraph *g, coloring *c, int v);
-    bool refine_color_class(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
+    bool refine_color_class_cumulative(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
@@ -219,14 +220,18 @@ public:
     work_list vertex_worklist;
     work_list degrees_worklist;
     ring_pair worklist_color_classes;
+    work_set_int color_vertices_considered;
     work_set_int neighbours;
     work_set_int neighbour_sizes;
     std::pair<int, int>* p;
+    work_list      singletons;
     work_list_pair old_color_classes;
     cumulative_counting counting_array;
     work_list_pair_bool color_class_splits;
     work_list dense_old_color_classes;
-    int* singleton_scratch;
+    int* scratch;
+
+    bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
 
     bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool *color_class_split_worklist);

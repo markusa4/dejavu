@@ -31,6 +31,9 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_reserved_sizes = new int[base_size + 2];
     BW.level_maxweight = new double[base_size + 2];
     BW.level_minweight = new double[base_size + 2];
+    BW.level_abort_map_done  = new int[base_size + 2];
+    BW.level_abort_map_mutex = new std::mutex*[base_size + 2];
+    BW.level_abort_map = new std::unordered_map<int, int>[base_size + 2];
 
     BW.level_expecting_finished = new int[base_size + 2];
     for(int i = 0; i < base_size + 2; ++i) {
@@ -39,6 +42,9 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
         BW.level_expecting_finished[i] = 0;
         BW.level_maxweight[i] = 1;
         BW.level_minweight[i] = INT32_MAX;
+        BW.level_abort_map[i] = std::unordered_map<int, int>();
+        BW.level_abort_map_done[i] = -1;
+        BW.level_abort_map_mutex[i] = new std::mutex();
     }
 
     BW.level_states[0]    = new bfs_element*[1];
@@ -51,6 +57,9 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
         sz += 1;
         BW.bfs_level_todo[BW.current_level].enqueue(std::tuple<bfs_element*, int, int>(root_elem, next_v, -1));
     }
+
+    std::cout << "Abort map expecting: " <<  root_elem->c->ptn[init_c] + 1 << std::endl;
+    BW.level_abort_map_done[BW.current_level + 1] = root_elem->c->ptn[init_c] + 1;
 
     BW.level_expecting_finished[0] = 0;
     BW.level_sizes[0] = 1;
@@ -68,20 +77,27 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     //std::cout << "[B] ToDo for level " << BW.current_level << " is " << BW.level_expecting_finished[BW.current_level] << std::endl;
 }
 
-void bfs::work_queues(int tolerance) {
+bool bfs::work_queues(int tolerance) {
     // no work left!
     if(BW.current_level == BW.target_level) {
         if(!BW.done) {
             BW.done = true;
             std::cout << "[B] Finished BFS at " << BW.current_level - 1 << " with " << BW.level_sizes[BW.current_level - 1] << " elements, maxweight " << BW.level_maxweight[BW.current_level - 1] << "" << std::endl;
         }
-        return;
+        return false;
     } else {
         BW.done = false;
     }
 
     // dequeue and process on current level only
     size_t num = BW.bfs_level_finished_elements[BW.current_level].try_dequeue_bulk(BW.finished_elems, BW.finished_elems_sz);
+
+    bool test = false;
+    if(num == 0) {
+        test = BW.bfs_level_finished_elements[BW.current_level].try_dequeue(BW.finished_elems[0]);
+        if(test)
+            num = 1;
+    }
 
     //if(num > 0) std::cout << "Chunk " << num << std::endl;
     for(int i = 0; i < num; ++i) {
@@ -111,6 +127,8 @@ void bfs::work_queues(int tolerance) {
         }
     }
 
+    bool need_queue_fill = false;
+
     // advance level if possible
     if (BW.level_expecting_finished[BW.current_level] == 0) {
         int expected_size = BW.level_expecting_finished[BW.current_level + 1];
@@ -127,31 +145,38 @@ void bfs::work_queues(int tolerance) {
             }
         }
 
-        if(expected_size < config.CONFIG_IR_SIZE_FACTOR * BW.domain_size * tolerance) {
+        if(expected_size < config.CONFIG_IR_SIZE_FACTOR * BW.domain_size * tolerance || config.CONFIG_IR_FULLBFS) {
             BW.level_reserved_sizes[BW.current_level + 1] = expected_size;
             BW.level_states[BW.current_level + 1] = new bfs_element * [expected_size];
             BW.level_sizes[BW.current_level + 1] = 0;
 
-            int check_expected = 0;
+            // ToDo: insert identity first...
+            /*int check_expected = 0;
+            int c, c_size;
             for (int j = 0; j < BW.level_sizes[BW.current_level]; ++j) {
                 bfs_element *elem = BW.level_states[BW.current_level][j];
                 if (elem->weight > 0) {
-                    int c = elem->target_color;
-                    int c_size = elem->c->ptn[c] + 1;
+                    c = elem->target_color;
+                    c_size = elem->c->ptn[c] + 1;
                     for (int i = c; i < c + c_size; ++i) {
                         BW.bfs_level_todo[BW.current_level + 1].enqueue(std::tuple<bfs_element *, int, int>(elem, elem->c->lab[i], -1));
                         check_expected += 1;
                     }
                 }
-            }
+                if(elem->is_identity) {
+                    std::cout << "Abort map expecting: " << c_size << std::endl;
+                    BW.level_abort_map_done[BW.current_level + 1] = c_size;
+                }
+            }*/
 
             assert(expected_size > 0);
-            assert(check_expected > 0);
-            if(expected_size != check_expected) {
+            //assert(check_expected > 0);
+            /*if(expected_size != check_expected) {
                 std::cout << "expected_size != actual_todo" << std::endl;
                 assert(false);
-            }
+            }*/
 
+            need_queue_fill = true;
             BW.current_level += 1;
         } else {
             std::cout << "[B] Refusing to advance level (expected_size too large), setting target level to " << BW.current_level + 1 << std::endl;
@@ -168,8 +193,26 @@ void bfs::work_queues(int tolerance) {
         //if(BW.bfs_level_todo[BW.current_level].size_approx() == 0)
         //    pthread_yield();
     }
+    return need_queue_fill;
 }
 
 void bfs::reset_initial_target() {
     BW.reached_initial_target = true;
+}
+
+void bfs::write_abort_map(int level, int pos, int val) {
+    BW.level_abort_map_mutex[level]->lock();
+    BW.level_abort_map[level].insert(std::pair<int, int>(pos, val));
+    BW.level_abort_map_done[level]--;
+    BW.level_abort_map_mutex[level]->unlock();
+}
+
+bool bfs::read_abort_map(int level, int pos, int val) {
+    //std::cout << BW.level_abort_map_done[level] << std::endl;
+    if(BW.level_abort_map_done[level] != 0)
+        return true;
+    auto check = BW.level_abort_map[level].find(pos);
+    if(check == BW.level_abort_map[level].end())
+        return false;
+    return(check->second == val);
 }

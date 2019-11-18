@@ -10,7 +10,7 @@
 class parser {
 public:
     void parse_dimacs_file(std::string filename, sgraph* g);
-
+    void parse_dimacs_file_g(std::string filename, sgraph* g);
     void parse_dimacs_file_digraph(std::string filename, sgraph *g);
 };
 

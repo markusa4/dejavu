@@ -14,6 +14,13 @@
 #include "bfs.h"
 #include "schreier_shared.h"
 #include "group_diy.h"
+#include "schreier_sequential.h"
+
+struct abort_code {
+    abort_code()=default;
+    abort_code(int reason):reason(reason){};
+    int reason = 0;
+};
 
 struct alignas(64) dejavu_workspace {
     refinement R;
@@ -53,6 +60,10 @@ struct alignas(64) dejavu_workspace {
     int*        shared_generators_size;
     int         generator_fix_base_alloc = -1;
 
+    permnode*       sequential_gens;
+    _schreierlevel* sequential_gp;
+    bool            sequential_init = false;
+
     //
     work_set  orbit_considered;
     work_list orbit_vertex_worklist;
@@ -87,12 +98,12 @@ private:
 
     void fast_automorphism_non_uniform(sgraph *g, bool compare, strategy* canon_strategy,
                                        bijection *automorphism, strategy_metrics *m,
-                                       bool *done, int selector_seed, dejavu_workspace *w, int tolerance);
+                                       bool *done, shared_switches* switches, int selector_seed, dejavu_workspace *w, int tolerance);
 
-    void find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
+    abort_code find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                     shared_switches *switches, int selector_seed);
 
-    bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes);
+    bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes, strategy_metrics* m);
 
     bool bfs_chunk(sgraph *g, strategy* canon_strategy, bool *done,
                    int selector_seed,
@@ -107,6 +118,8 @@ private:
     void bfs_fill_queue(dejavu_workspace *w);
 
     void bfs_assure_init(dejavu_workspace *w);
+
+    void sequential_init_copy(dejavu_workspace *w);
 };
 
 

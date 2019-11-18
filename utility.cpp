@@ -27,21 +27,36 @@ shared_switches::shared_switches() {
     checked.store(0);
 }
 
-bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m) {
+bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
     thread_local bool ichecked = false;
 
-    if(!ichecked) {
-        tournament_mutex.lock();
-        if((m->restarts < win_metrics.restarts) || (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) || win_id == -2) {
-            std::cout << m->restarts << ", " << m->expected_bfs_size << std::endl;
-            win_metrics = *m;
-            win_id  = id;
-        }
-        checked++;
-        tournament_mutex.unlock();
-    }
+    if(!early_check) {
+        if (!ichecked) {
+            tournament_mutex.lock();
+            std::cout << "late check" << m->color_refinement_cost << std::endl;
+            if ((m->restarts < win_metrics.restarts) ||
+                (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
+                win_id == -2) {
+                std::cout << m->restarts << ", " << m->expected_bfs_size << std::endl;
+                win_metrics = *m;
+                win_id = id;
+            }
 
-    ichecked = true;
+            checked++;
+            tournament_mutex.unlock();
+        }
+        ichecked = true;
+    } else {
+        if (!ichecked) {
+            if (win_id != -2 && m->restarts > win_metrics.restarts) {
+                tournament_mutex.lock();
+                std::cout << "early concede" << m->color_refinement_cost << std::endl;
+                checked++;
+                tournament_mutex.unlock();
+                ichecked = true;
+            }
+        }
+    }
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
 
