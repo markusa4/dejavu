@@ -141,6 +141,11 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);//enqueue_fail_point_sz
                     //std::cout << "Found automorphism." << *restarts << std::endl;
+                    if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
+                        // ToDo: delete automorphism!
+                        backtrack = true;
+                        continue;
+                    }
                     assert(g->certify_automorphism(*automorphism));
                     return abort_code();
                 } else {
@@ -450,7 +455,7 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);
                     automorphism->non_uniform = skipped_level;
-                    if(!R->certify_automorphism(g, automorphism)) {
+                    if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
                         // ToDo: delete automorphism!
                         backtrack = true;
                         continue;
@@ -1211,9 +1216,10 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         if(master) {
             // sifting results
             G->manage_results(switches);
+            if(*done) std::cout << "abort in head" << std::endl;
 
             // non-uniform search over, fix a group state for collaborative bfs
-            if(switches->done_fast && !switches->done_shared_group) {
+            if(switches->done_fast && !switches->done_shared_group && !switches->done) {
                 // wait for ack of done_fast
                 std::cout << "[N] Waiting for ACK" << std::endl;
                 switches->current_mode = modes::MODE_WAIT;
@@ -1294,8 +1300,10 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         }
 
         if(switches->done) {
-            //while (!switches->ack_done()) continue;
-            return;
+            if(!master)
+                return;
+            else
+                continue;
         }
 
         bijection automorphism;
@@ -1431,6 +1439,10 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                         W.skiplevels += 1;
                     if ((*done_fast && !automorphism.non_uniform)) continue;
                 } else continue;
+                if(*done && master) {
+                    std::cout << "abort within non-uniform" << std::endl;
+                    continue;
+                }
                 if ((*done_fast && !automorphism.non_uniform)) continue;
                 break;
 
@@ -1503,8 +1515,10 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                     std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                 }
                 A = find_automorphism_from_bfs(&W, g, true, canon_strategy, &automorphism, &restarts, switches, selector_seed);
-                if(A.reason == 2)
+                if(A.reason == 2) {
+                    std::cout << "early abort" << std::endl;
                     continue;
+                }
                 if(A.reason == 1) {
                     // go back to bfs?
                     switches->current_mode = MODE_WAIT;
@@ -1532,8 +1546,10 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         }
 
         if(switches->done) {
-            //while (!switches->ack_done()) continue;
-            return;
+            if(!master)
+                return;
+            else
+                continue;
         }
 
         automorphism.not_deletable();

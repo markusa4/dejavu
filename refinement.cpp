@@ -29,6 +29,8 @@ bool refinement::certify_automorphism(sgraph *g, bijection* p) {
 
     for(int i = 0; i < g->v_size; ++i) {
         int image_i = p->map_vertex(i);
+        if(image_i == i)
+            continue;
         if(g->d[i] != g->d[image_i]) // degrees must be equal
             return false;
 
@@ -52,6 +54,8 @@ bool refinement::certify_automorphism(sgraph *g, bijection* p) {
         if(found != 0) {
             color_workset.reset();
             return false;
+        } else {
+            color_workset.reset_soft();
         }
     }
 
@@ -653,7 +657,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     // thread_local?
     thread_local bool comp, mark_as_largest;
     thread_local int i, cc, vc, pe, end_i, v, col, deg1_col, deg1_col_sz, deg0_col, deg0_col_sz, deg1_write_pos, deg1_read_pos,
-                      vertex_at_pos, lab_pos;
+                      vertex_at_pos, lab_pos, singleton_inv;
     cc = color_class; // iterate over color class
     comp = true;
 
@@ -662,6 +666,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     vertex_worklist.reset();
     dense_old_color_classes.reset();
 
+    singleton_inv = 0;
     vc = c->lab[cc];
     pe = g->v[vc];
     end_i = pe + g->d[vc];
@@ -670,7 +675,10 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         col = c->vertex_to_col[v];
 
         if(c->ptn[col] == 0) {
-            vertex_worklist.push_back(col); // treat singletons in separate list
+            if(config.CONFIG_IR_FULL_INVARIANT)
+                vertex_worklist.push_back(col); // treat singletons in separate list
+            else
+                singleton_inv += (col + 1) * 23524361;
             continue;
         }
 
@@ -688,6 +696,8 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     }
 
     comp = comp && I->write_top_and_compare(INT32_MAX - 3);
+    if(!config.CONFIG_IR_FULL_INVARIANT)
+        comp = comp && I->write_top_and_compare(singleton_inv);
     comp = comp && I->write_top_and_compare(dense_old_color_classes.cur_pos);
     if(!comp) {
         while(!dense_old_color_classes.empty())
@@ -705,7 +715,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     }
 
     // sort and write down singletons in invariant
-    if(comp)
+    if(comp && config.CONFIG_IR_FULL_INVARIANT)
         vertex_worklist.sort();
 
     for(i = 0; i < vertex_worklist.cur_pos && comp; ++i) {
@@ -771,14 +781,16 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
     // for all vertices of the color class...
     // thread_local?
     thread_local bool comp, mark_as_largest;
-    thread_local int i, cc, vc, pe, end_i, end_cc, v, col, _col, acc, val, col_sz, v_new_color, v_color, v_degree, largest_color_class_size;
+    thread_local int i, cc, vc, pe, end_i, end_cc, v, col, _col, acc, val, col_sz, v_new_color, v_color, v_degree, largest_color_class_size, singleton_inv;
     cc = color_class; // iterate over color class
     comp = true;
 
     neighbours.reset_hard();
     color_workset.reset();
     dense_old_color_classes.reset();
+    vertex_worklist.reset();
 
+    singleton_inv = 0;
     end_cc = color_class + class_size;
     while (cc < end_cc) { // increment value of neighbours of vc by 1
         vc = c->lab[cc];
@@ -786,11 +798,18 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
         end_i = pe + g->d[vc];
         for (i = pe; i < end_i; i++) {
             v   = g->e[i];
-            neighbours.inc_nr(v);
             col = c->vertex_to_col[v];
-            if(!color_workset.get(col)) {
-                color_workset.set_nr(col);
-                dense_old_color_classes.push_back(col);
+            if(c->ptn[col] > 0) {
+                neighbours.inc_nr(v);
+                if (!color_workset.get(col)) {
+                    color_workset.set_nr(col);
+                    dense_old_color_classes.push_back(col);
+                }
+            } else {
+                if(config.CONFIG_IR_FULL_INVARIANT)
+                    vertex_worklist.push_back(col);
+                else
+                    singleton_inv += (col + 1) * 23524361;
             }
         }
         cc += 1;
@@ -798,16 +817,27 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
     color_workset.reset_hard();
 
+    // write singletons
+
     comp = comp && I->write_top_and_compare(INT32_MAX - 3);
     comp = comp && I->write_top_and_compare(dense_old_color_classes.cur_pos);
-    if(!comp) return comp;
+    if(!comp) {vertex_worklist.reset(); return comp;}
 
+    if(config.CONFIG_IR_FULL_INVARIANT) {
+        vertex_worklist.sort();
+        while (!vertex_worklist.empty()) {
+            col = vertex_worklist.pop_back();
+            comp = comp && I->write_top_and_compare(col);
+        }
+        comp = comp && I->write_top_and_compare(INT32_MAX - 9);
+    } else {
+        comp = comp && I->write_top_and_compare(singleton_inv);
+    }
+    if(!comp) {return comp;}
 
-    // DENSE-DENSE: dont sort, just iterate over all cells
     dense_old_color_classes.sort();
+
     // for every cell to be split...
-    //for(j = 0; j < g->v_size;) {
-        //col    = j;
     while(!dense_old_color_classes.empty()) {
         col = dense_old_color_classes.pop_back();
         //j     += c->ptn[j] + 1;
@@ -1966,6 +1996,10 @@ void work_set::reset_hard() {
 work_set::~work_set() {
     if(init)
         delete[] s;
+}
+
+void work_set::reset_soft() {
+    reset_queue.reset();
 }
 
 void work_set_int::initialize(int size) {

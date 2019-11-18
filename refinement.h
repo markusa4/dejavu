@@ -66,6 +66,7 @@ public:
     void set_nr(int index);
     void initialize_from_array(bool *p, int size);
     void unset(int index);
+    void reset_soft();
 private:
     work_queue reset_queue;
     //std::vector<bool> s;
