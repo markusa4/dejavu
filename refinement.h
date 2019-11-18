@@ -65,13 +65,14 @@ public:
     void reset_hard();
     void set_nr(int index);
     void initialize_from_array(bool *p, int size);
+    void unset(int index);
 private:
     work_queue reset_queue;
     //std::vector<bool> s;
     bool init = false;
     bool* s;
-    int sz;
 
+    int sz;
 };
 
 class work_set_int {
@@ -252,6 +253,7 @@ public:
 
     void assure_initialized_accumulate_counting(sgraph *g);
 
+    bool certify_automorphism(sgraph *g, bijection *p);
 };
 
 

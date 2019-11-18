@@ -24,6 +24,40 @@ public:
     }
 };
 
+bool refinement::certify_automorphism(sgraph *g, bijection* p) {
+    assert(p->map_sz == g->v_size);
+
+    for(int i = 0; i < g->v_size; ++i) {
+        int image_i = p->map_vertex(i);
+        if(g->d[i] != g->d[image_i]) // degrees must be equal
+            return false;
+
+        color_workset.reset();
+        // automorphism must preserve neighbours
+        int found = 0;
+        for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+            int vertex_j = g->e[j];
+            int image_j  = p->map_vertex(vertex_j);
+            color_workset.set(image_j);
+            found += 1;
+        }
+        for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+            int vertex_j = g->e[j];
+            if(!color_workset.get(vertex_j)) {
+                return false;
+            }
+            color_workset.unset(vertex_j);
+            found -= 1;
+        }
+        if(found != 0) {
+            color_workset.reset();
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes, invariant* I, int init_color_class, bool track_changes, strategy_metrics* m) {
     //std::cout << "Refining..." << std::endl;
     bool comp = true;
@@ -1896,6 +1930,13 @@ void work_set::set(int index) {
     }
 }
 
+void work_set::unset(int index) {
+    assert(init);
+    assert(index >= 0);
+    assert(index < sz);
+    s[index] = false;
+}
+
 void work_set::set_nr(int index) {
     s[index] = true;
 }
@@ -2031,6 +2072,17 @@ inline void sort_int(int* arr, int sz) {
             SWAP(1, 3);
             SWAP(1,2);
             break;
+        case 5:
+            SWAP(1, 2);
+            SWAP(0, 2);
+            SWAP(0, 1);
+            SWAP(3, 4);
+            SWAP(1, 4);
+            SWAP(0, 3);
+            SWAP(1, 3);
+            SWAP(2, 4);
+            SWAP(2, 3);
+            break;
         case 6:
             SWAP(1, 2);
             SWAP(4, 5);
@@ -2045,19 +2097,6 @@ inline void sort_int(int* arr, int sz) {
             SWAP(2, 4);
             SWAP(2, 3);
             break;
-        case 5:
-        case 7:
-        case 8:
-            for (k = 1; k < sz; ++k) {
-                value = arr[k];
-                i = k - 1;
-                while ((i >= 0) && (value < arr[i])) {
-                    arr[i + 1] = arr[i];
-                    --i;
-                }
-                arr[i + 1] = value;
-            }
-            break;
         default:
             std::sort(arr, arr + sz);
     }
@@ -2067,8 +2106,8 @@ inline void sort_int(int* arr, int sz) {
 }
 
 void work_list::sort() {
-        //sort_int(arr, cur_pos);
-        std::sort(arr, arr + cur_pos);
+        sort_int(arr, cur_pos);
+        //std::sort(arr, arr + cur_pos);
 }
 
 work_list::~work_list() {

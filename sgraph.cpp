@@ -52,13 +52,14 @@ void sgraph::initialize_coloring(coloring *c) {
 bool sgraph::certify_automorphism(bijection p) {
     assert(p.map_sz == v_size);
 
+    std::set<int> image_neighbours_of_i;
     for(int i = 0; i < v_size; ++i) {
         int image_i = p.map_vertex(i);
         if(d[i] != d[image_i]) // degrees must be equal
             return false;
 
+        image_neighbours_of_i.clear();
         // automorphism must preserve neighbours
-        std::set<int> image_neighbours_of_i;
         for(int j = v[i]; j < v[i] + d[i]; ++j) {
             int vertex_j = e[j];
             int image_j  = p.map_vertex(vertex_j);

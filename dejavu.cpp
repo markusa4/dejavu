@@ -392,8 +392,20 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
 
     skipped_level = w->first_skiplevel > 1;
 
+    int it = 0;
+
     while (true) {
         if(*done) return;
+
+        ++it;
+        if(it % 3 == 0) {
+            if(switches->current_mode == modes::MODE_TOURNAMENT)
+                switches->check_strategy_tournament(w->communicator_id, m, true);
+            // ToDo: master should check results here and put done fast
+            if(w->communicator_id == -1) // but need to be able to reach proper state afterwads
+                w->G->manage_results(switches);
+        }
+
         if (backtrack) {
             if(*done) return;
             if((m->restarts % (5 * tolerance) == ((5 * tolerance) - 1)) && (w->skiplevels < w->my_base_points_sz))
@@ -410,11 +422,6 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
 
             // initialize a search state
             m->restarts += 1;
-            if(switches->current_mode == modes::MODE_TOURNAMENT)
-                switches->check_strategy_tournament(w->communicator_id, m, true);
-            // ToDo: master should check results here and put done fast
-            if(w->communicator_id == -1) // but need to be able to reach proper state afterwads
-                w->G->manage_results(switches);
 
             c->copy_force(start_c);
             *I = *start_I;
@@ -443,7 +450,13 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
                     automorphism->inverse();
                     automorphism->compose(canon_leaf);
                     automorphism->non_uniform = skipped_level;
-                    assert(g->certify_automorphism(*automorphism));
+                    if(!R->certify_automorphism(g, automorphism)) {
+                        // ToDo: delete automorphism!
+                        backtrack = true;
+                        continue;
+                    }
+                    //assert(g->certify_automorphism(*automorphism));
+                    assert(R->certify_automorphism(g, automorphism));
                     return;
                 } else {
                     //I->push_level();
