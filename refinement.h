@@ -16,8 +16,40 @@
 #include <iostream>
 #include <bitset>
 #include <mutex>
+#include <cstring>
 
 static std::mutex malloc_lock;
+
+class mark_set {
+    int mark = 0;
+    int *s;
+    int sz;
+    bool init = false;
+public:
+    void initialize(int size) {
+        s = new int[size];
+        sz = size;
+        init = true;
+        memset(s, mark, sz * sizeof(int));
+        reset();
+    }
+    bool get(int pos) {
+        return s[pos] == mark;
+    }
+    void set(int pos) {
+        s[pos] = mark;
+    }
+    void unset(int pos) {
+        s[pos] = mark - 1;
+    }
+    void reset() {
+        ++mark;
+    }
+    ~mark_set() {
+        if(init)
+            delete[] s;
+    }
+};
 
 class work_queue {
 public:
@@ -219,6 +251,7 @@ public:
     work_list color_worklist_vertex;
     work_list_pair color_worklist_color;
     work_set    color_workset;
+    mark_set    scratch_set;
     work_list vertex_worklist;
     work_list degrees_worklist;
     ring_pair worklist_color_classes;

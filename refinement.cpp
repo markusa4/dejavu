@@ -34,28 +34,25 @@ bool refinement::certify_automorphism(sgraph *g, bijection* p) {
         if(g->d[i] != g->d[image_i]) // degrees must be equal
             return false;
 
-        color_workset.reset();
+        scratch_set.reset();
         // automorphism must preserve neighbours
         int found = 0;
         for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
             int vertex_j = g->e[j];
             int image_j  = p->map_vertex(vertex_j);
-            color_workset.set(image_j);
+            scratch_set.set(image_j);
             found += 1;
         }
         for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
             int vertex_j = g->e[j];
-            if(!color_workset.get(vertex_j)) {
+            if(!scratch_set.get(vertex_j)) {
                 return false;
             }
-            color_workset.unset(vertex_j);
+            scratch_set.unset(vertex_j);
             found -= 1;
         }
         if(found != 0) {
-            color_workset.reset();
             return false;
-        } else {
-            color_workset.reset_soft();
         }
     }
 
@@ -178,6 +175,7 @@ void refinement::assure_initialized(sgraph *g) {
         p = new std::pair<int, int>[g->v_size * 5];
         color_workset.initialize(g->v_size);
         vertex_worklist.initialize(g->v_size);
+        scratch_set.initialize(g->v_size);
         old_color_classes.initialize_from_array(p, g->v_size);
         singletons.initialize(g->v_size);
         color_worklist_vertex.initialize(g->v_size);
@@ -678,7 +676,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
             if(config.CONFIG_IR_FULL_INVARIANT)
                 vertex_worklist.push_back(col); // treat singletons in separate list
             else
-                singleton_inv += (col + 1) * 23524361;
+                singleton_inv += (col + 1) * (23524361 - col * 3);
             continue;
         }
 
@@ -809,7 +807,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
                 if(config.CONFIG_IR_FULL_INVARIANT)
                     vertex_worklist.push_back(col);
                 else
-                    singleton_inv += (col + 1) * 23524361;
+                    singleton_inv += (col + 1) * (23524361 - col * 3);
             }
         }
         cc += 1;

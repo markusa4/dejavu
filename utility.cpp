@@ -33,7 +33,7 @@ bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, boo
     if(!early_check) {
         if (!ichecked) {
             tournament_mutex.lock();
-            std::cout << "late check" << m->color_refinement_cost << std::endl;
+            //std::cout << "late check" << m->color_refinement_cost << std::endl;
             if ((m->restarts < win_metrics.restarts) ||
                 (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
                 win_id == -2) {
@@ -50,7 +50,7 @@ bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, boo
         if (!ichecked) {
             if (win_id != -2 && m->restarts > win_metrics.restarts) {
                 tournament_mutex.lock();
-                std::cout << "early concede" << m->color_refinement_cost << std::endl;
+                //std::cout << "early concede" << m->color_refinement_cost << std::endl;
                 checked++;
                 tournament_mutex.unlock();
                 ichecked = true;

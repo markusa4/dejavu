@@ -64,6 +64,9 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
     }
     ir_operation last_op;
 
+
+    automorphism->certified = false;
+
     // Pick start from BFS level instead!
     int bfs_level    = w->BW->BW.current_level - 1;
     int bfs_level_sz = w->BW->BW.level_sizes[bfs_level];
@@ -143,9 +146,11 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
                     //std::cout << "Found automorphism." << *restarts << std::endl;
                     if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
                         // ToDo: delete automorphism!
+                        std::cout << "late backtrack2" << std::endl;
                         backtrack = true;
                         continue;
                     }
+                    automorphism->certified = true;
                     assert(g->certify_automorphism(*automorphism));
                     return abort_code();
                 } else {
@@ -347,6 +352,7 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
     bijection* canon_leaf = canon_s->leaf;
 
     automorphism->non_uniform = false;
+    automorphism->certified   = false;
 
     bool base_aligned = true;
 
@@ -457,9 +463,11 @@ void dejavu::fast_automorphism_non_uniform(sgraph* g, bool compare, strategy* ca
                     automorphism->non_uniform = skipped_level;
                     if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
                         // ToDo: delete automorphism!
+                        std::cout << "late backtrack1" << std::endl;
                         backtrack = true;
                         continue;
                     }
+                    automorphism->certified = true;
                     //assert(g->certify_automorphism(*automorphism));
                     assert(R->certify_automorphism(g, automorphism));
                     return;
@@ -726,6 +734,7 @@ bool dejavu::bfs_chunk(sgraph* g, strategy* canon_strategy, bool *done, int sele
                 } else { // if abort map done, check abort map...
                     bool comp_ = BFS->read_abort_map(level, w->work_I->comp_fail_pos, w->work_I->comp_fail_val);
                     if(!comp_) {
+                        //std::cout << "prune" << std::endl;
                         elem->weight = 0;
                     }
                 }
@@ -965,6 +974,17 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
         sequential_init_copy(w);
 
     if(!w->sequential_init) {
+        // swap identity to first position...
+        for (int j = 0; j < w->BW->BW.level_sizes[w->BW->BW.current_level - 1]; ++j) {
+            bfs_element *elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][j];
+            if(elem->is_identity) {
+                bfs_element *first_elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][0];
+                w->BW->BW.level_states[w->BW->BW.current_level - 1][j] = first_elem;
+                w->BW->BW.level_states[w->BW->BW.current_level - 1][0] = elem;
+                break;
+            }
+        }
+            // then rest...
         for (int j = 0; j < w->BW->BW.level_sizes[w->BW->BW.current_level - 1]; ++j) {
             bfs_element *elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][j];
             if (elem->weight > 0) {
@@ -1516,7 +1536,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                 }
                 A = find_automorphism_from_bfs(&W, g, true, canon_strategy, &automorphism, &restarts, switches, selector_seed);
                 if(A.reason == 2) {
-                    std::cout << "early abort" << std::endl;
+                    //std::cout << "early abort" << std::endl;
                     continue;
                 }
                 if(A.reason == 1) {
@@ -1555,7 +1575,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         automorphism.not_deletable();
         //std::cout << automorphism.foreign_base << std::endl;
         bool test = true;
-        if(switches->done_created_group && automorphism.mark) {
+        if(switches->done_created_group && automorphism.mark && automorphism.certified) {
            // std::cout << "found auto" << std::endl;
             test = G->add_permutation(&automorphism, &idle_ms, done);
             if(test && foreign_base_done) {
@@ -1569,7 +1589,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             // switch this worker to canonical search
             reset_skiplevels(&W);
             foreign_base_done = true;
-            std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
+            //std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
         }
 
         delete[] automorphism.map;

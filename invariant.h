@@ -16,13 +16,20 @@ public:
     bool comp = true;
     int comp_fail_pos = -1;
     int comp_fail_val = -1;
+    int comp_fail_acc = -1;
     int cur_pos = -1;
+
     inline bool write_top_and_compare(int i) {
         if(no_write) {
             comp = ((*compare_vec)[++cur_pos] == i);
-            if(!comp && comp_fail_pos == -1) {
-                comp_fail_pos = cur_pos;
-                comp_fail_val = i;
+            if(!comp) {
+                if(comp_fail_pos == -1) {
+                    comp_fail_pos = cur_pos;
+                    comp_fail_val = i;
+                    comp_fail_acc = i;
+                } else {
+                    comp_fail_acc += i * (35235235 - i * 3);
+                }
             }
             return comp;
         } else {

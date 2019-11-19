@@ -43,6 +43,7 @@ class selector {
 
     //std::list<std::pair<int, int>> largest_cache;
     ring_pair largest_cache;
+    work_list non_trivial_list;
     int init = false;
 
 public:

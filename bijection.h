@@ -17,6 +17,7 @@ public:
     int map_sz;
     bool non_uniform  = false;
     bool foreign_base = false;
+    bool certified    = false;
     int map_vertex(int v);
     bijection();
     ~bijection();

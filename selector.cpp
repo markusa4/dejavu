@@ -35,6 +35,8 @@ int selector::select_color_smallest(sgraph *g, coloring *c) {
         if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
             smallest_cell = i;
             smallest_cell_sz = c->ptn[i];
+            if(smallest_cell_sz == 2)
+                break;
         }
         i += c->ptn[i] + 1;
     }
@@ -55,6 +57,7 @@ void selector::pop_cache() {
 int selector::select_color_largest(coloring *c) {
     if(!init) {
         largest_cache.initialize(c->lab_sz);
+        non_trivial_list.initialize(c->lab_sz);
         init = true;
     }
 
