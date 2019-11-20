@@ -32,6 +32,11 @@ public:
     double weight        = -1;
     double parent_weight = -1;
 
+    // synergy information for fast extension and deviation maps
+    int deviation_pos    = -1;
+    int deviation_val    = -1;
+    int deviation_vertex = -1;
+
     // memory management
     bool init_c = false;
     bool init_I = false;

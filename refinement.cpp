@@ -467,9 +467,10 @@ bool refinement::refine_color_class_cumulative(sgraph *g, coloring *c, int color
 
 bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
-    // thread_local?
-    bool comp, mark_as_largest;
-    int i, cc, vc, pe, end_i, end_cc, v, col, col_sz, v_old_color, v_class_size, v_new_color, vertex_old_pos, vertex_at_pos, v_color, v_degree, largest_color_class_size, acc_sz, acc_in, _col, _col_sz;
+    thread_local bool comp, mark_as_largest;
+    thread_local int i, cc, vc, pe, end_i, end_cc, v, col, v_new_color, vertex_old_pos, vertex_at_pos, v_degree,
+                     largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col;
+
     cc = color_class; // iterate over color class
     comp = true;
 
@@ -505,11 +506,8 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         }
         cc += 1;
     }
-
-   // comp = comp && I->write_top_and_compare(acc_in);
-    //if(!comp)
-    //    return comp;
-
+    // write invariant for singleton color classes
+    // could also hash this...
     singletons.sort();
     while(!singletons.empty()) {
         col      = singletons.pop_back();
@@ -522,6 +520,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     comp = comp && I->write_top_and_compare(INT32_MAX - 9);
     comp = comp && I->write_top_and_compare(acc_in);
 
+    // early out before sorting color classes
     if(!comp) {
         while (!dense_old_color_classes.empty()) {
             _col = dense_old_color_classes.pop_back();
@@ -532,6 +531,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         return comp;
     }
 
+    // sort split color classes
     dense_old_color_classes.sort();
     color_worklist_vertex.reset();
 
@@ -556,7 +556,6 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         degrees_worklist.sort();
 
         // enrich neighbour_sizes to accumulative counting array
-        int acc, val, __col, __col_sz;
         acc = 0;
         comp = comp && I->write_top_and_compare(INT32_MAX - 5);
         while(!degrees_worklist.empty()) {
@@ -628,9 +627,11 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
                 c->ptn[i - 1] = 0;
             i += c->ptn[i] + 1;
         }
+
         if(i != 0)
             c->ptn[i - 1] = 0;
 
+        // early out, but later
         if(!comp) {
             while (!dense_old_color_classes.empty()) {
                 _col = dense_old_color_classes.pop_back();
@@ -673,8 +674,9 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         col = c->vertex_to_col[v];
 
         if(c->ptn[col] == 0) {
+            // if full invariant, sort -- else use a hash value
             if(config.CONFIG_IR_FULL_INVARIANT)
-                vertex_worklist.push_back(col); // treat singletons in separate list
+                vertex_worklist.push_back(col); // treat singletons in separate list (more efficient sorting)
             else
                 singleton_inv += (col + 1) * (23524361 - col * 3);
             continue;
@@ -683,14 +685,12 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         if(!color_workset.get(col)) {
             color_workset.set(col);
             dense_old_color_classes.push_back(col);
-            // neighbours acts as the write position for degree 1 vertices of col
-            // in the singleton scratchpad
+            // neighbours acts as the write position for degree 1 vertices of col in the scratchpad
             neighbours.set(col, col);
         }
-        // write vertex to singleton scratchpad for later use
+        // write vertex to scratchpad for later use
         scratch[neighbours.get(col)] = v;
-        neighbours.inc_nr(col); // we reset neighbours later...
-        // dense_old_color_classes can be used as reset information
+        neighbours.inc_nr(col); // we reset neighbours later, since dense_old_color_classes for reset
     }
 
     comp = comp && I->write_top_and_compare(INT32_MAX - 3);
@@ -709,7 +709,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     for(i = 0; i < dense_old_color_classes.cur_pos && comp; ++i) {
         //comp = comp && I->write_top_and_compare(dense_old_color_classes.arr[i]); // color class
         comp = comp && I->write_top_and_compare(neighbours.get(dense_old_color_classes.arr[i])); // size
-        // should contain information about color degree
+        // contains information about color degree (= 1)
     }
 
     // sort and write down singletons in invariant
@@ -776,8 +776,6 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
 }
 
 bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
-    // for all vertices of the color class...
-    // thread_local?
     thread_local bool comp, mark_as_largest;
     thread_local int i, cc, vc, pe, end_i, end_cc, v, col, _col, acc, val, col_sz, v_new_color, v_color, v_degree, largest_color_class_size, singleton_inv;
     cc = color_class; // iterate over color class
@@ -790,6 +788,8 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
     singleton_inv = 0;
     end_cc = color_class + class_size;
+
+    // for all vertices of the color class...
     while (cc < end_cc) { // increment value of neighbours of vc by 1
         vc = c->lab[cc];
         pe = g->v[vc];
@@ -948,7 +948,6 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
 bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
-    // thread_local?
     thread_local bool comp, mark_as_largest;
     thread_local int i, j, cc, vc, pe, end_i, end_cc, v, col, _col, acc, val, col_sz, v_new_color, v_color, v_degree, largest_color_class_size;
     cc = color_class; // iterate over color class
@@ -970,9 +969,9 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
         cc += 1;
     }
 
-    // DENSE-DENSE: dont sort, just iterate over all cells
+    // in dense-dense we dont sort, instead we just iterate over all cells (which are already sorted)
     dense_old_color_classes.sort();
-    // for every cell to be split...
+    // for every cell...
     for(j = 0; j < g->v_size;) {
         col    = j;
         j     += c->ptn[j] + 1;
@@ -980,7 +979,7 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
 
         if(col_sz == 1) {
             v_degree = neighbours.get(c->lab[col]) + 1;
-            if(v_degree == -1)
+            if(v_degree == -1) // not connected! skip...
                 continue;
             comp = comp && I->write_top_and_compare(INT32_MAX - 2);
             comp = comp && I->write_top_and_compare(-col);
