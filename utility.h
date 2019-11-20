@@ -13,7 +13,7 @@
 int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 
-enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_TOURNAMENT_IT, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
 
 struct strategy_metrics {
     int    restarts              = 0;
@@ -36,6 +36,7 @@ public:
 
     std::atomic<modes> current_mode;
     std::atomic_int    checked;
+    std::atomic_int    budget;
     strategy_metrics   win_metrics;
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;

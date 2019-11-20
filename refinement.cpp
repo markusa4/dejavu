@@ -693,10 +693,10 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         neighbours.inc_nr(col); // we reset neighbours later, since dense_old_color_classes for reset
     }
 
-    comp = comp && I->write_top_and_compare(INT32_MAX - 3);
+    //comp = comp && I->write_top_and_compare(INT32_MAX - 3);
     if(!config.CONFIG_IR_FULL_INVARIANT)
-        comp = comp && I->write_top_and_compare(singleton_inv);
-    comp = comp && I->write_top_and_compare(dense_old_color_classes.cur_pos);
+        comp = comp && I->write_top_and_compare(g->v_size * 3 + singleton_inv);
+    comp = comp && I->write_top_and_compare(g->v_size * 8 + dense_old_color_classes.cur_pos);
     if(!comp) {
         while(!dense_old_color_classes.empty())
             neighbours.set(dense_old_color_classes.pop_back(), -1);
@@ -708,7 +708,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     // write invariant first...
     for(i = 0; i < dense_old_color_classes.cur_pos && comp; ++i) {
         //comp = comp && I->write_top_and_compare(dense_old_color_classes.arr[i]); // color class
-        comp = comp && I->write_top_and_compare(neighbours.get(dense_old_color_classes.arr[i])); // size
+        comp = comp && I->write_top_and_compare(g->v_size * 14 + neighbours.get(dense_old_color_classes.arr[i])); // size
         // contains information about color degree (= 1)
     }
 
@@ -717,7 +717,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
         vertex_worklist.sort();
 
     for(i = 0; i < vertex_worklist.cur_pos && comp; ++i) {
-        comp = comp && I->write_top_and_compare(vertex_worklist.arr[i]); // size
+        comp = comp && I->write_top_and_compare(g->v_size * 11 + vertex_worklist.arr[i]); // size
         // should contain information about color degree
     }
 
@@ -817,17 +817,17 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
     // write singletons
 
-    comp = comp && I->write_top_and_compare(INT32_MAX - 3);
-    comp = comp && I->write_top_and_compare(dense_old_color_classes.cur_pos);
+    //comp = comp && I->write_top_and_compare(INT32_MAX - 3);
+    comp = comp && I->write_top_and_compare(g->v_size * 3 + dense_old_color_classes.cur_pos);
     if(!comp) {vertex_worklist.reset(); return comp;}
 
     if(config.CONFIG_IR_FULL_INVARIANT) {
         vertex_worklist.sort();
         while (!vertex_worklist.empty()) {
             col = vertex_worklist.pop_back();
-            comp = comp && I->write_top_and_compare(col);
+            comp = comp && I->write_top_and_compare(g->v_size * 9 + col);
         }
-        comp = comp && I->write_top_and_compare(INT32_MAX - 9);
+        //comp = comp && I->write_top_and_compare(INT32_MAX - 9);
     } else {
         comp = comp && I->write_top_and_compare(singleton_inv);
     }
@@ -845,10 +845,10 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
             v_degree = neighbours.get(c->lab[col]) + 1;
             if(v_degree == -1)
                 continue;
-            comp = comp && I->write_top_and_compare(INT32_MAX - 2);
-            comp = comp && I->write_top_and_compare(-col);
-            comp = comp && I->write_top_and_compare(v_degree);
-            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
+            comp = comp && I->write_top_and_compare(- g->v_size * 2 - col);
+            comp = comp && I->write_top_and_compare(col + v_degree);
+            comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;
         }
@@ -878,10 +878,10 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
         if(degrees_worklist.cur_pos == 1) {
             // no split
             v_degree = neighbours.get(c->lab[col]);
-            comp = comp && I->write_top_and_compare(INT32_MAX - 4);
-            comp = comp && I->write_top_and_compare(-col);
-            comp = comp && I->write_top_and_compare(v_degree);
-            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            //comp = comp && I->write_top_and_compare(INT32_MAX - 4);
+            comp = comp && I->write_top_and_compare(- g->v_size * 4 - col);
+            comp = comp && I->write_top_and_compare(col + v_degree);
+            comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;
         }
@@ -889,7 +889,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
         degrees_worklist.sort();
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
-        comp = comp && I->write_top_and_compare(INT32_MAX - 5);
+        //comp = comp && I->write_top_and_compare(INT32_MAX - 5);
         while(!degrees_worklist.empty()) {
             i   = degrees_worklist.pop_back();
             val = neighbour_sizes.get(i) + 1;
@@ -900,9 +900,9 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
                 c->ptn[_col] = -1; // this is val - 1, actually...
 
                 v_degree = i;
-                comp = comp && I->write_top_and_compare(-_col);
-                comp = comp && I->write_top_and_compare(v_degree);
-                comp = comp && I->write_top_and_compare(val + 1);
+                comp = comp && I->write_top_and_compare(-g->v_size * 5 - _col);
+                comp = comp && I->write_top_and_compare(_col + v_degree);
+                comp = comp && I->write_top_and_compare(_col + val + 1);
                 if(!comp) return comp;
             }
         }
@@ -981,10 +981,10 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
             v_degree = neighbours.get(c->lab[col]) + 1;
             if(v_degree == -1) // not connected! skip...
                 continue;
-            comp = comp && I->write_top_and_compare(INT32_MAX - 2);
-            comp = comp && I->write_top_and_compare(-col);
-            comp = comp && I->write_top_and_compare(v_degree);
-            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
+            comp = comp && I->write_top_and_compare(-g->v_size * 11 - col);
+            comp = comp && I->write_top_and_compare(g->v_size + col + v_degree);
+            comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;
         }
@@ -1008,16 +1008,16 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
         neighbour_sizes.inc(first_index);
         neighbour_sizes.set(first_index, col_sz - total - 1);
 
-        comp = comp && I->write_top_and_compare(degrees_worklist.cur_pos);
+        comp = comp && I->write_top_and_compare(g->v_size * 12 + degrees_worklist.cur_pos);
         if(!comp) return comp;
 
         if(degrees_worklist.cur_pos == 1) {
             // no split
             v_degree = neighbours.get(c->lab[col]);
-            comp = comp && I->write_top_and_compare(INT32_MAX - 4);
-            comp = comp && I->write_top_and_compare(-col);
-            comp = comp && I->write_top_and_compare(v_degree);
-            comp = comp && I->write_top_and_compare(c->ptn[col] + 1);
+            //comp = comp && I->write_top_and_compare(INT32_MAX - 4);
+            comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
+            comp = comp && I->write_top_and_compare(col + v_degree);
+            comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;
         }
@@ -1025,7 +1025,7 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
         degrees_worklist.sort();
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
-        comp = comp && I->write_top_and_compare(INT32_MAX - 5);
+        //comp = comp && I->write_top_and_compare(INT32_MAX - 5);
         while(!degrees_worklist.empty()) {
             i   = degrees_worklist.pop_back();
             val = neighbour_sizes.get(i) + 1;
@@ -1036,9 +1036,9 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
                 c->ptn[_col] = -1; // this is val - 1, actually...
 
                 v_degree = i;
-                comp = comp && I->write_top_and_compare(-_col);
-                comp = comp && I->write_top_and_compare(v_degree);
-                comp = comp && I->write_top_and_compare(val + 1);
+                comp = comp && I->write_top_and_compare(-g->v_size * 5 - _col);
+                comp = comp && I->write_top_and_compare(_col + v_degree);
+                comp = comp && I->write_top_and_compare(_col + val + 1);
                 if(!comp) return comp;
             }
         }

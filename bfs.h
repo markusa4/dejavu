@@ -73,9 +73,12 @@ public:
 
     // the level which was determined to be reached via BFS
     std::atomic_int target_level;
+
+    std::atomic_int abort_map_prune;
+
     int domain_size;
     int base_size;
-    int chunk_size = 32; // ToDo: dynamically adapt this
+    int chunk_size = 128; // ToDo: dynamically adapt this
     bool reached_initial_target = true;
     int initial_target_level;
 

@@ -120,6 +120,9 @@ private:
     void bfs_assure_init(dejavu_workspace *w);
 
     void sequential_init_copy(dejavu_workspace *w);
+
+    bool extend_path(dejavu_workspace *w, sgraph *g, bfs_element *elem, int selector_seed, strategy *strat,
+                     bijection *automorphism);
 };
 
 

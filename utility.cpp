@@ -79,5 +79,6 @@ void shared_switches::reset_leaf_tournament() {
 }
 
 void shared_switches::iterate_tolerance() {
+    //tolerance = std::max(tolerance + (tolerance / 2), 2);
     tolerance *= 2;
 }

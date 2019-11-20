@@ -35,6 +35,8 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_abort_map_mutex = new std::mutex*[base_size + 2];
     BW.level_abort_map = new std::unordered_map<int, int>[base_size + 2];
 
+    BW.abort_map_prune.store(0);
+
     BW.level_expecting_finished = new int[base_size + 2];
     for(int i = 0; i < base_size + 2; ++i) {
         BW.bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int, int>>(BW.chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS);
@@ -50,6 +52,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_states[0]    = new bfs_element*[1];
     BW.level_states[0][0] = root_elem;
     root_elem->weight = 1;
+    root_elem->target_color = init_c;
 
     int sz = 0;
     for(int i = init_c; i < init_c + root_elem->c->ptn[init_c] + 1; ++i) {
@@ -209,10 +212,18 @@ void bfs::write_abort_map(int level, int pos, int val) {
 
 bool bfs::read_abort_map(int level, int pos, int val) {
     //std::cout << BW.level_abort_map_done[level] << std::endl;
-    if(BW.level_abort_map_done[level] != 0)
+    if(BW.level_abort_map_done[level] != 0) {
+       // if(BW.level_abort_map_done[level] < 0)
+       //     std::cout << "bad" << BW.level_abort_map_done[level] << std::endl;
         return true;
+    }
     auto check = BW.level_abort_map[level].find(pos);
     if(check == BW.level_abort_map[level].end())
         return false;
+
+    //if(check->second == val) {
+    //    std::cout << "insignificant " << val << std::endl;
+   // }
+
     return(check->second == val);
 }
