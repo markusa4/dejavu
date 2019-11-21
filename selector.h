@@ -12,7 +12,7 @@
 #include "refinement.h"
 #include <list>
 
-enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_RANDOM};
+enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM};
 
 struct strategy {
     bijection* leaf = nullptr;
@@ -64,6 +64,8 @@ public:
     void pop_cache();
 
     int select_color_dynamic(sgraph *g, coloring *c, strategy *s);
+
+    int select_color_traces(coloring *c);
 };
 
 #endif //BRUTUS_SELECTOR_H

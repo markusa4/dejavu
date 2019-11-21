@@ -19,6 +19,9 @@ public:
     bool init = false;
     std::vector<int>  vertex_to_col;
     std::vector<int>  vertex_to_lab;
+
+    std::vector<std::pair<int, int>> color_choices;
+
     ~coloring();
 
     void copy_force(coloring *c);

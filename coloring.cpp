@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <iterator>
 #include <cstring>
+#include <iostream>
 
 void coloring::rewrite_ptn(coloring *c) {
     for(int i = 0; i < c->ptn_sz; i += 1) {
@@ -38,6 +39,8 @@ void coloring::copy(coloring *c) {
         ptn = new int[c->ptn_sz];
     }
 
+    color_choices = c->color_choices;
+
     memcpy(lab, c->lab, c->lab_sz*sizeof(int));
     memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
 
@@ -64,6 +67,8 @@ void coloring::copy_force(coloring *c) {
         ptn = new int[c->ptn_sz];
     }
 
+    color_choices = c->color_choices;
+
     memcpy(lab, c->lab, c->lab_sz*sizeof(int));
     memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
 
@@ -87,6 +92,9 @@ void coloring::initialize(int domain_size) {
 
     lab_sz = domain_size;
     ptn_sz = domain_size;
+
+    color_choices.clear();
+    color_choices.reserve(16);
 }
 
 bool coloring::check() {

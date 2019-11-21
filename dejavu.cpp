@@ -522,11 +522,12 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
     v    = c->lab[rpos];
 
     I->reset_deviation();
-
+    //I->never_fail = true;
     comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
     if(!comp) { // fail on first level, set abort_val and abort_pos in elem
-        //std::cout << "saving..." << std::endl;
+        // std::cout << "saving..." << std::endl;
+        // ToDo: need to sync this write?
         elem->deviation_pos    = I->comp_fail_pos;
         elem->deviation_val    = I->comp_fail_val;
         elem->deviation_acc    = I->comp_fail_acc;
@@ -542,8 +543,19 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
 
         col = w->S.select_color_dynamic(g, c, strat);
         if(col == -1) break;
-        rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
-        v    = c->lab[rpos];
+        //rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
+        //v    = c->lab[rpos];
+
+        int min_v = INT32_MAX;
+        for(int j = col; j < col + c->ptn[col] + 1; ++j) {
+            if(c->lab[j] < min_v) {
+                min_v = c->lab[j];
+                rpos  = j;
+            }
+        }
+
+        v = min_v;
+
         comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
     } while(comp);
 
@@ -586,11 +598,19 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
             fake_leaf.map_sz = g->v_size;
             fake_leaf.not_deletable();
             automorphism->compose(&fake_leaf);
+
+            int j;
+            for(j = 0; j < automorphism->map_sz; ++j)
+                if(automorphism->map[j] != j) break;
+
+            if(j == automorphism->map_sz) {comp = false; break;}
+
             if(w->R.certify_automorphism(g, automorphism)) {
                 automorphism->certified = true;
                 automorphism->non_uniform = true;
                 comp = true;
             } else {
+                std::cout << "should add / check more" << std::endl;
                 comp = false;
             }
             break;
@@ -860,8 +880,9 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
 }
 
 
-void dejavu::sequential_init_copy(dejavu_workspace* w) {
+bool dejavu::sequential_init_copy(dejavu_workspace* w) {
     // update sequential group in workspace
+    bool new_gen = false;
     if(!w->sequential_init) {
         _newgroup(&w->sequential_gp, &w->sequential_gens, w->G->domain_size);
         w->sequential_init = true;
@@ -871,20 +892,41 @@ void dejavu::sequential_init_copy(dejavu_workspace* w) {
     mpermnode *it = w->G->gens;
     do {
         if(it->copied == 0) {
+            new_gen = true;
             _addpermutation(&w->sequential_gens, it->p, w->G->domain_size);
             it->copied = 1;
         }
         it = it->next;
     } while (it != w->G->gens);
+
+    return new_gen;
+}
+
+bool bfs_element_parent_sorter(bfs_element* const& lhs, bfs_element* const& rhs) {
+    if(lhs->parent < rhs->parent)
+        return true;
+    if(lhs->parent == rhs->parent) {
+        return(lhs->parent->parent < rhs->parent->parent);
+    }
+    return false;
 }
 
 void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
-    thread_local bool init_group = false;
+    thread_local bool init_group    = false;
+    thread_local bool first_call = true;
 
+    _schreier_fails(2);
     bfs_assure_init(w);
 
     int domain_size = w->G->domain_size;
-    sequential_init_copy(w);
+    bool new_gens = sequential_init_copy(w);
+
+    if(!new_gens && !first_call) {
+        std::cout << "[B] Skipping reduce tree (no new generators)." << std::endl;
+        return;
+    }
+
+    first_call = false;
 
     if(w->generator_fix_base_alloc < *w->shared_generators_size) {
         delete[] w->generator_fix_base;
@@ -908,6 +950,11 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
 
 
     for(i = 1; i < BW->current_level; ++i) {
+        //std::cout << "Sorting with respect to parents..." << std::endl;
+        bfs_element** arr = w->BW->BW.level_states[i];
+        int arr_sz        = w->BW->BW.level_sizes[i];
+        std::sort(arr, arr + arr_sz, &bfs_element_parent_sorter);
+
         //std::cout << "checking level " << i << ", sz " << BW->level_sizes[i] << std::endl;
         if(i == 1) {
             for(j = 0; j < BW->level_sizes[i]; ++j) {
@@ -944,6 +991,8 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
             // reduce using orbits
             for(j = 0; j < BW->level_sizes[i]; ++j) {
                 bfs_element *elem = BW->level_states[i][j];
+                if(elem == nullptr)
+                    continue;
                 assert(elem->parent != NULL);
                 if(elem->weight != 0) {
                     int* orbits_sz = nullptr;
@@ -1064,7 +1113,20 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
         }
     } else {
         std::cout << "Filling with orbits..." << std::endl;
+
+        // swap identity to first position...
+        for (int j = 0; j < w->BW->BW.level_sizes[w->BW->BW.current_level - 1]; ++j) {
+            bfs_element *elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][j];
+            if(elem->is_identity) {
+                bfs_element *first_elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][0];
+                w->BW->BW.level_states[w->BW->BW.current_level - 1][j] = first_elem;
+                w->BW->BW.level_states[w->BW->BW.current_level - 1][0] = elem;
+                break;
+            }
+        }
+
         int i;
+        // could parallelize this easily?
         for (int j = 0; j < w->BW->BW.level_sizes[w->BW->BW.current_level - 1]; ++j) {
             bfs_element *elem = w->BW->BW.level_states[w->BW->BW.current_level - 1][j];
             int added = 0;
@@ -1235,7 +1297,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         my_canon_I->compare_vec = nullptr;
         my_canon_I->compareI    = nullptr;
         my_canon_leaf = new bijection;
-        selector_type rst = (selector_type) intRand(0, 2, selector_seed);
+        selector_type rst = (selector_type) intRand(0, 3, selector_seed);
         my_strategy = new strategy(my_canon_leaf, my_canon_I, rst, -1);
 
         {

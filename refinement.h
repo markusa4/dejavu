@@ -285,6 +285,9 @@ public:
     bool refine_color_class_dense_dense_first(sgraph *g, coloring *c, int color_class, int class_size,
                                               work_list_pair_bool *color_class_split_worklist);
 
+    bool refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size,
+                                                     work_list_pair_bool* color_class_split_worklist);
+
     void assure_initialized_accumulate_counting(sgraph *g);
 
     bool certify_automorphism(sgraph *g, bijection *p);

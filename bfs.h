@@ -86,7 +86,7 @@ public:
 
     int domain_size;
     int base_size;
-    int chunk_size = 32; // ToDo: dynamically adapt this
+    int chunk_size = 16; // ToDo: dynamically adapt this
     bool reached_initial_target = true;
     int initial_target_level;
 

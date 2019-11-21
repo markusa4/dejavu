@@ -99,6 +99,45 @@ int selector::select_color_largest(coloring *c) {
     return largest_cell;
 }
 
+int selector::select_color_traces(coloring *c) {
+    if(!init) {
+        largest_cache.initialize(c->lab_sz);
+        non_trivial_list.initialize(c->lab_sz);
+        init = true;
+    }
+
+    int stack_sz = c->color_choices.size();
+
+    if(stack_sz == 0) return select_color_largest(c);
+
+    int col, col_sz;
+    int largest_cell    = -1;
+    int largest_cell_sz = -1;
+
+    for(int j = 0; j < stack_sz; ++j) {
+        col    = c->color_choices[stack_sz - j - 1].first;
+        col_sz = c->color_choices[stack_sz - j - 1].second;
+
+        largest_cell    = -1;
+        largest_cell_sz = -1;
+
+        for (int i = col; i < col + col_sz;) { // c->ptn[i] > largest_cell_sz &&
+            if(c->ptn[i] >= largest_cell_sz && c->ptn[i] > 0) {
+                largest_cell_sz = c->ptn[i];
+                largest_cell    = i;
+            }
+            i += c->ptn[i] + 1;
+        }
+
+        if(largest_cell_sz > 0) break;
+    }
+
+    if(largest_cell != -1)
+        return largest_cell;
+    else
+        return select_color_largest(c);
+}
+
 // ToDo: special code to make this happen?
 // rantree, pipe, etc. only have few basepoints left
 // "special code" simple version: just randomly permute leftover color class (since they are K)
@@ -157,11 +196,15 @@ int selector::select_color_dynamic(sgraph *g, coloring *c, strategy* s) {
         case SELECTOR_RANDOM:
             return seeded_select_color(g, c, s->cell_selector_seed);
         case SELECTOR_LARGEST:
+            //return select_color_traces(c);
             return select_color_largest(c);
         case SELECTOR_SMALLEST:
             return select_color_smallest(g, c);
+        case SELECTOR_TRACES:
+            return select_color_traces(c);
         case SELECTOR_FIRST:
         default:
+            //return select_color_traces(c);
             return select_color_first(g, c);
     }
 }
