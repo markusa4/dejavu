@@ -86,28 +86,27 @@ struct alignas(64) dejavu_workspace {
 
 class dejavu {
 public:
+    void automorphisms(sgraph *g);
 
+private:
     void sample_shared(sgraph *g_, bool master, shared_switches *switches, group_diy *G, coloring *start_c,
                        strategy* canon_strategy, int communicator_id,
                        int **shared_orbit, int** shared_orbit_weights, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
-private:
     void find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                                 bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                 shared_switches *switches, int selector_seed);
 
-    void fast_automorphism_non_uniform(sgraph *g, bool compare, strategy* canon_strategy,
-                                       bijection *automorphism, strategy_metrics *m,
-                                       bool *done, shared_switches* switches, int selector_seed, dejavu_workspace *w, int tolerance);
+    void
+    fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
+                                  strategy_metrics *m, bool *done, shared_switches *switches, int selector_seed);
 
     abort_code find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                     shared_switches *switches, int selector_seed);
 
     bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes, strategy_metrics* m);
 
-    bool bfs_chunk(sgraph *g, strategy* canon_strategy, bool *done,
-                   int selector_seed,
-                   dejavu_workspace *w);
+    bool bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bool *done, int selector_seed);
 
     bool get_orbit(dejavu_workspace *w, int *base, int base_sz, int v, int v_base, work_list *orbit, bool reuse_generators);
 
@@ -121,7 +120,7 @@ private:
 
     void sequential_init_copy(dejavu_workspace *w);
 
-    bool extend_path(dejavu_workspace *w, sgraph *g, bfs_element *elem, int selector_seed, strategy *strat,
+    bool extend_path(dejavu_workspace *w, sgraph *g, shared_switches* switches, bfs_element *elem, int selector_seed, strategy *strat,
                      bijection *automorphism);
 };
 

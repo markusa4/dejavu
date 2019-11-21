@@ -2,6 +2,7 @@
 // Created by markus on 18/10/2019.
 //
 
+#include <unordered_set>
 #include "bfs.h"
 #include "dejavu.h"
 
@@ -33,7 +34,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
     BW.level_minweight = new double[base_size + 2];
     BW.level_abort_map_done  = new int[base_size + 2];
     BW.level_abort_map_mutex = new std::mutex*[base_size + 2];
-    BW.level_abort_map = new std::unordered_map<int, int>[base_size + 2];
+    BW.level_abort_map = new std::unordered_set<std::pair<int, int>, pair_hash>[base_size + 2];
 
     BW.abort_map_prune.store(0);
 
@@ -44,7 +45,7 @@ void bfs::initialize(bfs_element* root_elem, int init_c, int domain_size, int ba
         BW.level_expecting_finished[i] = 0;
         BW.level_maxweight[i] = 1;
         BW.level_minweight[i] = INT32_MAX;
-        BW.level_abort_map[i] = std::unordered_map<int, int>();
+        BW.level_abort_map[i] = std::unordered_set<std::pair<int, int>, pair_hash>();
         BW.level_abort_map_done[i] = -1;
         BW.level_abort_map_mutex[i] = new std::mutex();
     }
@@ -213,17 +214,11 @@ void bfs::write_abort_map(int level, int pos, int val) {
 bool bfs::read_abort_map(int level, int pos, int val) {
     //std::cout << BW.level_abort_map_done[level] << std::endl;
     if(BW.level_abort_map_done[level] != 0) {
-       // if(BW.level_abort_map_done[level] < 0)
-       //     std::cout << "bad" << BW.level_abort_map_done[level] << std::endl;
+        //if(BW.level_abort_map_done[level] < 0)
+        //    std::cout << "bad" << BW.level_abort_map_done[level] << std::endl;
         return true;
     }
-    auto check = BW.level_abort_map[level].find(pos);
-    if(check == BW.level_abort_map[level].end())
-        return false;
 
-    //if(check->second == val) {
-    //    std::cout << "insignificant " << val << std::endl;
-   // }
-
-    return(check->second == val);
+    auto check = BW.level_abort_map[level].find(std::pair<int, int>(pos, val));
+    return !(check == BW.level_abort_map[level].end());
 }

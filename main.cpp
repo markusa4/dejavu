@@ -225,20 +225,8 @@ int commandline_mode(int argc, char **argv) {
     Clock::time_point timer;
     for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
-        dejavu A;
-        shared_switches switches;
-        if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            //A.sample(&_g, true, &done);
-        } else {
-            if (config.CONFIG_IR_REFINEMENT == 0) {
-                //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr, nullptr, nullptr);
-            } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                // A.sample_pipelined_bucket(&_g, true, &done, nullptr, nullptr, nullptr);
-            } else {
-                std::cout << "Unknown IR_REFINEMENT." << std::endl;
-            }
-        }
+        dejavu d;
+        d.automorphisms(&_g);
         double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
         avg += solve_time / repeat;
         std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
@@ -294,33 +282,35 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
-       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+    //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
       //p.parse_dimacs_file("/home/markus/CLionProjects/dejavu/graph_tools/k2000.dimacs", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-14", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_3000_d.dmc", &g);
-  // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_4000_d.dmc", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
   //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
-   //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-7", &g);
-   //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-2", &g);
-   //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
-    // p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-11", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-1", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
+    //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-30", &g); // skiplevels / base_size thing
      // p.parse_dimacs_file_g("/home/markus/Downloads/graphssaucy/states/AS.g", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-16-6", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
-       p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);
@@ -345,23 +335,10 @@ int main(int argc, char *argv[]) {
     Clock::time_point timer;
     for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
-        dejavu A;
-        shared_switches switches;
-        if (config.CONFIG_THREADS_PIPELINE_DEPTH <= 0) {
-            //   A.sample(&_g, true, &done);
-        } else {
-            if (config.CONFIG_IR_REFINEMENT == 0) {
-                //A.sample_pipelined(&_g, true, &switches, nullptr, nullptr, nullptr, nullptr, nullptr, -1, nullptr,  nullptr, nullptr,  nullptr);
-                A.sample_shared(&_g, true, &switches, nullptr, nullptr, nullptr, -1, nullptr, nullptr, nullptr,
-                                nullptr, nullptr);
-            } else if (config.CONFIG_IR_REFINEMENT == 1) {
-                // A.sample_pipelined_bucket(&_g, true, &done, nullptr);
-            } else {
-                std::cout << "Unknown IR_REFINEMENT." << std::endl;
-            }
-        }
+        dejavu d;
+        d.automorphisms(&_g);
         double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-        avg += solve_time / repeat;
+        avg += solve_time;
         std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
     }
     std::cout << "Avg solve time: " << avg / 1000000.0 << "ms" << std::endl;

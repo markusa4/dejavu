@@ -6,6 +6,7 @@
 #include <mutex>
 #include <algorithm>
 #include <random>
+#include <unordered_map>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -41,11 +42,17 @@ public:
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;
 
+    std::atomic_int    base2_skip;
+
     std::mutex         tournament_mutex;
+
+    std::unordered_multimap<int, int*> leaf_store;
+    std::mutex leaf_store_mutex;
 
     int tolerance = 1;
 
     void iterate_tolerance();
+    void reset_tolerance(int size, int domain_size);
     void reset_leaf_tournament();
     bool check_strategy_tournament(int id, strategy_metrics* m, bool early_check);
     bool ack_done();

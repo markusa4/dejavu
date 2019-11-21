@@ -22,6 +22,7 @@ double doubleRand(const double & min, const double & max, int seed) {
 shared_switches::shared_switches() {
     done_shared_group.store(false);
     done_created_group.store(false);
+    base2_skip.store(0);
     _ack_done.store(0);
     win_id.store(-2);
     checked.store(0);
@@ -81,4 +82,8 @@ void shared_switches::reset_leaf_tournament() {
 void shared_switches::iterate_tolerance() {
     //tolerance = std::max(tolerance + (tolerance / 2), 2);
     tolerance *= 2;
+}
+
+void shared_switches::reset_tolerance(int size, int domain_size) {
+    tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
 }

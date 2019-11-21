@@ -7,10 +7,17 @@
 
 
 #include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include "concurrentqueue.h"
 #include "coloring.h"
 #include "invariant.h"
+
+struct pair_hash {
+    inline std::size_t operator()(const std::pair<int,int> & v) const {
+        return v.first*31+v.second;
+    }
+};
 
 class bfs_element {
 public:
@@ -33,8 +40,9 @@ public:
     double parent_weight = -1;
 
     // synergy information for fast extension and deviation maps
-    int deviation_pos    = -1;
+    int deviation_pos    = -1; // save more than one?
     int deviation_val    = -1;
+    int deviation_acc    = -1;
     int deviation_vertex = -1;
 
     // memory management
@@ -60,7 +68,7 @@ public:
     int*           level_sizes;
     int*           level_reserved_sizes;
     int*           level_expecting_finished;
-    std::unordered_map<int, int>*  level_abort_map;
+    std::unordered_set<std::pair<int, int>, pair_hash>* level_abort_map;
     int*                           level_abort_map_done;
     std::mutex**                   level_abort_map_mutex;
 
@@ -78,7 +86,7 @@ public:
 
     int domain_size;
     int base_size;
-    int chunk_size = 128; // ToDo: dynamically adapt this
+    int chunk_size = 32; // ToDo: dynamically adapt this
     bool reached_initial_target = true;
     int initial_target_level;
 
@@ -92,9 +100,7 @@ public:
     bfs();
     void initialize(bfs_element* root_node, int init_c, int domain_size, int base_size);
     bool work_queues(int tolerance);
-
     void reset_initial_target();
-
     void write_abort_map(int level, int pos, int val);
     bool read_abort_map(int level, int pos, int val);
 };
