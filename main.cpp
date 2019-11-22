@@ -272,7 +272,7 @@ int main(int argc, char *argv[]) {
      // p.parse_dimacs_file_g("/home/markus/Downloads/graphssaucy/states/AS.g", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
-        p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-160", &g);
+        p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-133", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
