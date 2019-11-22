@@ -23,25 +23,24 @@ struct abort_code {
 };
 
 struct alignas(64) dejavu_workspace {
+    // workspace for normal search
     refinement R;
     selector   S;
     coloring   c;
     invariant  I;
 
+    // workspace for bfs
     coloring*  work_c;
     invariant* work_I;
 
+    // workspace for base aligned search
     int first_level = 1;
     int base_size = 0;
     int skiplevels = 1;
-
     int        first_skiplevel = 1;
     coloring   skip_c;
     invariant  skip_I;
     mschreier* skip_schreier_level;
-
-    int measure1 = 0;
-    int measure2 = 0;
 
     int* my_base_points;
     int  my_base_points_sz;
@@ -51,7 +50,9 @@ struct alignas(64) dejavu_workspace {
 
     coloring* start_c;
     invariant start_I;
-    int       communicator_id;
+
+    // indicates which thread this is
+    int id;
 
     // shared orbit and generators
     int**       shared_orbit;
@@ -60,11 +61,12 @@ struct alignas(64) dejavu_workspace {
     int*        shared_generators_size;
     int         generator_fix_base_alloc = -1;
 
+    // sequential, local group
     permnode*       sequential_gens;
     _schreierlevel* sequential_gp;
     bool            sequential_init = false;
 
-    //
+    // deprecated workspace for simple orbit method
     work_set  orbit_considered;
     work_list orbit_vertex_worklist;
     work_list orbit;
@@ -89,20 +91,19 @@ public:
     void automorphisms(sgraph *g);
 
 private:
-    void sample_shared(sgraph *g_, bool master, shared_switches *switches, group_diy *G, coloring *start_c,
+    void sample_shared(sgraph *g_, bool master, shared_decision_data *switches, group_diy *G, coloring *start_c,
                        strategy* canon_strategy, int communicator_id,
                        int **shared_orbit, int** shared_orbit_weights, bfs *bwork, mpermnode **gens, int *shared_group_size);
 
-    void find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
-                                shared_switches *switches, int selector_seed);
+    void find_first_leaf(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                         bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
+                         shared_decision_data *switches, int selector_seed);
 
-    void
-    fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
-                                  strategy_metrics *m, bool *done, shared_switches *switches, int selector_seed);
+    void base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
+                             strategy_metrics *m, bool *done, shared_decision_data *switches, int selector_seed);
 
-    abort_code find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
-                                    shared_switches *switches, int selector_seed);
+    abort_code uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
+                                       shared_decision_data *switches, int selector_seed);
 
     bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes, strategy_metrics* m);
 
@@ -120,8 +121,8 @@ private:
 
     bool sequential_init_copy(dejavu_workspace *w);
 
-    bool extend_path(dejavu_workspace *w, sgraph *g, shared_switches* switches, bfs_element *elem, int selector_seed, strategy *strat,
-                     bijection *automorphism, bool look_close);
+    bool uniform_from_bfs_search_with_storage(dejavu_workspace *w, sgraph *g, shared_decision_data* switches, bfs_element *elem, int selector_seed, strategy *strat,
+                                              bijection *automorphism, bool look_close);
 };
 
 

@@ -6,28 +6,16 @@
 #define DEJAVU_CONFIGURATION_H
 
 struct configstruct {
-    bool CONFIG_IR_BACKTRACK_RANDOM  = false;
-    bool CONFIG_IR_BACKTRACK      = false;
-    int  CONFIG_IR_CELL_SELECTOR  = 3; // 0 = random, 1 = first largest, 2 = first smallest, 3 = first
-    int  CONFIG_IR_INVARIANT      = 0;
-    int  CONFIG_IR_REFINEMENT     = 0;
-    bool CONFIG_IR_FAST_AUTOPRE   = true; // ToDo: option to stop this dynamically from group
-    bool CONFIG_IR_DENSE          = true; // ToDo: first color reifnement needs to use dense / sparse, too!
-    int  CONFIG_IR_SIZE_FACTOR    = 10; // 2
-    bool CONFIG_IR_FULL_INVARIANT = false;
-    bool CONFIG_BFS_OVERRIDE      = true;
+    int  CONFIG_IR_CELL_SELECTOR  = 3;     // not used
+    bool CONFIG_IR_DENSE          = true;  // automatically set by the solver
+    int  CONFIG_IR_SIZE_FACTOR    = 10;    // trade off between restarts and allowed breadth-first width
+    bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
+    bool CONFIG_IR_FULLBFS = false;        // enforces full traversal of the search tree (maybe good for asymmetric)
 
-    bool CONFIG_IR_FULLBFS = false;
-
-    int CONFIG_RAND_ABORT      = 5;
+    int CONFIG_RAND_ABORT      = 5;        // determines error probability (higher value means lower error probability)
     int CONFIG_RAND_ABORT_RAND = -1;
 
-    int CONFIG_THREADS_NO_PIPELINE        = 1;
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 3;
-    int CONFIG_THREADS_PIPELINE_DEPTH     = 1;
-    int CONFIG_THREADS_PIPELINE_STAGE_MIN = 10;
-    bool CONFIG_THREADS_COPYG             = false;
-    bool CONFIG_THREADS_COLLABORATE       = false;
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 3; // number of threads to use
 };
 
 extern configstruct config;

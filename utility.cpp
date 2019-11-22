@@ -19,11 +19,11 @@ double doubleRand(const double & min, const double & max, int seed) {
 }
 
 
-shared_switches::shared_switches() {
+shared_decision_data::shared_decision_data() {
     done_shared_group.store(false);
     done_created_group.store(false);
     experimental_look_close.store(false);
-    base2_skip.store(0);
+    base1_skip.store(0);
     _ack_done.store(0);
     win_id.store(-2);
     checked.store(0);
@@ -31,7 +31,7 @@ shared_switches::shared_switches() {
     experimental_deviation.store(0);
 }
 
-bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
+bool shared_decision_data::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
     thread_local bool ichecked = false;
 
     if(!early_check) {
@@ -64,7 +64,7 @@ bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, boo
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
 
-bool shared_switches::ack_done() {
+bool shared_decision_data::ack_done() {
     thread_local bool ichecked = false;
 
     if(!ichecked) {
@@ -75,18 +75,11 @@ bool shared_switches::ack_done() {
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
 
-void shared_switches::reset_leaf_tournament() {
-    done_shared_group.store(false);
-    done_created_group.store(false);
-    win_id.store(-2);
-    checked.store(0);
-}
-
-void shared_switches::iterate_tolerance() {
+void shared_decision_data::iterate_tolerance() {
     //tolerance = std::max(tolerance + (tolerance / 2), 2);
     tolerance *= 2;
 }
 
-void shared_switches::reset_tolerance(int size, int domain_size) {
+void shared_decision_data::reset_tolerance(int size, int domain_size) {
     tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
 }

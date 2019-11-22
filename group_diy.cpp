@@ -25,7 +25,7 @@ void group_diy::initialize(int domain_size, bijection *base_points) {
     mgetorbits(b, base_size, gp, &gens, domain_size);
 }
 
-void group_diy::manage_results(shared_switches *switches) {
+void group_diy::manage_results(shared_decision_data *switches) {
     int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
     for(int j = 0; j < num; ++j) {
         switch(dequeue_space[j].first) {

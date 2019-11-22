@@ -37,8 +37,8 @@ bool dejavu::proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invarian
 }
 
 
-abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
-                                        shared_switches *switches, int selector_seed) {
+abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
+                                           shared_decision_data *switches, int selector_seed) {
     bool backtrack = false;
     bool* done = &switches->done;
 
@@ -94,7 +94,7 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
 
             // make some global checks
             *restarts += 1;
-            if(w->communicator_id == -1) {
+            if(w->id == -1) {
                 // too many restarts? abort and try bfs again...
                 if(*restarts > (switches->tolerance * 10)) {
                     return abort_code(1);
@@ -137,7 +137,6 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
             if (s == -1) {
                 if (compare) {
                     // we can derive an automorphism!
-                    w->measure2 += 1;
                     bijection leaf;
                     leaf.read_from_coloring(c);
                     leaf.not_deletable();
@@ -228,9 +227,9 @@ abort_code dejavu::find_automorphism_from_bfs(dejavu_workspace *w, sgraph *g, bo
 }
 
 
-void dejavu::find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                                    bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
-                                    shared_switches *switches, int selector_seed) {
+void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
+                             bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
+                             shared_decision_data *switches, int selector_seed) {
     bool backtrack = false;
     bool* done = &switches->done;
 
@@ -269,7 +268,6 @@ void dejavu::find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare
             if (s == -1 && last_op == OP_R) {
                 if (compare) {
                     // we can derive an automorphism!
-                    w->measure2 += 1;
                     bijection leaf;
                     leaf.read_from_coloring(c);
                     leaf.not_deletable();
@@ -334,8 +332,8 @@ void dejavu::find_automorphism_prob(dejavu_workspace *w, sgraph *g, bool compare
 }
 
 void
-dejavu::fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
-                                      strategy_metrics *m, bool *done, shared_switches *switches, int selector_seed) {
+dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
+                            strategy_metrics *m, bool *done, shared_decision_data *switches, int selector_seed) {
     bool backtrack = false;
     bool skipped_level = false;
 
@@ -401,8 +399,8 @@ dejavu::fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *
         ++it;
         if(it % 3 == 0) {
             if(switches->current_mode == modes::MODE_TOURNAMENT)
-                switches->check_strategy_tournament(w->communicator_id, m, true);
-            if(w->communicator_id == -1) // but need to be able to reach proper state afterwads
+                switches->check_strategy_tournament(w->id, m, true);
+            if(w->id == -1) // but need to be able to reach proper state afterwads
                 w->G->manage_results(switches);
         }
 
@@ -439,7 +437,6 @@ dejavu::fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *
         int s = S->select_color_dynamic(g, c, canon_strategy);
         if (s == -1) {
             // we can derive an automorphism!
-            w->measure2 += 1;
             bijection leaf;
             leaf.read_from_coloring(c);
             leaf.not_deletable();
@@ -504,7 +501,7 @@ dejavu::fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *
     }
 }
 
-bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switches, bfs_element* elem, int selector_seed, strategy* strat, bijection* automorphism, bool look_close) {
+bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g, shared_decision_data* switches, bfs_element* elem, int selector_seed, strategy* strat, bijection* automorphism, bool look_close) {
     coloring*  c = &w->c;
     invariant* I = &w->I;
 
@@ -1168,7 +1165,7 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
     w->BW->BW.level_expecting_finished[w->BW->BW.current_level] = expected;
 }
 
-void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, group_diy* G, coloring* start_c, strategy* canon_strategy,
+void dejavu::sample_shared(sgraph* g_, bool master, shared_decision_data* switches, group_diy* G, coloring* start_c, strategy* canon_strategy,
                            int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs* bwork, mpermnode** gens, int* shared_group_size) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
@@ -1261,7 +1258,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         // set some workspace variables
         W.start_c = new coloring;
         W.start_c->copy_force(start_c);
-        W.communicator_id        = -1;
+        W.id        = -1;
         W.shared_orbit           = shrd_orbit_;
         W.shared_orbit_weights   = shrd_orbit_weights_;
         W.shared_generators      = &_gens;
@@ -1289,7 +1286,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         W.shared_orbit_weights = shared_orbit_weights;
         W.start_c = new coloring;
         W.start_c->copy_force(start_c);
-        W.communicator_id = communicator_id;
+        W.id = communicator_id;
         W.shared_generators = gens;
         W.shared_generators_size = shared_group_size;
     }
@@ -1308,7 +1305,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
         {
             W.S.empty_cache();
-            find_automorphism_prob(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches, selector_seed);
+            find_first_leaf(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches,
+                            selector_seed);
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
@@ -1317,7 +1315,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
         // skip immediately if base size is 1
         if(master && W.my_base_points_sz == 1 && !config.CONFIG_IR_FULLBFS) { // ToDo: can end in deadlock if threads dont aggree on base size 1
             std::cout << "[N] Base size 1 skip" << std::endl;
-            switches->base2_skip.store(2);
+            switches->base1_skip.store(2);
             //*canon_I    = my_canon_I;
             //*canon_leaf = my_canon_leaf;
             canon_strategy->replace(my_strategy);
@@ -1350,8 +1348,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             switches->current_mode = modes::MODE_BFS;
             std::cout << "[T] No tournament, created group by " << communicator_id << " with restarts " << restarts << std::endl;
         } else if(W.my_base_points_sz == 1 && !config.CONFIG_IR_FULLBFS) {
-            while(switches->base2_skip.load() == 0) continue;
-            if(switches->base2_skip == 2) {
+            while(switches->base1_skip.load() == 0) continue;
+            if(switches->base1_skip == 2) {
                 // wait until shared group created
                 while (!switches->done_shared_group)
                     continue;
@@ -1363,7 +1361,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                 W.is_foreign_base = false;
             }
         } else if(master) {
-            switches->base2_skip.store(1);
+            switches->base1_skip.store(1);
         }
     }
 
@@ -1488,8 +1486,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             case modes::MODE_TOURNAMENT:
                 m.restarts = 0;
                 m.expected_bfs_size = 0;
-                fast_automorphism_non_uniform(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
-                                              selector_seed); // <- we should already safe unsuccessfull / succ first level stuff here
+                base_aligned_search(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
+                                    selector_seed); // <- we should already safe unsuccessfull / succ first level stuff here
                 if(n_found == 0) { // check if I won
                     // wait until everyone checked
                     while(!switches->check_strategy_tournament(communicator_id, &m, false) && !switches->done_created_group) continue;
@@ -1545,14 +1543,14 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
             case modes::MODE_NON_UNIFORM_PROBE:
                 if(!foreign_base_done) {
-                    fast_automorphism_non_uniform(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
-                                                  selector_seed);
+                    base_aligned_search(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
+                                        selector_seed);
                     automorphism.foreign_base = true;
                     n_restarts += m.restarts;
                     automorphism.mark = true;
                 } else {
-                    fast_automorphism_non_uniform(&W, g, canon_strategy, &automorphism, &m, done_fast, switches,
-                                                  selector_seed);
+                    base_aligned_search(&W, g, canon_strategy, &automorphism, &m, done_fast, switches,
+                                        selector_seed);
                     automorphism.foreign_base = false;
                     n_restarts += m.restarts;
                     automorphism.mark = true;
@@ -1577,7 +1575,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                             base_points = bijection();
                             selector_type rst = (selector_type) intRand(0, 2, selector_seed);
                             my_strategy = new strategy(my_canon_leaf, my_canon_I, rst, -1);
-                            find_automorphism_prob(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches, selector_seed);
+                            find_first_leaf(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points,
+                                            &trash_int, switches, selector_seed);
                             W.my_base_points    = base_points.map;
                             W.my_base_points_sz = base_points.map_sz;
                             W.is_foreign_base   = true;
@@ -1587,14 +1586,14 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                     }
 
                     if (!foreign_base_done) {
-                        fast_automorphism_non_uniform(&W, g, my_strategy, &automorphism, &m,
-                                                      done_fast, switches, selector_seed);
+                        base_aligned_search(&W, g, my_strategy, &automorphism, &m,
+                                            done_fast, switches, selector_seed);
                         automorphism.foreign_base = true;
                         automorphism.mark = true;
                         n_restarts += m.restarts;
                     } else {
-                        fast_automorphism_non_uniform(&W, g, canon_strategy, &automorphism, &m,
-                                                      done_fast, switches, selector_seed);
+                        base_aligned_search(&W, g, canon_strategy, &automorphism, &m,
+                                            done_fast, switches, selector_seed);
                         automorphism.foreign_base = false;
                         automorphism.mark = true;
                         n_restarts += m.restarts;
@@ -1623,20 +1622,20 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             case modes::MODE_NON_UNIFORM_FROM_BFS:
                 {
                     // pick initial path from BFS level that is allocated to me
-                    --switches->budget;
-                    if(master && (switches->budget <= 0 || switches->done_fast)) {
+                    --switches->experimental_budget;
+                    if(master && (switches->experimental_budget <= 0 || switches->done_fast)) {
                         if(!switches->done_fast) {
                             if(switches->experimental_paths > switches->experimental_deviation) {
                                 if(!switches->experimental_look_close) {
                                     switches->experimental_look_close = true;
-                                    switches->budget += W.BW->BW.level_sizes[W.BW->BW.current_level - 1];
+                                    switches->experimental_budget += W.BW->BW.level_sizes[W.BW->BW.current_level - 1];
                                     std::cout << "Switching to close look..." << std::endl;
                                     continue;
                                 }
                             }
                         }
 
-                        switches->budget = -1;
+                        switches->experimental_budget = -1;
                         switches->current_mode = modes::MODE_WAIT;
                         switches->done_fast = true;
                         switches->done_shared_group = false;
@@ -1671,16 +1670,18 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                         if(rand_weight > picked_weight) continue;
                     } while (elem->weight <= 0 && !switches->done_fast && !switches->done); // && elem->deviation_vertex == -1
                     // compute one experimental path
-                    bool comp = extend_path(&W, g, switches, elem, selector_seed, canon_strategy, &automorphism, switches->experimental_look_close);
+                    bool comp = uniform_from_bfs_search_with_storage(&W, g, switches, elem, selector_seed,
+                                                                     canon_strategy, &automorphism,
+                                                                     switches->experimental_look_close);
 
                     if (!comp) {
-                        // if failed, deduct budget and continue
+                        // if failed, deduct experimental_budget and continue
                         continue;
                     } else {
                         if(increase_budget) {
                             increase_budget = false;
-                            switches->budget += ((bfs_level_sz * 4) / (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1));
-                            //std::cout << "Increasing budget..." << std::endl;
+                            switches->experimental_budget += ((bfs_level_sz * 4) / (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1));
+                            //std::cout << "Increasing experimental_budget..." << std::endl;
                         }
                         // otherwise add automorphism, if it exists...
                         automorphism.mark = true;
@@ -1743,8 +1744,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                             //switches->current_mode = modes::MODE_NON_UNIFORM_PROBE_IT; // ToDo: actually should go to leaf tournament
                             int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
 
-                            std::cout << "[B] Non-uniform extensions, budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] * budget_fac << std::endl;
-                            switches->budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1] *budget_fac);
+                            std::cout << "[B] Non-uniform extensions, experimental_budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] * budget_fac << std::endl;
+                            switches->experimental_budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1] * budget_fac);
                             switches->experimental_paths.store(0);
                             switches->experimental_deviation.store(0);
                             switches->current_mode = modes::MODE_NON_UNIFORM_FROM_BFS;
@@ -1757,13 +1758,14 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
             case modes::MODE_UNIFORM_PROBE:
                 reset_non_uniform_switch = true;
-                if(W.communicator_id == 0 && !switched2) {
+                if(W.id == 0 && !switched2) {
                     switched2 = true;
                     cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::high_resolution_clock::now() - timer).count());
                     std::cout << "[T] " << cref / 1000000.0 << "ms" << std::endl;
                 }
-                A = find_automorphism_from_bfs(&W, g, true, canon_strategy, &automorphism, &restarts, switches, selector_seed);
+                A = uniform_from_bfs_search(&W, g, true, canon_strategy, &automorphism, &restarts, switches,
+                                            selector_seed);
                 if(A.reason == 2) {
                     //std::cout << "early abort" << std::endl;
                     continue;
@@ -1783,8 +1785,8 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                     reset_skiplevels(&W);
                     foreign_base_done = true;
                     switches->current_mode = MODE_NON_UNIFORM_PROBE_IT;
-                    //std::cout << "[B] Non-uniform extensions, budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] << std::endl;
-                    //switches->budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1]);
+                    //std::cout << "[B] Non-uniform extensions, experimental_budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] << std::endl;
+                    //switches->experimental_budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1]);
                     //switches->current_mode = MODE_NON_UNIFORM_FROM_BFS;
                     required_level = W.BW->BW.current_level + 1;
                     std::cout << "[B] Requiring level " << required_level << std::endl;
@@ -1821,7 +1823,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
             // switch this worker to canonical search
             reset_skiplevels(&W);
             foreign_base_done = true;
-            //std::cout << "[N] Switching to canonical search (" << W.communicator_id << ", " << n_found << " generators)" << std::endl;
+            //std::cout << "[N] Switching to canonical search (" << W.id << ", " << n_found << " generators)" << std::endl;
         }
 
         delete[] automorphism.map;
@@ -1839,7 +1841,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 }
 
 void dejavu::automorphisms(sgraph *g) {
-    shared_switches switches;
+    shared_decision_data switches;
     sample_shared(g, true, &switches, nullptr, nullptr, nullptr, -1,
                   nullptr, nullptr, nullptr,nullptr, nullptr);
 }
