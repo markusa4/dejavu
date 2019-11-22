@@ -121,7 +121,7 @@ private:
     bool sequential_init_copy(dejavu_workspace *w);
 
     bool extend_path(dejavu_workspace *w, sgraph *g, shared_switches* switches, bfs_element *elem, int selector_seed, strategy *strat,
-                     bijection *automorphism);
+                     bijection *automorphism, bool look_close);
 };
 
 

@@ -22,10 +22,13 @@ double doubleRand(const double & min, const double & max, int seed) {
 shared_switches::shared_switches() {
     done_shared_group.store(false);
     done_created_group.store(false);
+    experimental_look_close.store(false);
     base2_skip.store(0);
     _ack_done.store(0);
     win_id.store(-2);
     checked.store(0);
+    experimental_paths.store(0);
+    experimental_deviation.store(0);
 }
 
 bool shared_switches::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {

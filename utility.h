@@ -42,6 +42,10 @@ public:
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;
 
+    std::atomic_int    experimental_paths;
+    std::atomic_int    experimental_deviation;
+    std::atomic_bool   experimental_look_close;
+
     std::atomic_int    base2_skip;
 
     std::mutex         tournament_mutex;

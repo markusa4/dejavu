@@ -504,7 +504,7 @@ dejavu::fast_automorphism_non_uniform(dejavu_workspace *w, sgraph *g, strategy *
     }
 }
 
-bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switches, bfs_element* elem, int selector_seed, strategy* strat, bijection* automorphism) {
+bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switches, bfs_element* elem, int selector_seed, strategy* strat, bijection* automorphism, bool look_close) {
     coloring*  c = &w->c;
     invariant* I = &w->I;
 
@@ -522,18 +522,23 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
     v    = c->lab[rpos];
 
     I->reset_deviation();
+    if(look_close)
+        I->never_fail = true;
     //I->never_fail = true;
     comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
     if(!comp) { // fail on first level, set abort_val and abort_pos in elem
         // std::cout << "saving..." << std::endl;
         // ToDo: need to sync this write?
+        ++switches->experimental_deviation;
         elem->deviation_pos    = I->comp_fail_pos;
         elem->deviation_val    = I->comp_fail_val;
         elem->deviation_acc    = I->comp_fail_acc;
         elem->deviation_vertex = v;
         return false;
     }
+
+    ++switches->experimental_paths;
 
     w->S.empty_cache();
 
@@ -543,10 +548,10 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
 
         col = w->S.select_color_dynamic(g, c, strat);
         if(col == -1) break;
-        //rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
-        //v    = c->lab[rpos];
+        rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
+        v    = c->lab[rpos];
 
-        int min_v = INT32_MAX;
+        /*int min_v = INT32_MAX;
         for(int j = col; j < col + c->ptn[col] + 1; ++j) {
             if(c->lab[j] < min_v) {
                 min_v = c->lab[j];
@@ -554,7 +559,7 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
             }
         }
 
-        v = min_v;
+        v = min_v;*/
 
         comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
     } while(comp);
@@ -566,7 +571,7 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
         *automorphism = leaf;
         automorphism->inverse();
         automorphism->compose(strat->leaf);
-        automorphism->non_uniform = true;
+        automorphism->non_uniform = false;
         if(!config.CONFIG_IR_FULL_INVARIANT && !w->R.certify_automorphism(g, automorphism)) {
             comp = false;
         } else {
@@ -606,8 +611,9 @@ bool dejavu::extend_path(dejavu_workspace* w, sgraph* g, shared_switches* switch
             if(j == automorphism->map_sz) {comp = false; break;}
 
             if(w->R.certify_automorphism(g, automorphism)) {
+                // std::cout << "found auto" << std::endl;
                 automorphism->certified = true;
-                automorphism->non_uniform = true;
+                automorphism->non_uniform = false;
                 comp = true;
             } else {
                 std::cout << "should add / check more" << std::endl;
@@ -1367,6 +1373,7 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
     strategy_metrics m;
     bool foreign_base_done = false;
     bool reset_non_uniform_switch = true;
+    bool increase_budget = true;
     int required_level = -1;
 
     // main loop...
@@ -1618,6 +1625,17 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                     // pick initial path from BFS level that is allocated to me
                     --switches->budget;
                     if(master && (switches->budget <= 0 || switches->done_fast)) {
+                        if(!switches->done_fast) {
+                            if(switches->experimental_paths > switches->experimental_deviation) {
+                                if(!switches->experimental_look_close) {
+                                    switches->experimental_look_close = true;
+                                    switches->budget += W.BW->BW.level_sizes[W.BW->BW.current_level - 1];
+                                    std::cout << "Switching to close look..." << std::endl;
+                                    continue;
+                                }
+                            }
+                        }
+
                         switches->budget = -1;
                         switches->current_mode = modes::MODE_WAIT;
                         switches->done_fast = true;
@@ -1627,10 +1645,12 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
 
                     bfs_element *elem;
                     int bfs_level    = W.BW->BW.current_level - 1;
+                    int max_weight    = W.BW->BW.level_maxweight[bfs_level];
                     int bfs_level_sz = W.BW->BW.level_sizes[bfs_level];
                     if(reset_non_uniform_switch) {
                         rotate_i = bfs_level_sz / (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
                         rotate_i = rotate_i * (communicator_id + 1);
+                        increase_budget = true;
                         reset_non_uniform_switch = false;
                         if(master) {
                             int proposed_level = std::max(bfs_level + 1, required_level);
@@ -1641,18 +1661,27 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                             }
                         }
                     }
+                    int picked_weight, rand_weight;
                     do {
-                        int pick_elem = rotate_i;
+                        int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
                         elem = W.BW->BW.level_states[bfs_level][pick_elem];
-                        rotate_i = (rotate_i + 1) % bfs_level_sz;
-                    } while (elem->weight <= 0 && !switches->done_fast && elem->deviation_vertex == -1);
+                        picked_weight = elem->weight;
+                        assert(max_weight > 0);
+                        rand_weight   = doubleRand(1, max_weight, selector_seed);
+                        if(rand_weight > picked_weight) continue;
+                    } while (elem->weight <= 0 && !switches->done_fast && !switches->done); // && elem->deviation_vertex == -1
                     // compute one experimental path
-                    bool comp = extend_path(&W, g, switches, elem, selector_seed, canon_strategy, &automorphism);
+                    bool comp = extend_path(&W, g, switches, elem, selector_seed, canon_strategy, &automorphism, switches->experimental_look_close);
 
                     if (!comp) {
                         // if failed, deduct budget and continue
                         continue;
                     } else {
+                        if(increase_budget) {
+                            increase_budget = false;
+                            switches->budget += ((bfs_level_sz * 4) / (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1));
+                            //std::cout << "Increasing budget..." << std::endl;
+                        }
                         // otherwise add automorphism, if it exists...
                         automorphism.mark = true;
                     }
@@ -1712,8 +1741,12 @@ void dejavu::sample_shared(sgraph* g_, bool master, shared_switches* switches, g
                             reset_skiplevels(&W);
                             foreign_base_done = true;
                             //switches->current_mode = modes::MODE_NON_UNIFORM_PROBE_IT; // ToDo: actually should go to leaf tournament
-                            std::cout << "[B] Non-uniform extensions, budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] << std::endl;
-                            switches->budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1]);
+                            int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
+
+                            std::cout << "[B] Non-uniform extensions, budget " << bwork->BW.level_sizes[bwork->BW.current_level - 1] * budget_fac << std::endl;
+                            switches->budget.store(bwork->BW.level_sizes[bwork->BW.current_level - 1] *budget_fac);
+                            switches->experimental_paths.store(0);
+                            switches->experimental_deviation.store(0);
                             switches->current_mode = modes::MODE_NON_UNIFORM_FROM_BFS;
                             continue;
                         }
