@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -281,7 +281,7 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/hypercubes/18cube.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pipe/7pipe.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/hole12.bliss", &g);
-      p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/pret150_25_ms.bliss", &g); // smallest is crazy here...
+     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/pret150_25_ms.bliss", &g); // smallest is crazy here...
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/s4-4-3-9.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/fpga11_20.bliss", &g);
 

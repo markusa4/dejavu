@@ -1,4 +1,4 @@
-n = 150
+n = 2500
 f = open("k%d.dimacs" %n,"w+")
 
 f.write("p edge {} {}\n".format(n, int((n * (n - 1)) / 2)))
