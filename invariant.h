@@ -1,5 +1,5 @@
-#ifndef BRUTUS_INVARIANT_H
-#define BRUTUS_INVARIANT_H
+#ifndef DEJAVU_INVARIANT_H
+#define DEJAVU_INVARIANT_H
 
 
 #include <stack>
@@ -21,6 +21,7 @@ public:
     int cur_pos = -1;
     int acc = 0;
 
+    // currently a bit convoluted, really should be split into 2 functions...
     inline bool write_top_and_compare(int i) {
         acc += i * (35235237 - i * 5);
         if(no_write) {
@@ -34,7 +35,7 @@ public:
                     comp_fail_val = i;
                     comp_fail_acc = i;
                 } else {
-                    comp_fail_acc += i * (35235235 - i * 3);
+                    comp_fail_acc += i * (35235235 - i * 3); // could just use acc instead
                 }
             }
             return (comp || never_fail);
@@ -63,7 +64,12 @@ public:
     void create_vector() {
         vec_invariant = new std::vector<int>();
     }
+
+    /*~invariant() {
+        if(vec_invariant != nullptr)
+            delete vec_invariant;
+    }*/
 };
 
 
-#endif //BRUTUS_INVARIANT_H
+#endif //DEJAVU_INVARIANT_H

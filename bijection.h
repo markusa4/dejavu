@@ -1,12 +1,6 @@
-//
-// Created by markus on 19.09.19.
-//
+#ifndef DEJAVU_BIJECTION_H
+#define DEJAVU_BIJECTION_H
 
-#ifndef BRUTUS_BIJECTION_H
-#define BRUTUS_BIJECTION_H
-
-
-#include <vector>
 #include "coloring.h"
 
 class bijection {
@@ -32,4 +26,4 @@ public:
 };
 
 
-#endif //BRUTUS_BIJECTION_H
+#endif //DEJAVU_BIJECTION_H

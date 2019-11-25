@@ -1,12 +1,10 @@
-//
-// Created by markus on 11/11/2019.
-//
+// currently not used
 
 #include <iostream>
 #include <cmath>
 #include "lowdeg.h"
 #include "refinement.h"
-#include "group_diy.h"
+#include "group_shared.h"
 
 
 void split_with_respect_to_array(coloring* c, int col, int col_sz, refinement* R, work_set_int* A) {
@@ -686,7 +684,7 @@ double factorial(int n) {
     return (res == 0)?1:res;
 }
 
-long double lowdeg::postprocess(group_diy* G) {
+long double lowdeg::postprocess(group_shared* G) {
     //std::cout << "dejavu_lowdeg_post------------------------------------------------" << std::endl;
     double grpsize1 = 1;
     long double addsize = 1;

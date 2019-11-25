@@ -1,9 +1,5 @@
-//
-// Created by markus on 19.09.19.
-//
-
-#ifndef BRUTUS_PARSER_H
-#define BRUTUS_PARSER_H
+#ifndef DEJAVU_PARSER_H
+#define DEJAVU_PARSER_H
 #include "sgraph.h"
 #include <string>
 
@@ -15,4 +11,4 @@ public:
 };
 
 
-#endif //BRUTUS_PARSER_H
+#endif //DEJAVU_PARSER_H

@@ -1,9 +1,5 @@
-//
-// Created by markus on 19.09.19.
-//
-
-#ifndef BRUTUS_SELECTOR_H
-#define BRUTUS_SELECTOR_H
+#ifndef DEJAVU_SELECTOR_H
+#define DEJAVU_SELECTOR_H
 
 
 #include "coloring.h"
@@ -68,4 +64,4 @@ public:
     int select_color_traces(coloring *c);
 };
 
-#endif //BRUTUS_SELECTOR_H
+#endif // DEJAVU_SELECTOR_H

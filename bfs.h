@@ -1,7 +1,3 @@
-//
-// Created by markus on 18/10/2019.
-//
-
 #ifndef DEJAVU_BFS_H
 #define DEJAVU_BFS_H
 
@@ -92,12 +88,9 @@ public:
 
     std::pair<bfs_element*, int>* finished_elems;
     int finished_elems_sz = -1;
-};
 
-class bfs {
-public:
-    bfs_workspace BW;
-    bfs();
+    bfs_workspace();
+    ~bfs_workspace();
     void initialize(bfs_element* root_node, int init_c, int domain_size, int base_size);
     bool work_queues(int tolerance);
     void reset_initial_target();

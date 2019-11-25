@@ -1,7 +1,3 @@
-//
-// Created by markus on 14.10.19.
-//
-
 #include <atomic>
 #include <mutex>
 #include <algorithm>
@@ -29,9 +25,9 @@ enum ir_operation {
     OP_I, OP_R, OP_END
 };
 
-class shared_decision_data {
+class shared_workspace {
 public:
-    shared_decision_data();
+    shared_workspace();
     bool done = false;
     bool done_fast = false;
     std::atomic_bool done_shared_group;

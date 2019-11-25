@@ -1,5 +1,5 @@
-#ifndef BRUTUS_GRAPH_H
-#define BRUTUS_GRAPH_H
+#ifndef DEJAVU_GRAPH_H
+#define DEJAVU_GRAPH_H
 
 #include <vector>
 #include "bijection.h"
@@ -31,4 +31,4 @@ public:
     void copy_graph(sgraph *g);
 };
 
-#endif //BRUTUS_GRAPH_H
+#endif //DEJAVU_GRAPH_H

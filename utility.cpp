@@ -1,7 +1,3 @@
-//
-// Created by markus on 14.10.19.
-//
-
 #include <iostream>
 #include "utility.h"
 #include "configuration.h"
@@ -19,7 +15,7 @@ double doubleRand(const double & min, const double & max, int seed) {
 }
 
 
-shared_decision_data::shared_decision_data() {
+shared_workspace::shared_workspace() {
     done_shared_group.store(false);
     done_created_group.store(false);
     experimental_look_close.store(false);
@@ -31,7 +27,7 @@ shared_decision_data::shared_decision_data() {
     experimental_deviation.store(0);
 }
 
-bool shared_decision_data::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
+bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
     thread_local bool ichecked = false;
 
     if(!early_check) {
@@ -64,7 +60,7 @@ bool shared_decision_data::check_strategy_tournament(int id, strategy_metrics* m
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
 
-bool shared_decision_data::ack_done() {
+bool shared_workspace::ack_done() {
     thread_local bool ichecked = false;
 
     if(!ichecked) {
@@ -75,11 +71,11 @@ bool shared_decision_data::ack_done() {
     return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
 }
 
-void shared_decision_data::iterate_tolerance() {
+void shared_workspace::iterate_tolerance() {
     //tolerance = std::max(tolerance + (tolerance / 2), 2);
     tolerance *= 2;
 }
 
-void shared_decision_data::reset_tolerance(int size, int domain_size) {
+void shared_workspace::reset_tolerance(int size, int domain_size) {
     tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
 }

@@ -10,14 +10,15 @@
 void sgraph::initialize_coloring(coloring *c) {
     c->lab = new int[this->v_size];
     c->ptn = new int[this->v_size];
+    c->vertex_to_col = new int[this->v_size];
+    c->vertex_to_lab = new int[this->v_size];
     c->lab_sz = this->v_size;
     c->ptn_sz = this->v_size;
     c->init = true;
-    c->vertex_to_col.reserve(this->v_size);
-    c->vertex_to_lab.reserve(this->v_size);
+
     for(int i = 0; i < v_size; i++) {
-        c->vertex_to_col.push_back(-1);
-        c->vertex_to_lab.push_back(-1);
+        c->vertex_to_col[i] = -1;
+        c->vertex_to_lab[i] = -1;
         c->lab[i] = i;
         c->ptn[i] = 1;
     }
@@ -80,7 +81,7 @@ bool sgraph::certify_automorphism(bijection p) {
     return true;
 }
 
-void sgraph::permute_graph(sgraph* ng, bijection* p) { // ToDo: broken
+void sgraph::permute_graph(sgraph* ng, bijection* p) {
     ng->v = new int[v_size];
     ng->d = new int[d_size];
     ng->e = new int[e_size];

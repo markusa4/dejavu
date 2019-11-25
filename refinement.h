@@ -1,9 +1,5 @@
-//
-// Created by markus on 19.09.19.
-//
-
-#ifndef BRUTUS_REFINEMENT_H
-#define BRUTUS_REFINEMENT_H
+#ifndef DEJAVU_REFINEMENT_H
+#define DEJAVU_REFINEMENT_H
 
 
 #include <queue>
@@ -64,26 +60,6 @@ public:
 private:
     bool init = false;
     int  sz;
-};
-
-class cumulative_counting {
-public:
-    void initialize(int size, int maxdegree);
-    void reset();
-    void increment(int index, int color);
-    void increment_r(int index, int color);
-    int get_size(int index,  int color);
-    int get_count(int index);
-    ~cumulative_counting();
-private:
-    int* count;
-    bool init = false;
-    //std::vector<int>* sizes;
-    int sz;
-    int* sizes;
-    int m;
-    work_queue reset_queue;
-    work_queue reset_queue_sizes;
 };
 
 class work_set {
@@ -231,45 +207,36 @@ class refinement {
 public:
     bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes, strategy_metrics* m);
     int  individualize_vertex(coloring* c, int v);
-    void undo_individualize_vertex(sgraph *g, coloring *c, int v);
-    bool refine_color_class_cumulative(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
-    void undo_refine_color_class(sgraph *g, coloring *c, std::list<std::pair<int, int>> *changes);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
-    bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
-    bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
     bool assert_is_equitable(sgraph *g, coloring *c);
     void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
-    bool old_refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
-                                      work_list_pair_bool *color_class_split_worklist);
-    bool old_refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     ~refinement();
 
     bool initialized = false;
     bool counting_initialized = false;
     work_set_int queue_pointer;
-    cell_worklist cell_todo;
-    work_list color_worklist_vertex;
+    cell_worklist  cell_todo;
     work_list_pair color_worklist_color;
-    work_set    color_workset;
-    mark_set    scratch_set;
+    work_set color_workset;
+    mark_set scratch_set;
     work_list vertex_worklist;
     work_list degrees_worklist;
-    ring_pair worklist_color_classes;
     work_set_int color_vertices_considered;
     work_set_int neighbours;
     work_set_int neighbour_sizes;
-    std::pair<int, int>* p;
-    work_list      singletons;
-    work_list_pair old_color_classes;
-    cumulative_counting counting_array;
+    work_list singletons;
     work_list_pair_bool color_class_splits;
-    work_list dense_old_color_classes;
+    work_list old_color_classes;
     int* scratch;
 
-    bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I);
+    bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
+                                   work_list_pair_bool* color_class_split_worklist, invariant* I);
 
-    bool refine_color_class_first(sgraph *g, coloring *c, int color_class, int class_size,
-                                  work_list_pair_bool *color_class_split_worklist);
+    bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size,
+                                  work_list_pair_bool* color_class_split_worklist, invariant* I);
+
+    bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size,
+                                        work_list_pair_bool* color_class_split_worklist, invariant* I);
 
     bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I);
@@ -288,12 +255,10 @@ public:
     bool refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size,
                                                      work_list_pair_bool* color_class_split_worklist);
 
-    void assure_initialized_accumulate_counting(sgraph *g);
-
     bool certify_automorphism(sgraph *g, bijection *p);
 };
 
 
 
 
-#endif //BRUTUS_REFINEMENT_H
+#endif //DEJAVU_REFINEMENT_H

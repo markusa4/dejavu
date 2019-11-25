@@ -1,6 +1,4 @@
-//
-// Created by markus on 11/11/2019.
-//
+// currently not used
 
 #ifndef DEJAVU_LOWDEG_H
 #define DEJAVU_LOWDEG_H
@@ -9,7 +7,7 @@
 #include "sgraph.h"
 #include "schreier_shared.h"
 #include "refinement.h"
-#include "group_diy.h"
+#include "group_shared.h"
 
 class lowdeg {
     lowdeg* nest = nullptr;
@@ -25,7 +23,7 @@ class lowdeg {
     int counters_sz;
 public:
     std::pair<sgraph*, coloring*> preprocess(coloring* c, sgraph* g, refinement* R);
-    long double postprocess(group_diy* G);
+    long double postprocess(group_shared* G);
 
     std::pair<sgraph *, coloring *> preprocess2(coloring *c, sgraph *g, refinement *R);
 };

@@ -1,24 +1,19 @@
-//
-// Created by markus on 19.09.19.
-//
-
-#ifndef BRUTUS_COLORING_H
-#define BRUTUS_COLORING_H
+#ifndef DEJAVU_COLORING_H
+#define DEJAVU_COLORING_H
 
 
 #include <vector>
 
-class coloring { // broken copy
+class coloring {
 public:
-    void rewrite_ptn(coloring* c);
     void copy(coloring* c);
     int* lab;
     int* ptn;
     int lab_sz;
     int ptn_sz;
     bool init = false;
-    std::vector<int>  vertex_to_col;
-    std::vector<int>  vertex_to_lab;
+    int* vertex_to_col;
+    int* vertex_to_lab;
 
     std::vector<std::pair<int, int>> color_choices;
 
@@ -31,4 +26,4 @@ public:
     bool check();
 };
 
-#endif //BRUTUS_COLORING_H
+#endif //DEJAVU_COLORING_H

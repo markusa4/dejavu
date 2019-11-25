@@ -1,7 +1,3 @@
-//
-// Created by markus on 24.09.19.
-//
-
 #ifndef DEJAVU_CONFIGURATION_H
 #define DEJAVU_CONFIGURATION_H
 
@@ -11,6 +7,8 @@ struct configstruct {
     int  CONFIG_IR_SIZE_FACTOR    = 10;    // trade off between restarts and allowed breadth-first width
     bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
     bool CONFIG_IR_FULLBFS = false;        // enforces full traversal of the search tree (maybe good for asymmetric)
+
+    bool CONFIG_PREPROCESS = false;
 
     int CONFIG_RAND_ABORT      = 5;        // determines error probability (higher value means lower error probability)
     int CONFIG_RAND_ABORT_RAND = -1;

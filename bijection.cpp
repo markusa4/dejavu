@@ -1,7 +1,3 @@
-//
-// Created by markus on 19.09.19.
-//
-
 #include <algorithm>
 #include <chrono>
 #include <random>
@@ -56,7 +52,6 @@ void bijection::deletable() {
 
 bijection::bijection() {
     init = false;
-    //map = std::vector<int>();
 }
 
 bijection::~bijection() {

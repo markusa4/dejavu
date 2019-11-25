@@ -1,3 +1,5 @@
+// adapted from schreier.h of nauty 2.5R9
+
 /* schreier.h - Version 1.2 (January 2013) */
 
 #ifndef  _SCHREIER_H_    /* only process this file once */

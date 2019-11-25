@@ -1,23 +1,12 @@
-//
-// Created by markus on 19.09.19.
-//
-
 #include "coloring.h"
-#include <algorithm>
-#include <iterator>
 #include <cstring>
-#include <iostream>
-
-void coloring::rewrite_ptn(coloring *c) {
-    for(int i = 0; i < c->ptn_sz; i += 1) {
-        ptn[i] = c->ptn[i];
-    }
-}
 
 coloring::~coloring() {
     if(init) {
         delete[] ptn;
         delete[] lab;
+        delete[] vertex_to_lab;
+        delete[] vertex_to_col;
     }
 }
 
@@ -26,10 +15,12 @@ void coloring::copy(coloring *c) {
         if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
             delete[] lab;
             delete[] ptn;
+            delete[] vertex_to_lab;
+            delete[] vertex_to_col;
             init = false;
         } else {
              memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
-             vertex_to_col = c->vertex_to_col;
+             memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
              return;
         }
     }
@@ -37,18 +28,19 @@ void coloring::copy(coloring *c) {
     if(!init) {
         lab = new int[c->lab_sz];
         ptn = new int[c->ptn_sz];
+        vertex_to_col = new int[c->lab_sz];
+        vertex_to_lab = new int[c->lab_sz];
     }
 
     color_choices = c->color_choices;
 
     memcpy(lab, c->lab, c->lab_sz*sizeof(int));
     memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
+    memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
+    memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
 
     lab_sz = c->lab_sz;
     ptn_sz = c->ptn_sz;
-
-    vertex_to_col = c->vertex_to_col;
-    vertex_to_lab = c->vertex_to_lab;
 
     init = true;
 }
@@ -58,6 +50,8 @@ void coloring::copy_force(coloring *c) {
         if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
             delete[] lab;
             delete[] ptn;
+            delete[] vertex_to_lab;
+            delete[] vertex_to_col;
             init = false;
         }
     }
@@ -65,18 +59,19 @@ void coloring::copy_force(coloring *c) {
     if(!init) {
         lab = new int[c->lab_sz];
         ptn = new int[c->ptn_sz];
+        vertex_to_col = new int[c->lab_sz];
+        vertex_to_lab = new int[c->lab_sz];
     }
 
     color_choices = c->color_choices;
 
     memcpy(lab, c->lab, c->lab_sz*sizeof(int));
     memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
+    memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
+    memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
 
     lab_sz = c->lab_sz;
     ptn_sz = c->ptn_sz;
-
-    vertex_to_col = c->vertex_to_col;
-    vertex_to_lab = c->vertex_to_lab;
 
     init = true;
 }
@@ -84,9 +79,8 @@ void coloring::copy_force(coloring *c) {
 void coloring::initialize(int domain_size) {
     lab = new int[domain_size];
     ptn = new int[domain_size];
-
-    vertex_to_col.resize(domain_size);
-    vertex_to_lab.resize(domain_size);
+    vertex_to_col = new int[domain_size];
+    vertex_to_lab = new int[domain_size];
 
     init = true;
 

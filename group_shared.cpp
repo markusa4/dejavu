@@ -1,17 +1,15 @@
 #include <iostream>
 #include <tgmath.h>
-#include "group_diy.h"
+#include "group_shared.h"
 #include "configuration.h"
 
-group_diy::group_diy(int domain_size) {
+group_shared::group_shared(int domain_size) {
     this->domain_size = domain_size;
 }
 
-void group_diy::initialize(int domain_size, bijection *base_points) {
+void group_shared::initialize(int domain_size, bijection *base_points) {
     mschreier_fails(-1);
     added = 0;
-    shared_group_todo = 5;
-    shared_group_trigger = false;
 
     _ack_done_shared_group = 0;
 
@@ -25,7 +23,8 @@ void group_diy::initialize(int domain_size, bijection *base_points) {
     mgetorbits(b, base_size, gp, &gens, domain_size);
 }
 
-void group_diy::manage_results(shared_decision_data *switches) {
+// master thread manages sifting results to determine abort criterion
+void group_shared::manage_results(shared_workspace *switches) {
     int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
     for(int j = 0; j < num; ++j) {
         switch(dequeue_space[j].first) {
@@ -54,26 +53,29 @@ void group_diy::manage_results(shared_decision_data *switches) {
             }
             break;
         }
+
         if(non_uniform_abort_counter > (std::min(switches->tolerance + 1, 5))  && !switches->done_fast) {
+            // non-uniform done
             non_uniform_abort_counter = 0;
             switches->done_fast = true;
             break;
         }
+
         if(abort_counter >= config.CONFIG_RAND_ABORT) {
-            std::cout << "proper abort" << std::endl;
+            // we are done
             switches->done = true;
             break;
         }
     }
 }
 
-group_diy::~group_diy() {
+group_shared::~group_shared() {
     delete[] b;
     delete[] dequeue_space;
     mfreeschreier(&gp, &gens);
 }
 
-bool group_diy::add_permutation(bijection *p, int *idle_ms, bool *done) {
+bool group_shared::add_permutation(bijection *p, int *idle_ms, bool *done) {
     filterstate state;
     state.ingroup = false;
     state.counts_towards_abort = !p->non_uniform;
@@ -82,18 +84,20 @@ bool group_diy::add_permutation(bijection *p, int *idle_ms, bool *done) {
     bool result;
     if(!p->foreign_base || base_size < 10) {
         result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
-                                             domain_size, state.level + 1, domain_size + 1, &state, domain_size + 1);
+                                             domain_size, state.level + 1, domain_size + 1,
+                                             &state, domain_size + 1);
         sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
     } else {
-        // finish sift, but return change according to sqrt(base) first levels such that we can switch to mor efficient base
+        // finish sift, but return change according to sqrt(base) first levels
+        // such that we can switch to more efficient base
         result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
-                                             domain_size, state.level + 1, sqrt(base_size + 1) + 1, &state, domain_size + 1); // sqrt(base_size + 1) + 1
-        //sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
+                                             domain_size, state.level + 1, sqrt(base_size + 1) + 1,
+                                             &state, domain_size + 1);
     }
     return result;
 }
 
-void group_diy::ack_done_shared() {
+void group_shared::ack_done_shared() {
     thread_local bool seen = false;
     if(!seen) {
         ++_ack_done_shared_group;
@@ -101,7 +105,8 @@ void group_diy::ack_done_shared() {
     }
 }
 
-void group_diy::sift_random() {
+// sift some random elements to make schreier vectors more complete
+void group_shared::sift_random() {
     bool result = true;
     while(result) {
         random_element re;
@@ -113,22 +118,23 @@ void group_diy::sift_random() {
         bool generated = generate_random_element(gp, &gens, domain_size, &re);
         if(!generated) break;
         result = mfilterschreier_shared(gp, re.perm, &gens, TRUE, domain_size + 1,
-                                            domain_size, state.level + 1, domain_size + 1, &state, domain_size + 1);
+                                            domain_size, state.level + 1, domain_size + 1,
+                                            &state, domain_size + 1);
         delete[] re.perm;
     }
 }
 
-void group_diy::reset_ack_done_shared() {
+void group_shared::reset_ack_done_shared() {
     _ack_done_shared_group = 0;
 }
 
-void group_diy::wait_for_ack_done_shared(int n) {
+void group_shared::wait_for_ack_done_shared(int n) {
     while(_ack_done_shared_group != n)
         continue;
     return;
 }
 
-void group_diy::print_group_size() {
+void group_shared::print_group_size() {
     double grpsize1;
     int grpsize2;
     mgrouporder(b, base_size, gp,&gens, &grpsize1, &grpsize2, domain_size);
@@ -137,7 +143,7 @@ void group_diy::print_group_size() {
     std::cout << "Generators: " << mschreier_gens(gens) << std::endl;
 }
 
-int group_diy::number_of_generators() {
+int group_shared::number_of_generators() {
     int k = 0;
     mpermnode *it = gens;
     if(it == NULL)

@@ -1,10 +1,11 @@
+// adapted from schreier.c of nauty 2.5R9
+
 /* schreier.c - procedures for manipulating a permutation group using
  * the random schreier algorithm.  There is a separate file schreier.txt
  * which describes the usage.
  *
  * Written for nauty and traces, Brendan McKay 2010-2013.
  */
-// adapted for dejavu
 
 #include <assert.h>
 #include <iostream>
