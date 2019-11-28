@@ -160,7 +160,6 @@ void refinement::assure_initialized(sgraph *g) {
         color_worklist_color.initialize(g->v_size);
         color_class_splits.initialize(g->v_size);
         queue_pointer.initialize(g->v_size);
-        //degrees_worklist.initialize(g->max_degree + 1);
         degrees_worklist.initialize(g->v_size);
         neighbours.initialize(g->v_size);
         color_vertices_considered.initialize(g->v_size);
@@ -266,7 +265,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     // for all vertices of the color class...
     thread_local bool comp, mark_as_largest;
     thread_local int i, cc, vc, pe, end_i, end_cc, v, col, v_new_color, vertex_old_pos, vertex_at_pos, v_degree,
-                     largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col;
+                     largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col, singleton_inv;
 
     cc = color_class; // iterate over color class
     comp = true;
@@ -279,6 +278,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
 
     end_cc = color_class + class_size;
     acc_in = 0;
+    singleton_inv = 0;
     while (cc < end_cc) { // increment value of neighbours of vc by 1
         vc = c->lab[cc];
         pe = g->v[vc];
@@ -297,7 +297,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
                     else
                         old_color_classes.push_back(col);
                     acc_in += (col + 1);
-                    color_workset.set(col);
+                    color_workset.set_nr(col);
                 }
             }
         }
@@ -306,8 +306,9 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     // write invariant for singleton color classes
     // could also hash this...
     singletons.sort();
-    while(!singletons.empty()) {
-        col      = singletons.pop_back();
+    while (!singletons.empty()) {
+        col = singletons.pop_back();
+        color_workset.unset(col);
         v_degree = neighbours.get(c->lab[col]);
         neighbours.set(c->lab[col], -1);
         color_vertices_considered.set(col, -1);
@@ -321,6 +322,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     if(!comp) {
         while (!old_color_classes.empty()) {
             _col = old_color_classes.pop_back();
+            color_workset.unset(_col);
             for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
                 neighbours.set(scratch[_col + i], -1);
             color_vertices_considered.set(_col, -1);
@@ -337,6 +339,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         _col_sz = c->ptn[_col] + 1;
         //std::cout << "it " << _col << ", " << _col_sz << std::endl;
 
+        color_workset.unset(_col);
         neighbour_sizes.reset();
         degrees_worklist.reset();
 
@@ -431,6 +434,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         if(!comp) {
             while (!old_color_classes.empty()) {
                 _col = old_color_classes.pop_back();
+                color_workset.unset(_col);
                 for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
                     neighbours.set(scratch[_col + i], -1);
                 color_vertices_considered.set(_col, -1);
@@ -791,8 +795,9 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
         if(col_sz == 1) {
             v_degree = neighbours.get(c->lab[col]) + 1;
-            if(v_degree == -1)
+            if(v_degree == -1) {
                 continue;
+            }
             //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
             comp = comp && I->write_top_and_compare(- g->v_size * 2 - col);
             comp = comp && I->write_top_and_compare(col + v_degree);
@@ -930,9 +935,9 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
             if(v_degree == -1) // not connected! skip...
                 continue;
             //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
-            comp = comp && I->write_top_and_compare(-g->v_size * 11 - col);
-            comp = comp && I->write_top_and_compare(g->v_size + col + v_degree);
-            comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
+            //comp = comp && I->write_top_and_compare(-g->v_size * 11 - col);
+            comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
+            //comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;
         }
@@ -963,8 +968,8 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
             // no split
             v_degree = neighbours.get(c->lab[col]);
             //comp = comp && I->write_top_and_compare(INT32_MAX - 4);
-            comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
-            comp = comp && I->write_top_and_compare(col + v_degree);
+            //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
+            comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
             comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
             if(!comp) return comp;
             continue;

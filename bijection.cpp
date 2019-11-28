@@ -15,10 +15,11 @@ void bijection::print() {
 }
 
 void bijection::read_from_coloring(coloring *c) {
-    if(init) {
-        delete[] map;
+    if(!init) {
+        //    delete[] map;
+        //}
+        map = new int[c->lab_sz];
     }
-    map = new int[c->lab_sz];
     init = true;
     map_sz = c->lab_sz;
     for(int i = 0; i < c->lab_sz; ++i) {

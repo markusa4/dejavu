@@ -570,7 +570,7 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
         for (auto it = range.first; it != range.second; ++it)
             pointers.push_back(it->second);
         if(pointers.empty()) {
-            switches->leaf_store.insert(std::pair<int, int *>(I->acc, leaf.map));
+            switches->leaf_store.insert(std::pair<long, int *>(I->acc, leaf.map));
         }
         switches->leaf_store_mutex.unlock();
 
@@ -595,12 +595,15 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
                 // std::cout << "found auto" << std::endl;
                 automorphism->certified = true;
                 automorphism->non_uniform = false;
+                if(i > 0) {
+                    std::cout << "found on second" << std::endl;
+                }
                 comp = true;
+                break;
             } else {
                 std::cout << "should add / check more" << std::endl;
                 comp = false;
             }
-            break;
         }
 
     }

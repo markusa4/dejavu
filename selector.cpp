@@ -176,7 +176,8 @@ int selector::select_color_dynamic(sgraph *g, coloring *c, strategy* s) {
         case SELECTOR_SMALLEST:
             return select_color_smallest(g, c);
         case SELECTOR_TRACES:
-            return select_color_traces(c);
+            return select_color_largest(c);
+            //return select_color_traces(c);
         case SELECTOR_FIRST:
         default:
             //return select_color_traces(c);

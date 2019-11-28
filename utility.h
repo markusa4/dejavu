@@ -48,7 +48,7 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<int, int*> leaf_store;
+    std::unordered_multimap<long, int*> leaf_store;
     std::mutex leaf_store_mutex;
 
     // variable used to synchronize base 1 tournament skip heuristic

@@ -122,7 +122,10 @@ int commandline_mode(int argc, char **argv) {
     bool comp_traces = true;
 
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "--file") {
+        std::string arg = std::string(argv[i]);
+        std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
+
+        if (arg == "--FILE") {
             if (i + 1 < argc) {
                 i++;
                 filename = argv[i];
@@ -132,7 +135,7 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }
-        if (std::string(argv[i]) == "--stat_file") {
+        if (arg == "--STAT_FILE") {
             if (i + 1 < argc) {
                 i++;
                 stat_filename = argv[i];
@@ -142,27 +145,27 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }
-        if (std::string(argv[i]) == "--no_nauty") {
+        if (arg == "--NO_NAUTY") {
             comp_nauty = false;
         }
-        if (std::string(argv[i]) == "--no_traces") {
+        if (std::string(argv[i]) == "--NO_TRACES") {
             comp_traces = false;
         }
-        if (std::string(argv[i]) == "--THREADS_REFINEMENT_WORKERS") {
+        if (arg == "--THREADS") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
             } else {
-                std::cerr << "--THREADS_REFINEMENT_WORKERS option requires one argument." << std::endl;
+                std::cerr << "--threads option requires one argument." << std::endl;
                 return 1;
             }
         }
-        if (std::string(argv[i]) == "--IR_CELL_SELECTOR") {
+        if (arg == "--IR_CELL_SELECTOR") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_CELL_SELECTOR = atoi(argv[i]);
             } else {
-                std::cerr << "--IR_CELL_SELECTOR option requires one argument." << std::endl;
+                std::cerr << "--ir_cell_selector option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -246,7 +249,7 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    return commandline_mode(argc, argv);
+    //return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
@@ -255,25 +258,28 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-100", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/tran/tran/tran_56832_255744.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/18cube.bliss", &g);
       //p.parse_dimacs_file("/home/markus/CLionProjects/dejavu/graph_tools/k2000.dimacs", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-   // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg65536.bliss", &g);
+     p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_4000_d.dmc", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
   //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
-  //  p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-11", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
+    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-11", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-1", &g);
-      //  p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
+      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
     //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-30", &g); // skiplevels / base_size thing
      // p.parse_dimacs_file_g("/home/markus/Downloads/graphssaucy/states/AS.g", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
-      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-160", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-170", &g);
+  //   p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);

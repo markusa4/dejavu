@@ -64,7 +64,7 @@ public:
     int*           level_sizes;
     int*           level_reserved_sizes;
     int*           level_expecting_finished;
-    std::unordered_set<std::pair<int, int>, pair_hash>* level_abort_map;
+    std::unordered_set<std::pair<int, long>, pair_hash>* level_abort_map;
     int*                           level_abort_map_done;
     std::mutex**                   level_abort_map_mutex;
 
@@ -94,8 +94,8 @@ public:
     void initialize(bfs_element* root_node, int init_c, int domain_size, int base_size);
     bool work_queues(int tolerance);
     void reset_initial_target();
-    void write_abort_map(int level, int pos, int val);
-    bool read_abort_map(int level, int pos, int val);
+    void write_abort_map(int level, int pos, long val);
+    bool read_abort_map(int level, int pos, long val);
 };
 
 

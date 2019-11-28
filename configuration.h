@@ -10,10 +10,14 @@ struct configstruct {
 
     bool CONFIG_PREPROCESS = false;
 
-    int CONFIG_RAND_ABORT      = 5;        // determines error probability (higher value means lower error probability)
+    int CONFIG_BULK_ALLOCATION = 10;
+
+    int CONFIG_RAND_ABORT      = 6;        // determines error probability (higher value means lower error probability)
+                                           // error is at most (1 / 2)^(i-1), where i is the given value
+                                           // 6 equals an error of roughly 3.2%
     int CONFIG_RAND_ABORT_RAND = -1;
 
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 3; // number of threads to use
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 7; // number of threads to use
 };
 
 extern configstruct config;

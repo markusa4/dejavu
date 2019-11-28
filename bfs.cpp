@@ -24,24 +24,24 @@ void bfs_workspace::initialize(bfs_element* root_elem, int init_c, int domain_si
     current_level = 1;
     target_level  = -1;
     level_states  = new bfs_element**[base_size + 2];
-    level_sizes   = new int[base_size + 2];
-    level_reserved_sizes = new int[base_size + 2];
-    level_maxweight = new double[base_size + 2];
-    level_minweight = new double[base_size + 2];
-    level_abort_map_done  = new int[base_size + 2];
+    level_sizes          = new int[(base_size + 2) * 4];
+    level_reserved_sizes = level_sizes + base_size + 2;
+    level_maxweight = new double[(base_size + 2) * 2];
+    level_minweight = level_maxweight + base_size + 2;
+    level_abort_map_done  = level_sizes + (base_size + 2) * 2;
     level_abort_map_mutex = new std::mutex*[base_size + 2];
-    level_abort_map = new std::unordered_set<std::pair<int, int>, pair_hash>[base_size + 2];
+    level_abort_map = new std::unordered_set<std::pair<int, long>, pair_hash>[base_size + 2];
 
     abort_map_prune.store(0);
 
-    level_expecting_finished = new int[base_size + 2];
+    level_expecting_finished = level_sizes + (base_size + 2) * 3;
     for(int i = 0; i < base_size + 2; ++i) {
         bfs_level_todo[i]              = moodycamel::ConcurrentQueue<std::tuple<bfs_element*, int, int>>(chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
         bfs_level_finished_elements[i] = moodycamel::ConcurrentQueue<std::pair<bfs_element*, int>>(chunk_size, 0, config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
         level_expecting_finished[i] = 0;
         level_maxweight[i] = 1;
         level_minweight[i] = INT32_MAX;
-        level_abort_map[i] = std::unordered_set<std::pair<int, int>, pair_hash>();
+        level_abort_map[i] = std::unordered_set<std::pair<int, long>, pair_hash>();
         level_abort_map_done[i] = -1;
         level_abort_map_mutex[i] = new std::mutex();
     }
@@ -172,14 +172,14 @@ void bfs_workspace::reset_initial_target() {
     reached_initial_target = true;
 }
 
-void bfs_workspace::write_abort_map(int level, int pos, int val) {
+void bfs_workspace::write_abort_map(int level, int pos, long val) {
     level_abort_map_mutex[level]->lock();
-    level_abort_map[level].insert(std::pair<int, int>(pos, val));
+    level_abort_map[level].insert(std::pair<int, long>(pos, val));
     level_abort_map_done[level]--;
     level_abort_map_mutex[level]->unlock();
 }
 
-bool bfs_workspace::read_abort_map(int level, int pos, int val) {
+bool bfs_workspace::read_abort_map(int level, int pos, long val) {
     //std::cout << level_abort_map_done[level] << std::endl;
     if(level_abort_map_done[level] != 0) {
         //if(level_abort_map_done[level] < 0)
@@ -187,7 +187,7 @@ bool bfs_workspace::read_abort_map(int level, int pos, int val) {
         return true;
     }
 
-    auto check = level_abort_map[level].find(std::pair<int, int>(pos, val));
+    auto check = level_abort_map[level].find(std::pair<int, long>(pos, val));
     return !(check == level_abort_map[level].end());
 }
 
@@ -203,11 +203,11 @@ bfs_workspace::~bfs_workspace() {
 
     delete[] level_states;
     delete[] level_sizes;
-    delete[] level_reserved_sizes;
+    //delete[] level_reserved_sizes;
     delete[] level_maxweight;
-    delete[] level_minweight;
-    delete[] level_abort_map_done;
+   // delete[] level_minweight;
+   // delete[] level_abort_map_done;
     delete[] level_abort_map_mutex;
     delete[] level_abort_map;
-    delete[] level_expecting_finished;
+   // delete[] level_expecting_finished;
 }

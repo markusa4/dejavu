@@ -33,6 +33,10 @@ void group_shared::manage_results(shared_workspace *switches) {
                 abort_counter += 1;
             } else {
                 gens_added += 1;
+                if(abort_counter > 0) {
+                    config.CONFIG_RAND_ABORT += 1;
+                    std::cout << "d: " << config.CONFIG_RAND_ABORT << std::endl;
+                }
                 abort_counter = 0;
             }
             break;

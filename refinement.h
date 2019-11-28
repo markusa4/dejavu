@@ -84,7 +84,7 @@ private:
     int sz;
 };
 
-class work_set_int {
+class alignas(64) work_set_int {
 public:
     void initialize(int size);
     void set(int index, int value);
