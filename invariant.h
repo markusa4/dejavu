@@ -60,7 +60,7 @@ public:
 
     void create_vector() {
         vec_invariant = new std::vector<int>();
-        vec_invariant->reserve(256);
+        vec_invariant->reserve(1025);
     }
 
     /*~invariant() {

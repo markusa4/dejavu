@@ -265,7 +265,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     // for all vertices of the color class...
     thread_local bool comp, mark_as_largest;
     thread_local int i, cc, vc, pe, end_i, end_cc, v, col, v_new_color, vertex_old_pos, vertex_at_pos, v_degree,
-                     largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col, singleton_inv;
+                     largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col, singleton_inv, total;
 
     cc = color_class; // iterate over color class
     comp = true;
@@ -343,7 +343,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
         neighbour_sizes.reset();
         degrees_worklist.reset();
 
-        int total = 0;
+        total = 0;
         for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
             v = scratch[_col + i];
             int index = neighbours.get(v) + 1;
@@ -453,8 +453,8 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
 
 bool refinement::refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist) {
     // for all vertices of the color class...
-    thread_local bool comp, mark_as_largest;
-    thread_local int i, cc, vc, pe, end_i, end_cc, v, col, v_new_color, vertex_old_pos, vertex_at_pos, v_degree,
+    bool comp, mark_as_largest;
+    int i, cc, vc, pe, end_i, end_cc, v, col, v_new_color, vertex_old_pos, vertex_at_pos, v_degree,
             largest_color_class_size, acc_in, _col, _col_sz, acc, val, __col;
 
     cc = color_class; // iterate over color class
@@ -1458,22 +1458,13 @@ void work_set::initialize(int size) {
     s = new bool[size];
     //s.reserve(size);
 
+    //for(int i = 0; i < size; ++i)
+    //    s.push_back(false);
     memset(s, false, size * sizeof(bool));
 
     reset_queue.initialize(size);
     init = true;
     sz = size;
-}
-
-void work_set::initialize_from_array(bool* p, int size) {
-    s = p;
-    //s.reserve(size);
-    for(int i = 0; i < size; i++) {
-        s[i] = false;
-        //s.push_back(false);
-    }
-    reset_queue.initialize(size);
-    //init = true;
 }
 
 void work_set::set(int index) {
@@ -1516,6 +1507,8 @@ void work_set::reset() {
 
 void work_set::reset_hard() {
     reset_queue.pos = 0;
+    //s.
+    // std::fill(s.begin(), s.end(), false);
     memset(s, false, sz*sizeof(bool));
 }
 

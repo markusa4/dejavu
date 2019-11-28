@@ -52,7 +52,7 @@ void coloring::copy(coloring *c) {
             init = false;
         } else {
              memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
-             memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
+             memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz*sizeof(int));
              return;
         }
     }
