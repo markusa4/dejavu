@@ -712,8 +712,6 @@ void dejavu::bfs_assure_init(dejavu_workspace* w) {
 }
 
 bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bool *done, int selector_seed) {
-    thread_local bool done_test = false;
-
     bfs_workspace *BFS = w->BW;
     int level = BFS->current_level;
     int target_level = BFS->target_level;
@@ -902,7 +900,7 @@ bool bfs_element_parent_sorter(bfs_element* const& lhs, bfs_element* const& rhs)
 }
 
 void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
-    thread_local bool init_group    = false;
+    thread_local bool init_group = false;
     thread_local bool first_call = true;
 
     _schreier_fails(2);

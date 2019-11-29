@@ -14,7 +14,6 @@ public:
     std::vector<int>* compare_vec;
     bool has_compare = false;
     bool no_write = false;
-    bool comp = true;
     bool never_fail = false;
     int comp_fail_pos = -2;
     int comp_fail_val = -1;
@@ -26,7 +25,7 @@ public:
     inline bool write_top_and_compare(int i) {
         acc += i * (35235237 - i * 5);
         if(no_write) {
-            comp = (comp_fail_pos == -2) && ((*compare_vec)[++cur_pos] == i);
+            const bool comp = (comp_fail_pos == -2) && ((*compare_vec)[++cur_pos] == i);
             //comp = comp && (comp_fail_pos == -2);
             if(!comp) {
                 if(comp_fail_pos == -2) {

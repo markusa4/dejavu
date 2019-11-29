@@ -100,6 +100,23 @@ private:
     int   sz;
 };
 
+class alignas(64) work_set_char {
+public:
+    void initialize(int size);
+    void set(int index, char value);
+    char  get(int index);
+    void reset();
+    void reset_hard();
+    int inc(int index);
+    void inc_nr(int index);
+    ~work_set_char();
+    work_queue reset_queue;
+private:
+    bool  init = false;
+    char*  s;
+    int   sz;
+};
+
 class work_list {
 public:
     void initialize(int size);
@@ -222,6 +239,7 @@ public:
     work_list degrees_worklist;
     work_set_int color_vertices_considered;
     work_set_int neighbours;
+    work_set_char neighbours127;
     work_set_int neighbour_sizes;
     work_list singletons;
     work_list_pair_bool color_class_splits;
@@ -231,11 +249,17 @@ public:
     bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
                                    work_list_pair_bool* color_class_split_worklist, invariant* I);
 
+    bool refine_color_class_sparse127(sgraph *g, coloring *c, int color_class, int class_size,
+                                   work_list_pair_bool* color_class_split_worklist, invariant* I);
+
     bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size,
                                   work_list_pair_bool* color_class_split_worklist, invariant* I);
 
     bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size,
                                         work_list_pair_bool* color_class_split_worklist, invariant* I);
+
+    bool refine_color_class_dense_dense127(sgraph *g, coloring *c, int color_class, int class_size,
+                                           work_list_pair_bool *color_class_split_worklist, invariant *I);
 
     bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I);
@@ -255,6 +279,7 @@ public:
                                                      work_list_pair_bool* color_class_split_worklist);
 
     bool certify_automorphism(sgraph *g, bijection *p);
+
 };
 
 
