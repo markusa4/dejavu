@@ -29,6 +29,13 @@ public:
         memset(s, mark, sz * sizeof(int));
         reset();
     }
+    void initialize_from_array(int* arr, int size) {
+        s  = arr;
+        sz = size;
+        init = false;
+        memset(s, mark, sz * sizeof(int));
+        reset();
+    }
     bool get(int pos) {
         return s[pos] == mark;
     }
@@ -50,6 +57,7 @@ public:
 class work_queue {
 public:
     void initialize(int size);
+    void initialize_from_array(int* arr, int size);
     void push(int val);
     int pop();
     void reset();
@@ -83,9 +91,29 @@ private:
     int sz;
 };
 
+class work_list {
+public:
+    void initialize(int size);
+    void initialize_from_array(int* arr, int size);
+    void push_back(int index);
+    int pop_back();
+    bool empty();
+    void reset();
+    ~work_list();
+    void sort();
+    int  cur_pos;
+    int* arr;
+    bool init = false;
+private:
+
+    int arr_sz = -1;
+};
+
+
 class alignas(64) work_set_int {
 public:
     void initialize(int size);
+    void initialize_from_array(int* arr, int size);
     void set(int index, int value);
     int  get(int index);
     void reset();
@@ -115,22 +143,6 @@ private:
     bool  init = false;
     char*  s;
     int   sz;
-};
-
-class work_list {
-public:
-    void initialize(int size);
-    void push_back(int index);
-    int pop_back();
-    bool empty();
-    void reset();
-    ~work_list();
-    void sort();
-    int cur_pos;
-    int* arr;
-private:
-
-    int arr_sz = -1;
 };
 
 class work_list_pair {
@@ -229,10 +241,9 @@ public:
     ~refinement();
 
     bool initialized = false;
-    bool counting_initialized = false;
     work_set_int queue_pointer;
     cell_worklist  cell_todo;
-    work_list_pair color_worklist_color;
+    work_list color_worklist_color;
     work_set color_workset;
     mark_set scratch_set;
     work_list vertex_worklist;
@@ -245,6 +256,7 @@ public:
     work_list_pair_bool color_class_splits;
     work_list old_color_classes;
     int* scratch;
+    int* workspace_int;
 
     bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
                                    work_list_pair_bool* color_class_split_worklist, invariant* I);
