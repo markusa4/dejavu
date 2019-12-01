@@ -19,7 +19,7 @@ public:
     int* vertex_to_col;
     int* vertex_to_lab;
 
-    std::vector<std::pair<int, int>> color_choices;
+    // std::vector<std::pair<int, int>> color_choices;
 
     ~coloring();
 

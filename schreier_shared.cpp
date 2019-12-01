@@ -799,6 +799,10 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
     boolean changed, lchanged, ident;
     boolean report_changed = FALSE;
 
+    // identity should not allocate...
+    for (i = 0; i < n; ++i) if (p[i] != i) {break;}
+    if(i == n) return false;
+
     mpermnode** r = ring;
     //std::cout << r << std::endl;
     //if(*r != NULL)

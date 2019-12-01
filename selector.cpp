@@ -82,6 +82,7 @@ int selector::select_color_largest(coloring *c) {
             largest_cell = i;
             largest_cell_sz = c->ptn[i];
             largest_cache.reset();
+            largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
             //hint      = -1;
             //hint_sz   = -1;
         } else if(c->ptn[i] == largest_cell_sz) {
@@ -102,17 +103,17 @@ int selector::select_color_traces(coloring *c) {
         init = true;
     }
 
-    int stack_sz = c->color_choices.size();
+    // int stack_sz = c->color_choices.size();
 
-    if(stack_sz == 0) return select_color_largest(c);
+    // if(stack_sz == 0) return select_color_largest(c);
 
     int col, col_sz;
     int largest_cell    = -1;
     int largest_cell_sz = -1;
 
-    for(int j = 0; j < stack_sz; ++j) {
-        col    = c->color_choices[stack_sz - j - 1].first;
-        col_sz = c->color_choices[stack_sz - j - 1].second;
+    //for(int j = 0; j < stack_sz; ++j) {
+        // col    = c->color_choices[stack_sz - j - 1].first;
+        // col_sz = c->color_choices[stack_sz - j - 1].second;
 
         largest_cell    = -1;
         largest_cell_sz = -1;
@@ -125,8 +126,8 @@ int selector::select_color_traces(coloring *c) {
             i += c->ptn[i] + 1;
         }
 
-        if(largest_cell_sz > 0) break;
-    }
+        // if(largest_cell_sz > 0) break;
+    // }
 
     if(largest_cell != -1)
         return largest_cell;

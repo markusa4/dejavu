@@ -10,6 +10,10 @@
 int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 
+
+// #define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
+
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
 

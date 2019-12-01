@@ -37,7 +37,7 @@ bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bo
             if ((m->restarts < win_metrics.restarts) ||
                 (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
                 win_id == -2) {
-                std::cout << m->restarts << ", " << m->expected_bfs_size << std::endl;
+                PRINT("[Strat] Best: " << m->restarts << ", " << m->expected_bfs_size);
                 win_metrics = *m;
                 win_id = id;
             }

@@ -7,6 +7,7 @@ struct configstruct {
     int  CONFIG_IR_SIZE_FACTOR    = 10;    // trade off between restarts and allowed breadth-first width
     bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
     bool CONFIG_IR_FULLBFS = false;        // enforces full traversal of the search tree (maybe good for asymmetric)
+    bool CONFIG_IR_FORCE_SELECTOR = false;
 
     bool CONFIG_PREPROCESS = false;
 
@@ -17,9 +18,10 @@ struct configstruct {
                                            // 6 equals an error of roughly 3.2%
     int CONFIG_RAND_ABORT_RAND = -1;
 
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 7; // number of threads to use
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 6; // number of threads to use
 };
 
 extern configstruct config;
+extern int dejavu_kill_request;
 
 #endif //DEJAVU_CONFIGURATION_H

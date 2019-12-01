@@ -28,12 +28,14 @@ void bijection::read_from_coloring(coloring *c) {
 }
 
 void bijection::inverse() {
-    int* old_map = map;
-    map = new int[map_sz];
+    thread_local int* switch_map = new int[map_sz];
+    int* swap = map;
+    map = switch_map;
+    switch_map = swap;
+
     for(int i = 0; i < map_sz; ++i) {
-        map[old_map[i]] = i;
+        map[switch_map[i]] = i;
     }
-    delete[] old_map;
 }
 
 void bijection::compose(bijection* p) {

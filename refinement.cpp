@@ -80,14 +80,11 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
         // write color class and size to invariant
         //comp = comp && I->write_top_and_compare(next_color_class.first + next_color_class.second * g->v_size);
         //if(!comp)
-        //    std::cout << "here" << std::endl;
 
         bool dense_dense = (g->d[c->lab[next_color_class.first]] > (g->v_size / (next_color_class.second + 1)));
 
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
-
-            // std::cout << "h4" << std::endl;
             // SINGLETON
             comp = comp && refine_color_class_singleton(g, c, next_color_class.first, next_color_class.second,
                                                         &color_class_splits, I);
@@ -218,7 +215,7 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
             // SINGLETON
-            comp = comp && refine_color_class_singleton_first(g, c, next_color_class.first, next_color_class.second,
+            comp = comp && refine_color_class_sparse_first(g, c, next_color_class.first, next_color_class.second,
                                                               &color_class_splits);
         } else if(config.CONFIG_IR_DENSE) {
             if(dense_dense) { // DENSE-DENSE
@@ -275,8 +272,6 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
 
     assert(c->check());
     assert(assert_is_equitable(g, c));
-
-    //std::cout << "its: " << its << std::endl;
 
     return comp;
 }
@@ -351,7 +346,6 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
     while(!old_color_classes.empty()) {
         const int _col    = old_color_classes.pop_back();
         const int _col_sz = c->ptn[_col] + 1;
-        //std::cout << "it " << _col << ", " << _col_sz << std::endl;
         neighbour_sizes.reset();
         vertex_worklist.reset();
 
@@ -536,7 +530,6 @@ bool refinement::refine_color_class_sparse127(sgraph *g, coloring *c, const int 
     while(!old_color_classes.empty()) {
         const int _col    = old_color_classes.pop_back();
         const int _col_sz = c->ptn[_col] + 1;
-        //std::cout << "it " << _col << ", " << _col_sz << std::endl;
         neighbour_sizes.reset();
         vertex_worklist.reset();
 
@@ -693,7 +686,6 @@ bool refinement::refine_color_class_sparse_first(sgraph *g, coloring *c, int col
     while(!old_color_classes.empty()) {
         const int _col    = old_color_classes.pop_back();
         const int _col_sz = c->ptn[_col] + 1;
-        //std::cout << "it " << _col << ", " << _col_sz << std::endl;
 
         neighbour_sizes.reset();
         vertex_worklist.reset();
@@ -931,7 +923,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
             const int v   = g->e[i];
             const int col = c->vertex_to_col[v];
             if(c->ptn[col] > 0) {
-                neighbours.inc_nr(v);
+                neighbours.inc(v); // want to use reset variant?
                 if (!scratch_set.get(col)) {
                     scratch_set.set(col);
                     old_color_classes.push_back(col);
@@ -939,8 +931,9 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
             } else {
                 if(config.CONFIG_IR_FULL_INVARIANT)
                     vertex_worklist.push_back(col);
-                else
+                else {
                     singleton_inv += (col + 1) * (23524361 - col * 3);
+                }
             }
         }
         cc += 1;
@@ -950,7 +943,8 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
     //comp = comp && I->write_top_and_compare(INT32_MAX - 3);
     comp = comp && I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos);
-    if(!comp) {vertex_worklist.reset(); return comp;}
+
+    if(!comp) return comp;
 
     if(config.CONFIG_IR_FULL_INVARIANT) {
         vertex_worklist.sort();
@@ -962,7 +956,8 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
     } else {
         comp = comp && I->write_top_and_compare(singleton_inv);
     }
-    if(!comp) {return comp;}
+
+    if(!comp) return comp;
 
     old_color_classes.sort();
 
@@ -981,7 +976,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
             // comp = comp && I->write_top_and_compare(- g->v_size * 2 - col);
             // comp = comp && I->write_top_and_compare(col + v_degree);
             // comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
-            if(!comp) return comp;
+            // if(!comp) return comp;
             continue;
         }
 
@@ -1014,7 +1009,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
             //comp = comp && I->write_top_and_compare(- g->v_size * 4 - col);
             comp = comp && I->write_top_and_compare(col + g->v_size * v_degree);
             //comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
-            if(!comp) return comp;
+            // if(!comp) return comp;
             continue;
         }
 
@@ -1083,7 +1078,7 @@ bool refinement::refine_color_class_dense(sgraph *g, coloring *c, int color_clas
 
 bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     bool comp;
-    int i, j, acc, cc, largest_color_class_size, pos;
+    int i, j, acc, cc, largest_color_class_size;
     cc = color_class; // iterate over color class
     comp = true;
 
@@ -1117,7 +1112,7 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
             //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
             //comp = comp && I->write_top_and_compare(-g->v_size * 11 - col);
             comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
-            //comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
+            // comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
             if(!comp) {neighbours.reset_hard(); return comp;}
             continue;
         }
@@ -1158,7 +1153,6 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
         vertex_worklist.sort();
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
-        //comp = comp && I->write_top_and_compare(INT32_MAX - 5);
         while(!vertex_worklist.empty()) {
             const int i   = vertex_worklist.pop_back();
             const int val = neighbour_sizes.get(i) + 1;
@@ -1176,14 +1170,16 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
             }
         }
 
+        vertex_worklist.reset();
+
         // copy cell for rearranging
-        memcpy(scratch, c->lab + col, col_sz * sizeof(int));
-        pos = col_sz;
+        memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(int));
+        vertex_worklist.cur_pos = col_sz;
 
         // determine colors and rearrange
         // split color classes according to count in counting array
-        while(pos > 0) {
-            const int v = scratch[--pos];
+        while(!vertex_worklist.empty()) {
+            const int v = vertex_worklist.pop_back();
             const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
             // i could immediately determine size of v_new_color here and write invariant before rearrange?
             assert(v_new_color >= col);
@@ -1311,14 +1307,16 @@ bool refinement::refine_color_class_dense_dense127(sgraph *g, coloring *c, int c
             }
         }
 
+        vertex_worklist.reset();
+
         // copy cell for rearranging
-        memcpy(scratch, c->lab + col, col_sz * sizeof(int));
-        pos = col_sz;
+        memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(int));
+        vertex_worklist.cur_pos = col_sz;
 
         // determine colors and rearrange
         // split color classes according to count in counting array
-        while(pos > 0) {
-            const int v = scratch[--pos];
+        while(!vertex_worklist.empty()) {
+            const int v = vertex_worklist.pop_back();
             const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours127.get(v) + 1));
             // i could immediately determine size of v_new_color here and write invariant before rearrange?
             assert(v_new_color >= col);
@@ -1666,7 +1664,7 @@ int refinement::individualize_vertex(coloring *c, int v) {
 
     int color_class_size = c->ptn[color];
 
-    c->color_choices.emplace_back(std::pair<int, int>(color, color_class_size + 1));
+    // c->color_choices.emplace_back(std::pair<int, int>(color, color_class_size + 1));
 
     assert(color_class_size > 0);
     int new_color = color + color_class_size;
@@ -1713,14 +1711,12 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     }
     int expect0 = 0;
     bool expectsize = true;
-    //std::cout << "part";
     for(int i = 0; i < c->lab_sz; ++i) {
         if(expectsize) {
             expectsize = false;
             expect0 = c->ptn[i];
         }
         if(expect0 == 0) {
-            //std::cout << i << " ";
             test = test && (c->ptn[i] == 0);
             expectsize = true;
         } else {

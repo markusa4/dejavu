@@ -58,7 +58,7 @@ void bfs_workspace::initialize(bfs_element* root_elem, int init_c, int domain_si
         bfs_level_todo[current_level].enqueue(std::tuple<bfs_element*, int, int>(root_elem, next_v, -1));
     }
 
-    std::cout << "Abort map expecting: " <<  root_elem->c->ptn[init_c] + 1 << std::endl;
+    // PRINT("[BFS] Abort map expecting: " <<  root_elem->c->ptn[init_c] + 1);
     level_abort_map_done[current_level + 1] = root_elem->c->ptn[init_c] + 1;
 
     level_expecting_finished[0] = 0;
@@ -72,7 +72,7 @@ void bfs_workspace::initialize(bfs_element* root_elem, int init_c, int domain_si
 
     finished_elems = new std::pair<bfs_element*, int>[chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
     finished_elems_sz = chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS;
-    std::cout << "[B] BFS structure initialized, expecting " << sz << " on first level" << std::endl;
+    PRINT("[BFS] BFS structure initialized, expecting " << sz << " on first level");
 }
 
 bool bfs_workspace::work_queues(int tolerance) {
@@ -80,7 +80,7 @@ bool bfs_workspace::work_queues(int tolerance) {
     if(current_level == target_level) {
         if(!done) {
             done = true;
-            std::cout << "[B] Finished BFS at " << current_level - 1 << " with " << level_sizes[current_level - 1] << " elements, maxweight " << level_maxweight[current_level - 1] << "" << std::endl;
+            PRINT("[BFS] Finished BFS at " << current_level - 1 << " with " << level_sizes[current_level - 1] << " elements, maxweight " << level_maxweight[current_level - 1] << "");
         }
         return false;
     } else {
@@ -131,7 +131,9 @@ bool bfs_workspace::work_queues(int tolerance) {
     if (level_expecting_finished[current_level] == 0) {
         int expected_size = level_expecting_finished[current_level + 1];
 
-        std::cout << "[B] BFS advancing to level " << current_level + 1 << " expecting " << level_sizes[current_level] << " -> " << expected_size << ", maxweight " << level_maxweight[current_level] << ", minweight " << level_minweight[current_level] << std::endl;
+        PRINT("[BFS] Advancing to level " << current_level + 1 << " expecting " << level_sizes[current_level]
+        << " -> " << expected_size << ", maxweight " << level_maxweight[current_level]
+        << ", minweight " << level_minweight[current_level]);
 
         if(current_level == target_level - 1 && target_level <= base_size) {
             //if(expected_size < std::max(domain_size / 100, 1)) {
@@ -153,7 +155,7 @@ bool bfs_workspace::work_queues(int tolerance) {
             need_queue_fill = true;
             current_level += 1;
         } else {
-            std::cout << "[B] Refusing to advance level (expected_size too large), setting target level to " << current_level + 1 << std::endl;
+            PRINT("[BFS] Refusing to advance level (expected_size too large), setting target level to " << current_level + 1);
 
             level_reserved_sizes[current_level + 1] = expected_size;
             level_states[current_level + 1] = new bfs_element * [expected_size]; // maybe do this only if tolerance is increased?
