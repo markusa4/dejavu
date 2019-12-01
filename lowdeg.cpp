@@ -7,7 +7,7 @@
 #include "group_shared.h"
 
 
-void split_with_respect_to_array(coloring* c, int col, int col_sz, refinement* R, work_set_int* A) {
+/*void split_with_respect_to_array(coloring* c, int col, int col_sz, refinement* R, work_set_int* A) {
     int i, v, acc, val, _col, h, v_new_color;
     R->degrees_worklist.reset();
     R->neighbour_sizes.reset();
@@ -486,7 +486,7 @@ std::pair<sgraph*, coloring*> lowdeg::preprocess2(coloring* c, sgraph* g, refine
         col = i;
         col_sz = c->ptn[i] + 1;
 
-        if(!R->color_workset.get(col) && g->d[c->lab[col]] != 2) {
+        if(!color_workset.get(col) && g->d[c->lab[col]] != 2) {
            // std::cout << "untouched" << std::endl;
             // copy color to reduced graph
             int first_labpos = labpos;
@@ -634,7 +634,7 @@ std::pair<sgraph*, coloring*> lowdeg::preprocess2(coloring* c, sgraph* g, refine
     for(int i = 0; i < labpos; ++i)
         std::cout << reduced_c->ptn[i] << " ";
     std::cout << std::endl;*/
-
+/*
     assert(labpos == reduce_vpos);
 
     for(int i = 0; i < labpos;++i) {
@@ -752,3 +752,4 @@ long double lowdeg::postprocess(group_shared* G) {
 
     std::cout << "------------------------------------------------------------------" << std::endl;
 }
+*/

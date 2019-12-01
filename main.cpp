@@ -115,11 +115,13 @@ void bench_traces(sgraph *g) {
 int commandline_mode(int argc, char **argv) {
     std::string filename = "";
     bool entered_file = false;
+    int  timeout = -1;
     std::fstream stat_file;
     std::string stat_filename = "test.dat";
     bool entered_stat_file = true;
     bool comp_nauty = true;
     bool comp_traces = true;
+    bool comp_dejavu = true;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
@@ -145,12 +147,30 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }
+
+        if (arg == "--TIMEOUT") {
+            if (i + 1 < argc) {
+                i++;
+                stat_filename = argv[i];
+                entered_stat_file = true;
+            } else {
+                std::cerr << "--timeout option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
         if (arg == "--NO_NAUTY") {
             comp_nauty = false;
         }
-        if (std::string(argv[i]) == "--NO_TRACES") {
+
+        if (arg == "--NO_TRACES") {
             comp_traces = false;
         }
+
+        if (arg == "--NO_DEJAVU") {
+            comp_dejavu = false;
+        }
+
         if (arg == "--THREADS") {
             if (i + 1 < argc) {
                 i++;
@@ -178,27 +198,28 @@ int commandline_mode(int argc, char **argv) {
     parser p;
     sgraph *g = new sgraph;
    // p.parse_dimacs_file_digraph(filename, g);
+    std::cout << "Parsing " << filename << "..." << std::endl;
     p.parse_dimacs_file(filename, g);
     //sleep(1);
-    std::cout << "Permuting graph---------------------------------------------------" << std::endl;
+    std::cout << "Permuting graph..." << std::endl;
     sgraph _g;
     bijection pr;
     bijection::random_bijection(&pr, g->v_size);
     g->permute_graph(&_g, &pr); // permute graph
     delete g;
-    std::cout << "Path Sampling-----------------------------------------------------" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "dejavu" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
     int repeat = 1;
-    double avg = 0;
+    double dejavu_solve_time;
     Clock::time_point timer;
     for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
         dejavu d;
         d.automorphisms(&_g);
-        double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-        avg += solve_time / repeat;
-        std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
+        dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+        std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     }
-    std::cout << "Avg solve time: " << avg / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "nauty" << std::endl;
@@ -221,8 +242,8 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "Compare (nauty): " << nauty_solve_time / avg << std::endl;
-    std::cout << "Compare (Traces): " << traces_solve_time / avg << std::endl;
+    std::cout << "Compare (nauty): " << nauty_solve_time / dejavu_solve_time << std::endl;
+    std::cout << "Compare (Traces): " << traces_solve_time / dejavu_solve_time << std::endl;
 
     if (entered_stat_file) {
         stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
@@ -236,7 +257,7 @@ int commandline_mode(int argc, char **argv) {
 
         }// use existing file
         std::cout << "Appending to " << stat_filename << ".\n";
-        stat_file << _g.v_size << " " << avg / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " "
+        stat_file << _g.v_size << " " << dejavu_solve_time / 1000000.0 << " " << nauty_solve_time / 1000000.0 << " "
                   << traces_solve_time / 1000000.0 << "\n";
         stat_file.close();
     }
@@ -249,28 +270,28 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    //return commandline_mode(argc, argv);
+    return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
     // p.parse_dimacs_file("/home/markus/Downloads/rantree/rantree/rantree-5000.bliss", &g);
-    p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/tran/tran/tran_56832_255744.bliss", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/12cube.bliss", &g);
+   // p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/17cube.bliss", &g);
       // p.parse_dimacs_file("/home/markus/CLionProjects/dejavu/graph_tools/k2000.dimacs", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-50", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
+     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_4000_d.dmc", &g);
  //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
   // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-11", &g);
-      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
+       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-1", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-44-11", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
@@ -281,7 +302,7 @@ int main(int argc, char *argv[]) {
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-170", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
-       //  p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
+        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);

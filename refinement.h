@@ -243,11 +243,8 @@ public:
     bool initialized = false;
     work_set_int queue_pointer;
     cell_worklist  cell_todo;
-    work_list color_worklist_color;
-    work_set color_workset;
     mark_set scratch_set;
     work_list vertex_worklist;
-    work_list degrees_worklist;
     work_set_int color_vertices_considered;
     work_set_int neighbours;
     work_set_char neighbours127;

@@ -245,7 +245,7 @@ void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, bool compare, invar
     if (compare) {
         start_I->set_compare_invariant(canon_I);
     } else {
-        start_I->create_vector();
+        start_I->create_vector(g->v_size * 2);
         automorphism->map = new int[g->v_size];
         automorphism->map_sz = 0;
     }
@@ -1164,9 +1164,9 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         start_c = new coloring;
         g->initialize_coloring(start_c);
         if(config.CONFIG_PREPROCESS) {
-            std::pair<sgraph *, coloring *> preprocessed_graph = L->preprocess(start_c, g, &W.R);
-            g = preprocessed_graph.first;
-            start_c = preprocessed_graph.second;
+          //  std::pair<sgraph *, coloring *> preprocessed_graph = L->preprocess(start_c, g, &W.R);
+          //  g = preprocessed_graph.first;
+          //  start_c = preprocessed_graph.second;
         }
         assert(start_c->check());
     }
@@ -1214,7 +1214,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         canon_strategy = new strategy;
 
         W.start_c = start_c;
-        start_I.create_vector();
+        //start_I.create_vector();
         W.R.refine_coloring_first(g, start_c, -1);
         cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::high_resolution_clock::now() - timer).count());
@@ -1231,8 +1231,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             std::cout << "First coloring discrete." << std::endl;
             std::cout << "Base size: 0" << std::endl;
             std::cout << "Group size: 1" << std::endl;
-            if(config.CONFIG_PREPROCESS)
-                L->postprocess(nullptr);
+            //if(config.CONFIG_PREPROCESS)
+            //    L->postprocess(nullptr);
             return;
         }
         W.S.empty_cache();
@@ -1285,7 +1285,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     {
         //W.base_size = G->base_size;
         my_canon_I = new invariant;
-        my_canon_I->create_vector();
+        //my_canon_I->create_vector();
         my_canon_I->has_compare = false;
         my_canon_I->compare_vec = nullptr;
         my_canon_I->compareI    = nullptr;
@@ -1297,6 +1297,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             W.S.empty_cache();
             find_first_leaf(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches,
                             selector_seed);
+            std::cout << "I_sz: " << my_canon_I->vec_invariant->size() << std::endl;
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
@@ -1346,7 +1347,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 while (!switches->current_mode == modes::MODE_BFS ||
                        !switches->current_mode == modes::MODE_UNIFORM_PROBE)
                     continue;
-                W.my_base_points = W.G->b;
+                W.my_base_points    = W.G->b;
                 W.my_base_points_sz = W.G->base_size;
                 W.is_foreign_base = false;
             }
@@ -1450,8 +1451,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
                 cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                 std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
-                if(config.CONFIG_PREPROCESS)
-                    L->postprocess(G);
+                //if(config.CONFIG_PREPROCESS)
+                //    L->postprocess(G);
                 break;
             }
         }
@@ -1560,7 +1561,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         if(!master) { // guess a new leaf
                             //delete my_canon_I->compare_vec;
                             my_canon_I = new invariant; // delete old if non canon
-                            my_canon_I->create_vector();
+                            //my_canon_I->create_vector();
                             //delete my_canon_leaf;
                             my_canon_leaf = new bijection;
                             base_points = bijection();

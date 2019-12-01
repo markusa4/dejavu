@@ -57,9 +57,9 @@ public:
 
     void set_compare_invariant(invariant *I);
 
-    void create_vector() {
+    void create_vector(int prealloc) {
         vec_invariant = new std::vector<int>();
-        vec_invariant->reserve(1025);
+        vec_invariant->reserve(prealloc * 20);
     }
 
     /*~invariant() {
