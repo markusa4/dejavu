@@ -103,7 +103,7 @@ private:
                          bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
                          shared_workspace *switches, int selector_seed);
 
-    void base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
+    abort_code base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
                              strategy_metrics *m, bool *done, shared_workspace *switches, int selector_seed);
 
     void reset_skiplevels(dejavu_workspace *w);

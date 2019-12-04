@@ -340,18 +340,18 @@ int main(int argc, char *argv[]) {
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-50000.bliss", &g);
-     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
+     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-50000.bliss", &g);
+     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
+     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
      //  p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/tran/tran/tran_56832_255744.bliss", &g);
      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cmz/cmz-50", &g);
-        p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/17cube.bliss", &g);
+      p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/18cube.bliss", &g);
       // p.parse_dimacs_file("/home/markus/CLionProjects/dejavu/graph_tools/k2000.dimacs", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/mz-aug2-50", &g);
-    //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/ag/ag/ag2-49", &g);
+      //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sat_cfi/sat_cfi_dim/sat_cfi_mult_5000_d.dmc", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
   // .parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
      // p.parse_dimacs_file_g("/home/markus/Downloads/graphssaucy/states/AS.g", &g);
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
-        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-170", &g);
+       //  p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-170", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
         // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0504-01-1", &g); // <- significantly faster here!
