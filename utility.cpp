@@ -34,10 +34,13 @@ bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bo
         if (!ichecked) {
             tournament_mutex.lock();
             //std::cout << "late check" << m->color_refinement_cost << std::endl;
+            if(m->restarts > 0)
+                all_no_restart = false;
+
             if ((m->restarts < win_metrics.restarts) ||
                 (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
                 win_id == -2) {
-                PRINT("[Strat] Best: " << m->restarts << ", " << m->expected_bfs_size);
+                PRINT("[Strat] Best: " << m->restarts << ", " << m->expected_bfs_size << ", " << m->color_refinement_cost);
                 win_metrics = *m;
                 win_id = id;
             }
@@ -50,6 +53,8 @@ bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bo
         if (!ichecked) {
             if (win_id != -2 && m->restarts > win_metrics.restarts) {
                 tournament_mutex.lock();
+                if(m->restarts > 0)
+                    all_no_restart = false;
                 //std::cout << "early concede" << m->color_refinement_cost << std::endl;
                 checked++;
                 tournament_mutex.unlock();

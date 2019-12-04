@@ -51,9 +51,10 @@ void coloring::copy(coloring *c) {
             dealloc();
             init = false;
         } else {
-             memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
-             memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz*sizeof(int));
-             return;
+            cells = c->cells;
+            memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
+            memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz*sizeof(int));
+            return;
         }
     }
 
@@ -79,6 +80,7 @@ void coloring::copy(coloring *c) {
     lab_sz = c->lab_sz;
     ptn_sz = c->ptn_sz;
 
+    cells = c->cells;
     init = true;
 }
 
@@ -111,6 +113,8 @@ void coloring::copy_force(coloring *c) {
 
     lab_sz = c->lab_sz;
     ptn_sz = c->ptn_sz;
+
+    cells = c->cells;
 
     init = true;
 }

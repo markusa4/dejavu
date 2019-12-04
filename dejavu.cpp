@@ -1300,7 +1300,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             W.S.empty_cache();
             find_first_leaf(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches,
                             selector_seed);
-            //std::cout << "I_sz: " << my_canon_I->vec_invariant->size() << std::endl;
+            std::cout << "I_sz: " << my_canon_I->vec_invariant->size() << std::endl;
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
@@ -1485,6 +1485,11 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     }
 
                     while(!(switches->done_created_group)) continue;
+                    if(switches->all_no_restart && W.is_foreign_base) {
+                        reset_skiplevels(&W);
+                        foreign_base_done = true;
+                        //std::cout << "All no restart" << std::endl;
+                    }
                 }
                 automorphism.foreign_base = true;
                 n_restarts += m.restarts;

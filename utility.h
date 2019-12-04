@@ -11,8 +11,8 @@ int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 
 
-// #define PRINT(str) std::cout << str << std::endl;
-#define PRINT(str) (void)0;
+#define PRINT(str) std::cout << str << std::endl;
+// #define PRINT(str) (void)0;
 
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
@@ -46,6 +46,7 @@ public:
     strategy_metrics   win_metrics;
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;
+    bool               all_no_restart = true;
 
     // used for leaf storage decisions and the leaf storage
     std::atomic_int    experimental_budget;

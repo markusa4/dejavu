@@ -19,6 +19,8 @@ public:
     int* vertex_to_col;
     int* vertex_to_lab;
 
+    int cells = 1;
+
     // std::vector<std::pair<int, int>> color_choices;
 
     ~coloring();
