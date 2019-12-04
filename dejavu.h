@@ -18,6 +18,13 @@ struct abort_code {
     int reason = 0;
 };
 
+struct base_cache {
+    coloring*       base_cache_colorings;
+    invariant*      base_cache_invariants;
+    bool*           base_cache_done;
+    std::atomic_int level_done;
+};
+
 struct alignas(64) dejavu_workspace {
     // workspace for normal search
     refinement R;
@@ -37,6 +44,7 @@ struct alignas(64) dejavu_workspace {
     coloring   skip_c;
     invariant  skip_I;
     mschreier* skip_schreier_level;
+    bool       skiplevel_is_uniform = false;
 
     int* my_base_points;
     int  my_base_points_sz;
@@ -98,16 +106,16 @@ private:
     void base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,
                              strategy_metrics *m, bool *done, shared_workspace *switches, int selector_seed);
 
+    void reset_skiplevels(dejavu_workspace *w);
+
     abort_code uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                        shared_workspace *switches, int selector_seed);
 
     bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes, strategy_metrics* m);
 
-    bool bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bool *done, int selector_seed);
-
     bool get_orbit(dejavu_workspace *w, int *base, int base_sz, int v, int v_base, work_list *orbit, bool reuse_generators);
 
-    void reset_skiplevels(dejavu_workspace *w);
+    bool bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bool *done, int selector_seed);
 
     void bfs_reduce_tree(dejavu_workspace *w);
 

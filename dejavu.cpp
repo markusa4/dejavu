@@ -401,8 +401,10 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
 
         if (backtrack) {
             if(*done) return;
-            if((m->restarts % (5 * switches->tolerance) == ((5 * switches->tolerance) - 1)) && (w->skiplevels < w->my_base_points_sz))
+            if((m->restarts % (5 * switches->tolerance) == ((5 * switches->tolerance) - 1)) && (w->skiplevels < w->my_base_points_sz)) {
+                w->skiplevel_is_uniform = false;
                 w->skiplevels += 1;
+            }
 
             S->empty_cache();
             if(w->skiplevels > w->my_base_points_sz)
@@ -443,7 +445,7 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
             *automorphism = leaf;
             automorphism->inverse();
             automorphism->compose(canon_leaf);
-            automorphism->non_uniform = skipped_level;
+            automorphism->non_uniform = (skipped_level && !w->skiplevel_is_uniform);
             if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
                 //leaf.deletable();
                 //std::cout << "late backtrack1" << std::endl;
@@ -1053,6 +1055,7 @@ void dejavu::reset_skiplevels(dejavu_workspace* w) {
     w->skiplevels = 0;
     w->skip_schreier_level = w->G->gp;
     w->first_skiplevel = 1;
+    w->skiplevel_is_uniform = true;
     w->my_base_points    = w->G->b;
     w->my_base_points_sz = w->G->base_size;
     w->is_foreign_base   = false;
@@ -1439,6 +1442,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             case modes::MODE_TOURNAMENT:
                 m.restarts = 0;
                 m.expected_bfs_size = 0;
+                W.skiplevel_is_uniform = false;
                 base_aligned_search(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
                                     selector_seed); // <- we should already safe unsuccessfull / succ first level stuff here
                 if(n_found == 0) { // check if I won
@@ -1464,7 +1468,6 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         W.S.empty_cache();
                         int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
                         W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
-                        switches->done_created_group = true;
                         int proposed_level = W.skiplevels + 1;
                         //if(proposed_level == G->base_size) // ToDo: do this better...
                         //    proposed_level += 1;
@@ -1473,7 +1476,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         W.BW->target_level.store(proposed_level);
                         PRINT("[Strat] Proposed level for BFS: " << proposed_level);
                         W.is_foreign_base = false;
-
+                        W.skiplevel_is_uniform = true;
                         W.skip_schreier_level = G->gp;
                         for(int i = 0; i < W.skiplevels; ++i)
                             W.skip_schreier_level = W.skip_schreier_level->next;
@@ -1481,6 +1484,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         W.base_size = G->base_size;
                         foreign_base_done = true;
                         switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
+                        switches->done_created_group = true;
                         PRINT("[Strat] Created shared group by " << communicator_id << " with restarts " << restarts);
                     }
 
@@ -1494,8 +1498,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 automorphism.foreign_base = true;
                 n_restarts += m.restarts;
                 n_found += 1;
-                if(n_found % 3 == 0 && (W.skiplevels < W.my_base_points_sz - 1))
+                if(n_found % 3 == 0 && (W.skiplevels < W.my_base_points_sz - 1)) {
+                    W.skiplevel_is_uniform = false;
                     W.skiplevels += 1;
+                }
                 if((*done_fast && !automorphism.non_uniform )) continue;
                 break;
 
@@ -1514,8 +1520,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     automorphism.mark = true;
                 }
                 n_found += 1;
-                if(n_found % 3 == 0 && (W.skiplevels < W.my_base_points_sz - 1))
+                if(n_found % 3 == 0 && (W.skiplevels < W.my_base_points_sz - 1)) {
+                    W.skiplevel_is_uniform = false;
                     W.skiplevels += 1;
+                }
                 if((*done_fast && !automorphism.non_uniform )) continue;
                     break;
 
@@ -1566,8 +1574,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     }
 
                     n_found += 1;
-                    if (n_found % (3 * switches->tolerance) == 0 && (W.skiplevels < W.my_base_points_sz - 1))
+                    if (n_found % (3 * switches->tolerance) == 0 && (W.skiplevels < W.my_base_points_sz - 1)) {
+                        W.skiplevel_is_uniform = false;
                         W.skiplevels += 1;
+                    }
                     if ((*done_fast && !automorphism.non_uniform)) continue;
                 } else continue;
                 if(*done && master) {
