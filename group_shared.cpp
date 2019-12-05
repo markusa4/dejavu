@@ -112,7 +112,11 @@ void group_shared::ack_done_shared() {
 // sift some random elements to make schreier vectors more complete
 void group_shared::sift_random() {
     bool result = true;
-    while(result) {
+    int result_buffer = 1;
+    while(result || (result_buffer > 0)) {
+        if((result_buffer > 0) && !result) {
+            --result_buffer;
+        }
         random_element re;
         filterstate state;
         state.ingroup = true;
@@ -124,6 +128,10 @@ void group_shared::sift_random() {
         result = mfilterschreier_shared(gp, re.perm, &gens, TRUE, domain_size + 1,
                                             domain_size, state.level + 1, domain_size + 1,
                                             &state, domain_size + 1);
+
+        if(result && result_buffer < 2) {
+            result_buffer++;
+        }
         delete[] re.perm;
     }
 }

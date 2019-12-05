@@ -361,6 +361,8 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
     if(w->skiplevels > w->my_base_points_sz)
         w->skiplevels = w->my_base_points_sz;
 
+    // std::cout << w->skiplevels << std::endl;
+
     m->expected_bfs_size = 1;
     m->expected_level = -1;
 
