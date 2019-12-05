@@ -51,7 +51,7 @@ bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bo
         ichecked = true;
     } else {
         if (!ichecked) {
-            if (win_id != -2 && m->restarts > win_metrics.restarts) {
+            if (win_id != -2 && (m->restarts > win_metrics.restarts || win_metrics.restarts == 0)) {
                 tournament_mutex.lock();
                 if(m->restarts > 0)
                     all_no_restart = false;

@@ -451,9 +451,8 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
             automorphism->compose(canon_leaf);
             automorphism->non_uniform = (skipped_level); // && !w->skiplevel_is_uniform // <- not yet working properly
             // std::cout << w->skiplevels << std::endl;
-            if(full_orbit_check && base_aligned) {
+            if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base) {
                 std::cout << "full orbit run" << std::endl;
-                std::cout << "ToDo: fix skiplevel_is_uniform" << std::endl;
                 return abort_code(1);
             }
             if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
@@ -1489,7 +1488,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         W.BW->target_level.store(proposed_level);
                         PRINT("[Strat] Proposed level for BFS: " << proposed_level);
                         W.is_foreign_base = false;
-                        W.skiplevel_is_uniform = true;
+                        W.skiplevel_is_uniform = W.skiplevels == 0;
                         W.skip_schreier_level = G->gp;
                         for(int i = 0; i < W.skiplevels; ++i)
                             W.skip_schreier_level = W.skip_schreier_level->next;
@@ -1564,6 +1563,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                                             &trash_int, switches, selector_seed);
                             W.my_base_points    = base_points.map;
                             W.my_base_points_sz = base_points.map_sz;
+                            W.skiplevel_is_uniform = false;
                             W.is_foreign_base   = true;
                             foreign_base_done = false;
                         }
@@ -1577,8 +1577,12 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         automorphism.mark = true;
                         n_restarts += m.restarts;
                     } else {
-                        base_aligned_search(&W, g, canon_strategy, &automorphism, &m,
+                        abort_code a = base_aligned_search(&W, g, canon_strategy, &automorphism, &m,
                                             done_fast, switches, selector_seed);
+                        if(a.reason == 1) {
+                            *done      = true;
+                            *done_fast = true;
+                        }
                         automorphism.foreign_base = false;
                         automorphism.mark = true;
                         n_restarts += m.restarts;

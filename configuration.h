@@ -18,7 +18,7 @@ struct configstruct {
                                            // 6 equals an error of roughly 3.2%
     int CONFIG_RAND_ABORT_RAND = -1;
 
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 6; // number of threads to use
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 3; // number of threads to use
 };
 
 extern configstruct config;
