@@ -39,6 +39,7 @@ public:
 
     // solver mode
     std::atomic<modes> current_mode;
+    std::atomic_int    exit_counter;
 
     // tournament variables
     std::mutex         tournament_mutex;

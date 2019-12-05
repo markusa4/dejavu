@@ -454,7 +454,7 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
             automorphism->non_uniform = (skipped_level); // && !w->skiplevel_is_uniform // <- not yet working properly
             // std::cout << w->skiplevels << std::endl;
             if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base) {
-                std::cout << "full orbit run" << std::endl;
+                PRINT("[NUni] Orbit equals cell abort");
                 return abort_code(1);
             }
             if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
@@ -1317,7 +1317,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             W.S.empty_cache();
             find_first_leaf(&W, g, false, my_canon_I, my_canon_leaf, my_strategy, &base_points, &trash_int, switches,
                             selector_seed);
-            std::cout << "I_sz: " << my_canon_I->vec_invariant->size() << std::endl;
+            //std::cout << "I_sz: " << my_canon_I->vec_invariant->size() << std::endl;
             W.my_base_points    = base_points.map;
             W.my_base_points_sz = base_points.map_sz;
             W.is_foreign_base   = true;
@@ -1339,7 +1339,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             // sifting results
             if(dejavu_kill_request) *done = true;
             G->manage_results(switches);
-            if(*done) PRINT("abort in head");
+            // if(*done) PRINT("[G] Abort in head");
 
             // non-uniform search over, fix a group state for collaborative bfs_workspace
             if(switches->done_fast && !switches->done_shared_group && !switches->done) {
@@ -1442,7 +1442,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
 
         if(switches->done) {
             if(!master)
-                return;
+                break;
             else
                 continue;
         }
@@ -1533,7 +1533,6 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                                         selector_seed);
 
                     if(a.reason == 1) {
-                        std::cout << "abort in nuni 1 " << W.skiplevel_is_uniform << ", " << W.skiplevels << std::endl;
                         *done      = true;
                         *done_fast = true;
                     }
@@ -1575,6 +1574,9 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         reset_non_uniform_switch = false;
                     }
 
+                    if(*done && !master)
+                        break;
+
                     if (!foreign_base_done) {
                         base_aligned_search(&W, g, my_strategy, &automorphism, &m,
                                             done_fast, switches, selector_seed);
@@ -1585,7 +1587,6 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         abort_code a = base_aligned_search(&W, g, canon_strategy, &automorphism, &m,
                                             done_fast, switches, selector_seed);
                         if(a.reason == 1) {
-                            std::cout << "abort in nuni 2" << std::endl;
                             *done      = true;
                             *done_fast = true;
                         }
@@ -1800,7 +1801,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
 
         if(switches->done) {
             if(!master)
-                return;
+                break;
             else
                 continue;
         }
@@ -1833,6 +1834,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     }
 
     if(master && !dejavu_kill_request) {
+        PRINT("[G] Cleanup...")
         delete[] shrd_orbit;
         delete[] shrd_orbit_weights;
 
@@ -1842,6 +1844,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         delete G;
         delete bwork;
     }
+
     return;
 }
 

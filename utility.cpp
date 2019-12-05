@@ -23,6 +23,7 @@ shared_workspace::shared_workspace() {
     _ack_done.store(0);
     win_id.store(-2);
     checked.store(0);
+    exit_counter.store(0);
     experimental_paths.store(0);
     experimental_deviation.store(0);
 }
