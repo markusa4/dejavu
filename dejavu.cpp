@@ -453,7 +453,8 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
             automorphism->compose(canon_leaf);
             automorphism->non_uniform = (skipped_level); // && !w->skiplevel_is_uniform // <- not yet working properly
             // std::cout << w->skiplevels << std::endl;
-            if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base) {
+            if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base
+                                && switches->current_mode != MODE_TOURNAMENT) {
                 PRINT("[NUni] Orbit equals cell abort");
                 return abort_code(1);
             }
@@ -1349,7 +1350,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
 
                 G->ack_done_shared();
                 reset_non_uniform_switch = true;
-                G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+                G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1, &switches->done);
+                
+                if(switches->done)
+                    continue;
 
                 PRINT("[N] Creating shared orbit and generators");
                 G->sift_random();
@@ -1458,7 +1462,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 m.expected_bfs_size = 0;
                 W.skiplevel_is_uniform = false;
                 base_aligned_search(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
-                                    selector_seed); // <- we should already safe unsuccessfull / succ first level stuff here
+                               selector_seed); // <- we should already safe unsuccessfull / succ first level stuff here
                 if(n_found == 0) { // check if I won
                     // wait until everyone checked
                     while(!switches->check_strategy_tournament(communicator_id, &m, false) && !switches->done_created_group) continue;

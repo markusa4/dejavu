@@ -140,8 +140,8 @@ void group_shared::reset_ack_done_shared() {
     _ack_done_shared_group = 0;
 }
 
-void group_shared::wait_for_ack_done_shared(int n) {
-    while(_ack_done_shared_group != n)
+void group_shared::wait_for_ack_done_shared(int n, bool* escape) {
+    while(_ack_done_shared_group != n && !*escape)
         continue;
     return;
 }

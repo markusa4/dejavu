@@ -42,7 +42,7 @@ public:
     void print_group_size();
     void manage_results(shared_workspace* switches);
     int  number_of_generators();
-    void wait_for_ack_done_shared(int n);
+    void wait_for_ack_done_shared(int n, bool* escape);
     void ack_done_shared();
     void reset_ack_done_shared();
     void sift_random();

@@ -376,7 +376,7 @@ int main(int argc, char *argv[]) {
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pipe/7pipe.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/hole12.bliss", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/pret150_25_ms.bliss", &g); // smallest is crazy here...
-        // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/s4-4-3-9.bliss", &g);
+         p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/s4-4-3-9.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
