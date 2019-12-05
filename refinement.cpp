@@ -85,28 +85,30 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
 
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
-            // SINGLETON
+            // singleton
             comp = comp && refine_color_class_singleton(g, c, next_color_class.first, next_color_class.second,
                                                         &color_class_splits, I);
         } else if(config.CONFIG_IR_DENSE) {
-            if(dense_dense) { // DENSE-DENSE
+            if(dense_dense) { // dense-dense
                 if(g->max_degree > 127) {
                     comp = comp && refine_color_class_dense_dense(g, c, next_color_class.first, next_color_class.second,
                                                                   &color_class_splits, I);
                 } else {
+                    // version with reduced workspace size
                     comp = comp && refine_color_class_dense_dense127(g, c, next_color_class.first, next_color_class.second,
                                                                      &color_class_splits, I);
                 }
-            } else { // DENSE-SPARSE
+            } else { // dense-sparse
                 comp = comp && refine_color_class_dense(g, c, next_color_class.first, next_color_class.second,
                                                         &color_class_splits, I);
             }
-        } else { // SPARSE
+        } else { // sparse
             if(g->max_degree > 127) {
                 comp = comp &&
                        refine_color_class_sparse(g, c, next_color_class.first, next_color_class.second,
                                                  &color_class_splits, I);
             } else {
+                // version with reduced workspace size
                 comp = comp &&
                        refine_color_class_sparse127(g, c, next_color_class.first, next_color_class.second,
                                                     &color_class_splits, I);
@@ -186,7 +188,7 @@ void refinement::assure_initialized(sgraph *g) {
     if(!initialized) {
         const int n = g->v_size;
 
-        // reduce contention on heap allocator through bulk allocation
+        // reducing contention on heap allocator through bulk allocation...
         workspace_int = new int[n * 14];
 
         vertex_worklist.initialize_from_array(workspace_int, n * 2);
@@ -234,18 +236,18 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
 
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
-            // SINGLETON
+            // singleton
             comp = comp && refine_color_class_sparse_first(g, c, next_color_class.first, next_color_class.second,
                                                               &color_class_splits);
         } else if(config.CONFIG_IR_DENSE) {
-            if(dense_dense) { // DENSE-DENSE
+            if(dense_dense) { // dense-dense
                 comp = comp && refine_color_class_dense_dense_first(g, c, next_color_class.first, next_color_class.second,
                                                                     &color_class_splits);
-            } else { // DENSE-SPARSE
+            } else { // dense-sparse
                 comp = comp && refine_color_class_dense_first(g, c, next_color_class.first, next_color_class.second,
                                                               &color_class_splits);
             }
-        } else { // SPARSE
+        } else { // sparse
             comp = comp &&
                    refine_color_class_sparse_first(g, c, next_color_class.first, next_color_class.second, &color_class_splits);
         }
