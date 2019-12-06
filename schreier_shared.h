@@ -60,26 +60,26 @@ typedef struct randomelementstruct {
 
 #define SCHREIERFAILS 10
 
-extern void shared_freeschreier(shared_schreier **gp, shared_permnode **gens);
-extern void shared_addpermutation(shared_permnode **ring, int *p, int n);
-extern shared_permnode *shared_findpermutation(shared_permnode *gens, int *p, int n);
-extern bool    generate_random_element(shared_schreier *gp, shared_permnode **ring, int n, random_element* element);
-extern bool mfilterschreier(shared_schreier *, int *, shared_permnode **, bool, int, int);
-extern bool mfilterschreier_interval(shared_schreier *, int *, shared_permnode **, bool, int, int, int, int, filterstate* state);
-extern bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level);
-void           free_random_element(random_element* r);
-extern bool shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
-extern bool shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
-extern bool shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n);
-extern int*    shared_getorbits(int *fix, int nfix,
+void shared_freeschreier(shared_schreier **gp, shared_permnode **gens);
+void shared_addpermutation(shared_permnode **ring, int *p, int n);
+shared_permnode *shared_findpermutation(shared_permnode *gens, int *p, int n);
+bool    generate_random_element(shared_schreier *gp, shared_permnode **ring, int n, random_element* element);
+bool mfilterschreier(shared_schreier *, int *, shared_permnode **, bool, int, int);
+bool mfilterschreier_interval(shared_schreier *, int *, shared_permnode **, bool, int, int, int, int, filterstate* state);
+bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level);
+void free_random_element(random_element* r);
+bool shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
+bool shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
+bool shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n);
+int*    shared_getorbits(int *fix, int nfix,
                              shared_schreier *gp, shared_permnode **gens, int n);
-extern void shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n);
-extern void shared_schreier_freedyn(void);
-extern int  shared_schreier_fails(int nfails);
-extern int  shared_schreier_gens(shared_permnode *gens);
-extern void mdeleteunmarked(shared_permnode **gens);
+void shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n);
+void shared_schreier_freedyn(void);
+int  shared_schreier_fails(int nfails);
+int  shared_schreier_gens(shared_permnode *gens);
+void mdeleteunmarked(shared_permnode **gens);
 
-extern void shared_grouporder(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens,
+void shared_grouporder(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens,
                               double *grpsize1, int *grpsize2, int n);
 
 

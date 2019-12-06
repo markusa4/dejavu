@@ -29,22 +29,21 @@ typedef struct sequential_schreierlevel {
 
 #define SCHREIERFAILS 10
 
-extern void _freeschreier(sequential_schreier **gp, sequential_permnode **gens);
-extern void _addpermutation(sequential_permnode **ring, int *p, int n);
-extern sequential_permnode *_findpermutation(sequential_permnode *gens, int *p, int n);
-extern bool _addgenerator(sequential_schreier **gp, sequential_permnode **gens, int *p, int n);
-extern bool
-	_condaddgenerator(sequential_schreier **gp, sequential_permnode **gens, int *p, int n);
-extern bool _expandschreier(sequential_schreier *gp, sequential_permnode **gens, int n, int* minimal_base);
-extern int *_getorbits(int *fix, int nfix,
+void _freeschreier(sequential_schreier **gp, sequential_permnode **gens);
+void _addpermutation(sequential_permnode **ring, int *p, int n);
+sequential_permnode *_findpermutation(sequential_permnode *gens, int *p, int n);
+bool _addgenerator(sequential_schreier **gp, sequential_permnode **gens, int *p, int n);
+bool _condaddgenerator(sequential_schreier **gp, sequential_permnode **gens, int *p, int n);
+bool _expandschreier(sequential_schreier *gp, sequential_permnode **gens, int n, int* minimal_base);
+int *_getorbits(int *fix, int nfix,
                        sequential_schreier *gp, sequential_permnode **gens, int n, int* minimal_base, int** orbits_sz);
-extern void _newgroup(sequential_schreier **sh, sequential_permnode **ring, int n);
-extern void _schreier_freedyn(void);
-extern int _schreier_fails(int nfails);
-extern int _schreier_gens(sequential_permnode *gens);
-extern void _deleteunmarked(sequential_permnode **gens);
-extern void _grouporder(int *fix, int nfix, sequential_schreier *gp, sequential_permnode **gens,
+void _newgroup(sequential_schreier **sh, sequential_permnode **ring, int n);
+void _schreier_freedyn(void);
+int _schreier_fails(int nfails);
+int _schreier_gens(sequential_permnode *gens);
+void _deleteunmarked(sequential_permnode **gens);
+void _grouporder(int *fix, int nfix, sequential_schreier *gp, sequential_permnode **gens,
                         double *grpsize1, int *grpsize2, int n);
-extern void _schreier_check(int wordsize, int m, int n, int version);
+void _schreier_check(int wordsize, int m, int n, int version);
 
 #endif  /* DEJAVU_SCHREIER_SEQUENTIAL_H */

@@ -24,12 +24,7 @@ static int mschreierfails = SCHREIERFAILS;
 
 /************************************************************************/
 
-int
-shared_schreier_fails(int nfails)
-/* Set the number of consecutive failures for filtering;
- * A value of <= 0 defaults to SCHREIERFAILS.
- * The function value is the previous setting. */
-{
+int shared_schreier_fails(int nfails) {
     int prev;
 
     prev = mschreierfails;
@@ -42,10 +37,7 @@ shared_schreier_fails(int nfails)
 
 /************************************************************************/
 
-static void
-mclearfreelists(void)
-/* Clear the schreier and sequential_permnode freelists */
-{
+static void mclearfreelists(void) {
     shared_schreier *sh, *nextsh;
     shared_permnode *p, *nextp;
 
@@ -71,10 +63,7 @@ mclearfreelists(void)
 
 /************************************************************************/
 
-static shared_permnode
-*mnewpermnode(int n)
-/* Allocate a new permode structure, with initialized next fields */
-{
+static shared_permnode *mnewpermnode(int n) {
     shared_permnode *p;
     p = (shared_permnode *) malloc(sizeof(shared_permnode) + (n - 2) * sizeof(int));
 
@@ -91,10 +80,7 @@ static shared_permnode
 
 /************************************************************************/
 
-static shared_schreier
-*mnewschreier(int n)
-/* Allocate a new schreier structure, with initialised next field */
-{
+static shared_schreier *mnewschreier(int n) {
     shared_schreier *sh;
 
     while (mschreier_freelist) {
@@ -141,10 +127,7 @@ static shared_schreier
 /************************************************************************/
 
 void
-shared_freeschreier(shared_schreier **gp, shared_permnode **gens)
-/* Free schreier structure and permutation ring.  Assume this is everything. */
-/* Use NULL for arguments which don't need freeing. */
-{
+shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
     shared_schreier *sh, *nextsh;
     shared_permnode *p, *nextp;
 
@@ -174,10 +157,7 @@ shared_freeschreier(shared_schreier **gp, shared_permnode **gens)
 /************************************************************************/
 
 shared_permnode *
-shared_findpermutation(shared_permnode *gens, int *p, int n)
-/* Return a pointer to permutation p in the circular list,
- * or NULL if it isn't present. */
-{
+shared_findpermutation(shared_permnode *gens, int *p, int n) {
     shared_permnode *rn;
     int i;
 
@@ -197,10 +177,7 @@ shared_findpermutation(shared_permnode *gens, int *p, int n)
 /************************************************************************/
 
 void
-shared_addpermutation(shared_permnode **ring, int *p, int n)
-/* Add new permutation to circular list, marked.
- * and return pointer to it in *ring. */
-{
+shared_addpermutation(shared_permnode **ring, int *p, int n) {
     shared_permnode *pn, *rn;
 
     pn = mnewpermnode(n);
@@ -225,10 +202,7 @@ shared_addpermutation(shared_permnode **ring, int *p, int n)
 /************************************************************************/
 
 static void
-maddpermutationunmarked(shared_permnode **ring, int *p, int n)
-/* Add new permutation to circular list, not marked.
- * and return pointer to it in *ring. */
-{
+maddpermutationunmarked(shared_permnode **ring, int *p, int n) {
     shared_addpermutation(ring, p, n);
     (*ring)->mark = 0;
 }
@@ -236,13 +210,7 @@ maddpermutationunmarked(shared_permnode **ring, int *p, int n)
 /************************************************************************/
 
 bool
-shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n)
-/* Add new permutation to group, unless it is discovered to be
- * already in the group.  It is is possible to be in the group
- * and yet this fact is not discovered.
- * Return TRUE if the generator (or an equivalent) is added or the
- * group knowledge with the current partial base is improved. */
-{
+shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n) {
     filterstate state;
     mfilterschreier_interval(*gp, p, gens, false, n + 1, n, 0, 10, &state);
     assert(test);
@@ -251,15 +219,7 @@ shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n)
 
 /************************************************************************/
 
-bool
-shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n)
-/* Add new permutation to group, unless it is discovered to be
- * already in the group.  It is is possible to be in the group
- * and yet this fact is not discovered, but this version will
- * always notice if this permutation precisely is present.
- * Return TRUE if the generator (or an equivalent) is added or the
- * group knowledge with the current partial base is improved. */
-{
+bool shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n) {
     if (shared_findpermutation(*gens, p, n))
         return false;
     else
@@ -269,9 +229,7 @@ shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, in
 /************************************************************************/
 
 static void
-mdelpermnode(shared_permnode **ring)
-/* Delete sequential_permnode at head of circular list, making the next node head. */
-{
+mdelpermnode(shared_permnode **ring) {
     shared_permnode *newring;
 
     if (!*ring) return;
@@ -293,9 +251,7 @@ mdelpermnode(shared_permnode **ring)
 /************************************************************************/
 
 void
-mdeleteunmarked(shared_permnode **ring)
-/* Delete all permutations in the ring that are not marked */
-{
+mdeleteunmarked(shared_permnode **ring) {
     shared_permnode *pn, *firstmarked;
 
     pn = *ring;
@@ -315,10 +271,7 @@ mdeleteunmarked(shared_permnode **ring)
 /************************************************************************/
 
 static void
-mclearvector(shared_permnode **vec, shared_permnode **ring, int n)
-/* clear vec[0..n-1], freeing permnodes that have no other references
- * and are not marked */
-{
+mclearvector(shared_permnode **vec, shared_permnode **ring, int n) {
     int i;
 
     for (i = 0; i < n; ++i)
@@ -337,9 +290,7 @@ mclearvector(shared_permnode **vec, shared_permnode **ring, int n)
 /************************************************************************/
 
 static void
-minitschreier(shared_schreier *sh, int n)
-/* Initialise schreier structure to trivial orbits and empty vector */
-{
+minitschreier(shared_schreier *sh, int n) {
     int i;
 
     sh->fixed = -1;
@@ -352,9 +303,7 @@ minitschreier(shared_schreier *sh, int n)
 /************************************************************************/
 
 void
-shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n)
-/* Make the trivial group, allow for ring to be set elsewhere */
-{
+shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n) {
     *gp = mnewschreier(n);
     minitschreier(*gp, n);
     if (gens) *gens = NULL;
@@ -363,9 +312,7 @@ shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n)
 /************************************************************************/
 
 void
-mapplyperm(int *wp, int *p, int k, int n)
-/* Apply the permutation p, k times to each element of wp */
-{
+mapplyperm(int *wp, int *p, int k, int n) {
     int i, j, cyclen, kk, m;
 
     if (k <= 5) {
@@ -439,15 +386,7 @@ mapplyperm(int *wp, int *p, int k, int n)
 
 /************************************************************************/
 
-bool mfilterschreier(shared_schreier *gp, int *p, shared_permnode **ring,
-                        bool ingroup, int maxlevel, int n)
-/* Filter permutation p up to level maxlevel of gp.
- * Use ingroup=TRUE if p is known to be in the group, otherwise
- * at least one equivalent generator is added unless it is proved
- * (nondeterministically) that it is in the group already.
- * maxlevel < 0 means no limit, maxlevel=0 means top level only, etc.
- * Return TRUE iff some change is made. */
-{
+bool mfilterschreier(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel, int n) {
     int i, j, j1, j2, lev;
     int ipwr;
     shared_schreier *sh;
@@ -547,20 +486,8 @@ bool mfilterschreier(shared_schreier *gp, int *p, shared_permnode **ring,
 /************************************************************************/
 
 
-bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **ring,
-                                 bool ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state)
-/* Interval version for pipelining:
- * if startlevel = 0,        initialize all DS
- * if endlevel   = maxlevel, delete all DS and return properly
- * if endlevel  != maxlevel, return filter state (workperm, etc.), leave DS initialized
- * */
-/* Filter permutation p up to level maxlevel of gp.
- * Use ingroup=TRUE if p is known to be in the group, otherwise
- * at least one equivalent generator is added unless it is proved
- * (nondeterministically) that it is in the group already.
- * maxlevel < 0 means no limit, maxlevel=0 means top level only, etc.
- * Return TRUE iff some change is made. */
-{
+bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel,
+                              int n, int startlevel, int endlevel, filterstate* state) {
     int i, j, j1, j2, lev;
     int ipwr;
     shared_schreier *sh;
@@ -636,7 +563,8 @@ bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **rin
                 sh->fixed_orbit[0] = sh->fixed;
                 sh->fixed_orbit_sz += 1;
             }
-            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
+            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {
+                // only look at orbit of sh->fixed here instead of entire domain
                 int i = sh->fixed_orbit[ii];
                 if (vec[i] && !vec[mworkperm[i]]) {
                     // acquire sh->level lock here
@@ -652,7 +580,7 @@ bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **rin
                             curr = *ring;
                         }
                         vec[j] = curr;
-                        pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
+                        pwr[j] = ipwr--;
                         ++curr->refcount;
                         circ_mutex.unlock();
                         assert(sh->fixed_orbit_sz < n);
@@ -706,20 +634,12 @@ bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **rin
 /************************************************************************/
 
 
-bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
-                            bool ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level)
-/* Interval version for pipelining:
- * if startlevel = 0,        initialize all DS
- * if endlevel   = maxlevel, delete all DS and return properly
- * if endlevel  != maxlevel, return filter state (workperm, etc.), leave DS initialized
- * */
-/* Filter permutation p up to level maxlevel of gp.
- * Use ingroup=TRUE if p is known to be in the group, otherwise
- * at least one equivalent generator is added unless it is proved
- * (nondeterministically) that it is in the group already.
- * maxlevel < 0 means no limit, maxlevel=0 means top level only, etc.
- * Return TRUE iff some change is made. */
-{
+// Interval version for pipelining:
+// if startlevel = 0,        initialize all DS
+// if endlevel   = maxlevel, delete all DS and return properly
+// if endlevel  != maxlevel, return filter state (workperm, etc.), leave DS initialized
+bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel,
+                            int n, int startlevel, int endlevel, filterstate* state, int reported_change_level) {
     int i, j, j1, j2, lev;
     int ipwr;
     shared_schreier *sh;
@@ -896,10 +816,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
 /************************************************************************/
 
 bool
-shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n)
-/* filter random elements until schreierfails failures.
- * Return true if it ever expanded. */
-{
+shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n) {
     int i, j, nfails, wordlen, skips;
     bool changed;
     shared_permnode *pn;
@@ -936,10 +853,7 @@ shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n)
 
 /************************************************************************/
 
-bool generate_random_element(shared_schreier *gp, shared_permnode **ring, int n, random_element* element)
-/* filter random elements until schreierfails failures.
- * Return true if it ever expanded. */
-{
+bool generate_random_element(shared_schreier *gp, shared_permnode **ring, int n, random_element* element) {
     int i, j, wordlen, skips;
     shared_permnode *pn;
 
@@ -980,14 +894,7 @@ void free_random_element(random_element* r) {
 /************************************************************************/
 
 int *
-shared_getorbits(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens, int n)
-/* Get a pointer to the orbits for this partial base. The pointer
- * remains valid until pruneset(), getorbits(), getorbitsmin()
- * or grouporder() is called with an incompatible base (neither a
- * prefix nor an extension). The contents of the array pointed to
- * MUST NOT BE MODIFIED by the calling program.
- */
-{
+shared_getorbits(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens, int n) {
     //circ_mutex.lock();
     int k;
     shared_schreier *sh, *sha;
@@ -1026,10 +933,7 @@ shared_getorbits(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens
 }
 
 /************************************************************************/
-int
-shared_schreier_gens(shared_permnode *gens)
-/* Returns the number of generators in the ring */
-{
+int shared_schreier_gens(shared_permnode *gens) {
     int j;
     shared_permnode *pn;
 
@@ -1039,14 +943,8 @@ shared_schreier_gens(shared_permnode *gens)
     return j;
 }
 
-void
-shared_grouporder(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens,
-                  double *grpsize1, int *grpsize2, int n)
-/* process the base like in getorbits(), then return the product of the
- * orbits along the base, using the largest orbit at the end if the
- * base is not complete.
-*/
-{
+void shared_grouporder(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens, double *grpsize1,
+                       int *grpsize2, int n) {
     shared_schreier *sh;
     int i, k;
 
