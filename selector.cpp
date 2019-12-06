@@ -153,6 +153,8 @@ int selector::seeded_select_color(sgraph *g, coloring *c, int seed) {
 
 int selector::select_color(sgraph *g, coloring *c, int seed) {
    // assert(config.CONFIG_IR_CELL_SELECTOR == 1);
+   if(c->cells == g->v_size)
+       return -1;
 
     switch(config.CONFIG_IR_CELL_SELECTOR) {
         case 0:

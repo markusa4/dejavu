@@ -1172,29 +1172,26 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
-    lowdeg* L;
     dejavu_workspace W;
 
+    // preprocessing
     if(master) {
         config.CONFIG_IR_DENSE = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
-        L       = new lowdeg();
         start_c = new coloring;
         g->initialize_coloring(start_c);
         if(config.CONFIG_PREPROCESS) {
-          //  std::pair<sgraph *, coloring *> preprocessed_graph = L->preprocess(start_c, g, &W.R);
-          //  g = preprocessed_graph.first;
-          //  start_c = preprocessed_graph.second;
+          //  add preprocessing here
         }
         assert(start_c->check());
     }
 
     double cref;
 
-    bool *done      = &switches->done;
-    bool *done_fast = &switches->done_fast;
+    bool *done             = &switches->done;
+    bool *done_fast        = &switches->done_fast;
+
     int _shared_group_size = false;
     mpermnode *_gens       = nullptr;
-
     int*  shrd_orbit;
     int*  shrd_orbit_weights;
     int** shrd_orbit_;
@@ -1209,8 +1206,32 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
 
     invariant start_I;
 
+    // first color refinement, initialize some more shared structures, launch threads
     if (master) {
         PRINT("[G] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+        switches->current_mode = modes::MODE_TOURNAMENT;
+
+        // first color refinement
+        canon_strategy = new strategy;
+
+        W.start_c = start_c;
+        //start_I.create_vector();
+        W.R.refine_coloring_first(g, start_c, -1);
+        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::high_resolution_clock::now() - timer).count());
+        PRINT("[G] First refinement: " << cref / 1000000.0 << "ms");
+
+        int init_c = W.S.select_color(g, start_c, selector_seed);
+        if(init_c == -1) {
+            *done = true;
+            std::cout << "First coloring discrete." << std::endl;
+            std::cout << "Base size: 0" << std::endl;
+            std::cout << "Group size: 1" << std::endl;
+            W.work_c = new coloring;
+            W.work_I = new invariant;
+            delete canon_strategy;
+            return;
+        }
 
         shrd_orbit = new int[g->v_size];
         for(int i = 0; i < g->v_size; ++i)
@@ -1225,33 +1246,11 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         shrd_orbit_weights_ = new (int*);
         *shrd_orbit_weights_      = shrd_orbit_weights;
 
-        switches->current_mode = modes::MODE_TOURNAMENT;
-
-        // first color refinement
-        canon_strategy = new strategy;
-
-        W.start_c = start_c;
-        //start_I.create_vector();
-        W.R.refine_coloring_first(g, start_c, -1);
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - timer).count());
-        PRINT("[G] First refinement: " << cref / 1000000.0 << "ms");
-
         // create some objects that are initialized after tournament
         G    = new group_shared(g->v_size);
         W.BW = new bfs_workspace();
         bwork = W.BW;
 
-        int init_c = W.S.select_color(g, start_c, selector_seed);
-        if(init_c == -1) {
-            *done = true;
-            std::cout << "First coloring discrete." << std::endl;
-            std::cout << "Base size: 0" << std::endl;
-            std::cout << "Group size: 1" << std::endl;
-            //if(config.CONFIG_PREPROCESS)
-            //    L->postprocess(nullptr);
-            return;
-        }
         W.S.empty_cache();
         // launch worker threads
         for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
@@ -1332,6 +1331,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     bool foreign_base_done = false;
     bool reset_non_uniform_switch = true;
     bool increase_budget = true;
+    bool is_canon_strategy = false;
     int required_level = -1;
 
     // main loop...
@@ -1417,11 +1417,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     }
                     // std::cout << "Abort map prune: " << W.BW->abort_map_prune << std::endl;
                     std::cout << "Group size: ";
-                    /*G->sift_random(); // should sift random again here... or add generators from sequential group
-                    G->sift_random();
-                    G->sift_random();
-                    G->sift_random();*/
                     G->print_group_size();
+
                     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
                     cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
                             std::chrono::high_resolution_clock::now() - timer).count());
@@ -1470,6 +1467,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     //if(switches->done_created_group) continue;
                     if(switches->win_id == communicator_id) {
                         canon_strategy->replace(my_strategy);
+                        is_canon_strategy = true;
                         actual_base = base_points;
                         base_points.not_deletable();
                         G->initialize(g->v_size, &actual_base);
@@ -1560,6 +1558,13 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         reset_skiplevels(&W);
                         if(!master) { // guess a new leaf
                             //delete my_canon_I->compare_vec;
+                            if(!is_canon_strategy) {
+                                delete my_canon_I;
+                                delete my_canon_leaf;
+                                delete my_strategy;
+                            }
+
+                            is_canon_strategy = false;
                             my_canon_I = new invariant; // delete old if non canon
                             //my_canon_I->create_vector();
                             //delete my_canon_leaf;
@@ -1847,12 +1852,22 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
 
         delete G;
         delete bwork;
+
+        delete canon_strategy->I;
+        delete canon_strategy->leaf;
+        delete canon_strategy;
+    }
+
+    if(!is_canon_strategy) {
+        delete my_canon_I;
+        delete my_canon_leaf;
+        delete my_strategy;
     }
 
     return;
 }
 
-void dejavu::automorphisms(sgraph *g) {
+void dejavu::automorphisms(sgraph *g, mpermnode **gens) {
     shared_workspace switches;
     worker_thread(g, true, &switches, nullptr, nullptr, nullptr, -1,
                   nullptr, nullptr, nullptr, nullptr, nullptr);

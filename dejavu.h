@@ -88,11 +88,27 @@ struct alignas(64) dejavu_workspace {
     int todo_elements_sz     = -1;
     bfs_element* prev_bfs_element = nullptr;
     bool init_bfs = false;
+
+    ~dejavu_workspace() {
+        if(init_bfs) {
+            delete[] todo_dequeue;
+            delete[] todo_elements,
+                    delete[] finished_elements;
+            delete[] generator_fix_base;
+        }
+        if(sequential_init) {
+            _freeschreier(&sequential_gp, &sequential_gens);
+        }
+
+        delete work_c;
+        delete work_I;
+        delete start_c;
+    };
 };
 
 class dejavu {
 public:
-    void automorphisms(sgraph *g);
+    void automorphisms(sgraph *g, mpermnode **gens);
 
 private:
     void worker_thread(sgraph *g_, bool master, shared_workspace *switches, group_shared *G, coloring *start_c,

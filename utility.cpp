@@ -40,6 +40,8 @@ bool shared_workspace::check_strategy_tournament(int id, strategy_metrics* m, bo
 
             if ((m->restarts < win_metrics.restarts) ||
                 (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
+                    (m->restarts == win_metrics.restarts && m->expected_bfs_size == win_metrics.expected_bfs_size &&
+                            m->color_refinement_cost < win_metrics.color_refinement_cost) ||
                 win_id == -2) {
                 PRINT("[Strat] Best: " << m->restarts << ", " << m->expected_bfs_size << ", " << m->color_refinement_cost);
                 win_metrics = *m;

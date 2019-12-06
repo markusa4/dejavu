@@ -9,6 +9,8 @@ struct configstruct {
     bool CONFIG_IR_FULLBFS = false;        // enforces full traversal of the search tree (maybe good for asymmetric)
     bool CONFIG_IR_FORCE_SELECTOR = false;
 
+    bool CONFIG_WRITE_AUTOMORPHISMS = true;
+
     bool CONFIG_PREPROCESS = false;
 
     int CONFIG_BULK_ALLOCATION = 10;

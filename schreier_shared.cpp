@@ -477,7 +477,7 @@ mapplyperm(int *wp, int *p, int k, int n)
         DYNALLOC1(int, mworkpermB, mworkpermB_sz, n, "applyperm");
         DYNALLOC1(set, mworkset2, mworkset2_sz, m, "applyperm");
 
-        EMPTYSET(mworkset2, m); // ToDo: this may be expensive, there should be only 1 workset per thread!
+        EMPTYSET(mworkset2, m);
 
         /* We will construct p^k in workpermB one cycle at a time. */
 
@@ -799,15 +799,11 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
     boolean changed, lchanged, ident;
     boolean report_changed = FALSE;
 
-    // identity should not allocate...
+    // identity should not allocate memory, hence early out here!
     for (i = 0; i < n; ++i) if (p[i] != i) {break;}
     if(i == n) return false;
 
     mpermnode** r = ring;
-    //std::cout << r << std::endl;
-    //if(*r != NULL)
-    //    for(i = 0; i < KRAN(16); ++i)
-    //        r = &((*r)->next);
 
     DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
     if (maxlevel < 0) maxlevel = n + 1;
@@ -844,7 +840,8 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
 
     for (lev = startlevel; lev <= endlevel; ++lev) {
         if(loop_break) {break;}
-        for (i = 0; i < n; ++i) if (mworkperm[i] != i) {break;}
+        if(lev > 0)
+            for (i = 0; i < n; ++i) if (mworkperm[i] != i) {break;}
         ident = (i == n);
         if (ident) {loop_break = true;break;}
 
@@ -855,10 +852,7 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
 
         if(lev == 0) { // orbit algorithm
             bool test = sh->level_lock->try_lock();
-           // if(!test)
-               // std::cout << "lock contention " << lev << std::endl;
             if(test) {
-                //sh->level_lock->lock();
                 for (i = 0; i < n; ++i) {
                     j1 = orbits[i];
                     while (orbits[j1] != j1) j1 = orbits[j1];
@@ -889,43 +883,26 @@ boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring,
                 }
                 sh->level_lock->unlock();
             }
-            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {// only look at orbit of sh->fixed here instead of entire domain
+            for (int ii = 0; ii < sh->fixed_orbit_sz; ++ii) {
+                // only looking at orbit of sh->fixed here instead of entire domain
                 int i = sh->fixed_orbit[ii];
                 if (vec[i] && !vec[mworkperm[i]]) {
                     // acquire sh->level lock here
-                    bool test = sh->level_lock->try_lock();
-                  //  if(!test)
-                   //     std::cout << "lock contention " << lev << std::endl;
-                    if(!test)
-                        sh->level_lock->lock();
+                    sh->level_lock->lock();
                     if (vec[i] && !vec[mworkperm[i]]) { // need to check again, though (data race possible)
                         changed = TRUE;
                         ipwr = 0;
                         for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) ++ipwr;
                         for (j = mworkperm[i]; !vec[j]; j = mworkperm[j]) {
                             if (!curr) {
-                                //else
-                                //circ_mutex.lock();
-                                //mpermnode* lock_r = *r;
-                                /*if(lock_r != NULL) {
-                                    //std::cout << "lock " << lock_r->next_lock << std::endl;
-                                    lock_r->next_lock->lock();
-                                }*/
                                 circ_mutex.lock();
                                 if (!ingroup) maddpermutation(r, mworkperm, n);
                                 else maddpermutationunmarked(r, mworkperm, n);
                                 ingroup = TRUE;
                                 curr = *r;
-                                circ_mutex.unlock(); // ToDo: create permnode BEFORE locking mutex!
-                                //(*r)->next_lock->unlock();
-                                /*if(lock_r != NULL) {
-                                    //std::cout << "unlock " << lock_r->next_lock << std::endl;
-                                    lock_r->next_lock->unlock();
-                                }*/
-                                //else
-                                //circ_mutex.unlock();
+                                circ_mutex.unlock();
                             }
-                            pwr[j] = ipwr--; // add intermediate perms here since we will reuse them very often? at least on lower levels?
+                            pwr[j] = ipwr--;
                             ++curr->refcount;
                             vec[j] = curr;
                             assert(sh->fixed_orbit_sz < n);
@@ -1141,40 +1118,19 @@ mgrouporder(int *fix, int nfix, mschreier *gp, mpermnode **ring,
 */
 {
     mschreier *sh;
-    int i, j, k, fx;
+    int i, k, fx;
     int *orb;
 
-  //  DYNALLSTAT_NOSTATIC(int, mworkperm, mworkperm_sz);
-  //  DYNALLOC1(int, mworkperm, mworkperm_sz, n, "grouporder");
-
-    //mschreier_fails(10);
-    //mexpandschreier(gp, ring, n);
-    //mgetorbits(fix, nfix, gp, ring, n);
-    //mexpandschreier(gp, ring, n);
     *grpsize1 = 1.0;
     *grpsize2 = 0;
 
     for (i = 0, sh = gp; i < nfix; ++i, sh = sh->next) {
         orb = sh->orbits;
-        fx = orb[sh->fixed];
         k = sh->fixed_orbit_sz;
         if(k == 0)
             k = 1;
-       /* for (j = fx; j < n; ++j) if (orb[j] == fx) ++k;*/
         MULTIPLY(*grpsize1, *grpsize2, k);
     }
-
-    //orb = sh->orbits;
-    k = 1;
-    /*for (i = 0; i < n; ++i)
-        if (orb[i] == i)
-            mworkperm[i] = 1;
-        else {
-            ++mworkperm[orb[i]];
-            if (mworkperm[orb[i]] > k) k = mworkperm[orb[i]];
-        }*/
-    MULTIPLY(*grpsize1, *grpsize2, k);
- //   DYNFREE(mworkperm, mworkperm_sz);
 }
 
 /************************************************************************/

@@ -237,7 +237,7 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
             // singleton
-            comp = comp && refine_color_class_sparse_first(g, c, next_color_class.first, next_color_class.second,
+            comp = comp && refine_color_class_singleton_first(g, c, next_color_class.first, next_color_class.second,
                                                               &color_class_splits);
         } else if(config.CONFIG_IR_DENSE) {
             if(dense_dense) { // dense-dense
@@ -268,6 +268,24 @@ bool refinement::refine_coloring_first(sgraph *g, coloring *c, int init_color_cl
             const bool is_largest = color_class_splits.last()->second;
 
             c->cells += (old_class != new_class);
+
+#ifndef NDEBUG // debug code
+            if(color_class_splits.empty()) {
+                int actual_cells = 0;
+                for (int i = 0; i < c->ptn_sz;) {
+                    actual_cells += 1;
+                    i += c->ptn[i] + 1;
+                }
+
+                assert(c->cells == actual_cells);
+            }
+#endif
+
+            if(c->cells == g->v_size) {
+                color_class_splits.reset();
+                cell_todo.reset(&queue_pointer);
+                return comp;
+            }
 
             if(latest_old_class != old_class) {
                 latest_old_class = old_class;
@@ -1404,10 +1422,6 @@ bool refinement::refine_color_class_singleton_first(sgraph *g, coloring *c, int 
         neighbours.inc_nr(col); // we reset neighbours later...
         // old_color_classes can be used as reset information
     }
-
-    //old_color_classes.sort();
-
-    // sort and write down singletons in invariant
 
     while(!old_color_classes.empty()) {
         const int deg0_col    = old_color_classes.pop_back();
