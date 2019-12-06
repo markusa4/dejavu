@@ -734,7 +734,7 @@ bool refinement::refine_color_class_sparse_first(sgraph *g, coloring *c, int col
                 vertex_worklist.push_back(index);
         }
 
-        vertex_worklist.sort();
+        //vertex_worklist.sort();
 
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
@@ -1280,9 +1280,7 @@ bool refinement::refine_color_class_dense_dense127(sgraph *g, coloring *c, int c
             continue;
 
         if(col_sz == 1) {
-            //comp = comp && I->write_top_and_compare(INT32_MAX - 2);
-            //comp = comp && I->write_top_and_compare(-g->v_size * 11 - col);
-            // comp = comp && I->write_top_and_compare(col + v_degree * g->v_size); // ToDo: write this instead?
+            // comp = comp && I->write_top_and_compare(col + v_degree * g->v_size); // maybe write this instead?
             singleton_inv1 *= (col + 1) * (529 - col - v_degree - 3);
             singleton_inv2 *= (col + 2) * (715 - col - v_degree - 1);
             //comp = comp && I->write_top_and_compare(g->v_size + col + c->ptn[col] + 1);
@@ -1315,10 +1313,7 @@ bool refinement::refine_color_class_dense_dense127(sgraph *g, coloring *c, int c
         if(vertex_worklist.cur_pos == 1) {
             // no split
             const int v_degree = neighbours127.get(c->lab[col]);
-            //comp = comp && I->write_top_and_compare(INT32_MAX - 4);
-            //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
             comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
-            //comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
             if(!comp) {neighbours127.reset_hard(); return comp;}
             continue;
         }
@@ -1496,7 +1491,6 @@ bool refinement::refine_color_class_dense_first(sgraph *g, coloring *c, int colo
         cc += 1;
     }
 
-    // DENSE-DENSE: dont sort, just iterate over all cells
     while(!old_color_classes.empty()) {
         const int col = old_color_classes.pop_back();
         const int col_sz = c->ptn[col] + 1;
@@ -1530,7 +1524,7 @@ bool refinement::refine_color_class_dense_first(sgraph *g, coloring *c, int colo
             continue;
         }
 
-        vertex_worklist.sort();
+        // vertex_worklist.sort();
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
         while(!vertex_worklist.empty()) {
@@ -1585,7 +1579,6 @@ bool refinement::refine_color_class_dense_first(sgraph *g, coloring *c, int colo
 
 bool refinement::refine_color_class_dense_dense_first(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist) {
     // for all vertices of the color class...
-    bool mark_as_largest;
     int i, j, cc, acc, largest_color_class_size, pos;
     cc = color_class; // iterate over color class
 
@@ -1636,7 +1629,7 @@ bool refinement::refine_color_class_dense_dense_first(sgraph *g, coloring *c, in
             continue;
         }
 
-        vertex_worklist.sort();
+        // vertex_worklist.sort();
         // enrich neighbour_sizes to accumulative counting array
         acc = 0;
         while(!vertex_worklist.empty()) {

@@ -4,13 +4,15 @@
 
 std::pair<int*, int*> coloring_bulk_allocator(int domain_size) {
     thread_local int* bulk_domain = nullptr;
-    thread_local int bulk_domain_sz = -1, bulk_domain_cnt = -1;
+    thread_local int  buffer_const = 20;
+    thread_local int  bulk_domain_sz = -1, bulk_domain_cnt = -1;
 
     if(bulk_domain_sz < 0) {
-        bulk_domain     = new int[20 * domain_size + 1];
+        bulk_domain     = new int[buffer_const * domain_size + 1];
         bulk_domain[0]  = 1;
-        bulk_domain_sz  = 20 * domain_size + 1;
+        bulk_domain_sz  = buffer_const * domain_size + 1;
         bulk_domain_cnt = 1;
+        buffer_const *= 2;
     }
 
     bulk_domain_cnt += domain_size;

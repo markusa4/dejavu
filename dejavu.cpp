@@ -537,7 +537,7 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
     comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
     if(!comp) { // fail on first level, set abort_val and abort_pos in elem
-        // ToDo: need to sync this write?
+        // need to sync this write?
         ++switches->experimental_deviation;
         elem->deviation_pos    = I->comp_fail_pos;
         elem->deviation_val    = I->comp_fail_val;
@@ -744,7 +744,6 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
     }
 
     // try to dequeue a chunk of work
-    // ToDo: try out next levels as well! (but should check target_level, though)
     size_t num = BFS->bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->chunk_size);
     int finished_elements_sz = 0;
     int todo_elements_sz = 0;
@@ -1000,8 +999,8 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
                 assert(elem->parent != NULL);
                 if(elem->weight != 0) {
                     int* orbits_sz = nullptr;
-                    // ToDo: find all other elements with same base -1 and prune using exactly this orbit, then its fine
-                    int* orbits = _getorbits(elem->base, elem->base_sz - 1, w->sequential_gp, &w->sequential_gens, domain_size, w->G->b, &orbits_sz); // ToDo: weights incorrect?
+                    // find all other elements with same base -1 and prune using exactly this orbit, then its fine
+                    int* orbits = _getorbits(elem->base, elem->base_sz - 1, w->sequential_gp, &w->sequential_gens, domain_size, w->G->b, &orbits_sz);
 
                     int calc_sz = 0;
                     for(int ii = 0; ii < domain_size; ++ii) {
@@ -1108,7 +1107,7 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
                 for (int i = c; i < c + c_size; ++i) {
                     expected += 1;
                     w->BW->bfs_level_todo[w->BW->current_level].enqueue(
-                            std::tuple<bfs_element *, int, int>(elem, elem->c->lab[i], -1)); // ToDo: prune this, too!
+                            std::tuple<bfs_element *, int, int>(elem, elem->c->lab[i], -1));
                 }
                 if (elem->is_identity) {
                     PRINT("[BFS] Abort map expecting: " << c_size);
@@ -1485,7 +1484,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
                         W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
                         int proposed_level = W.skiplevels + 1;
-                        //if(proposed_level == G->base_size) // ToDo: do this better...
+                        //if(proposed_level == G->base_size)
                         //    proposed_level += 1;
                         if(config.CONFIG_IR_FULLBFS)
                             proposed_level = G->base_size + 1;
@@ -1608,6 +1607,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         int proposed_level = required_level; // consider skiplevel (or previous "proposed level") here?
                         if (proposed_level == G->base_size)
                             proposed_level += 1;
+                        if (proposed_level > G->base_size + 1)
+                            proposed_level = G->base_size + 1;
                         if (proposed_level > W.BW->target_level)
                             W.BW->target_level.store(proposed_level);
                     }
@@ -1662,6 +1663,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                             int proposed_level = std::max(bfs_level + 1, required_level);
                             if (proposed_level == G->base_size)
                                 proposed_level += 1;
+                            if (proposed_level > G->base_size + 1)
+                                proposed_level = G->base_size + 1;
                             if (proposed_level > W.BW->target_level) {
                                 W.BW->target_level.store(proposed_level);
                             }
@@ -1710,6 +1713,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         int proposed_level = W.skiplevels + 1;
                         if (proposed_level == G->base_size)
                             proposed_level += 1;
+                        if (proposed_level > G->base_size + 1)
+                            proposed_level = G->base_size + 1;
                         W.BW->target_level.store(proposed_level);
                     }
                     if(switches->done_shared_group && W.BW->target_level >= 0) {
@@ -1723,7 +1728,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                         }
                         bfs_chunk(&W, g, canon_strategy, done, selector_seed);
                         if(master) {
-                            bool fill = bwork->work_queues(switches->tolerance); // ToDo: maybe current level should be incremented later for sync...
+                            bool fill = bwork->work_queues(switches->tolerance);
                             if(fill)
                                 bfs_fill_queue(&W);
                         }
@@ -1750,8 +1755,9 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                             // switches->reset_leaf_tournament();
                             reset_skiplevels(&W);
                             foreign_base_done = true;
-                            //switches->current_mode = modes::MODE_NON_UNIFORM_PROBE_IT; // ToDo: actually should go to leaf tournament
+                            //switches->current_mode = modes::MODE_NON_UNIFORM_PROBE_IT;
                             int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
+                            // budget_fac = 0;
 
                             PRINT("[UniLeaf] Switching to uniform with leaf storage, budget " << bwork->level_sizes[bwork->current_level - 1] * budget_fac)
                             switches->experimental_budget.store(bwork->level_sizes[bwork->current_level - 1] * budget_fac);
