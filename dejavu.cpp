@@ -46,7 +46,7 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
 
     S->empty_cache();
 
-    int init_color_class;
+    int init_color_class = -1;
     *restarts = 0;
     int level = w->first_level;
 
@@ -63,10 +63,10 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
     int bfs_level    = w->BW->current_level - 1;
     int bfs_level_sz = w->BW->level_sizes[bfs_level];
 
-    mschreier* start_group_level = w->G->gp;
+    shared_schreier* start_group_level = w->G->gp;
     for(int i = 0; i < bfs_level; i++)
         start_group_level = start_group_level->next;
-    mschreier* group_level = start_group_level;
+    shared_schreier* group_level = start_group_level;
 
     int rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
     bfs_element* picked_elem = w->BW->level_states[bfs_level][rand_pos];
@@ -78,7 +78,6 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
     last_op = OP_R;
     level = bfs_level + 1;
     S->empty_cache();
-    int base;
     double picked_weight, max_weight, rand_weight;
 
     while (true) {
@@ -339,7 +338,7 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
 
     coloring  *start_c     = &w->skip_c;
     invariant *start_I     = &w->skip_I;
-    mschreier *group_level = w->skip_schreier_level;
+    shared_schreier *group_level = w->skip_schreier_level;
 
     invariant* canon_I    = canon_strategy->I;
     bijection* canon_leaf = canon_strategy->leaf;
@@ -417,7 +416,7 @@ dejavu::base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_stra
 
             if(w->first_skiplevel <= w->skiplevels) {
                 m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
-                bool comp = proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m);
+                proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m);
                 w->first_skiplevel += 1;
                 if(!w->is_foreign_base) {
                     w->skip_schreier_level = w->skip_schreier_level->next;
@@ -592,7 +591,7 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
 
         comp = false;
 
-        for(int i = 0; i < pointers.size(); ++i) {
+        for(size_t i = 0; i < pointers.size(); ++i) {
             *automorphism = leaf;
             automorphism->inverse();
             bijection fake_leaf;
@@ -653,7 +652,7 @@ bool dejavu::get_orbit(dejavu_workspace* w, int* base, int base_sz, int v, int v
         // collect generators
         if(!reuse_generators) {
             w->generator_fix_base_size = 0;
-            mpermnode *it = *w->shared_generators;
+            shared_permnode *it = *w->shared_generators;
             do {
                 // does it fix base?
                 // do not need this variable
@@ -722,7 +721,7 @@ void dejavu::bfs_assure_init(dejavu_workspace* w) {
         w->orbit.initialize(w->G->domain_size);
         w->orbit_considered.initialize(w->G->domain_size);
         w->orbit_vertex_worklist.initialize(w->G->domain_size);
-        w->generator_fix_base = new mpermnode*[*w->shared_generators_size];
+        w->generator_fix_base = new shared_permnode*[*w->shared_generators_size];
         w->generator_fix_base_alloc = *w->shared_generators_size;
     }
 }
@@ -738,7 +737,7 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
 
     if (w->generator_fix_base_alloc < *w->shared_generators_size) {
         delete[] w->generator_fix_base;
-        w->generator_fix_base = new mpermnode *[*w->shared_generators_size];
+        w->generator_fix_base = new shared_permnode *[*w->shared_generators_size];
         w->generator_fix_base_alloc = *w->shared_generators_size;
         w->prev_bfs_element = nullptr;
     }
@@ -746,11 +745,9 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
     // try to dequeue a chunk of work
     size_t num = BFS->bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->chunk_size);
     int finished_elements_sz = 0;
-    int todo_elements_sz = 0;
-
     int finished_elements_null_buffer = 0;
 
-    for (int i = 0; i < num; ++i) {
+    for (size_t i = 0; i < num; ++i) {
         bfs_element *elem = std::get<0>(w->todo_dequeue[i]);
         int v = std::get<1>(w->todo_dequeue[i]);
         int weight = std::get<2>(w->todo_dequeue[i]);
@@ -892,7 +889,7 @@ bool dejavu::sequential_init_copy(dejavu_workspace* w) {
     }
 
     // copy generators that have not been copied yet
-    mpermnode *it = w->G->gens;
+    shared_permnode *it = w->G->gens;
     do {
         if(it->copied == 0) {
             new_gen = true;
@@ -915,7 +912,6 @@ bool bfs_element_parent_sorter(bfs_element* const& lhs, bfs_element* const& rhs)
 }
 
 void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
-    thread_local bool init_group = false;
     thread_local bool first_call = true;
 
     _schreier_fails(2);
@@ -933,7 +929,7 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
 
     if(w->generator_fix_base_alloc < *w->shared_generators_size) {
         delete[] w->generator_fix_base;
-        w->generator_fix_base = new mpermnode*[*w->shared_generators_size];
+        w->generator_fix_base = new shared_permnode*[*w->shared_generators_size];
         w->generator_fix_base_alloc = *w->shared_generators_size;
         w->prev_bfs_element = nullptr;
     }
@@ -1047,7 +1043,6 @@ void dejavu::bfs_reduce_tree(dejavu_workspace* w) {
     int expecting_finished = 0;
     for (int j = 0; j < BFS->level_sizes[BFS->current_level - 1]; ++j) {
         bfs_element *elem = BFS->level_states[BFS->current_level - 1][j];
-        int added = 0;
         if (elem->weight > 0) {
             int c      = elem->target_color;
             int c_size = elem->c->ptn[c] + 1;
@@ -1167,7 +1162,7 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
 }
 
 void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, group_shared* G, coloring* start_c, strategy* canon_strategy,
-                           int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs_workspace* bwork, mpermnode** gens, int* shared_group_size) {
+                           int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs_workspace* bwork, shared_permnode** gens, int* shared_group_size) {
     // find comparison leaf
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
@@ -1189,12 +1184,12 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     bool *done             = &switches->done;
     bool *done_fast        = &switches->done_fast;
 
-    int _shared_group_size = false;
-    mpermnode *_gens       = nullptr;
-    int*  shrd_orbit;
-    int*  shrd_orbit_weights;
-    int** shrd_orbit_;
-    int** shrd_orbit_weights_;
+    int _shared_group_size   = false;
+    shared_permnode *_gens   = nullptr;
+    int*  shrd_orbit         = nullptr;
+    int*  shrd_orbit_weights = nullptr;
+    int** shrd_orbit_        = nullptr;
+    int** shrd_orbit_weights_= nullptr;
 
     std::vector<std::thread> work_threads;
     bijection base_points;
@@ -1240,10 +1235,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         memset(shrd_orbit_weights, 0, g->v_size * sizeof(int));
 
         shrd_orbit_ = new (int*);
-        *shrd_orbit_      = shrd_orbit;
+        *shrd_orbit_= shrd_orbit;
 
         shrd_orbit_weights_ = new (int*);
-        *shrd_orbit_weights_      = shrd_orbit_weights;
+        *shrd_orbit_weights_= shrd_orbit_weights;
 
         // create some objects that are initialized after tournament
         G    = new group_shared(g->v_size);
@@ -1323,15 +1318,15 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         }
     }
 
-    int n_found = 0;
+    int n_found    = 0;
     int n_restarts = 0;
-    int rotate_i = 0;
+    int rotate_i   = 0;
     strategy_metrics m;
-    bool foreign_base_done = false;
+    bool foreign_base_done        = false;
     bool reset_non_uniform_switch = true;
-    bool increase_budget = true;
+    bool increase_budget   = true;
     bool is_canon_strategy = false;
-    int required_level = -1;
+    int required_level     = -1;
 
     // main loop...
     while(true) {
@@ -1374,12 +1369,10 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 *W.shared_generators_size   = G->number_of_generators();
 
                 if(W.BW->current_level > 1) { // > 1
-                    bool tree_reduce = false;
                     if(*W.shared_generators_size > 0) {
                         PRINT("[BFS] Reducing tree (" << n_found << ")");
                         assert(master && communicator_id == -1);
                         bfs_reduce_tree(&W);
-                        tree_reduce = true;
                     }
                     // check if expected size is still too large...
                     if(W.BW->level_expecting_finished[W.BW->current_level] >= config.CONFIG_IR_SIZE_FACTOR * g->v_size * switches->tolerance) {
@@ -1873,7 +1866,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
     return;
 }
 
-void dejavu::automorphisms(sgraph *g, mpermnode **gens) {
+void dejavu::automorphisms(sgraph *g, shared_permnode **gens) {
     shared_workspace switches;
     worker_thread(g, true, &switches, nullptr, nullptr, nullptr, -1,
                   nullptr, nullptr, nullptr, nullptr, nullptr);

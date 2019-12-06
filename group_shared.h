@@ -32,8 +32,8 @@ public:
     int non_uniform_abort_counter = 0;
     int gens_added = 0;
 
-    mschreier *gp;
-    mpermnode *gens;
+    shared_schreier *gp;
+    shared_permnode *gens;
 
     group_shared(int domain_size);
     void initialize(int domain_size, bijection *base_points);

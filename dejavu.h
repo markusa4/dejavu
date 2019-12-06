@@ -43,7 +43,7 @@ struct alignas(64) dejavu_workspace {
     int        first_skiplevel = 1;
     coloring   skip_c;
     invariant  skip_I;
-    mschreier* skip_schreier_level;
+    shared_schreier* skip_schreier_level;
     bool       skiplevel_is_uniform = false;
 
     int* my_base_points;
@@ -61,13 +61,13 @@ struct alignas(64) dejavu_workspace {
     // shared orbit and generators
     int**       shared_orbit;
     int**       shared_orbit_weights;
-    mpermnode** shared_generators;
+    shared_permnode** shared_generators;
     int*        shared_generators_size;
     int         generator_fix_base_alloc = -1;
 
     // sequential, local group
-    permnode*       sequential_gens;
-    _schreierlevel* sequential_gp;
+    sequential_permnode*       sequential_gens;
+    sequential_schreierlevel* sequential_gp;
     bool            sequential_init = false;
 
     // deprecated workspace for simple orbit method
@@ -75,7 +75,7 @@ struct alignas(64) dejavu_workspace {
     work_list orbit_vertex_worklist;
     work_list orbit;
     int canonical_v;
-    mpermnode** generator_fix_base;
+    shared_permnode** generator_fix_base;
     int         generator_fix_base_size;
 
     // bfs_workspace workspace
@@ -108,12 +108,12 @@ struct alignas(64) dejavu_workspace {
 
 class dejavu {
 public:
-    void automorphisms(sgraph *g, mpermnode **gens);
+    void automorphisms(sgraph *g, shared_permnode **gens);
 
 private:
     void worker_thread(sgraph *g_, bool master, shared_workspace *switches, group_shared *G, coloring *start_c,
                        strategy* canon_strategy, int communicator_id,
-                       int **shared_orbit, int** shared_orbit_weights, bfs_workspace *bwork, mpermnode **gens, int *shared_group_size);
+                       int **shared_orbit, int** shared_orbit_weights, bfs_workspace *bwork, shared_permnode **gens, int *shared_group_size);
 
     void find_first_leaf(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
                          bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,

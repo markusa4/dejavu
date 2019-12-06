@@ -738,7 +738,7 @@ long double lowdeg::postprocess(group_shared* G) {
 
     if(nest == nullptr) {
         if(G != nullptr) {
-            mgrouporder(G->b, G->base_size, G->gp, &G->gens, &grpsize1, &grpsize2, G->domain_size);
+            shared_grouporder(G->b, G->base_size, G->gp, &G->gens, &grpsize1, &grpsize2, G->domain_size);
             return addsize * grpsize1 * pow(10, grpsize2);
         } else {
             return addsize;

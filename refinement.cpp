@@ -1249,7 +1249,7 @@ bool refinement::refine_color_class_dense_dense(sgraph *g, coloring *c, int colo
 
 bool refinement::refine_color_class_dense_dense127(sgraph *g, coloring *c, int color_class, int class_size, work_list_pair_bool* color_class_split_worklist, invariant* I) {
     bool comp;
-    int i, j, acc, cc, largest_color_class_size, pos;
+    int i, j, acc, cc, largest_color_class_size;
     cc = color_class; // iterate over color class
     comp = true;
 
@@ -1684,21 +1684,14 @@ bool refinement::refine_color_class_dense_dense_first(sgraph *g, coloring *c, in
 }
 
 int refinement::individualize_vertex(coloring *c, int v) {
-    //assert(initialized);
-
-    int color = c->vertex_to_col[v];
-    int pos   = c->vertex_to_lab[v];
-    //int pos   = color;
-    //while(c->lab[pos] != v) pos += 1;
+    const int color = c->vertex_to_col[v];
+    const int pos   = c->vertex_to_lab[v];
 
     int color_class_size = c->ptn[color];
 
-    // c->color_choices.emplace_back(std::pair<int, int>(color, color_class_size + 1));
-
     assert(color_class_size > 0);
-    int new_color = color + color_class_size;
 
-    int vertex_at_pos = c->lab[color + color_class_size];
+    const int vertex_at_pos = c->lab[color + color_class_size];
     c->lab[pos] = vertex_at_pos;
     c->vertex_to_lab[vertex_at_pos] = pos;
 
@@ -1719,10 +1712,10 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     bool first_of_color = true;
     bool test = true;
 
-    for(int i = 0; i < g->v_size; ++i) {
+    for(size_t i = 0; i < g->v_size; ++i) {
         neighbour_col.clear();
         int v = c->lab[i];
-        for(int j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
+        for(size_t j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
             neighbour_col.push_back(c->vertex_to_col[g->e[j]]);
         }
         std::sort(neighbour_col.begin(), neighbour_col.end());
@@ -1730,7 +1723,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
             first_of_color = false;
             neighbour_col_canon.swap(neighbour_col);
         } else {
-            for (auto j = 0; j < neighbour_col.size(); ++j) {
+            for (size_t j = 0; j < neighbour_col.size(); ++j) {
                 test = test && (neighbour_col[j] == neighbour_col_canon[j]);
             }
         }
@@ -1741,7 +1734,7 @@ bool refinement::assert_is_equitable(sgraph *g, coloring *c) {
     }
     int expect0 = 0;
     bool expectsize = true;
-    for(int i = 0; i < c->lab_sz; ++i) {
+    for(size_t i = 0; i < c->lab_sz; ++i) {
         if(expectsize) {
             expectsize = false;
             expect0 = c->ptn[i];

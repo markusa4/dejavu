@@ -7,7 +7,7 @@
 #include <iostream>
 #include "assert.h"
 
-class alignas(64) invariant {
+class alignas(16) invariant {
 public:
     std::vector<int>* vec_invariant = nullptr;
     invariant*        compareI;

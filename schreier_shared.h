@@ -6,52 +6,46 @@
 #ifndef DEJAVU_SCHREIER_SHARED_H
 #define DEJAVU_SCHREIER_SHARED_H
 
-#include "nauty/nauty.h"
-#include "nauty/naurng.h"
 #include <mutex>
 #include <atomic>
+#include "nauty/nauty.h"
+#include "nauty/naurng.h"
 
-#define DYNALLSTAT_NOSTATIC(type,name,name_sz) \
+#define DYNALL(type,name,name_sz) \
 	type *name = NULL; size_t name_sz=0;
 
 enum sift_type {SIFT_UNIFORM, SIFT_NON_UNIFORM, SIFT_RANDOM};
 
-typedef struct mpermnodestruct
-{
-    struct mpermnodestruct *prev,*next;   /* prev&next in circular list */
-    std::atomic<int> refcount;              /* number of references */
-    int nalloc;                          /* size of p[] in ints,
-                                            <= 0 for a perm marker */
+typedef struct shared_permnodestruct {
+    struct shared_permnodestruct *prev,*next;
+    std::atomic<int> refcount;
+    int nalloc;
     int copied;
-    std::mutex* next_lock;
-    int mark;                            /* a mark, 0 unless changed */
-    int p[2];                            /* actual vector, extended to
-                                            nalloc enties */
-} mpermnode;
+    int mark;
+    int p[2];
+} shared_permnode;
 
-typedef struct mschreierlevel
-{
-    struct mschreierlevel *next;    /* down one level, if any */
-    int fixed;                     /* fixed at next level, -1 if none */
-    /* Invariant: next=NULL => fixed = -1 */
-    int nalloc;                    /* size of vec[] and orbits[] */
-    mpermnode **vec;                /* vec[i]^pwr[i] is edge label, */
-    int *pwr;                      /*  transitive closure maps i->fixed */
-    int *orbits;                   /* vector of orbits */
+typedef struct shared_schreierlevel {
+    struct shared_schreierlevel *next;
+    int fixed;
+    int nalloc;
+    shared_permnode **vec;
+    int *pwr;
+    int *orbits;
     int *fixed_orbit = nullptr;
     int  fixed_orbit_sz = -1;
     std::mutex* level_lock;
-    mpermnode *marker;              /* points to marker for this level */
-} mschreier;
+    shared_permnode *marker;
+} shared_schreier;
 
 
 typedef struct filterstatestruct {
     int level;
     bool loop_break;
-    mschreier *sh;
+    shared_schreier *sh;
     int *orbits, *pwr;
-    mpermnode **vec, *curr;
-    boolean changed, lchanged, ident;
+    shared_permnode **vec, *curr;
+    bool changed, lchanged, ident;
     bool ingroup;
     bool counts_towards_abort;
     int* workperm;
@@ -65,44 +59,29 @@ typedef struct randomelementstruct {
 } random_element;
 
 #define SCHREIERFAILS 10
-/* Default number of Schreier failures before giving up. */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+extern void shared_freeschreier(shared_schreier **gp, shared_permnode **gens);
+extern void shared_addpermutation(shared_permnode **ring, int *p, int n);
+extern shared_permnode *shared_findpermutation(shared_permnode *gens, int *p, int n);
+extern bool    generate_random_element(shared_schreier *gp, shared_permnode **ring, int n, random_element* element);
+extern bool mfilterschreier(shared_schreier *, int *, shared_permnode **, bool, int, int);
+extern bool mfilterschreier_interval(shared_schreier *, int *, shared_permnode **, bool, int, int, int, int, filterstate* state);
+extern bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring, bool ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level);
+void           free_random_element(random_element* r);
+extern bool shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
+extern bool shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n);
+extern bool shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n);
+extern int*    shared_getorbits(int *fix, int nfix,
+                             shared_schreier *gp, shared_permnode **gens, int n);
+extern void shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n);
+extern void shared_schreier_freedyn(void);
+extern int  shared_schreier_fails(int nfails);
+extern int  shared_schreier_gens(shared_permnode *gens);
+extern void mdeleteunmarked(shared_permnode **gens);
 
-/* See separate file schreier.txt for a description of usage. */
+extern void shared_grouporder(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens,
+                              double *grpsize1, int *grpsize2, int n);
 
-extern void mfreeschreier(mschreier **gp, mpermnode **gens);
-extern void maddpermutation(mpermnode **ring, int *p, int n);
-extern mpermnode *mfindpermutation(mpermnode *gens, int *p, int n);
-extern bool generate_random_element(mschreier *gp, mpermnode **ring, int n, random_element* element);
-extern boolean mfilterschreier(mschreier *, int *, mpermnode **, boolean, int, int);
-extern boolean mfilterschreier_interval(mschreier *, int *, mpermnode **, boolean, int, int, int, int, filterstate* state);
-extern boolean mfilterschreier_shared(mschreier *gp, int *p, mpermnode **ring, boolean ingroup, int maxlevel, int n, int startlevel, int endlevel, filterstate* state, int reported_change_level);
-void free_random_element(random_element* r);
-extern boolean maddgenerator(mschreier **gp, mpermnode **gens, int *p, int n);
-extern boolean
-mcondaddgenerator(mschreier **gp, mpermnode **gens, int *p, int n);
-extern boolean mexpandschreier(mschreier *gp, mpermnode **gens, int n);
-extern int *mgetorbits(int *fix, int nfix,
-                      mschreier *gp, mpermnode **gens, int n);
-extern int mgetorbitsmin(int *fix, int nfix, mschreier *gp, mpermnode **gens,
-                        int **orbits, int *cell, int ncell, int n, boolean changed);
-extern void mpruneset(set *fixset, mschreier *gp, mpermnode **gens,
-                     set *x, int m, int n);
-extern void mnewgroup(mschreier **gp, mpermnode **gens, int n);
-extern void mschreier_freedyn(void);
-extern int mschreier_fails(int nfails);
-extern void mdumpschreier(FILE *f, mschreier *gp, mpermnode *gens, int n);
-extern int mschreier_gens(mpermnode *gens);
-extern void mdeleteunmarked(mpermnode **gens);
-extern void mgrouporder(int *fix, int nfix,  mschreier *gp, mpermnode **gens,
-                       double *grpsize1, int *grpsize2, int n);
-extern void mschreier_check(int wordsize, int m, int n, int version);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif //DEJAVU_SCHREIER_SHARED_H

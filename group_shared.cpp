@@ -8,7 +8,7 @@ group_shared::group_shared(int domain_size) {
 }
 
 void group_shared::initialize(int domain_size, bijection *base_points) {
-    mschreier_fails(-1);
+    shared_schreier_fails(-1);
     added = 0;
 
     _ack_done_shared_group = 0;
@@ -19,8 +19,8 @@ void group_shared::initialize(int domain_size, bijection *base_points) {
     b         = base_points->map;
     base_size = base_points->map_sz;
 
-    mnewgroup(&gp, &gens, domain_size);
-    mgetorbits(b, base_size, gp, &gens, domain_size);
+    shared_newgroup(&gp, &gens, domain_size);
+    shared_getorbits(b, base_size, gp, &gens, domain_size);
 }
 
 // master thread manages sifting results to determine abort criterion
@@ -76,7 +76,7 @@ void group_shared::manage_results(shared_workspace *switches) {
 group_shared::~group_shared() {
     delete[] b;
     delete[] dequeue_space;
-    mfreeschreier(&gp, &gens);
+    shared_freeschreier(&gp, &gens);
 }
 
 bool group_shared::add_permutation(bijection *p, int *idle_ms, bool *done) {
@@ -149,15 +149,15 @@ void group_shared::wait_for_ack_done_shared(int n, bool* escape) {
 void group_shared::print_group_size() {
     double grpsize1;
     int grpsize2;
-    mgrouporder(b, base_size, gp,&gens, &grpsize1, &grpsize2, domain_size);
+    shared_grouporder(b, base_size, gp, &gens, &grpsize1, &grpsize2, domain_size);
     std::cout << grpsize1 << " * 10^" << (grpsize2) << std::endl;
     //deleteunmarked(&gens);
-    std::cout << "Generators: " << mschreier_gens(gens) << std::endl;
+    std::cout << "Generators: " << shared_schreier_gens(gens) << std::endl;
 }
 
 int group_shared::number_of_generators() {
     int k = 0;
-    mpermnode *it = gens;
+    shared_permnode *it = gens;
     if(it == NULL)
         return k;
     do {

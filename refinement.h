@@ -110,7 +110,7 @@ private:
 };
 
 
-class alignas(64) work_set_int {
+class alignas(16) work_set_int {
 public:
     void initialize(int size);
     void initialize_from_array(int* arr, int size);
@@ -128,7 +128,7 @@ private:
     int   sz;
 };
 
-class alignas(64) work_set_char {
+class alignas(16) work_set_char {
 public:
     void initialize(int size);
     void set(int index, char value);

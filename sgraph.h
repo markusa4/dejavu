@@ -5,7 +5,7 @@
 #include "bijection.h"
 #include "coloring.h"
 
-class alignas(64) sgraph {
+class alignas(16) sgraph {
     struct vertexComparator {
         vertexComparator(const sgraph& g) : g(g) {}
         const sgraph& g;

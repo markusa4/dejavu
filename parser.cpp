@@ -22,7 +22,7 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph* g) {
         std::istringstream iss(line);
         if(line.empty())
             break;
-        switch (first) {
+        switch(first) {
             case true:
                 iss >> nv >> ne;
                 g->v = new int[nv];
@@ -39,8 +39,6 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph* g) {
                 incidence_list[nv1].push_back(nv2);
                 incidence_list[nv2].push_back(nv1);
                 break;
-            default:
-                break;
         }
     }
 
@@ -49,14 +47,14 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph* g) {
 
     int maxd = 0;
 
-    for(int i = 0; i < incidence_list.size(); ++i) {
+    for(size_t i = 0; i < incidence_list.size(); ++i) {
         g->v[vpos] = epos;
         g->d[vpos] = incidence_list[i].size();
         degrees.insert(g->d[vpos]);
         if(g->d[vpos] > maxd)
             maxd = g->d[vpos];
         vpos += 1;
-        for(int j = 0; j < incidence_list[i].size(); ++j) {
+        for(size_t j = 0; j < incidence_list[i].size(); ++j) {
             g->e[epos] = incidence_list[i][j];
             epos += 1;
         }
@@ -120,14 +118,14 @@ void parser::parse_dimacs_file(std::string filename, sgraph* g) {
 
     int maxd = 0;
 
-    for(int i = 0; i < incidence_list.size(); ++i) {
+    for(size_t i = 0; i < incidence_list.size(); ++i) {
         g->v[vpos] = epos;
         g->d[vpos] = incidence_list[i].size();
         degrees.insert(g->d[vpos]);
         if(g->d[vpos] > maxd)
             maxd = g->d[vpos];
         vpos += 1;
-        for(int j = 0; j < incidence_list[i].size(); ++j) {
+        for(size_t j = 0; j < incidence_list[i].size(); ++j) {
             g->e[epos] = incidence_list[i][j];
             epos += 1;
         }
@@ -191,13 +189,13 @@ void parser::parse_dimacs_file_digraph(std::string filename, sgraph* g) {
 
     int maxd = 0;
 
-    for(int i = 0; i < incidence_list.size(); ++i) {
+    for(size_t i = 0; i < incidence_list.size(); ++i) {
         g->v[vpos] = epos;
         g->d[vpos] = incidence_list[i].size();
         if(g->d[vpos] > maxd)
             maxd = g->d[vpos];
         vpos += 1;
-        for(int j = 0; j < incidence_list[i].size(); ++j) {
+        for(size_t j = 0; j < incidence_list[i].size(); ++j) {
             g->e[epos] = incidence_list[i][j];
             epos += 1;
         }
