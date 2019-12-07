@@ -18,7 +18,7 @@ public:
     void read_from_coloring(coloring *c);
     void compose(bijection* p);
     void inverse();
-    static void random_bijection(bijection* p, int n);
+    static void random_bijection(bijection* p, int n, unsigned seed);
 
     void print();
     void not_deletable();

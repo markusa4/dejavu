@@ -62,14 +62,13 @@ bijection::~bijection() {
         delete[] map;
 }
 
-void bijection::random_bijection(bijection* p, int n) {
+void bijection::random_bijection(bijection* p, int n, unsigned seed) {
     p->map = new int[n];
     p->init = true;
     p->map_sz = n;
     for(int i = 0; i < n; ++i) {
         p->map[i] = i;
     }
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::default_random_engine re = std::default_random_engine(seed);
     std::shuffle(p->map, p->map + p->map_sz, re);
 }

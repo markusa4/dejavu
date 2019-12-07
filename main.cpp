@@ -145,6 +145,8 @@ int commandline_mode(int argc, char **argv) {
     bool comp_nauty = true;
     bool comp_traces = true;
     bool comp_dejavu = true;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    bool permute_graph = false;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
@@ -160,6 +162,7 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }
+
         if (arg == "--STAT_FILE") {
             if (i + 1 < argc) {
                 i++;
@@ -203,12 +206,18 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }
-        if (arg == "--IR_CELL_SELECTOR") {
+
+        if (arg == "--PERMUTE") {
+            permute_graph = true;
+        }
+
+        if (arg == "--PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_IR_CELL_SELECTOR = atoi(argv[i]);
+                permute_graph = true;
+                seed = atoi(argv[i]);
             } else {
-                std::cerr << "--ir_cell_selector option requires one argument." << std::endl;
+                std::cerr << "--permute_seed option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -235,13 +244,16 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "Parsing " << filename << "..." << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     p.parse_dimacs_file(filename, g);
-    //sleep(1);
-    std::cout << "Permuting graph..." << std::endl;
-    sgraph _g;
-    bijection pr;
-    bijection::random_bijection(&pr, g->v_size);
-    g->permute_graph(&_g, &pr); // permute graph
-    delete g;
+    sgraph *_g = new sgraph;
+    if(permute_graph) {
+        std::cout << "Permuting graph..." << std::endl;
+        bijection pr;
+        bijection::random_bijection(&pr, g->v_size, seed);
+        g->permute_graph(_g, &pr); // permute graph
+        delete g;
+    } else {
+        _g = g;
+    }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
@@ -250,11 +262,10 @@ int commandline_mode(int argc, char **argv) {
 
     if(comp_dejavu) {
         finished = false;
-        std::thread bench(bench_dejavu, &_g, &dejavu_solve_time);
+        std::thread bench(bench_dejavu, _g, &dejavu_solve_time);
         Clock::time_point start = Clock::now();
         while(!finished) {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            //std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0 << ", " << timeout * 1000.0 << std::endl;
             if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
                 std::cout << "Killing" << std::endl;
                 dejavu_kill_request = 1;
@@ -273,12 +284,11 @@ int commandline_mode(int argc, char **argv) {
     if(comp_nauty) {
         finished = false;
         nauty_kill_request = 0;
-        std::thread bench(bench_nauty, &_g, &nauty_solve_time);
+        std::thread bench(bench_nauty, _g, &nauty_solve_time);
         //bench_nauty(&_g, &nauty_solve_time);
         Clock::time_point start = Clock::now();
         while(!finished) {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            //std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0 << ", " << timeout * 1000.0 << std::endl;
             if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
                 std::cout << "Killing" << std::endl;
                 nauty_kill_request = 1;
@@ -297,11 +307,10 @@ int commandline_mode(int argc, char **argv) {
         finished = false;
         nauty_kill_request = 0;
         //bench_traces(&_g, &traces_solve_time);
-        std::thread bench(bench_traces, &_g, &traces_solve_time);
+        std::thread bench(bench_traces, _g, &traces_solve_time);
         Clock::time_point start = Clock::now();
         while(!finished) {
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            //std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0 << ", " << timeout * 1000.0 << std::endl;
             if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
                 std::cout << "Killing" << std::endl;
                 nauty_kill_request = 1;
@@ -319,7 +328,7 @@ int commandline_mode(int argc, char **argv) {
         stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
 
         std::cout << "Appending to " << stat_filename << ".\n";
-        stat_file << filename << " " << _g.v_size << " ";
+        stat_file << filename << " " << _g->v_size << " ";
         if(comp_dejavu)
             stat_file << dejavu_solve_time / 1000000.0 << " ";
         if(comp_nauty)
@@ -330,6 +339,8 @@ int commandline_mode(int argc, char **argv) {
         stat_file.close();
     }
 
+    delete _g;
+
     return 0;
 }
 
@@ -338,17 +349,17 @@ int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
-    // return commandline_mode(argc, argv);
+     return commandline_mode(argc, argv);
 
     // parse a sgraph
     parser p;
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-10000.bliss", &g);
+      // p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-50000.bliss", &g);
        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
      //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
+      // p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/tran/tran/tran_56832_255744.bliss", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cmz/cmz-50", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/hypercubes/17cube.bliss", &g);
@@ -360,9 +371,9 @@ int main(int argc, char *argv[]) {
        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cfi/cfi/cfi-200", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/paley/paley/paley-461", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts-sw/sts-sw/sts-sw-79-11", &g);
-        p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
+     //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/sts/sts/sts-67", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-1", &g);
-      //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-44-11", &g);
+      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-44-11", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-88", &g);
     //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
@@ -371,22 +382,24 @@ int main(int argc, char *argv[]) {
     //p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/32768.bliss", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg32768.bliss", &g);
         // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/pp/pp/pp-25-170", &g);
-     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
-        //p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
+     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/ranreg/ranreg/Ranreg131072.bliss", &g);
+        // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin-sw/latin-sw/latin-sw-30-5", &g);
    // p.parse_dimacs_file("/home/markus/Downloads/graphs/cfi-rigid-t2-tar/cfi-rigid-t2/cfi-rigid-t2-0576-04-1", &g); // <- significantly faster here!
-     //  p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_a.bliss", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);
+        // p.parse_dimacs_file("/home/markus/Downloads/graphs/ran2/ran2/ran2_5000_e.bliss", &g);
+     // p.parse_dimacs_file("/home/markus/Downloads/graphs/ran10/ran10/ran10_5000_a.bliss", &g);
+       // p.parse_dimacs_file("/home/markus/Downloads/graphs/ransq/ransq/ransq_10000_a.bliss", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/hypercubes/18cube.bliss", &g);
-    //  p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pipe/7pipe.bliss", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/pipe/7pipe.bliss", &g);
      //  p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/hole12.bliss", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/pret150_25_ms.bliss", &g); // smallest is crazy here...
        // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/s4-4-3-9.bliss", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/fpga11_20.bliss", &g);
+     // p.parse_dimacs_file("/home/markus/Downloads/graphs/dac/dac/other/fpga11_20.bliss", &g);
 
     std::cout << "Permuting graph---------------------------------------------------" << std::endl;
     sgraph _g;
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bijection pr;
-    bijection::random_bijection(&pr, g.v_size);
+    bijection::random_bijection(&pr, g.v_size, seed);
     g.permute_graph(&_g, &pr); // permute graph
     //sgraph backup_graph;
     //backup_graph.copy_graph(&_g);
@@ -420,17 +433,7 @@ int main(int argc, char *argv[]) {
     double traces_solve_time;
     finished = false;
     nauty_kill_request = 0;
-    std::thread bench(bench_traces, &_g, &traces_solve_time);
-    Clock::time_point start = Clock::now();
-    while(!finished) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        //std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0 << ", " << timeout * 1000.0 << std::endl;
-        if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > 100 * 1000.0) {
-            std::cout << "Killing" << std::endl;
-            nauty_kill_request = 1;
-        }
-    }
-    bench.join();
+    bench_traces(&_g, &traces_solve_time);
 
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 

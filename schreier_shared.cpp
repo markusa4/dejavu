@@ -213,7 +213,6 @@ bool
 shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n) {
     filterstate state;
     mfilterschreier_interval(*gp, p, gens, false, n + 1, n, 0, 10, &state);
-    assert(test);
     return mfilterschreier_interval(*gp, p, gens, false, n + 1, n, 11, n + 1, &state);
 }
 
