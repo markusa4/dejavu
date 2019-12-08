@@ -24,6 +24,6 @@ struct configstruct {
 };
 
 extern configstruct config;
-extern int dejavu_kill_request;
+extern volatile int dejavu_kill_request;
 
 #endif //DEJAVU_CONFIGURATION_H

@@ -18,9 +18,20 @@ typedef std::chrono::high_resolution_clock Clock;
 class time_point;
 
 configstruct config;
-int dejavu_kill_request = 0;
+volatile int dejavu_kill_request = 0;
 
 bool finished = false;
+
+void kill_thread(volatile int* kill_switch, int timeout) {
+    Clock::time_point start = Clock::now();
+    while(!finished) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
+            std::cout << "Killing" << std::endl;
+            *kill_switch = 1;
+        }
+    }
+}
 
 void bench_nauty(sgraph *g, double* nauty_solve_time) {
     //TracesStats stats;
@@ -62,6 +73,14 @@ void bench_nauty(sgraph *g, double* nauty_solve_time) {
         sg.e[i] = g->e[i];
     }
 
+    // touch the graph (mitigate cache variance
+    int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += sg.v[i] + sg.d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += sg.e[i];
+    }
     Clock::time_point timer = Clock::now();
 
     sparsenauty(&sg, lab, ptn, orbits, &options, &stats, NULL);
@@ -75,6 +94,15 @@ void bench_nauty(sgraph *g, double* nauty_solve_time) {
 
 
 void bench_dejavu(sgraph *g, double* dejavu_solve_time) {
+    // touch the graph (mitigate cache variance)
+    int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += g->v[i] + g->d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += g->e[i];
+    }
+
     Clock::time_point timer = Clock::now();
     dejavu d;
     d.automorphisms(g, nullptr);
@@ -123,6 +151,14 @@ void bench_traces(sgraph *g, double* traces_solve_time) {
         sg.e[i] = g->e[i];
     }
 
+    // touch the graph (mitigate cache variance
+    int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += sg.v[i] + sg.d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += sg.e[i];
+    }
     Clock::time_point timer = Clock::now();
 
     //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
@@ -242,7 +278,6 @@ int commandline_mode(int argc, char **argv) {
     sgraph *g = new sgraph;
    // p.parse_dimacs_file_digraph(filename, g);
     std::cout << "Parsing " << filename << "..." << std::endl;
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     p.parse_dimacs_file(filename, g);
     sgraph *_g = new sgraph;
     if(permute_graph) {
@@ -262,16 +297,12 @@ int commandline_mode(int argc, char **argv) {
 
     if(comp_dejavu) {
         finished = false;
-        std::thread bench(bench_dejavu, _g, &dejavu_solve_time);
-        Clock::time_point start = Clock::now();
-        while(!finished) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
-                std::cout << "Killing" << std::endl;
-                dejavu_kill_request = 1;
-            }
-        }
-        bench.join();
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
+        bench_dejavu(_g, &dejavu_solve_time);
+        if(timeout > 0)
+            killer.join();
     }
 
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
@@ -284,17 +315,12 @@ int commandline_mode(int argc, char **argv) {
     if(comp_nauty) {
         finished = false;
         nauty_kill_request = 0;
-        std::thread bench(bench_nauty, _g, &nauty_solve_time);
-        //bench_nauty(&_g, &nauty_solve_time);
-        Clock::time_point start = Clock::now();
-        while(!finished) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
-                std::cout << "Killing" << std::endl;
-                nauty_kill_request = 1;
-            }
-        }
-        bench.join();
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &nauty_kill_request, timeout);
+        bench_nauty(_g, &nauty_solve_time);
+        if(timeout > 0)
+            killer.join();
     }
     std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -306,17 +332,12 @@ int commandline_mode(int argc, char **argv) {
     if(comp_traces) {
         finished = false;
         nauty_kill_request = 0;
-        //bench_traces(&_g, &traces_solve_time);
-        std::thread bench(bench_traces, _g, &traces_solve_time);
-        Clock::time_point start = Clock::now();
-        while(!finished) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
-            if(((std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - start).count()) / 1000000.0) > timeout * 1000.0) {
-                std::cout << "Killing" << std::endl;
-                nauty_kill_request = 1;
-            }
-        }
-        bench.join();
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &nauty_kill_request, timeout);
+        bench_traces(_g, &traces_solve_time);
+        if(timeout > 0)
+            killer.join();
     }
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
@@ -356,9 +377,9 @@ int main(int argc, char *argv[]) {
     sgraph g;
     //p.parse_dimacs_file(argv[1], &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/rantree/rantree/rantree-50000.bliss", &g);
-       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-30", &g);
+        p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/lattice/lattice/lattice-22", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/grid/grid/grid-3-20", &g);
-     //   p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k2500.dimacs", &g);
+       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/k/k/k-10", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/combinatorial/combinatorial/FTWKB11.bliss", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/tran/tran/tran_56832_255744.bliss", &g);
      // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/cmz/cmz-50", &g);
@@ -375,7 +396,7 @@ int main(int argc, char *argv[]) {
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-32-1", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had-sw/had-sw/had-sw-44-11", &g);
       // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-156", &g);
-    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-88", &g);
+    // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/had/had/had-112", &g);
     //p.parse_dimacs_file_digraph("/home/markus/Downloads/graphs/rnd-3-reg_cfi/rnd-3-reg-4000-2", &g);
     // p.parse_dimacs_file("/home/markus/Downloads/graphs/undirected_dim/undirected_dim/latin/latin/latin-30", &g); // skiplevels / base_size thing
      // p.parse_dimacs_file_g("/home/markus/Downloads/graphssaucy/states/AS.g", &g);
@@ -408,14 +429,18 @@ int main(int argc, char *argv[]) {
     int repeat = 1;
     double avg = 0;
     Clock::time_point timer;
-    for (int i = 0; i < repeat; ++i) {
+
+    std::thread bench = std::thread(bench_dejavu, &g, &avg);
+    bench.join();
+
+    /*for (int i = 0; i < repeat; ++i) {
         timer = Clock::now();
         dejavu d;
         d.automorphisms(&_g, nullptr);
         double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
         avg += solve_time;
         std::cout << "Solve time: " << solve_time / 1000000.0 << "ms" << std::endl;
-    }
+    }*/
     std::cout << "Avg solve time: " << avg / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "nauty" << std::endl;

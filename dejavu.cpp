@@ -1164,7 +1164,7 @@ void dejavu::bfs_fill_queue(dejavu_workspace* w) {
 void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, group_shared* G, coloring* start_c, strategy* canon_strategy,
                            int communicator_id, int** shared_orbit, int** shared_orbit_weights, bfs_workspace* bwork, shared_permnode** gens, int* shared_group_size) {
     // find comparison leaf
-    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+    //std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     sgraph *g = g_;
     dejavu_workspace W;
 
@@ -1211,8 +1211,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
         W.start_c = start_c;
         //start_I.create_vector();
         W.R.refine_coloring_first(g, start_c, -1);
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - timer).count());
+        //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+        //        std::chrono::high_resolution_clock::now() - timer).count());
         PRINT("[G] First refinement: " << cref / 1000000.0 << "ms");
 
         int init_c = W.S.select_color(g, start_c, selector_seed);
@@ -1251,8 +1251,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             work_threads.emplace_back(
                     std::thread(&dejavu::worker_thread, dejavu(), g, false, switches, G, start_c,
                                 canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens, &_shared_group_size));
-        cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::high_resolution_clock::now() - timer).count());
+        //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+        //        std::chrono::high_resolution_clock::now() - timer).count());
         PRINT("[G] Refinement workers created: " << cref / 1000000.0 << "ms");
 
         // set some workspace variables
@@ -1411,9 +1411,9 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     std::cout << "Group size: ";
                     G->print_group_size();
 
-                    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::high_resolution_clock::now() - timer).count());
+                    //std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+                    //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    //        std::chrono::high_resolution_clock::now() - timer).count());
                     std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
                 } else {
                     while (!work_threads.empty()) {
@@ -1713,7 +1713,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     if(switches->done_shared_group && W.BW->target_level >= 0) {
                         if(master && !switched1) {
                             switched1 = true;
-                            cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+                            //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
                             PRINT("[NUni] Finished non-uniform automorphism search (" << *W.shared_generators_size << " generators, " << n_restarts << " restarts)")
                             PRINT("[NUni] Ended in skiplevel " << W.skiplevels << ", found " << n_found)
                             PRINT("[NUni] " << cref / 1000000.0 << "ms")
@@ -1768,8 +1768,8 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                 reset_non_uniform_switch = true;
                 if(W.id == 0 && !switched2) {
                     switched2 = true;
-                    cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            std::chrono::high_resolution_clock::now() - timer).count());
+                    //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    //        std::chrono::high_resolution_clock::now() - timer).count());
                     PRINT("[Uni] " << cref / 1000000.0 << "ms")
                 }
                 A = uniform_from_bfs_search(&W, g, true, canon_strategy, &automorphism, &restarts, switches,
