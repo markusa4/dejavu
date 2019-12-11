@@ -68,10 +68,6 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph* g) {
 
     std::cout << "Vertices: \t" << g->v_size << std::endl;
     std::cout << "Edges: \t\t" << g->e_size << std::endl;
-    std::cout << "Degrees: \t";
-    for(auto it = degrees.begin(); it != degrees.end(); ++it)
-        std::cout << *it << ", ";
-    std::cout << std::endl;
 
     assert(nv == g->v_size);
     assert(nv == g->d_size);

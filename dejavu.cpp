@@ -1400,20 +1400,27 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             if(switches->done) {
                 if(!dejavu_kill_request) {
                     std::cout << "Base size:  " << G->base_size << std::endl;
-
-                    //while(!switches->ack_done()) continue;
-
                     while (!work_threads.empty()) {
                         work_threads[work_threads.size() - 1].join();
                         work_threads.pop_back();
                     }
-                    // std::cout << "Abort map prune: " << W.BW->abort_map_prune << std::endl;
                     std::cout << "Group size: ";
                     G->print_group_size();
 
-                    //std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-                    //cref = (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    //        std::chrono::high_resolution_clock::now() - timer).count());
+                    if(config.CONFIG_WRITE_AUTOMORPHISMS) {
+                        std::cout << "Generators: " << std::endl;
+                        shared_permnode *it = G->gens;
+                        if(it != nullptr) {
+                            do {
+                                for (int i = 0; i < g->v_size; ++i) {
+                                    std::cout << it->p[i] << " ";
+                                }
+                                std::cout << std::endl;
+                                it = it->next;
+                            } while (it != G->gens);
+                        }
+                    }
+
                     std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
                 } else {
                     while (!work_threads.empty()) {
