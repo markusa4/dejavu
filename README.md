@@ -30,5 +30,3 @@ Command Line Argument | Effect
 `--no_traces` | does not run Traces
 `--no_dejavu` | does not run dejavu
 `--stat_file` | specify a file to which measurements shall be written
-
-# API
