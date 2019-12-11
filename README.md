@@ -23,6 +23,7 @@ Command Line Argument | Effect
 
 ## bench
 `bench` understands the same command line arguments, with the addition of the following: 
+
 Command Line Argument | Effect
 --- | ---
 `--no_nauty` | does not run nauty
