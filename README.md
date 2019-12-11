@@ -11,3 +11,4 @@ The solver only accepts files in the DIMACS graph format.
 
 ## bench
 
+# API
