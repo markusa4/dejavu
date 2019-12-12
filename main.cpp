@@ -2,12 +2,6 @@
 #include "parser.h"
 #include "dejavu.h"
 #include <assert.h>
-
-extern "C" {
-#include "nauty/traces.h"
-}
-
-#include "nauty/naugroup.h"
 #include "configuration.h"
 #include <chrono>
 #include <string>
