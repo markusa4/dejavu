@@ -3,7 +3,7 @@ The implementation has binary dependencies to nauty. The easiest way to compile 
 
 The solver itself technically only depends on "nauty.h" and "naurng.h", utilizing some of the included data structures and randomization functions. The distribution does however also include the benchmark code used for the benchmarks of the paper, which call nauty and Traces.
 
-After placing nauty and Traces into the respective folder, the project can by simply running cmake.
+After placing nauty and Traces into the respective folder, the project can be compiled by simply running cmake.
 
 # Usage
 Compilation produces two binaries (dejavu and bench), which are however similar in usage. dejavu is the binary of the actual solver. bench is basically just a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
