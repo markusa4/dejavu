@@ -14,7 +14,7 @@ The solver only accepts files in the DIMACS graph format. The solver accepts the
 Command Line Argument | Effect
 --- | ---
 `--file` | specifies the graph input file in DIMACS format
-`--threads` | specifies the amount of additional threads used (total is threads + 1)
+`--threads` | specifies the amount of additional threads used (total is threads + 1, default is 0)
 `--write_auto` | writes all of the generators of the found automorphism group
 `--timeout` | specifies a timeout (in seconds)
 `--force_selector` | forces a specific cell selector (0 is first, 1 is smallest, 2 is largest)
