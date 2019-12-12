@@ -73,17 +73,13 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
     while(!cell_todo.empty()) {
         its += 1;
         color_class_splits.reset();
+        // actually, saving size in cell_todo is unnecessary...
         std::pair<int, int> next_color_class = cell_todo.next_cell(&queue_pointer);
 
         if(m)
             m->color_refinement_cost += next_color_class.second;
 
-        // write color class and size to invariant
-        //comp = comp && I->write_top_and_compare(next_color_class.first + next_color_class.second * g->v_size);
-        //if(!comp)
-
         bool dense_dense = (g->d[c->lab[next_color_class.first]] > (g->v_size / (next_color_class.second + 1)));
-
 
         if(next_color_class.second == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
             // singleton
@@ -119,7 +115,6 @@ bool refinement::refine_coloring(sgraph *g, coloring *c, change_tracker *changes
 
         // add all new classes except for the first, largest one
         int skip = 0;
-        //for(auto cc = color_class_splits.begin(); cc != color_class_splits.end(); ++cc) {
 
         int  latest_old_class = -1;
         bool skipped_largest = false;

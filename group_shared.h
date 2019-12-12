@@ -32,6 +32,8 @@ public:
     int non_uniform_abort_counter = 0;
     int gens_added = 0;
 
+    bool generators_persistent = false;
+
     shared_schreier *gp;
     shared_permnode *gens;
 

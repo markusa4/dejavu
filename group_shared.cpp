@@ -76,7 +76,11 @@ void group_shared::manage_results(shared_workspace *switches) {
 group_shared::~group_shared() {
     delete[] b;
     delete[] dequeue_space;
-    shared_freeschreier(&gp, &gens);
+    if(generators_persistent) {
+        shared_freeschreier(&gp, nullptr);
+    } else {
+        shared_freeschreier(&gp, &gens);
+    }
 }
 
 bool group_shared::add_permutation(bijection *p, int *idle_ms, bool *done) {
