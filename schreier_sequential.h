@@ -5,9 +5,6 @@
 #ifndef DEJAVU_SCHREIER_SEQUENTIAL_H
 #define DEJAVU_SCHREIER_SEQUENTIAL_H
 
-#include "nauty/nauty.h"
-#include "nauty/naurng.h"
-
 typedef struct sequential_permnodestruct {
     struct sequential_permnodestruct *prev,*next;
     unsigned long refcount;

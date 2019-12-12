@@ -12,7 +12,6 @@ add_custom_target(nauty_target
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/nauty
         )
 
-add_executable(dejavu schreier_sequential.cpp group_shared.cpp utility.cpp main.cpp sgraph.cpp sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h ${source_list})
-add_executable(bench schreier_sequential.cpp group_shared.cpp utility.cpp bench.cpp sgraph.cpp sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h ${source_list})
-add_dependencies(dejavu nauty_target)
+add_executable(dejavu schreier_sequential.cpp group_shared.cpp utility.cpp main.cpp sgraph.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h ${source_list})
+add_executable(bench schreier_sequential.cpp group_shared.cpp utility.cpp bench.cpp sgraph.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h ${source_list} naudefs.h)
 add_dependencies(bench nauty_target)

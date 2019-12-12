@@ -8,8 +8,6 @@
 
 #include <mutex>
 #include <atomic>
-#include "nauty/nauty.h"
-#include "nauty/naurng.h"
 
 #define DYNALL(type,name,name_sz) \
 	type *name = NULL; size_t name_sz=0;

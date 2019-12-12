@@ -8,6 +8,8 @@
  */
 
 #include "schreier_sequential.h"
+#include "naurng.h"
+#include "naudefs.h"
 
 static sequential_permnode id_permnode;
 #define ID_PERMNODE (&id_permnode)
@@ -90,7 +92,6 @@ static sequential_permnode *_newpermnode(int n) {
 
     if (p == NULL)
     {
-        fprintf(ERRFILE,">E malloc failed in newpermnode()\n");
         exit(1);
     }
 
@@ -128,7 +129,6 @@ static sequential_schreier *_newschreier(int n) {
 
     if (sh == NULL)
     {
-        fprintf(ERRFILE,">E malloc failed in newschreier()\n");
         exit(1);
     }
 
@@ -139,7 +139,6 @@ static sequential_schreier *_newschreier(int n) {
 
     if (sh->vec == NULL || sh->pwr == NULL || sh->orbits == NULL || sh->orbits_sz == NULL)
     {
-        fprintf(ERRFILE,">E malloc failed in newschreier()\n");
         exit(1);
     }
 

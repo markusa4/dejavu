@@ -9,17 +9,21 @@
 
 #include <assert.h>
 #include <iostream>
+#include <cstdint>
+#include <cstring>
 #include <mutex>
 #include "schreier_shared.h"
+#include "naurng.h"
+#include "naudefs.h"
 
 char pad1[128];
 std::mutex circ_mutex;
 char pad2[128];
 
 static shared_permnode id_permnode;
-#define ID_PERMNODE (&id_permnode)
-static shared_schreier *mschreier_freelist = NULL;
-static shared_permnode *mpermnode_freelist = NULL;
+
+static shared_schreier *mschreier_freelist = nullptr;
+static shared_permnode *mpermnode_freelist = nullptr;
 static int mschreierfails = SCHREIERFAILS;
 
 /************************************************************************/
@@ -50,7 +54,7 @@ static void mclearfreelists(void) {
         free(sh->orbits);
         free(sh);
     }
-    mschreier_freelist = NULL;
+    mschreier_freelist = nullptr;
 
     nextp = mpermnode_freelist;
     while (nextp) {
@@ -58,7 +62,7 @@ static void mclearfreelists(void) {
         nextp = p->next;
         free(p);
     }
-    mpermnode_freelist = NULL;
+    mpermnode_freelist = nullptr;
 }
 
 /************************************************************************/
@@ -67,12 +71,11 @@ static shared_permnode *mnewpermnode(int n) {
     shared_permnode *p;
     p = (shared_permnode *) malloc(sizeof(shared_permnode) + (n - 2) * sizeof(int));
 
-    if (p == NULL) {
-        fprintf(ERRFILE, ">E malloc failed in newpermnode()\n");
+    if (p == nullptr) {
         exit(1);
     }
 
-    p->next = p->prev = NULL;
+    p->next = p->prev = nullptr;
     p->nalloc = n;
 
     return p;
@@ -87,7 +90,7 @@ static shared_schreier *mnewschreier(int n) {
         sh = mschreier_freelist;
         mschreier_freelist = sh->next;
         if (sh->nalloc >= n && sh->nalloc <= n + 100) {
-            sh->next = NULL;
+            sh->next = nullptr;
             return sh;
         } else {
             free(sh->vec);
@@ -99,8 +102,7 @@ static shared_schreier *mnewschreier(int n) {
 
     sh = (shared_schreier *) malloc(sizeof(shared_schreier));
 
-    if (sh == NULL) {
-        fprintf(ERRFILE, ">E malloc failed in newschreier()\n");
+    if (sh == nullptr) {
         exit(1);
     }
 
@@ -113,12 +115,11 @@ static shared_schreier *mnewschreier(int n) {
 
     sh->level_lock = new std::mutex;
 
-    if (sh->vec == NULL || sh->pwr == NULL || sh->orbits == NULL) {
-        fprintf(ERRFILE, ">E malloc failed in newschreier()\n");
+    if (sh->vec == nullptr || sh->pwr == nullptr || sh->orbits == nullptr) {
         exit(1);
     }
 
-    sh->next = NULL;
+    sh->next = nullptr;
     sh->nalloc = n;
 
     return sh;
@@ -139,7 +140,7 @@ shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
             sh->next = mschreier_freelist;
             mschreier_freelist = sh;
         }
-        *gp = NULL;
+        *gp = nullptr;
     }
 
     if (gens && *gens) {
@@ -150,7 +151,7 @@ shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
             mpermnode_freelist = p;
             p = nextp;
         } while (p != *gens);
-        *gens = NULL;
+        *gens = nullptr;
     }
 }
 
@@ -161,7 +162,7 @@ shared_findpermutation(shared_permnode *gens, int *p, int n) {
     shared_permnode *rn;
     int i;
 
-    if (!gens) return NULL;
+    if (!gens) return nullptr;
 
     rn = gens;
     do {
@@ -171,7 +172,7 @@ shared_findpermutation(shared_permnode *gens, int *p, int n) {
         rn = rn->next;
     } while (rn != gens);
 
-    return NULL;
+    return nullptr;
 }
 
 /************************************************************************/
@@ -181,7 +182,7 @@ shared_addpermutation(shared_permnode **ring, int *p, int n) {
     shared_permnode *pn, *rn;
 
     pn = mnewpermnode(n);
-    pn->next = NULL;
+    pn->next = nullptr;
 
     memcpy(pn->p, p, n * sizeof(int));
 
@@ -234,7 +235,7 @@ mdelpermnode(shared_permnode **ring) {
     if (!*ring) return;
 
     if ((*ring)->next == *ring)
-        newring = NULL;
+        newring = nullptr;
     else {
         newring = (*ring)->next;
         newring->prev = (*ring)->prev;
@@ -254,9 +255,9 @@ mdeleteunmarked(shared_permnode **ring) {
     shared_permnode *pn, *firstmarked;
 
     pn = *ring;
-    firstmarked = NULL;
+    firstmarked = nullptr;
 
-    while (pn != NULL && pn != firstmarked) {
+    while (pn != nullptr && pn != firstmarked) {
         if (pn->mark) {
             if (!firstmarked) firstmarked = pn;
             pn = pn->next;
@@ -282,7 +283,7 @@ mclearvector(shared_permnode **vec, shared_permnode **ring, int n) {
                     mdelpermnode(ring);
                 }
             }
-            vec[i] = NULL;
+            vec[i] = nullptr;
         }
 }
 
@@ -294,7 +295,7 @@ minitschreier(shared_schreier *sh, int n) {
 
     sh->fixed = -1;
     for (i = 0; i < n; ++i) {
-        sh->vec[i] = NULL;
+        sh->vec[i] = nullptr;
         sh->orbits[i] = i;
     }
 }
@@ -305,7 +306,7 @@ void
 shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n) {
     *gp = mnewschreier(n);
     minitschreier(*gp, n);
-    if (gens) *gens = NULL;
+    if (gens) *gens = nullptr;
 }
 
 /************************************************************************/
@@ -404,7 +405,7 @@ bool mfilterschreier(shared_schreier *gp, int *p, shared_permnode **ring, bool i
         ingroup = true;
         curr = *ring;
     } else
-        curr = NULL;
+        curr = nullptr;
 
 /* curr is the location of workperm in ring, if anywhere */
 
@@ -465,7 +466,7 @@ bool mfilterschreier(shared_schreier *gp, int *p, shared_permnode **ring, bool i
             while (j != sh->fixed) {
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                // ++mmultcount;
-                curr = NULL;
+                curr = nullptr;
                 j = mworkperm[sh->fixed];
             }
             sh = sh->next;
@@ -507,7 +508,7 @@ bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **rin
             ingroup = true;
             curr = *ring;
         } else
-            curr = NULL;
+            curr = nullptr;
 
         sh = gp;
         changed = false;
@@ -594,7 +595,7 @@ bool mfilterschreier_interval(shared_schreier *gp, int *p, shared_permnode **rin
             while (j != sh->fixed) {
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                 //++mmultcount;
-                curr = NULL;
+                curr = nullptr;
                 j = mworkperm[sh->fixed];
             }
             sh = sh->next;
@@ -667,7 +668,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
             ingroup = true;
             curr = *ring;
         } else
-            curr = NULL;
+            curr = nullptr;
 
         sh = gp;
         changed = false;
@@ -768,7 +769,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
             while (j != sh->fixed) {
                 mapplyperm(mworkperm, vec[j]->p, pwr[j], n);
                 //++mmultcount;
-                curr = NULL;
+                curr = nullptr;
                 j = mworkperm[sh->fixed];
             }
             sh = sh->next;
@@ -786,7 +787,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
         if (!ident && !ingroup) {
             std::cout << "should not happen" << std::endl;
             assert(false);
-            changed = TRUE;
+            changed = true;
             report_changed = changed;
             shared_addpermutation(ring, p, n);
         }
@@ -821,7 +822,7 @@ shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n) {
     shared_permnode *pn;
 
     pn = *gens;
-    if (pn == NULL) return false;
+    if (pn == nullptr) return false;
 
     DYNALL(int, mworkperm2, mworkperm2_sz);
     DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
@@ -839,8 +840,8 @@ shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n) {
             for (skips = KRAN(17); --skips >= 0;) pn = pn->next;
             for (i = 0; i < n; ++i) mworkperm2[i] = pn->p[mworkperm2[i]];
         }
-        if (mfilterschreier(gp, mworkperm2, gens, TRUE, -1, n)) {
-            changed = TRUE;
+        if (mfilterschreier(gp, mworkperm2, gens, true, -1, n)) {
+            changed = true;
             nfails = 0;
         } else
             ++nfails;
@@ -858,13 +859,13 @@ bool generate_random_element(shared_schreier *gp, shared_permnode **ring, int n,
 
     circ_mutex.lock();
     pn = *ring;
-    if (pn == NULL) {
+    if (pn == nullptr) {
         circ_mutex.unlock();
         return false;
     }
 
     DYNALL(int, mworkperm2, mworkperm2_sz);
-    mworkperm2 = NULL;
+    mworkperm2 = nullptr;
     DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
 
     element->perm    = mworkperm2;

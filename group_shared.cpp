@@ -91,14 +91,14 @@ bool group_shared::add_permutation(bijection *p, int *idle_ms, bool *done) {
     state.stype = p->non_uniform?SIFT_NON_UNIFORM:SIFT_UNIFORM;
     bool result;
     if(!p->foreign_base || base_size < 10) {
-        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
+        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? true : false), domain_size + 1,
                                              domain_size, state.level + 1, domain_size + 1,
                                              &state, domain_size + 1);
         sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
     } else {
         // finish sift, but return change according to sqrt(base) first levels
         // such that we can switch to more efficient base
-        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? TRUE : FALSE), domain_size + 1,
+        result = mfilterschreier_shared(gp, p->map, &gens, (state.ingroup ? true : false), domain_size + 1,
                                              domain_size, state.level + 1, sqrt(base_size + 1) + 1,
                                              &state, domain_size + 1);
     }
@@ -129,7 +129,7 @@ void group_shared::sift_random() {
         state.stype = SIFT_RANDOM;
         bool generated = generate_random_element(gp, &gens, domain_size, &re);
         if(!generated) break;
-        result = mfilterschreier_shared(gp, re.perm, &gens, TRUE, domain_size + 1,
+        result = mfilterschreier_shared(gp, re.perm, &gens, true, domain_size + 1,
                                             domain_size, state.level + 1, domain_size + 1,
                                             &state, domain_size + 1);
 
