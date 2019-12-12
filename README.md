@@ -1,7 +1,14 @@
 # Compilation
-The benchmark utility has binary dependencies to nauty. The easiest way to compile it is to place a configured and compiled distribution of nauty / Traces (available at http://pallini.di.uniroma1.it/) in "nauty/". After placing nauty and Traces into the respective folder, the project can be compiled with cmake. 
-
-If only the dejavu solver is to be compiled, the `bench` target can be ignored and the project will compile without any further dependencies.
+The benchmark utility has binary dependencies to nauty. The easiest way to compile it is to place a configured and compiled distribution of nauty / Traces (available at http://pallini.di.uniroma1.it/) in "nauty/". After placing nauty and Traces into the respective folder, the project can be compiled with cmake:
+```
+cmake -DBENCH=1 --build "."
+make 
+```
+If only the dejavu solver is to be compiled, the `bench` target can be ignored and the project will compile without any further dependencies:
+```
+cmake .
+make 
+```
 
 # Usage
 Compilation produces two binaries (`dejavu` and `bench`), which are however similar in usage. dejavu is the binary of the actual solver. bench is basically just a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
