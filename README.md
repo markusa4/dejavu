@@ -32,10 +32,10 @@ Command Line Argument | Effect
 `--stat_file` | specify a file to which measurements shall be written
 
 # API
-By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used like this:
+By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `automorphisms`:
 ```cpp
 shared_permnode* gens;
 dejavu d;
-d.automorphisms(g, &gens);
+d.automorphisms(&g, &gens);
 ```
 Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (similar to the commandline arguments).
