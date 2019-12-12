@@ -30,3 +30,12 @@ Command Line Argument | Effect
 `--no_traces` | does not run Traces
 `--no_dejavu` | does not run dejavu
 `--stat_file` | specify a file to which measurements shall be written
+
+# API
+By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used like this:
+```cpp
+shared_permnode* gens;
+dejavu d;
+d.automorphisms(g, &gens);
+```
+Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (similar to the commandline arguments).
