@@ -13,5 +13,7 @@ add_custom_target(nauty_target
         )
 
 add_executable(dejavu schreier_sequential.cpp group_shared.cpp utility.cpp main.cpp sgraph.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.cpp bfs.h lowdeg.cpp lowdeg.h)
-add_executable(bench schreier_sequential.cpp group_shared.cpp utility.cpp bench.cpp sgraph.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.cpp bfs.h lowdeg.cpp lowdeg.h ${source_list} naudefs.h)
-add_dependencies(bench nauty_target)
+if (DEFINED BENCH)
+	add_executable(bench schreier_sequential.cpp group_shared.cpp utility.cpp bench.cpp sgraph.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.cpp selector.h coloring.cpp coloring.h parser.cpp parser.h bijection.cpp bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.cpp bfs.h lowdeg.cpp lowdeg.h ${source_list} naudefs.h)
+	add_dependencies(bench nauty_target)
+endif ()
