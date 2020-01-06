@@ -4,7 +4,7 @@
 
 #include <vector>
 
-class coloring {
+class alignas(16) coloring {
 public:
     void copy(coloring* c);
     int* bulk_alloc;

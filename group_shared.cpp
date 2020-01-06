@@ -132,11 +132,9 @@ void group_shared::sift_random() {
         result = mfilterschreier_shared(gp, re.perm, &gens, true, domain_size + 1,
                                             domain_size, state.level + 1, domain_size + 1,
                                             &state, domain_size + 1);
-
         if(result && result_buffer < 2) {
             result_buffer++;
         }
-        delete[] re.perm;
     }
 }
 

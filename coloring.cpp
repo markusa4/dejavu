@@ -54,8 +54,12 @@ void coloring::copy(coloring *c) {
             init = false;
         } else {
             cells = c->cells;
-            memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
-            memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz*sizeof(int));
+            if(!efficient_alloc || !c->efficient_alloc) {
+                memcpy(ptn, c->ptn, c->ptn_sz * sizeof(int));
+                memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(int));
+            } else {
+                memcpy(ptn, c->ptn, 2 * c->ptn_sz * sizeof(int));
+            }
             return;
         }
     }

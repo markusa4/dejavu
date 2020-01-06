@@ -1,20 +1,13 @@
 #ifndef DEJAVU_REFINEMENT_H
 #define DEJAVU_REFINEMENT_H
 
-
-#include <queue>
-#include <set>
 #include "coloring.h"
 #include "sgraph.h"
 #include "invariant.h"
 #include "utility.h"
 #include <list>
 #include <iostream>
-#include <bitset>
-#include <mutex>
 #include <cstring>
-
-static std::mutex malloc_lock;
 
 class mark_set {
     int mark = 0;
@@ -46,6 +39,9 @@ public:
         s[pos] = mark - 1;
     }
     void reset() {
+        if(mark == -1) {
+            memset(s, mark, sz * sizeof(int));
+        }
         ++mark;
     }
     ~mark_set() {
@@ -77,7 +73,6 @@ public:
     bool get(int index);
     void reset();
     ~work_set();
-    // std::bitset< s;
     void reset_hard();
     void set_nr(int index);
     void unset(int index);
@@ -145,24 +140,6 @@ private:
     int   sz;
 };
 
-class work_list_pair {
-public:
-    void initialize(int size);
-    void push_back(std::pair<int, int> value);
-    std::pair<int, int>* last();
-    void pop_back();
-    void sort();
-    bool empty();
-    void reset();
-    ~work_list_pair();
-    std::pair<int, int>* arr;
-    bool init = false;
-    int arr_sz = -1;
-
-    void initialize_from_array(int *p, int size);
-    void initialize_from_array(std::pair<int, int> *p, int size);
-};
-
 class ring_pair {
 public:
     void initialize(int size);
@@ -217,14 +194,14 @@ public:
 class cell_worklist {
 public:
     void initialize(int domain_size);
-    int add_cell(work_set_int* queue_pointer, int col, int col_sz);
-    std::pair<int, int> next_cell(work_set_int* queue_pointer);
-    void replace_cell(work_set_int* queue_pointer, int col_old, int col, int col_sz);
+    int add_cell(work_set_int* queue_pointer, int col);
+    int next_cell(work_set_int* queue_pointer, coloring* c);
+    void replace_cell(work_set_int* queue_pointer, int col_old, int col);
     void reset(work_set_int* queue_pointer);
     bool empty();
 
 private:
-    std::pair<int, int>* arr = nullptr;
+    int* arr = nullptr;
     int  arr_sz  = -1;
     int  cur_pos = -1;
     bool init    = false;
@@ -236,10 +213,12 @@ public:
     bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes, strategy_metrics* m);
     int  individualize_vertex(coloring* c, int v);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
+    bool certify_automorphism(sgraph *g, bijection *p);
     bool assert_is_equitable(sgraph *g, coloring *c);
     void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
     ~refinement();
 
+private:
     bool initialized = false;
     work_set_int queue_pointer;
     cell_worklist  cell_todo;
@@ -253,6 +232,7 @@ public:
     work_list_pair_bool color_class_splits;
     work_list old_color_classes;
     int* scratch;
+
     int* workspace_int;
 
     bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
@@ -286,9 +266,6 @@ public:
 
     bool refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size,
                                                      work_list_pair_bool* color_class_split_worklist);
-
-    bool certify_automorphism(sgraph *g, bijection *p);
-
 };
 
 

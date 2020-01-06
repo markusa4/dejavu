@@ -62,6 +62,7 @@ bench("./graphs/ransq/ransq/", "results/ransq", -1, -1, 1)
 bench("./graphs/dac/dac/other/", "results/dac_other", -1,-1, 2)
 bench("./graphs/tran/tran/", "results/tran", -1, -1, 1)
 #
+bench("./graphs/large-cfi/", "results/large-cfi", -1, 30, 1)
 bench("./graphs/rantree/rantree/", "results/rantree", -1, 120, 1)
 bench("./graphs/ranreg/ranreg/", "results/ranreg", -1, 120, 1)
 bench("./graphs/hypercubes/", "results/hypercubes", -1, -1, 1)

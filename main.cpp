@@ -134,15 +134,13 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
-    if(comp_dejavu) {
-        finished = false;
-        std::thread killer;
-        if(timeout > 0)
-            killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-        bench_dejavu(_g, &dejavu_solve_time);
-        if(timeout > 0)
-            killer.join();
-    }
+    finished = false;
+    std::thread killer;
+    if(timeout > 0)
+        killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
+    bench_dejavu(_g, &dejavu_solve_time);
+    if(timeout > 0)
+        killer.join();
 
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;

@@ -115,8 +115,8 @@ private:
                        strategy* canon_strategy, int communicator_id,
                        int **shared_orbit, int** shared_orbit_weights, bfs_workspace *bwork, shared_permnode **gens, int *shared_group_size);
 
-    void find_first_leaf(dejavu_workspace *w, sgraph *g, bool compare, invariant *canon_I,
-                         bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism, int *restarts,
+    void find_first_leaf(dejavu_workspace *w, sgraph *g, invariant *canon_I,
+                         bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism,
                          shared_workspace *switches, int selector_seed);
 
     abort_code base_aligned_search(dejavu_workspace *w, sgraph *g, strategy *canon_strategy, bijection *automorphism,

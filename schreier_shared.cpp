@@ -659,10 +659,10 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
     if (maxlevel < 0) maxlevel = n + 1;
 
     if(startlevel == 0) {
-        //mworkperm = p;
-        DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
+        mworkperm = p;
+        //DYNALLOC1(int, mworkperm, mworkperm_sz, n, "filterschreier");
         //++mfiltercount;
-        memcpy(mworkperm, p, n * sizeof(int));
+        //memcpy(mworkperm, p, n * sizeof(int));
 
         if (*ring && p == (*ring)->p) {
             ingroup = true;

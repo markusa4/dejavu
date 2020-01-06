@@ -4,6 +4,9 @@
 #include <iostream>
 #include "bijection.h"
 
+thread_local int* switch_map;
+thread_local bool switch_map_init = false;
+
 int bijection::map_vertex(int v) {
     return map[v];
 }
@@ -28,7 +31,11 @@ void bijection::read_from_coloring(coloring *c) {
 }
 
 void bijection::inverse() {
-    thread_local int* switch_map = new int[map_sz];
+    if(!switch_map_init) {
+        switch_map_init = true;
+        switch_map      = new int[map_sz];
+    }
+
     int* swap = map;
     map = switch_map;
     switch_map = swap;

@@ -3,6 +3,9 @@
 
 #include "coloring.h"
 
+extern thread_local int* switch_map;
+extern thread_local bool switch_map_init;
+
 class bijection {
 public:
     bool init = false;

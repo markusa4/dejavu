@@ -11,7 +11,7 @@ int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 
 
-// #define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) std::cout << str << std::endl;
 #define PRINT(str) (void)0;
 
 // modes of the solver
