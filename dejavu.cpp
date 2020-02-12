@@ -125,85 +125,51 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
         }
 
         int s;
-        if (!backtrack) {
-            s = S->select_color_dynamic(g, c, canon_strategy);
-            if (s == -1) {
-                if (compare) {
-                    // we can derive an automorphism!
-                    bijection leaf;
-                    leaf.read_from_coloring(c);
-                    leaf.not_deletable();
-                    *automorphism = leaf;
-                    automorphism->inverse();
-                    automorphism->compose(canon_leaf);//enqueue_fail_point_sz
-                    if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
-                        backtrack = true;
-                        continue;
-                    }
-                    automorphism->certified = true;
-                    assert(g->certify_automorphism(*automorphism));
-                    return abort_code();
-                } else {
-                    canon_leaf->read_from_coloring(c);
-                    *canon_I = *I;
-                    return abort_code();
-                }
-            }
-        }
-
-        if (last_op == OP_I) { // add new operations to trail...
-            // refinement
-            //changes.clear();
-            bool comp = I->write_top_and_compare(INT32_MAX);
-            comp = comp && R->refine_coloring(g, c, nullptr, I, init_color_class, false, nullptr);
-            comp = comp && I->write_top_and_compare(INT32_MAX);
-            comp = comp && I->write_top_and_compare(INT32_MIN);
-            last_op = OP_R;
+        s = S->select_color_dynamic(g, c, canon_strategy);
+        if (s == -1) {
             if (compare) {
-                // compare invariant
-                if(!comp) {
+                // we can derive an automorphism!
+                bijection leaf;
+                leaf.read_from_coloring(c);
+                leaf.not_deletable();
+                *automorphism = leaf;
+                automorphism->inverse();
+                automorphism->compose(canon_leaf);//enqueue_fail_point_sz
+                if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
                     backtrack = true;
                     continue;
                 }
-                continue;
-            }
-        } else if (last_op == OP_R) {
-            // individualization
-            // collect all elements of color s
-            init_color_class = -1;
-            int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-            int v = c->lab[rpos];
-
-            if (group_level->vec[v] && base_aligned) {
-                v = group_level->fixed;// choose base point
-                if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz - 1)) {
-                    bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
-                    if(total_orbit)
-                        w->skiplevels += 1;
-                }
+                automorphism->certified = true;
+                assert(g->certify_automorphism(*automorphism));
+                return abort_code();
             } else {
-                base_aligned = false;
+                canon_leaf->read_from_coloring(c);
+                *canon_I = *I;
+                return abort_code();
             }
+        }
 
-            // individualize random vertex of class
-            int newpos = R->individualize_vertex(c, v);
-            last_op = OP_I;
-            init_color_class = newpos;
-            assert(c->vertex_to_col[v] > 0);
-            if (!compare) { // base points
-                automorphism->map[automorphism->map_sz] = v;
-                automorphism->map_sz += 1;
+        int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+        int v = c->lab[rpos];
+
+        if (group_level->vec[v] && base_aligned) {
+            v = group_level->fixed;// choose base point
+            if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz - 1)) {
+                bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
+                if(total_orbit)
+                    w->skiplevels += 1;
             }
+        } else {
+            base_aligned = false;
+        }
 
-            group_level = group_level->next;
-            level += 1;
+        group_level = group_level->next;
+        level += 1;
+        const bool comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
-            bool comp = I->write_top_and_compare(INT32_MIN);
-            comp && I->write_top_and_compare(INT32_MIN);
-            if(!comp) {
-                backtrack = true;
-                continue;
-            }
+        if(!comp) {
+            backtrack = true;
+            continue;
         }
     }
 }
