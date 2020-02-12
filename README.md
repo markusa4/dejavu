@@ -44,3 +44,6 @@ dejavu d;
 d.automorphisms(&g, &gens);
 ```
 Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (similar to the commandline arguments).
+
+# Remarks
+The source code contains modified source code of the [nauty / Traces](http://pallini.di.uniroma1.it) distribution, as well as the lock-free queue implementation described [here](http://moodycamel.com/blog/2014/a-fast-general-purpose-lock-free-queue-for-c++).
