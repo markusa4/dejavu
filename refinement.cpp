@@ -8,9 +8,10 @@
 
 bool refinement::certify_automorphism(sgraph *g, bijection* p) {
     assert(p->map_sz == g->v_size);
+    int i, found;
 
-    for(int i = 0; i < g->v_size; ++i) {
-        int image_i = p->map_vertex(i);
+    for(i = 0; i < g->v_size; ++i) {
+        const int image_i = p->map_vertex(i);
         if(image_i == i)
             continue;
         if(g->d[i] != g->d[image_i]) // degrees must be equal
@@ -18,15 +19,15 @@ bool refinement::certify_automorphism(sgraph *g, bijection* p) {
 
         scratch_set.reset();
         // automorphism must preserve neighbours
-        int found = 0;
+        found = 0;
         for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
-            int vertex_j = g->e[j];
-            int image_j  = p->map_vertex(vertex_j);
+            const int vertex_j = g->e[j];
+            const int image_j  = p->map_vertex(vertex_j);
             scratch_set.set(image_j);
             found += 1;
         }
         for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
-            int vertex_j = g->e[j];
+            const int vertex_j = g->e[j];
             if(!scratch_set.get(vertex_j)) {
                 return false;
             }
@@ -307,8 +308,7 @@ bool refinement::refine_color_class_sparse(sgraph *g, coloring *c, int color_cla
                                            work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     bool comp, mark_as_largest;
-    int i, j, cc, end_cc,
-            largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc, total;
+    int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc, total;
 
     cc = color_class; // iterate over color class
     comp = true;
@@ -495,8 +495,7 @@ bool refinement::refine_color_class_sparse127(sgraph *g, coloring *c, const int 
                                               work_list_pair_bool* color_class_split_worklist, invariant* I) {
     // for all vertices of the color class...
     bool comp, mark_as_largest;
-    int i, j, cc, end_cc,
-            largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc, total;
+    int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc, total;
 
     cc = color_class; // iterate over color class
     comp = true;
@@ -1806,7 +1805,7 @@ bool work_set::get(int index) {
 
 void work_set::reset() {
     while(!reset_queue.empty()) {
-        int index = reset_queue.pop();
+        const int index = reset_queue.pop();
         assert(init);
         assert(index >= 0);
         assert(index < sz);
@@ -1816,8 +1815,6 @@ void work_set::reset() {
 
 void work_set::reset_hard() {
     reset_queue.pos = 0;
-    //s.
-    // std::fill(s.begin(), s.end(), false);
     memset(s, false, sz*sizeof(bool));
 }
 
@@ -2236,7 +2233,7 @@ int cell_worklist::next_cell(work_set_int *queue_pointer, coloring* c) {
     }
 
     // swap sm_j and j
-    int sm_col = arr[sm_j];
+    const int sm_col = arr[sm_j];
     arr[sm_j] = arr[cur_pos - 1];
     queue_pointer->set(arr[sm_j], sm_j);
 
@@ -2246,7 +2243,7 @@ int cell_worklist::next_cell(work_set_int *queue_pointer, coloring* c) {
 }
 
 void cell_worklist::replace_cell(work_set_int *queue_pointer, int col_old, int col) {
-    int pos = queue_pointer->get(col_old);
+    const int pos = queue_pointer->get(col_old);
     arr[pos] = col;
     assert(queue_pointer->get(col_old) != -1);
     queue_pointer->set(col_old, -1);
