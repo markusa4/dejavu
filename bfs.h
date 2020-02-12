@@ -36,6 +36,7 @@ public:
     double parent_weight = -1;
 
     // synergy information for fast extension and deviation maps
+    std::mutex deviation_write;
     int deviation_pos    = -1; // save more than one?
     int deviation_val    = -1;
     int deviation_acc    = -1;

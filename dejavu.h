@@ -124,7 +124,7 @@ private:
 
     void reset_skiplevels(dejavu_workspace *w);
 
-    abort_code uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy, bijection *automorphism, int *restarts,
+    abort_code uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strategy* canon_strategy, bijection *automorphism, int *restarts,
                                        shared_workspace *switches, int selector_seed);
 
     bool proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes, strategy_metrics* m);

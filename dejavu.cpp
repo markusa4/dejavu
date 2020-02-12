@@ -31,7 +31,7 @@ bool dejavu::proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invarian
 }
 
 // search uniformly from bfs structure, no additional leaf storage
-abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool compare, strategy* canon_strategy,
+abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strategy* canon_strategy,
                                            bijection *automorphism, int *restarts,
                                            shared_workspace *switches, int selector_seed) {
     bool backtrack = false;
@@ -50,10 +50,8 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
     *restarts = 0;
     int level = w->first_level;
 
-    if (compare) {
-        automorphism->map    = new int[g->v_size];
-        automorphism->map_sz = 0;
-    }
+    automorphism->map    = new int[g->v_size];
+    automorphism->map_sz = 0;
     ir_operation last_op;
 
 
@@ -127,26 +125,20 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, bool 
         int s;
         s = S->select_color_dynamic(g, c, canon_strategy);
         if (s == -1) {
-            if (compare) {
-                // we can derive an automorphism!
-                bijection leaf;
-                leaf.read_from_coloring(c);
-                leaf.not_deletable();
-                *automorphism = leaf;
-                automorphism->inverse();
-                automorphism->compose(canon_leaf);//enqueue_fail_point_sz
-                if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
-                    backtrack = true;
-                    continue;
-                }
-                automorphism->certified = true;
-                assert(g->certify_automorphism(*automorphism));
-                return abort_code();
-            } else {
-                canon_leaf->read_from_coloring(c);
-                *canon_I = *I;
-                return abort_code();
+            // we can derive an automorphism!
+            bijection leaf;
+            leaf.read_from_coloring(c);
+            leaf.not_deletable();
+            *automorphism = leaf;
+            automorphism->inverse();
+            automorphism->compose(canon_leaf);//enqueue_fail_point_sz
+            if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
+                backtrack = true;
+                continue;
             }
+            automorphism->certified = true;
+            assert(g->certify_automorphism(*automorphism));
+            return abort_code();
         }
 
         int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
@@ -419,16 +411,18 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
     I->reset_deviation();
     if(look_close)
         I->never_fail = true;
-    //I->never_fail = true;
     comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
     if(!comp) { // fail on first level, set abort_val and abort_pos in elem
         // need to sync this write?
         ++switches->experimental_deviation;
-        elem->deviation_pos    = I->comp_fail_pos;
-        elem->deviation_val    = I->comp_fail_val;
-        elem->deviation_acc    = I->comp_fail_acc;
-        elem->deviation_vertex = v;
+        if(elem->deviation_write.try_lock()) {
+            elem->deviation_pos = I->comp_fail_pos;
+            elem->deviation_val = I->comp_fail_val;
+            elem->deviation_acc = I->comp_fail_acc;
+            elem->deviation_vertex = v;
+            elem->deviation_write.unlock();
+        }
         return false;
     }
 
@@ -1625,8 +1619,7 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
                     switched2 = true;
                     PRINT("[Uni] " << cref / 1000000.0 << "ms")
                 }
-                A = uniform_from_bfs_search(&W, g, true, canon_strategy, &automorphism, &restarts, switches,
-                                            selector_seed);
+                A = uniform_from_bfs_search(&W, g, canon_strategy, &automorphism, &restarts, switches, selector_seed);
                 if(A.reason == 2) // abort
                     continue;
 
