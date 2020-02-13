@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="dejavu"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="nauty_target">
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 nauty_target"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="bench">
+				<Option output="/home/markus/CLionProjects/dejavu/bench" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 bench"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="bench/fast">
+				<Option output="/home/markus/CLionProjects/dejavu/bench" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 bench/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu">
+				<Option output="/home/markus/CLionProjects/dejavu/dejavu" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 dejavu"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu/fast">
+				<Option output="/home/markus/CLionProjects/dejavu/dejavu" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/CLionProjects/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 dejavu/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/CLionProjects/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/home/markus/CLionProjects/dejavu/bench.cpp">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/bfs.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/bfs.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/bijection.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/bijection.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/coloring.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/coloring.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/configuration.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/dejavu.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/dejavu.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/group_shared.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/group_shared.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/invariant.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/invariant.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/main.cpp">
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/naudefs.h">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/naurng.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/naurng.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/gtnauty.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/gtools.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/gutil1.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/gutil2.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/naugraph.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/naugroup.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/naurng.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/nausparse.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/nautil.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/nautinv.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/naututil.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/nauty.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/schreier.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/nauty/traces.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/parser.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/parser.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/refinement.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/refinement.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/schreier_sequential.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/schreier_sequential.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/schreier_shared.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/schreier_shared.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/selector.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/selector.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/sgraph.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/sgraph.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/utility.cpp">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/utility.h">
+			<Option target="bench"/>
+			<Option target="dejavu"/>
+		</Unit>
+		<Unit filename="/home/markus/CLionProjects/dejavu/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

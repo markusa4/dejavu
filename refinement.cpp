@@ -867,7 +867,7 @@ bool refinement::refine_color_class_singleton(sgraph *g, coloring *c, int color_
     // write invariant first...
     for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
         //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-        comp = comp && I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes.arr[i])); // size
+        comp = comp && I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes.arr[i]));
         // contains information about color degree (= 1)
     }
 

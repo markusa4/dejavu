@@ -13,13 +13,13 @@ public:
     invariant*        compareI;
     std::vector<int>* compare_vec;
     bool has_compare = false;
-    bool no_write = false;
-    bool never_fail = false;
-    int comp_fail_pos = -2;
-    int comp_fail_val = -1;
+    bool no_write    = false;
+    bool never_fail  = false;
+    int  comp_fail_pos = -2;
+    int  comp_fail_val = -1;
     long comp_fail_acc = -1;
-    int cur_pos = -1;
-    long acc = 0;
+    int  cur_pos = -1;
+    long acc     = 0;
 
     // currently a bit convoluted, really should be split into 2 functions...
     inline bool write_top_and_compare(int i) {

@@ -100,7 +100,6 @@ public:
     int* arr;
     bool init = false;
 private:
-
     int arr_sz = -1;
 };
 
@@ -206,7 +205,6 @@ private:
     int  cur_pos = -1;
     bool init    = false;
 };
-
 
 class refinement {
 public:

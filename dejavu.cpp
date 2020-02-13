@@ -19,7 +19,7 @@ bool dejavu::proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invarian
     if(changes != nullptr)
         changes->track(c->vertex_to_col[v]);
 
-    int init_color_class = w->R.individualize_vertex(c, v);
+    const int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
     comp = comp && I->write_top_and_compare(INT32_MAX);
@@ -46,34 +46,30 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strat
 
     S->empty_cache();
 
-    int init_color_class = -1;
     *restarts = 0;
-    int level = w->first_level;
+    int level;
 
     automorphism->map    = new int[g->v_size];
     automorphism->map_sz = 0;
-    ir_operation last_op;
-
 
     automorphism->certified = false;
 
     // pick start from BFS level
-    int bfs_level    = w->BW->current_level - 1;
-    int bfs_level_sz = w->BW->level_sizes[bfs_level];
+    const int bfs_level    = w->BW->current_level - 1;
+    const int bfs_level_sz = w->BW->level_sizes[bfs_level];
 
     shared_schreier* start_group_level = w->G->gp;
     for(int i = 0; i < bfs_level; i++)
         start_group_level = start_group_level->next;
     shared_schreier* group_level = start_group_level;
 
-    int rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
+    int rand_pos       = intRand(0, bfs_level_sz - 1, selector_seed);
     bfs_element* picked_elem = w->BW->level_states[bfs_level][rand_pos];
-    bool base_aligned = picked_elem->is_identity;
+    bool base_aligned        = picked_elem->is_identity;
 
     *I = *picked_elem->I;
     c->copy_force(picked_elem->c);
     I->set_compare_invariant(canon_I);
-    last_op = OP_R;
     level = bfs_level + 1;
     S->empty_cache();
     double picked_weight, max_weight, rand_weight;
@@ -99,9 +95,7 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strat
             }
 
             // do uniform search
-            bfs_level    = w->BW->current_level - 1;
-            bfs_level_sz = w->BW->level_sizes[bfs_level];
-            rand_pos     = intRand(0, bfs_level_sz - 1, selector_seed);
+            rand_pos    = intRand(0, bfs_level_sz - 1, selector_seed);
             picked_elem = w->BW->level_states[bfs_level][rand_pos];
             group_level = start_group_level;
             base_aligned = picked_elem->is_identity;
@@ -117,13 +111,11 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strat
             c->copy_force(picked_elem->c);
             I->set_compare_invariant(canon_I);
             backtrack = false;
-            last_op = OP_R;
             level = bfs_level + 1;
             S->empty_cache();
         }
 
-        int s;
-        s = S->select_color_dynamic(g, c, canon_strategy);
+        const int s = S->select_color_dynamic(g, c, canon_strategy);
         if (s == -1) {
             // we can derive an automorphism!
             bijection leaf;
@@ -141,13 +133,13 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strat
             return abort_code();
         }
 
-        int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+        const int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
         int v = c->lab[rpos];
 
         if (group_level->vec[v] && base_aligned) {
             v = group_level->fixed;// choose base point
             if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz - 1)) {
-                bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
+                const bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
                 if(total_orbit)
                     w->skiplevels += 1;
             }
@@ -170,7 +162,7 @@ abort_code dejavu::uniform_from_bfs_search(dejavu_workspace *w, sgraph *g, strat
 void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, invariant *canon_I,
                              bijection *canon_leaf, strategy* canon_strategy, bijection *automorphism,
                              shared_workspace *switches, int selector_seed) {
-    bool* done = &switches->done;
+    const bool* done = &switches->done;
 
     // workspace
     refinement *R = &w->R;
@@ -181,19 +173,17 @@ void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, invariant *canon_I,
     invariant *start_I = &w->start_I;
 
     S->empty_cache();
-    int level = 1;
 
     start_I->create_vector(g->v_size * 2);
-    automorphism->map = new int[g->v_size];
+    automorphism->map    = new int[g->v_size];
     automorphism->map_sz = 0;
 
     *I = *start_I;
     c->copy(start_c);
-    int s;
 
     while (true) {
         if(*done) return;
-        s = S->select_color_dynamic(g, c, canon_strategy);
+        const int s = S->select_color_dynamic(g, c, canon_strategy);
         if (s == -1) {
             canon_leaf->read_from_coloring(c);
             *canon_I = *I;
@@ -201,8 +191,8 @@ void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, invariant *canon_I,
         }
 
         // choose random vertex of class
-        int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
-        int v = c->lab[rpos];
+        const int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+        const int v = c->lab[rpos];
 
         // individualize and refine
         proceed_state(w, g, c, I, v, nullptr, nullptr);
@@ -211,7 +201,6 @@ void dejavu::find_first_leaf(dejavu_workspace *w, sgraph *g, invariant *canon_I,
         // base point
         automorphism->map[automorphism->map_sz] = v;
         automorphism->map_sz += 1;
-        level += 1;
     }
 }
 
@@ -401,29 +390,30 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
     *I = *elem->I;
     I->set_compare_invariant(strat->I);
 
-    int col, v, rpos;
     bool comp;
 
     // first individualization
-    col  = elem->target_color;
-    rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
-    v    = c->lab[rpos];
-    I->reset_deviation();
-    if(look_close)
-        I->never_fail = true;
-    comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
+    {
+        const int col = elem->target_color;
+        const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
+        const int v = c->lab[rpos];
+        I->reset_deviation();
+        if (look_close)
+            I->never_fail = true;
+        comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
 
-    if(!comp) { // fail on first level, set abort_val and abort_pos in elem
-        // need to sync this write?
-        ++switches->experimental_deviation;
-        if(elem->deviation_write.try_lock()) {
-            elem->deviation_pos = I->comp_fail_pos;
-            elem->deviation_val = I->comp_fail_val;
-            elem->deviation_acc = I->comp_fail_acc;
-            elem->deviation_vertex = v;
-            elem->deviation_write.unlock();
+        if (!comp) { // fail on first level, set abort_val and abort_pos in elem
+            // need to sync this write?
+            ++switches->experimental_deviation;
+            if (elem->deviation_write.try_lock()) {
+                elem->deviation_pos = I->comp_fail_pos;
+                elem->deviation_val = I->comp_fail_val;
+                elem->deviation_acc = I->comp_fail_acc;
+                elem->deviation_vertex = v;
+                elem->deviation_write.unlock();
+            }
+            return false;
         }
-        return false;
     }
 
     ++switches->experimental_paths;
@@ -433,10 +423,10 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
     I->never_fail = true;
     do {
         if(switches->done_fast) return false;
-        col = w->S.select_color_dynamic(g, c, strat);
+        const int col = w->S.select_color_dynamic(g, c, strat);
         if(col == -1) break;
-        rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
-        v    = c->lab[rpos];
+        const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
+        const int v    = c->lab[rpos];
 
         comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
     } while(comp);
@@ -623,6 +613,8 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
     }
 
     // try to dequeue a chunk of work
+    //moodycamel::ConsumerToken
+
     size_t num = BFS->bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->chunk_size);
     int finished_elements_sz = 0;
     int finished_elements_null_buffer = 0;
@@ -641,7 +633,10 @@ bool dejavu::bfs_chunk(dejavu_workspace *w, sgraph *g, strategy *canon_strategy,
             if (!elem->is_identity) {
                 bool comp_ = BFS->read_abort_map(level, elem->deviation_pos, elem->deviation_acc);
                 if(!comp_) {
-                    elem->weight = 0;
+                    if(elem->weight != 0 && elem->deviation_write.try_lock()) {
+                        elem->weight = 0;
+                        elem->deviation_write.unlock();
+                    }
                 }
                 comp = comp && comp_;
             }
