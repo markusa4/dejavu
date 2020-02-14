@@ -50,12 +50,71 @@ public:
     }
 };
 
+template<class T>
+class work_list_temp {
+public:
+    void initialize(int size) {
+        arr     = new T[size];
+        arr_sz  = size;
+        init     = true;
+        cur_pos = 0;
+    }
+
+    void initialize_from_array(T* arr, int size) {
+        this->arr = arr;
+        arr_sz    = size;
+        init      = false;
+        cur_pos   = 0;
+    }
+
+    void push_back(T value) {
+        assert(cur_pos >= 0 && cur_pos < arr_sz);
+        arr[cur_pos] = value;
+        cur_pos += 1;
+    }
+
+    T pop_back() {
+        return arr[--cur_pos];
+    }
+
+    T* last() {
+        return &arr[cur_pos - 1];
+    }
+
+    bool empty() {
+        return cur_pos == 0;
+    }
+
+    void reset() {
+        cur_pos = 0;
+    }
+
+    ~work_list_temp() {
+        if(init) {
+            delete[] arr;
+        }
+    }
+
+    void sort() {
+        std::sort(arr, arr + cur_pos);
+    }
+
+    int  cur_pos;
+    T*   arr;
+    bool init = false;
+private:
+    int arr_sz = -1;
+};
+
+typedef work_list_temp<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
+typedef work_list_temp<int> work_list;
+
 class work_queue {
 public:
     void initialize(int size);
     void initialize_from_array(int* arr, int size);
     void push(int val);
-    int pop();
+    int  pop();
     void reset();
     bool empty();
     ~work_queue();
@@ -77,67 +136,86 @@ public:
     void set_nr(int index);
     void unset(int index);
     void reset_soft();
+
 private:
     work_queue reset_queue;
-   // std::vector<bool> s;
     bool init = false;
     bool* s;
-
     int sz;
 };
 
-class work_list {
+template<class T>
+class alignas(16) work_set_temp {
 public:
-    void initialize(int size);
-    void initialize_from_array(int* arr, int size);
-    void push_back(int index);
-    int pop_back();
-    bool empty();
-    void reset();
-    ~work_list();
-    void sort();
-    int  cur_pos;
-    int* arr;
-    bool init = false;
-private:
-    int arr_sz = -1;
-};
+    void initialize(int size) {
+        s = new T[size];
+        reset_queue.initialize(size);
 
+        memset(s, -1, size * sizeof(T));
 
-class alignas(16) work_set_int {
-public:
-    void initialize(int size);
-    void initialize_from_array(int* arr, int size);
-    void set(int index, int value);
-    int  get(int index);
-    void reset();
-    void reset_hard();
-    int inc(int index);
-    void inc_nr(int index);
-    ~work_set_int();
+        init = true;
+        sz = size;
+    }
+
+    void initialize_from_array(T* arr, int size) {
+        s = arr;
+        reset_queue.initialize_from_array(arr + size, size);
+
+        memset(s, -1, size * sizeof(T));
+
+        init = false;
+        sz = size;
+    }
+
+    void set(int index, T value) {
+        assert(index >= 0);
+        assert(index < sz);
+        s[index] = value;
+    }
+
+    T   get(int index) {
+        assert(index >= 0);
+        assert(index < sz);
+        return s[index];
+    }
+
+    void reset() {
+        while(!reset_queue.empty())
+            s[reset_queue.pop()] = -1;
+    }
+
+    void reset_hard() {
+        memset(s, -1, sz*sizeof(T));
+        reset_queue.pos = 0;
+    }
+
+    T   inc(int index) {
+        assert(index >= 0);
+        assert(index < sz);
+        if(s[index]++ == -1)
+            reset_queue.push(index);
+        return s[index];
+    }
+
+    void inc_nr(int index) {
+        assert(index >= 0 && index < sz);
+        ++s[index];
+    }
+
+    ~work_set_temp() {
+        if(init)
+            delete[] s;
+    }
+
     work_queue reset_queue;
 private:
     bool  init = false;
-    int*  s;
+    T*    s;
     int   sz;
 };
 
-class alignas(16) work_set_char {
-public:
-    void initialize(int size);
-    void set(int index, char value);
-    char  get(int index);
-    void reset();
-    void reset_hard();
-    int inc(int index);
-    void inc_nr(int index);
-    ~work_set_char();
-    work_queue reset_queue;
-private:
-    bool  init = false;
-    char*  s;
-    int   sz;
-};
+typedef work_set_temp<int>  work_set_int;
+typedef work_set_temp<char> work_set_char;
 
 class ring_pair {
 public:
@@ -155,24 +233,6 @@ public:
     int back_pos = -1;
 
     void initialize_from_array(std::pair<int, int> *p, int size);
-};
-
-
-class work_list_pair_bool {
-public:
-    void initialize(int size);
-    void push_back(std::pair<std::pair<int, int>, bool> value);
-    std::pair<std::pair<int, int>, bool>* last();
-    void pop_back();
-    void sort();
-    bool empty();
-    void reset();
-    ~work_list_pair_bool();
-private:
-    std::pair<std::pair<int, int>, bool>* arr;
-    bool init = false;
-    int arr_sz = -1;
-    int cur_pos;
 };
 
 class change_tracker {
@@ -208,7 +268,8 @@ private:
 
 class refinement {
 public:
-    bool refine_coloring(sgraph* g, coloring* c, change_tracker *, invariant* I, int init_color_class, bool track_changes, strategy_metrics* m);
+    bool refine_coloring(sgraph *g, coloring *c, change_tracker *, invariant *I, int init_color_class,
+                         bool track_changes, strategy_metrics *m);
     int  individualize_vertex(coloring* c, int v);
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
     bool certify_automorphism(sgraph *g, bijection *p);
@@ -218,19 +279,19 @@ public:
 
 private:
     bool initialized = false;
-    work_set_int queue_pointer;
-    cell_worklist  cell_todo;
-    mark_set scratch_set;
-    work_list vertex_worklist;
-    work_set_int color_vertices_considered;
-    work_set_int neighbours;
+    work_set_int  queue_pointer;
+    cell_worklist cell_todo;
+    mark_set      scratch_set;
+    work_list     vertex_worklist;
+    work_set_int  color_vertices_considered;
+    work_set_int  neighbours;
     work_set_char neighbours127;
-    work_set_int neighbour_sizes;
-    work_list singletons;
+    work_set_int  neighbour_sizes;
+    work_list     singletons;
+    work_list     old_color_classes;
     work_list_pair_bool color_class_splits;
-    work_list old_color_classes;
-    int* scratch;
 
+    int* scratch;
     int* workspace_int;
 
     bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
