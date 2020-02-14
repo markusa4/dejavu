@@ -127,8 +127,7 @@ static shared_schreier *mnewschreier(int n) {
 
 /************************************************************************/
 
-void
-shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
+void shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
     shared_schreier *sh, *nextsh;
     shared_permnode *p, *nextp;
 
@@ -157,8 +156,7 @@ shared_freeschreier(shared_schreier **gp, shared_permnode **gens) {
 
 /************************************************************************/
 
-shared_permnode *
-shared_findpermutation(shared_permnode *gens, int *p, int n) {
+shared_permnode* shared_findpermutation(shared_permnode *gens, int *p, int n) {
     shared_permnode *rn;
     int i;
 
@@ -177,8 +175,7 @@ shared_findpermutation(shared_permnode *gens, int *p, int n) {
 
 /************************************************************************/
 
-void
-shared_addpermutation(shared_permnode **ring, int *p, int n) {
+void shared_addpermutation(shared_permnode **ring, int *p, int n) {
     shared_permnode *pn, *rn;
 
     pn = mnewpermnode(n);
@@ -202,16 +199,14 @@ shared_addpermutation(shared_permnode **ring, int *p, int n) {
 
 /************************************************************************/
 
-static void
-maddpermutationunmarked(shared_permnode **ring, int *p, int n) {
+static void maddpermutationunmarked(shared_permnode **ring, int *p, int n) {
     shared_addpermutation(ring, p, n);
     (*ring)->mark = 0;
 }
 
 /************************************************************************/
 
-bool
-shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n) {
+bool shared_addgenerator(shared_schreier **gp, shared_permnode **gens, int *p, int n) {
     filterstate state;
     mfilterschreier_interval(*gp, p, gens, false, n + 1, n, 0, 10, &state);
     return mfilterschreier_interval(*gp, p, gens, false, n + 1, n, 11, n + 1, &state);
@@ -228,8 +223,7 @@ bool shared_condaddgenerator(shared_schreier **gp, shared_permnode **gens, int *
 
 /************************************************************************/
 
-static void
-mdelpermnode(shared_permnode **ring) {
+static void mdelpermnode(shared_permnode **ring) {
     shared_permnode *newring;
 
     if (!*ring) return;
@@ -250,8 +244,7 @@ mdelpermnode(shared_permnode **ring) {
 
 /************************************************************************/
 
-void
-mdeleteunmarked(shared_permnode **ring) {
+void mdeleteunmarked(shared_permnode **ring) {
     shared_permnode *pn, *firstmarked;
 
     pn = *ring;
@@ -270,8 +263,7 @@ mdeleteunmarked(shared_permnode **ring) {
 
 /************************************************************************/
 
-static void
-mclearvector(shared_permnode **vec, shared_permnode **ring, int n) {
+static void mclearvector(shared_permnode **vec, shared_permnode **ring, int n) {
     int i;
 
     for (i = 0; i < n; ++i)
@@ -289,8 +281,7 @@ mclearvector(shared_permnode **vec, shared_permnode **ring, int n) {
 
 /************************************************************************/
 
-static void
-minitschreier(shared_schreier *sh, int n) {
+static void minitschreier(shared_schreier *sh, int n) {
     int i;
 
     sh->fixed = -1;
@@ -302,8 +293,7 @@ minitschreier(shared_schreier *sh, int n) {
 
 /************************************************************************/
 
-void
-shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n) {
+void shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n) {
     *gp = mnewschreier(n);
     minitschreier(*gp, n);
     if (gens) *gens = nullptr;
@@ -311,8 +301,7 @@ shared_newgroup(shared_schreier **gp, shared_permnode **gens, int n) {
 
 /************************************************************************/
 
-void
-mapplyperm(int *wp, int *p, int k, int n) {
+void mapplyperm(int *wp, int *p, int k, int n) {
     int i, j, cyclen, kk, m;
 
     if (k <= 5) {
@@ -815,8 +804,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
 
 /************************************************************************/
 
-bool
-shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n) {
+bool shared_expandschreier(shared_schreier *gp, shared_permnode **gens, int n) {
     int i, j, nfails, wordlen, skips;
     bool changed;
     shared_permnode *pn;
@@ -893,8 +881,7 @@ void free_random_element(random_element* r) {
 
 /************************************************************************/
 
-int *
-shared_getorbits(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens, int n) {
+int * shared_getorbits(int *fix, int nfix, shared_schreier *gp, shared_permnode **gens, int n) {
     //circ_mutex.lock();
     int k;
     shared_schreier *sh, *sha;
