@@ -51,6 +51,66 @@ public:
 };
 
 template<class T>
+void sort_temp(T* arr, int sz) {
+#define min(x, y) (x<y?x:y)
+#define max(x, y) (x<y?y:x)
+#define SWAP(x,y) { const T a = min(arr[x], arr[y]); \
+                    const T b = max(arr[x], arr[y]); \
+                    arr[x] = a; arr[y] = b; }
+    switch(sz) {
+        case 0:
+        case 1:
+            break;
+        case 2:
+            SWAP(0, 1);
+            break;
+        case 3:
+            SWAP(0, 1);
+            SWAP(0, 2);
+            SWAP(1, 2);
+            break;
+        case 4:
+            SWAP(0, 1);
+            SWAP(2, 3);
+            SWAP(0, 2);
+            SWAP(1, 3);
+            SWAP(1,2);
+            break;
+        case 5:
+            SWAP(0, 1);
+            SWAP(2, 3);
+            SWAP(0, 2);
+            SWAP(1, 4);
+            SWAP(0, 1);
+            SWAP(2, 3);
+            SWAP(1, 2);
+            SWAP(3, 4);
+            SWAP(2, 3);
+            break;
+        case 6:
+            SWAP(1, 2);
+            SWAP(4, 5);
+            SWAP(0, 2);
+            SWAP(3, 5);
+            SWAP(0, 1);
+            SWAP(3, 4);
+            SWAP(1, 4);
+            SWAP(0, 3);
+            SWAP(2, 5);
+            SWAP(1, 3);
+            SWAP(2, 4);
+            SWAP(2, 3);
+            break;
+        default:
+            std::sort(arr, arr + sz);
+    }
+#undef SWAP
+#undef min
+#undef max
+}
+
+
+template<class T>
 class work_list_temp {
 public:
     void initialize(int size) {
@@ -96,7 +156,7 @@ public:
     }
 
     void sort() {
-        std::sort(arr, arr + cur_pos);
+        sort_temp<T>(arr, cur_pos);
     }
 
     int  cur_pos;
@@ -270,11 +330,15 @@ class refinement {
 public:
     bool refine_coloring(sgraph *g, coloring *c, change_tracker *, invariant *I, int init_color_class,
                          bool track_changes, strategy_metrics *m);
+
     int  individualize_vertex(coloring* c, int v);
+
     bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class);
+
     bool certify_automorphism(sgraph *g, bijection *p);
+
     bool assert_is_equitable(sgraph *g, coloring *c);
-    void undo_changes_with_reference(change_tracker* changes, coloring* c, coloring* old_c);
+
     ~refinement();
 
 private:
@@ -285,7 +349,6 @@ private:
     work_list     vertex_worklist;
     work_set_int  color_vertices_considered;
     work_set_int  neighbours;
-    work_set_char neighbours127;
     work_set_int  neighbour_sizes;
     work_list     singletons;
     work_list     old_color_classes;
@@ -294,10 +357,9 @@ private:
     int* scratch;
     int* workspace_int;
 
-    bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
-                                   work_list_pair_bool* color_class_split_worklist, invariant* I);
+    void assure_initialized(sgraph *g);
 
-    bool refine_color_class_sparse127(sgraph *g, coloring *c, int color_class, int class_size,
+    bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
                                    work_list_pair_bool* color_class_split_worklist, invariant* I);
 
     bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size,
@@ -306,13 +368,8 @@ private:
     bool refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size,
                                         work_list_pair_bool* color_class_split_worklist, invariant* I);
 
-    bool refine_color_class_dense_dense127(sgraph *g, coloring *c, int color_class, int class_size,
-                                           work_list_pair_bool *color_class_split_worklist, invariant *I);
-
     bool refine_color_class_singleton(sgraph *g, coloring *c, int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I);
-
-    void assure_initialized(sgraph *g);
 
     bool refine_color_class_singleton_first(sgraph *g, coloring *c, int color_class, int class_size,
                                             work_list_pair_bool *color_class_split_worklist);
