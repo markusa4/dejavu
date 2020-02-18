@@ -7,8 +7,6 @@
 #include <random>
 #include <iostream>
 
-extern thread_local int* switch_map;
-extern thread_local bool switch_map_init;
 
 template<class vertex_type>
 class bijection_temp {
@@ -31,7 +29,7 @@ public:
         std::cout << std::endl;
     }
 
-    void read_from_coloring(coloring *c) {
+    void read_from_coloring(coloring_temp<vertex_type> *c) {
         if(!init) {
             //    delete[] map;
             //}
@@ -45,12 +43,15 @@ public:
     }
 
     void inverse() {
+        thread_local vertex_type* switch_map;
+        thread_local bool         switch_map_init;
+
         if(!switch_map_init) {
             switch_map_init = true;
             switch_map      = new vertex_type[map_sz];
         }
 
-        int* swap = map;
+        vertex_type* swap = map;
         map = switch_map;
         switch_map = swap;
 
@@ -95,7 +96,7 @@ public:
     }
 };
 
-typedef  bijection_temp<int> bijection;
+// typedef  bijection_temp<int> bijection;
 
 
 #endif //DEJAVU_BIJECTION_H

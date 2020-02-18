@@ -33,7 +33,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void bench_nauty(sgraph *g, double* nauty_solve_time) {
+void bench_nauty(sgraph_temp<int, int, int> *g, double* nauty_solve_time) {
     //TracesStats stats;
     statsblk stats;
     sparsegraph sg;
@@ -93,7 +93,7 @@ void bench_nauty(sgraph *g, double* nauty_solve_time) {
 }
 
 
-void bench_dejavu(sgraph *g, double* dejavu_solve_time) {
+void bench_dejavu(sgraph_temp<int, int, int> *g, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     int acc = 0;
     for(int i = 0; i < g->v_size; ++i) {
@@ -104,13 +104,12 @@ void bench_dejavu(sgraph *g, double* dejavu_solve_time) {
     }
 
     Clock::time_point timer = Clock::now();
-    dejavu d;
-    d.automorphisms(g, nullptr);
+    dejavu_automorphisms(g, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }
 
-void bench_traces(sgraph *g, double* traces_solve_time) {
+void bench_traces(sgraph_temp<int, int, int> *g, double* traces_solve_time) {
     //sleep(1);
     TracesStats stats;
     //statsblk stats;
@@ -221,6 +220,11 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
+        if (arg == "--COMPRESS") {
+            config.CONFIG_PREPROCESS_COMPRESS      = true;
+            config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
+        }
+
         if (arg == "--NO_NAUTY") {
             comp_nauty = false;
         }
@@ -282,8 +286,8 @@ int commandline_mode(int argc, char **argv) {
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
-        bijection pr;
-        bijection::random_bijection(&pr, g->v_size, seed);
+        bijection_temp<int> pr;
+        bijection_temp<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
         delete g;
     } else {

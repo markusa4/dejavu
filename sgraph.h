@@ -75,7 +75,7 @@ public:
     }
 
     // certify that a permutation is an automorphism of the sgraph
-    bool certify_automorphism(bijection p) {
+    bool certify_automorphism(bijection_temp<vertex_type> p) {
         assert(p.map_sz == v_size);
 
         std::set<int> image_neighbours_of_i;
@@ -106,7 +106,7 @@ public:
         return true;
     }
 
-    void permute_graph(sgraph_temp<vertex_type, degree_type, edge_type>* ng, bijection* p) {
+    void permute_graph(sgraph_temp<vertex_type, degree_type, edge_type>* ng, bijection_temp<vertex_type>* p) {
         ng->v = new edge_type[v_size];
         ng->d = new degree_type[d_size];
         ng->e = new vertex_type[e_size];
@@ -115,11 +115,11 @@ public:
         ng->e_size = e_size;
         ng->max_degree = max_degree;
 
-        bijection p_inv;
-        p_inv.map = new int[p->map_sz];
+        bijection_temp<vertex_type> p_inv;
+        p_inv.map = new vertex_type[p->map_sz];
         p_inv.map_sz = p->map_sz;
         p_inv.deletable();
-        memcpy(p_inv.map, p->map, p->map_sz*sizeof(int));
+        memcpy(p_inv.map, p->map, p->map_sz*sizeof(vertex_type));
         p_inv.inverse();
 
         std::set<int> vertices_hit;
@@ -171,6 +171,81 @@ public:
             std::sort(e + estart, e + eend);
         }
     }
+};
+
+
+template<class vertex_type_src, class degree_type_src, class edge_type_src,
+         class vertex_type_tgt, class degree_type_tgt, class edge_type_tgt>
+static void copy_graph(sgraph_temp<vertex_type_src, degree_type_src, edge_type_src>* g1,
+                       sgraph_temp<vertex_type_tgt, degree_type_tgt, edge_type_tgt>* g2) {
+    g2->v_size = g1->v_size;
+    g2->d_size = g1->d_size;
+    g2->e_size = g1->e_size;
+    g2->max_degree = g1->max_degree;
+
+    g2->v = new edge_type_tgt[g2->v_size];
+    g2->d = new degree_type_tgt[g2->d_size];
+    g2->e = new vertex_type_tgt[g2->e_size];
+
+    for(int i = 0; i < g1->v_size; ++i) {
+        g2->v[i] = static_cast<edge_type_tgt>(g1->v[i]);
+    }
+    for(int i = 0; i < g1->d_size; ++i) {
+        g2->d[i] = static_cast<degree_type_tgt>(g1->d[i]);
+    }
+    for(int i = 0; i < g1->e_size; ++i) {
+        g2->e[i] = static_cast<vertex_type_tgt>(g1->e[i]);
+    }
+}
+
+enum sgraph_type {DSG_INT_INT_INT, DSG_SHORT_SHORT_INT, DSG_SHORT_SHORT_SHORT, DSG_CHAR_CHAR_SHORT, DSG_CHAR_CHAR_CHAR};
+struct dynamic_sgraph {
+    sgraph_type type;
+    sgraph_temp<int, int, int>*             sgraph_0 = nullptr;
+    sgraph_temp<int16_t, int16_t, int>*     sgraph_1 = nullptr;
+    sgraph_temp<int16_t, int16_t, int16_t>* sgraph_2 = nullptr;
+    sgraph_temp<int8_t,  int8_t,  int16_t>* sgraph_3 = nullptr;
+    sgraph_temp<int8_t,  int8_t,  int8_t>*  sgraph_4 = nullptr;
+
+    static void read(sgraph_temp<int, int, int>* g, dynamic_sgraph* sg) {
+        bool short_v = (g->v_size <= 32767);
+        bool short_e = (g->e_size <= 32767);
+        bool char_v  = (g->v_size <= 127);
+        bool char_e  = (g->e_size <= 127);
+
+        if(char_v && char_e) {
+            sg->sgraph_4 = new sgraph_temp<int8_t,  int8_t,  int8_t>;
+            copy_graph<int, int, int, int8_t,  int8_t,  int8_t>(g, sg->sgraph_4);
+            sg->type = DSG_CHAR_CHAR_CHAR;
+            return;
+        }
+
+        if(char_v && short_e) {
+            sg->sgraph_3 = new sgraph_temp<int8_t,  int8_t,  int16_t>;
+            copy_graph<int, int, int, int8_t,  int8_t,  int16_t>(g, sg->sgraph_3);
+            sg->type = DSG_CHAR_CHAR_SHORT;
+            return;
+        }
+
+        if(short_v && short_e) {
+            sg->sgraph_2 = new sgraph_temp<int16_t,  int16_t,  int16_t>;
+            copy_graph<int, int, int, int16_t,  int16_t,  int16_t>(g, sg->sgraph_2);
+            sg->type = DSG_SHORT_SHORT_SHORT;
+            return;
+        }
+
+        if(short_v && !short_e) {
+            sg->sgraph_1 = new sgraph_temp<int16_t,  int16_t,  int>;
+            copy_graph<int, int, int, int16_t,  int16_t,  int>(g, sg->sgraph_1);
+            sg->type = DSG_SHORT_SHORT_INT;
+            return;
+        }
+
+        sg->sgraph_0 = g;
+        sg->type = DSG_INT_INT_INT;
+        return;
+    }
+
 };
 
 typedef sgraph_temp<int, int, int> sgraph;

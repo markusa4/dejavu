@@ -10,21 +10,22 @@
 
 enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM};
 
-struct strategy {
-    bijection* leaf = nullptr;
+template<class vertex_type>
+struct strategy_temp {
+    bijection_temp<vertex_type>* leaf = nullptr;
     invariant* I    = nullptr;
     selector_type cell_selector_type = SELECTOR_FIRST;
     int           cell_selector_seed = 0;
 
-    strategy() = default;
-    strategy(bijection* leaf, invariant* I, selector_type cell_selector_type, int seed) {
+    strategy_temp() = default;
+    strategy_temp(bijection_temp<vertex_type>* leaf, invariant* I, selector_type cell_selector_type, int seed) {
         this->leaf = leaf;
         this->I    = I;
         this->cell_selector_type = cell_selector_type;
         this->cell_selector_seed = seed;
     }
 
-    void replace(strategy* s) {
+    void replace(strategy_temp<vertex_type>* s) {
         leaf = s->leaf;
         I    = s->I;
         cell_selector_type = s->cell_selector_type;
@@ -156,7 +157,7 @@ public:
     }
 
     int select_color_dynamic(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type>  *c,
-                             strategy *s) {
+                             strategy_temp<vertex_type> *s) {
         if(c->cells == g->v_size)
             return -1;
         switch(s->cell_selector_type) {
@@ -175,6 +176,6 @@ public:
     }
 };
 
-typedef selector_temp<int, int, int> selector;
+// typedef selector_temp<int, int, int> selector;
 
 #endif // DEJAVU_SELECTOR_H

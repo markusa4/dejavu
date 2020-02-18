@@ -44,6 +44,7 @@ public:
 
     vertex_type* lab;
     vertex_type* ptn;
+
     int lab_sz;
     int ptn_sz;
     bool init = false;
@@ -186,6 +187,6 @@ public:
     }
 };
 
-typedef coloring_temp<int> coloring;
+// typedef coloring_temp<int> coloring;
 
 #endif //DEJAVU_COLORING_H

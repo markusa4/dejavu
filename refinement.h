@@ -311,14 +311,64 @@ public:
     bool did_overflow();
 };
 
-class cell_worklist {
+template<class vertex_type>
+class cell_worklist_temp {
 public:
-    void initialize(int domain_size);
-    int add_cell(work_set_int* queue_pointer, int col);
-    int next_cell(work_set_int* queue_pointer, coloring* c);
-    void replace_cell(work_set_int* queue_pointer, int col_old, int col);
-    void reset(work_set_int* queue_pointer);
-    bool empty();
+    void initialize(int domain_size) {
+        arr = new int[domain_size];
+        arr_sz = domain_size;
+        init = true;
+        cur_pos = 0;
+    }
+
+    int add_cell(work_set_int* queue_pointer, int col) {
+        assert(init);
+        assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
+        queue_pointer->set(col, cur_pos);
+        arr[cur_pos] = col;
+        cur_pos++;
+        return 0;
+    }
+
+    int next_cell(work_set_int* queue_pointer, coloring_temp<vertex_type>* c) {
+        // look at first 12 positions and scramble if possible
+        int sm_j = cur_pos - 1;
+        for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
+            if(c->ptn[arr[j]] < c->ptn[arr[sm_j]]) {
+                sm_j = j;
+                if (c->ptn[arr[sm_j]] == 0)
+                    break;
+            }
+        }
+
+        // swap sm_j and j
+        const int sm_col = arr[sm_j];
+        arr[sm_j] = arr[cur_pos - 1];
+        queue_pointer->set(arr[sm_j], sm_j);
+
+        cur_pos--;
+        queue_pointer->set(sm_col, -1);
+        return sm_col;
+    }
+
+    void replace_cell(work_set_int* queue_pointer, int col_old, int col) {
+        const int pos = queue_pointer->get(col_old);
+        arr[pos] = col;
+        assert(queue_pointer->get(col_old) != -1);
+        queue_pointer->set(col_old, -1);
+        queue_pointer->set(col, pos);
+    }
+
+    void reset(work_set_int* queue_pointer) {
+        while(cur_pos > 0) {
+            cur_pos--;
+            queue_pointer->set(arr[cur_pos], -1);
+        }
+    }
+
+    bool empty() {
+        return (cur_pos == 0);
+    }
 
 private:
     int* arr = nullptr;
@@ -566,7 +616,7 @@ public:
         return true;
     }
 
-    bool certify_automorphism(sgraph_temp<vertex_type, degree_type, edge_type>  *g, bijection *p) {
+    bool certify_automorphism(sgraph_temp<vertex_type, degree_type, edge_type>  *g, bijection_temp<vertex_type> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -654,7 +704,7 @@ public:
 private:
     bool initialized = false;
     work_set_int  queue_pointer;
-    cell_worklist cell_todo;
+    cell_worklist_temp<vertex_type> cell_todo;
     mark_set      scratch_set;
     work_list_temp<vertex_type> vertex_worklist;
     work_set_temp<vertex_type>  color_vertices_considered;
@@ -682,7 +732,7 @@ private:
             queue_pointer.initialize(n);
             color_vertices_considered.initialize(n);
 
-            scratch = workspace_int;
+            scratch = (vertex_type*) workspace_int;
             scratch_set.initialize_from_array(workspace_int + n, n);
 
             color_class_splits.initialize(n);
@@ -1747,6 +1797,6 @@ private:
     }
 };
 
-typedef refinement_temp<int, int, int> refinement;
+// typedef refinement_temp<int, int, int> refinement;
 
 #endif //DEJAVU_REFINEMENT_H

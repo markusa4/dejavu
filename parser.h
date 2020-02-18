@@ -5,9 +5,10 @@
 
 class parser {
 public:
-    void parse_dimacs_file(std::string filename, sgraph* g);
-    void parse_dimacs_file_g(std::string filename, sgraph* g);
-    void parse_dimacs_file_digraph(std::string filename, sgraph *g);
+    void parse_dimacs_file_dynamic(std::string filename, dynamic_sgraph* g);
+    void parse_dimacs_file(std::string filename,         sgraph_temp<int, int, int>* g);
+    void parse_dimacs_file_g(std::string filename,       sgraph_temp<int, int, int>* g);
+    void parse_dimacs_file_digraph(std::string filename, sgraph_temp<int, int, int>* g);
 };
 
 
