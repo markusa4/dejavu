@@ -11,6 +11,8 @@ struct configstruct {
 
     bool CONFIG_WRITE_AUTOMORPHISMS = false;
 
+    bool CONFIG_EDGELIST_SORT = false;
+
     bool CONFIG_PREPROCESS = false;
 
     int CONFIG_BULK_ALLOCATION = 10;

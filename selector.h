@@ -142,7 +142,6 @@ public:
     int select_color(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type> *c, int seed) {
         if(c->cells == g->v_size)
             return -1;
-
         switch(config.CONFIG_IR_CELL_SELECTOR) {
             case 0:
                 return seeded_select_color(c, seed);
@@ -158,6 +157,8 @@ public:
 
     int select_color_dynamic(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type>  *c,
                              strategy *s) {
+        if(c->cells == g->v_size)
+            return -1;
         switch(s->cell_selector_type) {
             case SELECTOR_RANDOM:
                 return seeded_select_color(c, s->cell_selector_seed);

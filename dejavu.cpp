@@ -16,15 +16,12 @@
 // individualize and refine
 bool dejavu::proceed_state(dejavu_workspace* w, sgraph* g, coloring* c, invariant* I, int v, change_tracker* changes,
                            strategy_metrics* m) {
-    if(changes != nullptr)
-        changes->track(c->vertex_to_col[v]);
-
     const int init_color_class = w->R.individualize_vertex(c, v);
     bool comp = I->write_top_and_compare(INT32_MIN);
     comp && I->write_top_and_compare(INT32_MIN);
     comp = comp && I->write_top_and_compare(INT32_MAX);
 
-    comp = comp && w->R.refine_coloring(g, c, changes, I, init_color_class, changes != nullptr, m);
+    comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m);
     comp = comp && I->write_top_and_compare(INT32_MAX);
     comp = comp && I->write_top_and_compare(INT32_MIN);
     return comp;
@@ -417,7 +414,6 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
     }
 
     ++switches->experimental_paths;
-
     w->S.empty_cache();
 
     I->never_fail = true;
@@ -480,13 +476,9 @@ bool dejavu::uniform_from_bfs_search_with_storage(dejavu_workspace* w, sgraph* g
             if(w->R.certify_automorphism(g, automorphism)) {
                 automorphism->certified = true;
                 automorphism->non_uniform = false;
-                //if(i > 0) {
-                //    std::cout << "found on second" << std::endl;
-                //}
                 comp = true;
                 break;
             } else {
-                //std::cout << "should add / check more" << std::endl;
                 comp = false;
             }
         }
@@ -1090,6 +1082,17 @@ void dejavu::worker_thread(sgraph* g_, bool master, shared_workspace* switches, 
             W.work_I = new invariant;
             delete canon_strategy;
             return;
+        }
+
+        if(config.CONFIG_EDGELIST_SORT) {
+            if (start_c->cells == 1) {
+                for (int i = 0; i < start_c->lab_sz; ++i) {
+                    start_c->lab[i] = i;
+                    start_c->vertex_to_lab[i] = i;
+                }
+            }
+
+            g->sort_edgelist();
         }
 
         shrd_orbit = new int[g->v_size];

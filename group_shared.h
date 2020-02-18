@@ -7,7 +7,8 @@
 #include "concurrentqueue.h"
 #include "utility.h"
 
-struct dejavu_workspace;
+template <class vertex_type, class degree_type, class edge_type>
+struct dejavu_workspace_temp;
 
 class group_shared {
 public:

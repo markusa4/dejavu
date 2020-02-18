@@ -163,6 +163,14 @@ public:
         e_size = g->e_size;
         max_degree = g->max_degree;
     }
+
+    void sort_edgelist() {
+        for(int i = 0; i < v_size; ++i) {
+            const int estart = v[i];
+            const int eend   = estart + d[i];
+            std::sort(e + estart, e + eend);
+        }
+    }
 };
 
 typedef sgraph_temp<int, int, int> sgraph;

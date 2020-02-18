@@ -18,14 +18,8 @@ struct abort_code {
     int reason = 0;
 };
 
-struct base_cache {
-    coloring*       base_cache_colorings;
-    invariant*      base_cache_invariants;
-    bool*           base_cache_done;
-    std::atomic_int level_done;
-};
-
-struct alignas(64) dejavu_workspace {
+template <class vertex_type, class degree_type, class edge_type>
+struct alignas(64) dejavu_workspace_temp {
     // workspace for normal search
     refinement R;
     selector   S;
@@ -50,7 +44,7 @@ struct alignas(64) dejavu_workspace {
     int  my_base_points_sz;
     bool is_foreign_base;
 
-    group_shared*      G;
+    group_shared* G;
 
     coloring* start_c;
     invariant start_I;
@@ -59,11 +53,11 @@ struct alignas(64) dejavu_workspace {
     int id;
 
     // shared orbit and generators
-    int**       shared_orbit;
-    int**       shared_orbit_weights;
+    int** shared_orbit;
+    int** shared_orbit_weights;
     shared_permnode** shared_generators;
-    int*        shared_generators_size;
-    int         generator_fix_base_alloc = -1;
+    int*  shared_generators_size;
+    int   generator_fix_base_alloc = -1;
 
     // sequential, local group
     sequential_permnode*       sequential_gens;
@@ -89,7 +83,7 @@ struct alignas(64) dejavu_workspace {
     bfs_element* prev_bfs_element = nullptr;
     bool init_bfs = false;
 
-    ~dejavu_workspace() {
+    ~dejavu_workspace_temp() {
         if(init_bfs) {
             delete[] todo_dequeue;
             delete[] todo_elements,
@@ -105,6 +99,8 @@ struct alignas(64) dejavu_workspace {
         delete start_c;
     };
 };
+
+typedef dejavu_workspace_temp<int, int, int> dejavu_workspace;
 
 class dejavu {
 public:
