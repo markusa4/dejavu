@@ -178,14 +178,14 @@ private:
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
-            PRINT("[G] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+            PRINT("[Dej] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
             switches->current_mode = modes::MODE_TOURNAMENT;
 
             // first color refinement
             canon_strategy = new strategy_temp<vertex_type>;
             W.start_c = start_c;
             W.R.refine_coloring_first(g, start_c, -1);
-            PRINT("[G] First refinement: " << cref / 1000000.0 << "ms");
+            PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g, start_c, selector_seed);
             if(init_c == -1) {
@@ -236,7 +236,7 @@ private:
                                      dejavu_temp<vertex_type, degree_type, edge_type>(), g, false, switches, G, start_c,
                                      canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens,
                                      &_shared_group_size));
-            PRINT("[G] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
+            PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
             W.start_c = new coloring_temp<vertex_type>;
@@ -366,7 +366,7 @@ private:
                             W.BW->target_level.store(W.BW->current_level);
                         } else {
                             switches->reset_tolerance(W.BW->level_expecting_finished[W.BW->current_level], g->v_size);
-                            PRINT("[G] tolerance " << switches->tolerance);
+                            PRINT("[Dej] Tolerance: " << switches->tolerance);
                             PRINT("[BFS] Filling queue..." << W.BW->current_level << " -> " << W.BW->target_level)
                             bfs_fill_queue(&W);
                         }
@@ -612,7 +612,7 @@ private:
                                 if(!switches->experimental_look_close) {
                                     switches->experimental_look_close = true;
                                     switches->experimental_budget += W.BW->level_sizes[W.BW->current_level - 1];
-                                    PRINT("[UniLeaf] Switching to close look...");
+                                    PRINT("[UStore] Switching to close look...");
                                     continue;
                                 }
                             }
@@ -693,10 +693,10 @@ private:
                         if(switches->done_shared_group && W.BW->target_level >= 0) {
                             if(master && !switched1) {
                                 switched1 = true;
-                                PRINT("[NUni] Finished non-uniform automorphism search (" << *W.shared_generators_size
+                                PRINT("[BA] Finished non-uniform automorphism search (" << *W.shared_generators_size
                                                                                           << " generators, " << n_restarts << " restarts)")
-                                PRINT("[NUni] Ended in skiplevel " << W.skiplevels << ", found " << n_found)
-                                PRINT("[NUni] " << cref / 1000000.0 << "ms")
+                                PRINT("[BA] Ended in skiplevel " << W.skiplevels << ", found " << n_found)
+                                PRINT("[BA] " << cref / 1000000.0 << "ms")
                                 PRINT("[BFS] Determined target level: " << W.BW->target_level << "")
                             }
                             bfs_chunk(&W, g, canon_strategy, done, selector_seed);
@@ -719,7 +719,7 @@ private:
                                     *done = true;
                                     continue;
                                 }
-                                PRINT("[Uni] Starting uniform probe, tolerance: " << switches->tolerance)
+                                PRINT("[UTarget] Starting uniform probe, tolerance: " << switches->tolerance)
                                 switches->current_mode = modes::MODE_UNIFORM_PROBE;
                             } else {
                                 // did not reach the target level within tolerance? iterate!
@@ -730,12 +730,12 @@ private:
                                 n_found = 0;
                                 switched1 = false;
                                 bwork->reset_initial_target();
-                                PRINT("[Uni] Iterating, tolerance: " << switches->tolerance)
+                                PRINT("[UTarget] Iterating, tolerance: " << switches->tolerance)
                                 reset_skiplevels(&W);
                                 foreign_base_done = true;
                                 const int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
 
-                                PRINT("[UniLeaf] Switching to uniform with leaf storage, budget "
+                                PRINT("[UStore] Switching to uniform with leaf storage, budget "
                                               << bwork->level_sizes[bwork->current_level - 1] * budget_fac)
                                 switches->experimental_budget.store(bwork->level_sizes[bwork->current_level - 1] * budget_fac);
                                 switches->experimental_paths.store(0);
@@ -752,7 +752,7 @@ private:
                     reset_non_uniform_switch = true;
                     if(W.id == 0 && !switched2) {
                         switched2 = true;
-                        PRINT("[Uni] " << cref / 1000000.0 << "ms")
+                        PRINT("[UTarget] " << cref / 1000000.0 << "ms")
                     }
                     A = uniform_from_bfs_search(&W, g, canon_strategy, &automorphism, &restarts, switches, selector_seed);
                     if(A.reason == 2) // abort
@@ -768,7 +768,7 @@ private:
                         n_found = 0;
                         switched1 = false;
                         bwork->reset_initial_target();
-                        PRINT("[G] Tolerance: " << switches->tolerance)
+                        PRINT("[Dej] Tolerance: " << switches->tolerance)
                         reset_skiplevels(&W);
                         foreign_base_done = true;
                         switches->current_mode = MODE_NON_UNIFORM_PROBE_IT;
@@ -814,7 +814,7 @@ private:
         //}
 
         if(master && !dejavu_kill_request) {
-            PRINT("[G] Cleanup...")
+            PRINT("[Dej] Cleanup...")
             delete[] shrd_orbit;
             delete[] shrd_orbit_weights;
 
@@ -1007,7 +1007,7 @@ private:
 
                 if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base
                    && switches->current_mode != MODE_TOURNAMENT) {
-                    PRINT("[NUni] Orbit equals cell abort");
+                    PRINT("[BA] Orbit equals cell abort");
                     return abort_code(1);
                 }
 
@@ -1856,31 +1856,31 @@ typedef dejavu_temp<int, int, int> dejavu;
 void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
-            PRINT("[dispatch] <int32, int32, int32>" << std::endl);
+            PRINT("[Dispatch] <int32, int32, int32>");
             dejavu_temp<int, int, int> d;
             d.automorphisms(sgraph->sgraph_0, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_INT: {
-            PRINT("[dispatch] <int16, int16, int>" << std::endl);
+            PRINT("[Dispatch] <int16, int16, int>");
             dejavu_temp<int16_t, int16_t, int> d;
             d.automorphisms(sgraph->sgraph_1, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_SHORT: {
-            PRINT("[dispatch] <int16, int16, int16>" << std::endl);
+            PRINT("[Dispatch] <int16, int16, int16>");
             dejavu_temp<int16_t, int16_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_2, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_SHORT:{
-            PRINT("[dispatch] <int8, int8, int16>" << std::endl);
+            PRINT("[Dispatch] <int8, int8, int16>");
             dejavu_temp<int8_t, int8_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_3, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_CHAR: {
-            PRINT("[dispatch] <int8, int8, int8>" << std::endl);
+            PRINT("[Dispatch] <int8, int8, int8>");
             dejavu_temp<int8_t, int8_t, int8_t> d;
             d.automorphisms(sgraph->sgraph_4, gens);
         }
