@@ -9,6 +9,7 @@
 
 class alignas(16) invariant {
 public:
+    std::vector<int>* vec_cells     = nullptr;
     std::vector<int>* vec_invariant = nullptr;
     invariant*        compareI;
     std::vector<int>* compare_vec;
@@ -49,6 +50,18 @@ public:
         }
     }
 
+    inline void write_cells(int cells) {
+        if(!no_write) {
+            vec_cells->push_back(cells);
+        }
+    }
+
+    inline void fast_forward(int abort_marker) {
+        while((*compare_vec)[cur_pos] != abort_marker) {
+            write_top_and_compare((*compare_vec)[cur_pos + 1]);
+        }
+    }
+
     void reset_deviation() {
         comp_fail_pos = -2;
         comp_fail_val = -1;
@@ -58,7 +71,9 @@ public:
     void set_compare_invariant(invariant *I);
 
     void create_vector(int prealloc) {
+        vec_cells     = new std::vector<int>();
         vec_invariant = new std::vector<int>();
+        vec_cells->reserve(prealloc);
         vec_invariant->reserve(prealloc * 20);
     }
 

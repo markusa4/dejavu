@@ -160,8 +160,8 @@ public:
         sort_temp<T>(arr, cur_pos);
     }
 
-    int  cur_pos;
-    T*   arr;
+    int  cur_pos = 0;
+    T*   arr  = nullptr;
     bool init = false;
 private:
     int arr_sz = -1;
@@ -381,7 +381,7 @@ template<class vertex_type, class degree_type, class edge_type>
 class refinement_temp {
 public:
     bool refine_coloring(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type> *c,
-                         invariant *I, int init_color_class, strategy_metrics *m) {
+                         invariant *I, int init_color_class, strategy_metrics *m, int cell_early) {
         bool comp = true;
         assure_initialized(g);
 
@@ -457,6 +457,16 @@ public:
                 if(c->cells == g->v_size) {
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
+                    I->write_cells(c->cells);
+                    comp = comp && I->write_top_and_compare(ENDREF_MARK);
+                    return comp;
+                }
+
+                // fast forward coloring
+                if(c->cells == cell_early) {
+                    I->fast_forward(ENDREF_MARK);
+                    color_class_splits.reset();
+                    cell_todo.reset(&queue_pointer);
                     return comp;
                 }
 
@@ -485,6 +495,8 @@ public:
             if(!comp) break;
         }
 
+        I->write_cells(c->cells);
+        comp = comp && I->write_top_and_compare(ENDREF_MARK);
         assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
 
         return comp;
@@ -1049,7 +1061,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
             //vertex_worklist.cur_pos = col_sz;
             pos = col_sz;
 
@@ -1184,7 +1196,7 @@ private:
             vertex_worklist.reset();
 
             // copy cell for rearranging
-            memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(int));
+            memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(vertex_type));
             vertex_worklist.cur_pos = col_sz;
 
             // determine colors and rearrange
@@ -1513,7 +1525,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
             pos = col_sz;
 
             // determine colors and rearrange
@@ -1621,7 +1633,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
             pos = col_sz;
 
             // determine colors and rearrange

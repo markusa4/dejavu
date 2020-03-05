@@ -88,6 +88,14 @@ int commandline_mode(int argc, char **argv) {
             permute_graph = true;
         }
 
+        if (arg == "--REF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = true;
+        }
+
+        if (arg == "--NOREF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = false;
+        }
+
         if (arg == "--COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;

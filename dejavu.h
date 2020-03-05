@@ -12,6 +12,8 @@
 #include "group_shared.h"
 #include "schreier_sequential.h"
 
+thread_local int numnodes = 0;
+
 struct abort_code {
     abort_code()=default;
     abort_code(int reason):reason(reason){};
@@ -407,6 +409,7 @@ private:
                         }
 
                         std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
+                        std::cout << "Numnodes: " << numnodes << std::endl;
                     } else {
                         while (!work_threads.empty()) {
                             work_threads[work_threads.size() - 1].join();
@@ -866,7 +869,7 @@ private:
             const int v = c->lab[rpos];
 
             // individualize and refine
-            proceed_state(w, g, c, I, v, nullptr, nullptr);
+            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
             assert(c->vertex_to_col[v] > 0);
 
             // base point
@@ -916,7 +919,7 @@ private:
         while(w->first_skiplevel <= w->skiplevels) {
             m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
             if(*done) return abort_code(0);
-            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m);
+            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m, -1);
             w->first_skiplevel += 1;
             if(!w->is_foreign_base)
                 w->skip_schreier_level = w->skip_schreier_level->next;
@@ -960,7 +963,8 @@ private:
 
                 if(w->first_skiplevel <= w->skiplevels) {
                     m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
-                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m);
+                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1],
+                            nullptr, m, -1);
                     w->first_skiplevel += 1;
                     if(!w->is_foreign_base) {
                         w->skip_schreier_level = w->skip_schreier_level->next;
@@ -1040,7 +1044,8 @@ private:
                 }
             }
 
-            bool comp = proceed_state(w, g, c, I, v, nullptr, m);
+            const int cell_early = (*I->compareI->vec_cells)[level - 1];
+            bool comp = proceed_state(w, g, c, I, v, nullptr, m, cell_early);
             level += 1;
 
             if(!comp) {
@@ -1164,7 +1169,7 @@ private:
                     continue;
                 }
                 automorphism->certified = true;
-                assert(g->certify_automorphism(*automorphism));
+                // assert(g->certify_automorphism(*automorphism));
                 return abort_code();
             }
 
@@ -1184,7 +1189,7 @@ private:
 
             group_level = group_level->next;
             level += 1;
-            const bool comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
+            const bool comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
 
             if(!comp) {
                 backtrack = true;
@@ -1195,13 +1200,16 @@ private:
 
     bool proceed_state(dejavu_workspace_temp<vertex_type, degree_type, edge_type>* w,
                        sgraph_temp<vertex_type, degree_type, edge_type> * g, coloring_temp<vertex_type>* c,
-                       invariant* I, int v, change_tracker* changes, strategy_metrics* m) {
+                       invariant* I, int v, change_tracker* changes, strategy_metrics* m, int cell_early) {
+        if(!config.CONFIG_IR_CELL_EARLY)
+            cell_early = -1;
+
         const int init_color_class = w->R.individualize_vertex(c, v);
         bool comp = I->write_top_and_compare(INT32_MIN);
         comp && I->write_top_and_compare(INT32_MIN);
         comp = comp && I->write_top_and_compare(INT32_MAX);
 
-        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m);
+        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early);
         comp = comp && I->write_top_and_compare(INT32_MAX);
         comp = comp && I->write_top_and_compare(INT32_MIN);
         return comp;
@@ -1363,9 +1371,11 @@ private:
                     w->work_c->copy(elem->c);
                 }
 
+                numnodes++;
                 // compute next coloring
                 w->work_I->reset_deviation();
-                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, nullptr); // &w->changes
+                const int cells_early = (*w->work_I->compareI->vec_cells)[elem->base_sz];
+                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, nullptr, cells_early); // &w->changes
 
                 // manage abort map counter
                 if (comp && elem->is_identity && level > 1) {
@@ -1742,7 +1752,7 @@ private:
             I->reset_deviation();
             if (look_close)
                 I->never_fail = true;
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
+            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
 
             if (!comp) { // fail on first level, set abort_val and abort_pos in elem
                 // need to sync this write?
@@ -1769,7 +1779,7 @@ private:
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
 
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr);
+            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
         } while(comp);
 
         if(comp && (strat->I->acc == I->acc)) { // automorphism computed
@@ -1839,31 +1849,31 @@ typedef dejavu_temp<int, int, int> dejavu;
 void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
-            std::cout << "[dispatch] <int, int, int>" << std::endl;
+            PRINT("[dispatch] <int32, int32, int32>" << std::endl);
             dejavu_temp<int, int, int> d;
             d.automorphisms(sgraph->sgraph_0, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_INT: {
-            std::cout << "[dispatch] <int16, int16, int>" << std::endl;
+            PRINT("[dispatch] <int16, int16, int>" << std::endl);
             dejavu_temp<int16_t, int16_t, int> d;
             d.automorphisms(sgraph->sgraph_1, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_SHORT: {
-            std::cout << "[dispatch] <int16, int16, int16>" << std::endl;
+            PRINT("[dispatch] <int16, int16, int16>" << std::endl);
             dejavu_temp<int16_t, int16_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_2, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_SHORT:{
-            std::cout << "[dispatch] <int8, int8, int16>" << std::endl;
+            PRINT("[dispatch] <int8, int8, int16>" << std::endl);
             dejavu_temp<int8_t, int8_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_3, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_CHAR: {
-            std::cout << "[dispatch] <int8, int8, int8>" << std::endl;
+            PRINT("[dispatch] <int8, int8, int8>" << std::endl);
             dejavu_temp<int8_t, int8_t, int8_t> d;
             d.automorphisms(sgraph->sgraph_4, gens);
         }

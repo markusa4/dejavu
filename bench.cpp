@@ -237,6 +237,14 @@ int commandline_mode(int argc, char **argv) {
             comp_dejavu = false;
         }
 
+        if (arg == "--REF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = true;
+        }
+
+        if (arg == "--NOREF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = false;
+        }
+
         if (arg == "--THREADS") {
             if (i + 1 < argc) {
                 i++;
