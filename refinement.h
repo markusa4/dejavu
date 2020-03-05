@@ -441,6 +441,9 @@ public:
                 bool is_largest = color_class_splits.last()->second;
 
                 c->cells += (old_class != new_class);
+                const int class_size = c->ptn[new_class];
+                c->smallest_cell_lower_bound = (class_size < c->smallest_cell_lower_bound)?
+                                               class_size:c->smallest_cell_lower_bound;
 
 #ifndef NDEBUG // debug code
                 if(color_class_splits.empty()) {
@@ -578,6 +581,10 @@ public:
                 const bool is_largest = color_class_splits.last()->second;
 
                 c->cells += (old_class != new_class);
+                const int class_size             = c->ptn[new_class] + 1;
+                const int class_size_non_trivial = (class_size == 1)?INT32_MAX:class_size;
+                c->smallest_cell_lower_bound = (class_size < c->smallest_cell_lower_bound)?
+                        class_size:c->smallest_cell_lower_bound;
 
 #ifndef NDEBUG // debug code
                 if(color_class_splits.empty()) {

@@ -53,6 +53,7 @@ public:
     vertex_type* vertex_to_lab;
 
     int cells = 1;
+    int smallest_cell_lower_bound = INT32_MAX;
 
     ~coloring_temp() {
         if(init) {

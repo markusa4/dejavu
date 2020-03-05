@@ -108,10 +108,12 @@ public:
                 skipstart = i;
                 only_trivial = false;
             }
-            if(c->ptn[i] < smallest_cell_sz && c->ptn[i] > 0) {
+            if((c->ptn[i] + 1) < smallest_cell_sz && c->ptn[i] > 0) {
                 smallest_cell = i;
-                smallest_cell_sz = c->ptn[i];
+                smallest_cell_sz = (c->ptn[i] + 1);
                 if(smallest_cell_sz == 2)
+                    break;
+                if(smallest_cell_sz == c->smallest_cell_lower_bound)
                     break;
             }
             i += c->ptn[i] + 1;
