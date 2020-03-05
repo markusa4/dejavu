@@ -318,7 +318,8 @@ private:
                 if(dejavu_kill_request) *done = true;
 
                 // manage sifting results
-                G->manage_results(switches);
+                if(!switches->done)
+                    G->manage_results(switches);
 
                 // non-uniform search over, fix a group state for collaborative bfs_workspace
                 if(switches->done_fast && !switches->done_shared_group && !switches->done) {
@@ -712,6 +713,12 @@ private:
                                 bfs_fill_queue(&W);
                             if(bwork->reached_initial_target) {
                                 // reached the desired target level? go to next phase!
+                                if(bwork->current_level - 1 >= 0 && bwork->level_sizes[bwork->current_level - 1] == 1
+                                                                 && bwork->current_level == bwork->base_size + 1) {
+                                    PRINT("[BFS] Early-out");
+                                    *done = true;
+                                    continue;
+                                }
                                 PRINT("[Uni] Starting uniform probe, tolerance: " << switches->tolerance)
                                 switches->current_mode = modes::MODE_UNIFORM_PROBE;
                             } else {

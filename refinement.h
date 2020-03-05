@@ -909,14 +909,16 @@ private:
                 neighbours.set(v, -1);
                 if(v_new_color == _col)
                     continue;
+
                 const int vertex_old_pos = c->vertex_to_lab[v];
                 const int vertex_at_pos  = c->lab[v_new_color + c->ptn[v_new_color] + 1];
                 c->lab[vertex_old_pos]          = vertex_at_pos;
                 c->vertex_to_lab[vertex_at_pos] = vertex_old_pos;
 
-                c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
+                const int new_color_sz = c->ptn[v_new_color] + 1;
+                c->lab[v_new_color + new_color_sz] = v;
                 c->vertex_to_col[v] = v_new_color;
-                c->vertex_to_lab[v] = v_new_color + c->ptn[v_new_color] + 1;
+                c->vertex_to_lab[v] = v_new_color + new_color_sz;
                 c->ptn[v_new_color] += 1;
 
                 if (_col != v_new_color) {

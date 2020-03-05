@@ -80,10 +80,19 @@ public:
         } else {
             cells = c->cells;
             if(!efficient_alloc || !c->efficient_alloc) {
-                memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
+                for(int i = 0; i < c->ptn_sz;) {
+                    const int rd = c->ptn[i];
+                    ptn[i] = rd;
+                    i += rd +1;
+                }
                 memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_type));
             } else {
-                memcpy(ptn, c->ptn, 2 * c->ptn_sz * sizeof(vertex_type));
+                for(int i = 0; i < c->ptn_sz;) {
+                    const int rd = c->ptn[i];
+                    ptn[i] = rd;
+                    i += rd +1;
+                }
+                memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_type));
             }
             return;
         }
