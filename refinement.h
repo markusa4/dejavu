@@ -500,7 +500,7 @@ public:
 
         I->write_cells(c->cells);
         comp = comp && I->write_top_and_compare(ENDREF_MARK);
-        assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
+        // assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
 
         return comp;
     }
@@ -522,6 +522,7 @@ public:
         c->vertex_to_col[v] = color + color_class_size;
 
         c->ptn[color] -= 1;
+        c->ptn[color + color_class_size] = 0;
         c->ptn[color + color_class_size - 1] = 0;
         c->cells += 1;
         return color + color_class_size;
@@ -602,7 +603,7 @@ public:
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     assert(c->check());
-                    assert(assert_is_equitable(g, c));
+                    // assert(assert_is_equitable(g, c));
                     return true;
                 }
 
@@ -631,7 +632,7 @@ public:
         }
 
         assert(c->check());
-        assert(assert_is_equitable(g, c));
+        // assert(assert_is_equitable(g, c));
         return true;
     }
 
@@ -1140,7 +1141,6 @@ private:
             const int col    = j;
             j     += c->ptn[j] + 1;
             const int col_sz = c->ptn[col] + 1;
-
             if(col_sz == 1) {
                 const int v_degree = neighbours.get(c->lab[col]) + 1;
                 if(v_degree == -1) // not connected! skip...

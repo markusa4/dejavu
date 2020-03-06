@@ -81,17 +81,19 @@ public:
             cells = c->cells;
             if(!efficient_alloc || !c->efficient_alloc) {
                 for(int i = 0; i < c->ptn_sz;) {
-                    const int rd = c->ptn[i];
+                    const vertex_type rd = c->ptn[i];
                     ptn[i] = rd;
                     i += rd +1;
                 }
+                // memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
                 memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_type));
             } else {
                 for(int i = 0; i < c->ptn_sz;) {
-                    const int rd = c->ptn[i];
+                    const vertex_type rd = c->ptn[i];
                     ptn[i] = rd;
                     i += rd +1;
                 }
+                // memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
                 memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_type));
             }
             return;
@@ -99,21 +101,28 @@ public:
         }
 
         if(!init) {
-        std::pair<vertex_type*, vertex_type*> alloc = coloring_bulk_allocator<vertex_type>(c->lab_sz * 4);
-        bulk_alloc = alloc.first;
-        bulk_pt    = alloc.second;
+            std::pair<vertex_type*, vertex_type*> alloc = coloring_bulk_allocator<vertex_type>(c->lab_sz * 4);
+            bulk_alloc = alloc.first;
+            bulk_pt    = alloc.second;
 
-        lab           = bulk_pt;
-        ptn           = lab + c->lab_sz;
-        vertex_to_col = lab + c->lab_sz * 2;
-        vertex_to_lab = lab + c->lab_sz * 3;
-        efficient_alloc = true;
+            lab           = bulk_pt;
+            ptn           = lab + c->lab_sz;
+            vertex_to_col = lab + c->lab_sz * 2;
+            vertex_to_lab = lab + c->lab_sz * 3;
+            efficient_alloc = true;
         }
 
-        // color_choices = c->color_choices;
-
+        if(c->cells > c->ptn_sz / 4) {
+            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
+        } else {
+            for (int i = 0; i < c->ptn_sz;) {
+                const vertex_type rd = c->ptn[i];
+                ptn[i] = rd;
+                i += rd + 1;
+            }
+        }
+        // memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
         memcpy(lab, c->lab, c->lab_sz*sizeof(vertex_type));
-        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(vertex_type));
         memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(vertex_type));
         memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(vertex_type));
 
@@ -144,10 +153,16 @@ public:
         efficient_alloc = true;
         }
 
-        // color_choices = c->color_choices;
-
+        if(c->cells > c->ptn_sz / 4) {
+            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_type));
+        } else {
+            for (int i = 0; i < c->ptn_sz;) {
+                const vertex_type rd = c->ptn[i];
+                ptn[i] = rd;
+                i += rd + 1;
+            }
+        }
         memcpy(lab, c->lab, c->lab_sz*sizeof(vertex_type));
-        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(vertex_type));
         memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(vertex_type));
         memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(vertex_type));
 
@@ -187,11 +202,11 @@ public:
         }
 
         // assert proper ptn
-        for(int i = 0; i < lab_sz;) {
+        /*for(int i = 0; i < lab_sz;) {
             if(i != 0)
                 comp = comp && (ptn[i - 1] == 0);
             i += ptn[i] + 1;
-        }
+        }*/
 
         return comp;
     }
