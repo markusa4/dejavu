@@ -225,6 +225,16 @@ int commandline_mode(int argc, char **argv) {
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
         }
 
+        if (arg == "--KDEVIATION") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
+            } else {
+                std::cerr << "--kdeviation option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
         if (arg == "--NO_NAUTY") {
             comp_nauty = false;
         }

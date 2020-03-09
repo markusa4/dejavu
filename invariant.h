@@ -10,7 +10,9 @@
 class alignas(16) invariant {
 public:
     std::vector<int>* vec_cells     = nullptr;
+    std::vector<int>* vec_protocol  = nullptr;
     std::vector<int>* vec_invariant = nullptr;
+
     invariant*        compareI;
     std::vector<int>* compare_vec;
     bool has_compare = false;
@@ -27,14 +29,13 @@ public:
         acc += i * (35235237 - i * 5);
         if(no_write) {
             const bool comp = (comp_fail_pos == -2) && ((*compare_vec)[++cur_pos] == i);
-            //comp = comp && (comp_fail_pos == -2);
             if(!comp) {
                 if(comp_fail_pos == -2) {
                     comp_fail_pos = cur_pos;
                     comp_fail_val = i;
                     comp_fail_acc = i;
                 }
-                comp_fail_acc += i * (35235235 - i * 3); // could just use acc instead
+                comp_fail_acc += i * (352355 - i * 3); // could just use acc instead
             }
             return (comp || never_fail);
         } else {
@@ -56,6 +57,12 @@ public:
         }
     }
 
+    inline void write_protocol(int cell) {
+        if(!no_write) {
+            vec_protocol->push_back(cell);
+        }
+    }
+
     inline void fast_forward(int abort_marker) {
         while((*compare_vec)[cur_pos] != abort_marker) {
             write_top_and_compare((*compare_vec)[cur_pos + 1]);
@@ -72,6 +79,7 @@ public:
 
     void create_vector(int prealloc) {
         vec_cells     = new std::vector<int>();
+        vec_protocol  = new std::vector<int>();
         vec_invariant = new std::vector<int>();
         vec_cells->reserve(prealloc);
         vec_invariant->reserve(prealloc * 20);

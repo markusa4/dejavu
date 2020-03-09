@@ -370,6 +370,10 @@ public:
         return (cur_pos == 0);
     }
 
+    int size() {
+        return cur_pos;
+    }
+
 private:
     int* arr = nullptr;
     int  arr_sz  = -1;
@@ -384,6 +388,10 @@ public:
                          invariant *I, int init_color_class, strategy_metrics *m, int cell_early) {
         bool comp = true;
         assure_initialized(g);
+
+        int   splitcost = 0;
+        int nosplitcost = 0;
+        int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
 
         cell_todo.reset(&queue_pointer);
 
@@ -401,37 +409,51 @@ public:
         while(!cell_todo.empty()) {
             its += 1;
             color_class_splits.reset();
-            const int next_color_class    = cell_todo.next_cell(&queue_pointer, c);
-            const int next_color_class_sz = c->ptn[next_color_class] + 1;
+            const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
+            I->write_protocol(next_color_class);
 
+            const int next_color_class_sz = c->ptn[next_color_class] + 1;
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
 
+            colorcost += next_color_class_sz;
+
             bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+
+            const bool pre_comp = comp;
+            comp = true;
 
             if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
                 // singleton
-                comp = comp && refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
+                comp = (comp) && refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
                                                             &color_class_splits, I);
             } else if(config.CONFIG_IR_DENSE) {
                 if(dense_dense) { // dense-dense
-                    comp = comp && refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
+                    comp = (comp) && refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
                                                                   &color_class_splits, I);
                 } else { // dense-sparse
-                    comp = comp && refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
+                    comp = (comp) && refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
                                                             &color_class_splits, I);
                 }
             } else { // sparse
-                comp = comp && refine_color_class_sparse(g, c, next_color_class, next_color_class_sz, &color_class_splits, I);
+                comp = (comp) && refine_color_class_sparse(g, c, next_color_class, next_color_class_sz, &color_class_splits, I);
             }
-            if(!comp)
+
+            comp = comp && pre_comp;
+
+            deviation_expander -= (comp == false);
+            if(!comp && deviation_expander <= 0) {
                 break;
+            } else if(!comp) {
+                // std::cout << "Expanding deviation " << deviation_expander << ", " << I->comp_fail_acc << std::endl;
+            }
 
             // add all new classes except for the first, largest one
             int skip = 0;
 
             int  latest_old_class = -1;
-            bool skipped_largest = false;
+            bool skipped_largest  = false;
+            const int pre_cells   = c->cells;
 
             // color class splits are sorted in reverse
             // the old color class will always come last
@@ -458,15 +480,28 @@ public:
 #endif
 
                 if(c->cells == g->v_size) {
+                    if(I->no_write == false) {
+                        const int new_cells = c->cells - pre_cells;
+                        //std::cout << new_cells << " (cost: " << next_color_class_sz << ")" << std::endl;
+                        if(new_cells == 0) {
+                            nosplitcost += next_color_class_sz;
+                        } else {
+                            splitcost   += next_color_class_sz;
+                        }
+                        std::cout << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
+                    }
+
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     I->write_cells(c->cells);
                     comp = comp && I->write_top_and_compare(ENDREF_MARK);
+                    I->write_protocol(ENDREF_MARK);
                     return comp;
                 }
 
                 // fast forward coloring
-                if(c->cells == cell_early) {
+                if(c->cells == cell_early && comp) {
+                    //std::cout << "early out " << cell_todo.size() << std::endl;
                     I->fast_forward(ENDREF_MARK);
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
@@ -495,11 +530,30 @@ public:
                     }
                 }
             }
-            if(!comp) break;
+
+            const int new_cells = c->cells - pre_cells;
+
+            if(I->no_write == false) {
+                //std::cout << new_cells << " (cost: " << next_color_class_sz << ")" << std::endl;
+                if(new_cells == 0) {
+                    nosplitcost += next_color_class_sz;
+                } else {
+                    splitcost   += next_color_class_sz;
+                }
+            }
+
+            if(!comp && deviation_expander <= 0) break;
         }
 
-        I->write_cells(c->cells);
-        comp = comp && I->write_top_and_compare(ENDREF_MARK);
+        if(I->no_write == false) {
+            //std::cout << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
+        }
+
+        if(comp) {
+            I->write_cells(c->cells);
+            comp = comp && I->write_top_and_compare(ENDREF_MARK);
+            I->write_protocol(ENDREF_MARK);
+        }
         // assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
 
         return comp;
@@ -998,7 +1052,7 @@ private:
 
         comp = comp && I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos);
 
-        if(!comp) return comp;
+        // if(!comp) return comp;
 
         if(config.CONFIG_IR_FULL_INVARIANT) {
             vertex_worklist.sort();
@@ -1010,7 +1064,7 @@ private:
             comp = comp && I->write_top_and_compare(singleton_inv);
         }
 
-        if(!comp) return comp;
+        // if(!comp) return comp;
 
         old_color_classes.sort();
 
@@ -1042,7 +1096,7 @@ private:
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
             comp = comp && I->write_top_and_compare(vertex_worklist.cur_pos);
-            if(!comp) return comp;
+            // if(!comp) return comp;
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
@@ -1066,7 +1120,7 @@ private:
                     const int v_degree = i;
                     comp = comp && I->write_top_and_compare(_col + g->v_size * v_degree);
                     comp = comp && I->write_top_and_compare(_col + val + 1);
-                    if(!comp) return comp;
+                    // if(!comp) return comp;
                 }
             }
 
@@ -1146,7 +1200,7 @@ private:
                 if(v_degree == -1) // not connected! skip...
                     continue;
                 comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
-                if(!comp) {neighbours.reset_hard(); return comp;}
+                //if(!comp) {neighbours.reset_hard(); return comp;}
                 continue;
             }
 
@@ -1170,7 +1224,7 @@ private:
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
             comp = comp && I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos);
-            if(!comp) {neighbours.reset_hard(); return comp;}
+            // if(!comp) {neighbours.reset_hard(); return comp;}
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
@@ -1178,7 +1232,7 @@ private:
                 //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
                 comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
                 comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
-                if(!comp) {neighbours.reset_hard(); return comp;}
+                // if(!comp) {neighbours.reset_hard(); return comp;}
                 continue;
             }
 
@@ -1198,7 +1252,7 @@ private:
                     comp = comp && I->write_top_and_compare(-g->v_size * 5 - _col);
                     comp = comp && I->write_top_and_compare(_col + v_degree);
                     comp = comp && I->write_top_and_compare(_col + val + 1);
-                    if(!comp) {neighbours.reset_hard(); return comp;}
+                    // if(!comp) {neighbours.reset_hard(); return comp;}
                 }
             }
 
@@ -1290,11 +1344,11 @@ private:
         if(!config.CONFIG_IR_FULL_INVARIANT)
             comp = comp && I->write_top_and_compare(g->v_size * 3 + singleton_inv);
 
-        if(!comp) {
+        /*if(!comp) {
             while(!old_color_classes.empty())
                 neighbours.set(old_color_classes.pop_back(), -1);
             return comp;
-        }
+        }*/
 
         old_color_classes.sort();
 
@@ -1306,19 +1360,19 @@ private:
         }
 
         // sort and write down singletons in invariant
-        if(comp && config.CONFIG_IR_FULL_INVARIANT)
+        if(config.CONFIG_IR_FULL_INVARIANT)
             vertex_worklist.sort();
 
-        for(i = 0; i < vertex_worklist.cur_pos && comp; ++i) {
+        for(i = 0; i < vertex_worklist.cur_pos; ++i) {
             comp = comp && I->write_top_and_compare(g->v_size * 11 + vertex_worklist.arr[i]); // size
             // should contain information about color degree
         }
 
-        if(!comp) {
+        /*if(!comp) {
             while(!old_color_classes.empty())
                 neighbours.set(old_color_classes.pop_back(), -1);
             return comp;
-        }
+        }*/
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();

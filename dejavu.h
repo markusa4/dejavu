@@ -12,8 +12,6 @@
 #include "group_shared.h"
 #include "schreier_sequential.h"
 
-thread_local int numnodes = 0;
-
 struct abort_code {
     abort_code()=default;
     abort_code(int reason):reason(reason){};
@@ -143,6 +141,9 @@ private:
                        bfs_workspace_temp<vertex_type> *bwork, shared_permnode **gens, int *shared_group_size) {
         sgraph_temp<vertex_type, degree_type, edge_type> *g = g_;
         dejavu_workspace_temp<vertex_type, degree_type, edge_type> W;
+
+        numnodes  = 0;
+        colorcost = 0;
 
         // preprocessing
         if(master) {
@@ -410,7 +411,8 @@ private:
                         }
 
                         std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
-                        std::cout << "Numnodes: " << numnodes << std::endl;
+                        std::cout << "Numnodes (master): " << numnodes << std::endl;
+                        std::cout << "Colorcost (master): " << colorcost << std::endl;
                     } else {
                         while (!work_threads.empty()) {
                             work_threads[work_threads.size() - 1].join();
