@@ -1758,10 +1758,14 @@ private:
             const int col = elem->target_color;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
+            int cell_early = -1;
             I->reset_deviation();
-            if (look_close)
+            if (look_close) {
                 I->never_fail = true;
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            } else {
+                cell_early = (*I->compareI->vec_cells)[elem->base_sz];
+            }
+            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
 
             if (!comp) { // fail on first level, set abort_val and abort_pos in elem
                 // need to sync this write?
