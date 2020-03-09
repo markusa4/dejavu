@@ -7,11 +7,13 @@
 #include <iostream>
 #include "assert.h"
 
+enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
+
 class alignas(16) invariant {
 public:
-    std::vector<int>* vec_cells     = nullptr;
-    std::vector<int>* vec_protocol  = nullptr;
-    std::vector<int>* vec_invariant = nullptr;
+    std::vector<int>*  vec_cells     = nullptr;
+    std::vector<cell_state>* vec_protocol  = nullptr;
+    std::vector<int>*  vec_invariant = nullptr;
 
     invariant*        compareI;
     std::vector<int>* compare_vec;
@@ -22,6 +24,7 @@ public:
     int  comp_fail_val = -1;
     long comp_fail_acc = -1;
     int  cur_pos = -1;
+    int  protocol_pos = -1;
     long acc     = 0;
 
     // currently a bit convoluted, really should be split into 2 functions...
@@ -57,9 +60,28 @@ public:
         }
     }
 
-    inline void write_protocol(int cell) {
+    inline void write_protocol(bool active_cell, int c) {
         if(!no_write) {
-            vec_protocol->push_back(cell);
+            ++protocol_pos;
+            vec_protocol->push_back(active_cell?cell_state::CELL_ACTIVE:cell_state::CELL_IDLE);
+        }
+    }
+
+    inline void mark_protocol() {
+        if(!no_write) {
+            ++protocol_pos;
+            vec_protocol->push_back(CELL_END);
+        }
+    }
+
+    inline bool read_protocol(int c) {
+        ++protocol_pos;
+        return (*compareI->vec_protocol)[protocol_pos] == cell_state::CELL_ACTIVE;
+    }
+
+    inline void skip_to_mark_protocol() {
+        while((*compareI->vec_protocol)[protocol_pos] != cell_state::CELL_END) {
+            ++protocol_pos;
         }
     }
 
@@ -79,9 +101,10 @@ public:
 
     void create_vector(int prealloc) {
         vec_cells     = new std::vector<int>();
-        vec_protocol  = new std::vector<int>();
+        vec_protocol  = new std::vector<cell_state>();
         vec_invariant = new std::vector<int>();
         vec_cells->reserve(prealloc);
+        vec_protocol->reserve(prealloc);
         vec_invariant->reserve(prealloc * 20);
     }
 

@@ -410,11 +410,18 @@ public:
             its += 1;
             color_class_splits.reset();
             const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
-            I->write_protocol(next_color_class);
-
             const int next_color_class_sz = c->ptn[next_color_class] + 1;
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
+            comp = comp && I->write_top_and_compare(INV_MARK_STARTCELL);
+
+            if(I->no_write && !I->never_fail && comp) {
+                const bool skip = !I->read_protocol(next_color_class);
+                if(skip) {
+                    I->fast_forward(INV_MARK_ENDCELL);
+                    continue;
+                }
+            }
 
             colorcost += next_color_class_sz;
 
@@ -441,11 +448,9 @@ public:
 
             comp = comp && pre_comp;
 
-            deviation_expander -= (comp == false);
+            deviation_expander -= (!comp);
             if(!comp && deviation_expander <= 0) {
                 break;
-            } else if(!comp) {
-                // std::cout << "Expanding deviation " << deviation_expander << ", " << I->comp_fail_acc << std::endl;
             }
 
             // add all new classes except for the first, largest one
@@ -480,29 +485,31 @@ public:
 #endif
 
                 if(c->cells == g->v_size) {
-                    if(I->no_write == false) {
-                        const int new_cells = c->cells - pre_cells;
-                        //std::cout << new_cells << " (cost: " << next_color_class_sz << ")" << std::endl;
-                        if(new_cells == 0) {
-                            nosplitcost += next_color_class_sz;
-                        } else {
-                            splitcost   += next_color_class_sz;
-                        }
-                        std::cout << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
+                    const int new_cells = c->cells - pre_cells;
+                    if(new_cells == 0) {
+                        nosplitcost += next_color_class_sz;
+                    } else {
+                        splitcost   += next_color_class_sz;
                     }
+                    //std::cout << I->no_write << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
 
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     I->write_cells(c->cells);
-                    comp = comp && I->write_top_and_compare(ENDREF_MARK);
-                    I->write_protocol(ENDREF_MARK);
+                    I->write_protocol(true, next_color_class);
+                    I->mark_protocol();
+                    if(I->no_write)
+                        I->skip_to_mark_protocol();
+                    comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
+                    comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
                     return comp;
                 }
 
                 // fast forward coloring
                 if(c->cells == cell_early && comp) {
                     //std::cout << "early out " << cell_todo.size() << std::endl;
-                    I->fast_forward(ENDREF_MARK);
+                    I->fast_forward(INV_MARK_ENDREF);
+                    I->skip_to_mark_protocol();
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     return comp;
@@ -533,26 +540,27 @@ public:
 
             const int new_cells = c->cells - pre_cells;
 
-            if(I->no_write == false) {
-                //std::cout << new_cells << " (cost: " << next_color_class_sz << ")" << std::endl;
-                if(new_cells == 0) {
-                    nosplitcost += next_color_class_sz;
-                } else {
-                    splitcost   += next_color_class_sz;
-                }
+            if(new_cells == 0) {
+                nosplitcost += next_color_class_sz;
+            } else {
+                splitcost   += next_color_class_sz;
             }
 
+            I->write_protocol(new_cells > 0, next_color_class);
+            comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
             if(!comp && deviation_expander <= 0) break;
         }
 
-        if(I->no_write == false) {
-            //std::cout << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
-        }
+        //if(I->no_write == false) {
+        //std::cout << I->no_write << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
+        //}
 
         if(comp) {
+            I->mark_protocol();
+            if(I->no_write)
+                I->skip_to_mark_protocol();
             I->write_cells(c->cells);
-            comp = comp && I->write_top_and_compare(ENDREF_MARK);
-            I->write_protocol(ENDREF_MARK);
+            comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
         }
         // assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
 

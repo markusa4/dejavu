@@ -10,7 +10,10 @@
 
 int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
-#define ENDREF_MARK (INT32_MAX - 5)
+
+#define INV_MARK_ENDREF    (INT32_MAX - 5)
+#define INV_MARK_STARTCELL (INT32_MAX - 6)
+#define INV_MARK_ENDCELL   (INT32_MAX - 7)
 
 #define PRINT(str) std::cout << str << std::endl;
 //#define PRINT(str) (void)0;
