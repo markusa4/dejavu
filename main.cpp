@@ -30,8 +30,9 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 void bench_dejavu(sgraph *g, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    dejavu d;
-    d.automorphisms(g, nullptr);
+    dejavu_automorphisms(g, nullptr);
+    //dejavu d;
+    //d.automorphisms(g, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }
@@ -87,6 +88,19 @@ int commandline_mode(int argc, char **argv) {
             permute_graph = true;
         }
 
+        if (arg == "--REF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = true;
+        }
+
+        if (arg == "--NOREF_EARLYOUT") {
+            config.CONFIG_IR_CELL_EARLY = false;
+        }
+
+        if (arg == "--COMPRESS") {
+            config.CONFIG_PREPROCESS_COMPRESS      = true;
+            config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
+        }
+
         if (arg == "--PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
@@ -121,8 +135,8 @@ int commandline_mode(int argc, char **argv) {
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
-        bijection pr;
-        bijection::random_bijection(&pr, g->v_size, seed);
+        bijection<int> pr;
+        bijection<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
         delete g;
     } else {

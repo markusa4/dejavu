@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <random>
 #include <unordered_map>
+#include "configuration.h"
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -10,12 +11,23 @@
 int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 
+#define INV_MARK_ENDREF    (INT32_MAX - 5)
+#define INV_MARK_STARTCELL (INT32_MAX - 6)
+#define INV_MARK_ENDCELL   (INT32_MAX - 7)
 
-//#define PRINT(str) std::cout << str << std::endl;
-#define PRINT(str) (void)0;
+#define MASH0(i) (i * (35235237 - i * 5))
+#define MASH1(i) (i * (352355 - i * 3))
+#define MASH2(i) ((i + 1) * (423733 - (i + 1)))
+#define MASH3(i) ((i + 1) * (423233 - (i + 1)))
+#define MASH4(i) ((i + 1) * (23524361 - i * 3))
+#define MASH5(i) ((i + 1) * (23524361 - i * 3))
+
+#define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) (void)0;
 
 // modes of the solver
-enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,  MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,
+            MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
 
 // metrics used to compare strategies
 struct strategy_metrics {
@@ -25,13 +37,22 @@ struct strategy_metrics {
     int    color_refinement_cost = 0;
 };
 
-enum ir_operation {
-    OP_I, OP_R, OP_END
-};
-
+template<class vertex_t>
 class shared_workspace {
 public:
-    shared_workspace();
+    shared_workspace() {
+        done_shared_group.store(false);
+        done_created_group.store(false);
+        experimental_look_close.store(false);
+        base1_skip.store(0);
+        _ack_done.store(0);
+        win_id.store(-2);
+        checked.store(0);
+        exit_counter.store(0);
+        experimental_paths.store(0);
+        experimental_deviation.store(0);
+    };
+
     bool done = false;
     bool done_fast = false;
     std::atomic_bool done_shared_group;
@@ -54,7 +75,7 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, int*> leaf_store;
+    std::unordered_multimap<long, vertex_t*> leaf_store;
 
     std::mutex leaf_store_mutex;
 
@@ -63,10 +84,64 @@ public:
 
     int tolerance = 1;
 
-    void iterate_tolerance();
-    void reset_tolerance(int size, int domain_size);
-    bool check_strategy_tournament(int id, strategy_metrics* m, bool early_check);
-    bool ack_done();
+    void iterate_tolerance() {
+        tolerance *= 2;
+    }
+
+    void reset_tolerance(int size, int domain_size) {
+        tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
+    }
+
+    bool check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
+        thread_local bool ichecked = false;
+
+        if(!early_check) {
+            if (!ichecked) {
+                tournament_mutex.lock();
+                //std::cout << "late check" << m->color_refinement_cost << std::endl;
+                if(m->restarts > 0)
+                    all_no_restart = false;
+
+                if ((m->restarts < win_metrics.restarts) ||
+                    (m->restarts == win_metrics.restarts && m->expected_bfs_size < win_metrics.expected_bfs_size) ||
+                    (m->restarts == win_metrics.restarts && m->expected_bfs_size == win_metrics.expected_bfs_size &&
+                     m->color_refinement_cost < win_metrics.color_refinement_cost) ||
+                    win_id == -2) {
+                    PRINT("[Strat] Best: " << m->restarts << ", " << m->expected_bfs_size << ", " << m->color_refinement_cost);
+                    win_metrics = *m;
+                    win_id = id;
+                }
+
+                checked++;
+                tournament_mutex.unlock();
+            }
+            ichecked = true;
+        } else {
+            if (!ichecked) {
+                if (win_id != -2 && (m->restarts > win_metrics.restarts || win_metrics.restarts == 0)) {
+                    tournament_mutex.lock();
+                    if(m->restarts > 0)
+                        all_no_restart = false;
+                    //std::cout << "early concede" << m->color_refinement_cost << std::endl;
+                    checked++;
+                    tournament_mutex.unlock();
+                    ichecked = true;
+                }
+            }
+        }
+        return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+    }
+
+    bool ack_done() {
+        thread_local bool ichecked = false;
+
+        if(!ichecked) {
+            _ack_done++;
+        }
+
+        ichecked = true;
+        return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+    }
 };
 
 #endif //DEJAVU_UTILITY_H
