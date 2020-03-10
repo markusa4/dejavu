@@ -188,7 +188,7 @@ int commandline_mode(int argc, char **argv) {
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
         std::replace(arg.begin(), arg.end(), '-', '_');
 
-        if (arg == "--FILE") {
+        if (arg == "__FILE") {
             if (i + 1 < argc) {
                 i++;
                 filename = argv[i];
@@ -199,7 +199,7 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--STAT_FILE") {
+        if (arg == "__STAT_FILE") {
             if (i + 1 < argc) {
                 i++;
                 stat_filename = argv[i];
@@ -210,7 +210,7 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--TIMEOUT") {
+        if (arg == "__TIMEOUT") {
             if (i + 1 < argc) {
                 i++;
                 timeout = atoi(argv[i]);
@@ -221,12 +221,12 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--COMPRESS") {
+        if (arg == "__COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
         }
 
-        if (arg == "--KDEVIATION") {
+        if (arg == "__KDEVIATION") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
@@ -236,23 +236,23 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--NO_NAUTY") {
+        if (arg == "__NO_NAUTY") {
             comp_nauty = false;
         }
 
-        if (arg == "--NO_TRACES") {
+        if (arg == "__NO_TRACES") {
             comp_traces = false;
         }
 
-        if (arg == "--NO_DEJAVU") {
+        if (arg == "__NO_DEJAVU") {
             comp_dejavu = false;
         }
 
-        if (arg == "--NO_IDLESKIP") {
+        if (arg == "__NO_IDLESKIP") {
             config.CONFIG_IR_IDLE_SKIP = false;
         }
 
-        if (arg == "--THREADS") {
+        if (arg == "__THREADS") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
@@ -262,11 +262,11 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--PERMUTE") {
+        if (arg == "__PERMUTE") {
             permute_graph = true;
         }
 
-        if (arg == "--PERMUTE_SEED") {
+        if (arg == "__PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
                 permute_graph = true;
@@ -277,7 +277,7 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "--FORCE_SELECTOR") {
+        if (arg == "__FORCE_SELECTOR") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
