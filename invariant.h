@@ -61,26 +61,26 @@ public:
         }
     }
 
-    inline void write_protocol(bool active_cell, int c) {
+    inline void protocol_write(bool active_cell, int c) {
         if(!no_write) {
             ++protocol_pos;
             vec_protocol->push_back(active_cell?cell_state::CELL_ACTIVE:cell_state::CELL_IDLE);
         }
     }
 
-    inline void mark_protocol() {
+    inline void protocol_mark() {
         if(!no_write) {
             ++protocol_pos;
             vec_protocol->push_back(CELL_END);
         }
     }
 
-    inline bool read_protocol(int c) {
+    inline bool protocol_read(int c) {
         ++protocol_pos;
         return (*compareI->vec_protocol)[protocol_pos] == cell_state::CELL_ACTIVE;
     }
 
-    inline void skip_to_mark_protocol() {
+    inline void protocol_skip_to_mark() {
         while((*compareI->vec_protocol)[protocol_pos] != cell_state::CELL_END) {
             ++protocol_pos;
         }

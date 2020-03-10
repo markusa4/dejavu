@@ -16,14 +16,14 @@ struct pair_hash {
     }
 };
 
-template<class vertex_type>
-class bfs_element_temp {
+template<class vertex_t>
+class bfs_element {
 public:
     // coloring and invariant for the specified path / base
-    bfs_element_temp<vertex_type>* parent = nullptr;
-    coloring_temp<vertex_type>*    c = nullptr;
+    bfs_element<vertex_t>* parent = nullptr;
+    coloring<vertex_t>*    c = nullptr;
     invariant* I = nullptr;
-    int* base = nullptr;
+    int* base    = nullptr;
     int  base_sz = -1;
 
     // position of element in level_states of workspace
@@ -48,7 +48,7 @@ public:
     bool init_c = false;
     bool init_I = false;
     bool init_base = false;
-    ~bfs_element_temp() {
+    ~bfs_element() {
         if(init_c)
             delete c;
         if(init_I)
@@ -58,20 +58,20 @@ public:
     }
 };
 
-template<class vertex_type>
-class bfs_workspace_temp {
+template<class vertex_t>
+class bfs_workspace {
 public:
     // level array that keeps a queue with tasks
     // bfs_element* is a pointer to the state where int has to be individualized
-    moodycamel::ConcurrentQueue<std::tuple<bfs_element_temp<vertex_type>*, int, int>>* bfs_level_todo;
+    moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>* bfs_level_todo;
 
     // commit finished elements (or nullptr if element was deleted)
     // integer determines how many todos were added for this element
-    moodycamel::ConcurrentQueue<std::pair<bfs_element_temp<vertex_type>*, int>>* bfs_level_finished_elements;
+    moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>* bfs_level_finished_elements;
 
     // elements of all levels
     // delete elements of level once work of level + 1 is fully commited, then it is safe
-    bfs_element_temp<vertex_type>*** level_states;
+    bfs_element<vertex_t>***         level_states;
     int*                             level_sizes;
     int*                             level_reserved_sizes;
     int*                             level_expecting_finished;
@@ -97,11 +97,11 @@ public:
     bool reached_initial_target = true;
     int initial_target_level;
 
-    std::pair<bfs_element_temp<vertex_type>*, int>* finished_elems;
+    std::pair<bfs_element<vertex_t>*, int>* finished_elems;
     int finished_elems_sz = -1;
 
-    bfs_workspace_temp() {}
-    ~bfs_workspace_temp() {
+    bfs_workspace() {}
+    ~bfs_workspace() {
         for(int i = 0; i < base_size + 2; ++i)
             delete level_abort_map_mutex[i];
 
@@ -122,15 +122,15 @@ public:
         // delete[] level_expecting_finished;
     }
 
-    void initialize(bfs_element_temp<vertex_type>* root_elem, int init_c, int domain_size, int base_size) {
-        bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element_temp<vertex_type>*, int, int>>[base_size + 2];
-        bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element_temp<vertex_type>*, int>>[base_size + 2];
+    void initialize(bfs_element<vertex_t>* root_elem, int init_c, int domain_size, int base_size) {
+        bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>[base_size + 2];
+        bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>[base_size + 2];
 
         this->domain_size = domain_size;
         this->base_size   = base_size;
         current_level = 1;
         target_level  = -1;
-        level_states  = new bfs_element_temp<vertex_type>**[base_size + 2];
+        level_states  = new bfs_element<vertex_t>**[base_size + 2];
         level_sizes          = new int[(base_size + 2) * 4];
         level_reserved_sizes = level_sizes + base_size + 2;
         level_maxweight = new double[(base_size + 2) * 2];
@@ -144,10 +144,10 @@ public:
         level_expecting_finished = level_sizes + (base_size + 2) * 3;
         for(int i = 0; i < base_size + 2; ++i) {
             bfs_level_todo[i] =
-                    moodycamel::ConcurrentQueue<std::tuple<bfs_element_temp<vertex_type>*, int, int>>(chunk_size, 0,
+                    moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>(chunk_size, 0,
                             config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
             bfs_level_finished_elements[i] =
-                    moodycamel::ConcurrentQueue<std::pair<bfs_element_temp<vertex_type>*, int>>(chunk_size, 0,
+                    moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>(chunk_size, 0,
                             config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
             level_expecting_finished[i] = 0;
             level_maxweight[i] = 1;
@@ -157,7 +157,7 @@ public:
             level_abort_map_mutex[i] = new std::mutex();
         }
 
-        level_states[0]    = new bfs_element_temp<vertex_type>*[1];
+        level_states[0]    = new bfs_element<vertex_t>*[1];
         level_states[0][0] = root_elem;
         root_elem->weight = 1;
         root_elem->target_color = init_c;
@@ -167,7 +167,7 @@ public:
             int next_v = root_elem->c->lab[i];
             sz += 1;
             bfs_level_todo[current_level].enqueue(
-                    std::tuple<bfs_element_temp<vertex_type>*, int, int>(root_elem, next_v, -1));
+                    std::tuple<bfs_element<vertex_t>*, int, int>(root_elem, next_v, -1));
         }
 
         // PRINT("[BFS] Abort map expecting: " <<  root_elem->c->ptn[init_c] + 1);
@@ -178,11 +178,11 @@ public:
         level_reserved_sizes[0] = 1;
 
         level_expecting_finished[1] = sz;
-        level_states[1] = new bfs_element_temp<vertex_type>*[sz];
+        level_states[1] = new bfs_element<vertex_t>*[sz];
         level_reserved_sizes[1] = sz;
         level_sizes[1] = 0;
 
-        finished_elems = new std::pair<bfs_element_temp<vertex_type>*, int>[chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
+        finished_elems = new std::pair<bfs_element<vertex_t>*, int>[chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
         finished_elems_sz = chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS;
         PRINT("[BFS] BFS structure initialized, expecting " << sz << " on first level");
     }
@@ -212,7 +212,7 @@ public:
         int todo, lvl, i;
 
         for(i = 0; i < num; ++i) {
-            bfs_element_temp<vertex_type> *elem = finished_elems[i].first;
+            bfs_element<vertex_t> *elem = finished_elems[i].first;
             todo = finished_elems[i].second;
             lvl = current_level;
 
@@ -257,7 +257,7 @@ public:
 
             if(expected_size < config.CONFIG_IR_SIZE_FACTOR * domain_size * tolerance || config.CONFIG_IR_FULLBFS) {
                 level_reserved_sizes[current_level + 1] = expected_size;
-                level_states[current_level + 1] = new bfs_element_temp<vertex_type> * [expected_size];
+                level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
                 level_sizes[current_level + 1] = 0;
 
                 assert(expected_size > 0);
@@ -268,7 +268,7 @@ public:
                 PRINT("[BFS] Refusing to advance level (expected_size too large), setting target level to " << current_level + 1);
 
                 level_reserved_sizes[current_level + 1] = expected_size;
-                level_states[current_level + 1] = new bfs_element_temp<vertex_type> * [expected_size];
+                level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
                 level_sizes[current_level + 1] = 0;
 
                 target_level   = current_level + 1;
@@ -301,7 +301,5 @@ public:
         return !(check == level_abort_map[level].end());
     }
 };
-
-// typedef bfs_workspace_temp<int> bfs_workspace;
 
 #endif //DEJAVU_BFS_H

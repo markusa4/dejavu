@@ -8,12 +8,12 @@
 #include <iostream>
 
 
-template<class vertex_type>
-class bijection_temp {
+template<class vertex_t>
+class bijection {
 public:
     bool init = false;
     bool mark = false;
-    vertex_type* map;
+    vertex_t* map;
     int map_sz;
     bool non_uniform  = false;
     bool foreign_base = false;
@@ -29,11 +29,11 @@ public:
         std::cout << std::endl;
     }
 
-    void read_from_coloring(coloring_temp<vertex_type> *c) {
+    void read_from_coloring(coloring<vertex_t> *c) {
         if(!init) {
             //    delete[] map;
             //}
-            map = new vertex_type[c->lab_sz];
+            map = new vertex_t[c->lab_sz];
         }
         init = true;
         map_sz = c->lab_sz;
@@ -43,15 +43,15 @@ public:
     }
 
     void inverse() {
-        thread_local vertex_type* switch_map;
+        thread_local vertex_t* switch_map;
         thread_local bool         switch_map_init;
 
         if(!switch_map_init) {
             switch_map_init = true;
-            switch_map      = new vertex_type[map_sz];
+            switch_map      = new vertex_t[map_sz];
         }
 
-        vertex_type* swap = map;
+        vertex_t* swap = map;
         map = switch_map;
         switch_map = swap;
 
@@ -60,7 +60,7 @@ public:
         }
     }
 
-    void compose(bijection_temp<vertex_type>* p) {
+    void compose(bijection<vertex_t>* p) {
         for(int i = 0; i < map_sz; ++i) {
             map[i] = p->map[map[i]];
         }
@@ -75,17 +75,17 @@ public:
         init = true;
     }
 
-    bijection_temp() {
+    bijection() {
         init = false;
     }
 
-    ~bijection_temp() {
+    ~bijection() {
         if(init)
             delete[] map;
     }
 
-    static void random_bijection(bijection_temp<vertex_type>* p, int n, unsigned seed) {
-        p->map = new vertex_type[n];
+    static void random_bijection(bijection<vertex_t>* p, int n, unsigned seed) {
+        p->map = new vertex_t[n];
         p->init = true;
         p->map_sz = n;
         for(int i = 0; i < n; ++i) {
@@ -95,8 +95,5 @@ public:
         std::shuffle(p->map, p->map + p->map_sz, re);
     }
 };
-
-// typedef  bijection_temp<int> bijection;
-
 
 #endif //DEJAVU_BIJECTION_H

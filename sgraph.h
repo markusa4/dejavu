@@ -10,20 +10,20 @@
 #include <set>
 #include <cstring>
 
-template<class vertex_type, class degree_type, class edge_type>
-class alignas(16) sgraph_temp {
+template<class vertex_t, class degree_t, class edge_t>
+class alignas(16) sgraph_t {
     struct vertexComparator {
-        vertexComparator(const sgraph_temp<vertex_type, degree_type, edge_type>& g) : g(g) {}
-        const sgraph_temp& g;
+        vertexComparator(const sgraph_t<vertex_t, degree_t, edge_t>& g) : g(g) {}
+        const sgraph_t& g;
 
-        bool operator()( const vertex_type & v1, const vertex_type & v2) {
+        bool operator()(const vertex_t & v1, const vertex_t & v2) {
             return g.d[v1] < g.d[v2];
         }
     };
 public:
-    edge_type*   v;
-    degree_type* d;
-    vertex_type* e;
+    edge_t*   v;
+    degree_t* d;
+    vertex_t* e;
 
     int v_size;
     int d_size;
@@ -32,11 +32,11 @@ public:
     int max_degree;
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
-    void initialize_coloring(coloring_temp<vertex_type> *c) {
-        c->lab = new vertex_type[this->v_size];
-        c->ptn = new vertex_type[this->v_size];
-        c->vertex_to_col = new vertex_type[this->v_size];
-        c->vertex_to_lab = new vertex_type[this->v_size];
+    void initialize_coloring(coloring<vertex_t> *c) {
+        c->lab = new vertex_t[this->v_size];
+        c->ptn = new vertex_t[this->v_size];
+        c->vertex_to_col = new vertex_t[this->v_size];
+        c->vertex_to_lab = new vertex_t[this->v_size];
         c->lab_sz = this->v_size;
         c->ptn_sz = this->v_size;
         c->init = true;
@@ -75,7 +75,7 @@ public:
     }
 
     // certify that a permutation is an automorphism of the sgraph
-    bool certify_automorphism(bijection_temp<vertex_type> p) {
+    bool certify_automorphism(bijection<vertex_t> p) {
         assert(p.map_sz == v_size);
 
         std::set<int> image_neighbours_of_i;
@@ -106,20 +106,20 @@ public:
         return true;
     }
 
-    void permute_graph(sgraph_temp<vertex_type, degree_type, edge_type>* ng, bijection_temp<vertex_type>* p) {
-        ng->v = new edge_type[v_size];
-        ng->d = new degree_type[d_size];
-        ng->e = new vertex_type[e_size];
+    void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection<vertex_t>* p) {
+        ng->v = new edge_t[v_size];
+        ng->d = new degree_t[d_size];
+        ng->e = new vertex_t[e_size];
         ng->v_size = v_size;
         ng->d_size = d_size;
         ng->e_size = e_size;
         ng->max_degree = max_degree;
 
-        bijection_temp<vertex_type> p_inv;
-        p_inv.map = new vertex_type[p->map_sz];
+        bijection<vertex_t> p_inv;
+        p_inv.map = new vertex_t[p->map_sz];
         p_inv.map_sz = p->map_sz;
         p_inv.deletable();
-        memcpy(p_inv.map, p->map, p->map_sz*sizeof(vertex_type));
+        memcpy(p_inv.map, p->map, p->map_sz*sizeof(vertex_t));
         p_inv.inverse();
 
         std::set<int> vertices_hit;
@@ -150,14 +150,14 @@ public:
         return;
     }
 
-    void copy_graph(sgraph_temp<vertex_type, degree_type, edge_type>* g) {
-        v = new edge_type[g->v_size];
-        d = new degree_type[g->d_size];
-        e = new vertex_type[g->e_size];
+    void copy_graph(sgraph_t<vertex_t, degree_t, edge_t>* g) {
+        v = new edge_t[g->v_size];
+        d = new degree_t[g->d_size];
+        e = new vertex_t[g->e_size];
 
-        memcpy(v, g->v, g->v_size*sizeof(edge_type));
-        memcpy(d, g->d, g->d_size*sizeof(degree_type));
-        memcpy(e, g->e, g->e_size*sizeof(vertex_type));
+        memcpy(v, g->v, g->v_size*sizeof(edge_t));
+        memcpy(d, g->d, g->d_size*sizeof(degree_t));
+        memcpy(e, g->e, g->e_size*sizeof(vertex_t));
         v_size = g->v_size;
         d_size = g->d_size;
         e_size = g->e_size;
@@ -176,8 +176,8 @@ public:
 
 template<class vertex_type_src, class degree_type_src, class edge_type_src,
          class vertex_type_tgt, class degree_type_tgt, class edge_type_tgt>
-static void copy_graph(sgraph_temp<vertex_type_src, degree_type_src, edge_type_src>* g1,
-                       sgraph_temp<vertex_type_tgt, degree_type_tgt, edge_type_tgt>* g2) {
+static void copy_graph(sgraph_t<vertex_type_src, degree_type_src, edge_type_src>* g1,
+                       sgraph_t<vertex_type_tgt, degree_type_tgt, edge_type_tgt>* g2) {
     g2->v_size = g1->v_size;
     g2->d_size = g1->d_size;
     g2->e_size = g1->e_size;
@@ -201,41 +201,41 @@ static void copy_graph(sgraph_temp<vertex_type_src, degree_type_src, edge_type_s
 enum sgraph_type {DSG_INT_INT_INT, DSG_SHORT_SHORT_INT, DSG_SHORT_SHORT_SHORT, DSG_CHAR_CHAR_SHORT, DSG_CHAR_CHAR_CHAR};
 struct dynamic_sgraph {
     sgraph_type type;
-    sgraph_temp<int, int, int>*             sgraph_0 = nullptr;
-    sgraph_temp<int16_t, int16_t, int>*     sgraph_1 = nullptr;
-    sgraph_temp<int16_t, int16_t, int16_t>* sgraph_2 = nullptr;
-    sgraph_temp<int8_t,  int8_t,  int16_t>* sgraph_3 = nullptr;
-    sgraph_temp<int8_t,  int8_t,  int8_t>*  sgraph_4 = nullptr;
+    sgraph_t<int, int, int>*             sgraph_0 = nullptr;
+    sgraph_t<int16_t, int16_t, int>*     sgraph_1 = nullptr;
+    sgraph_t<int16_t, int16_t, int16_t>* sgraph_2 = nullptr;
+    sgraph_t<int8_t,  int8_t,  int16_t>* sgraph_3 = nullptr;
+    sgraph_t<int8_t,  int8_t,  int8_t>*  sgraph_4 = nullptr;
 
-    static void read(sgraph_temp<int, int, int>* g, dynamic_sgraph* sg) {
+    static void read(sgraph_t<int, int, int>* g, dynamic_sgraph* sg) {
         bool short_v = (g->v_size <= 32767);
         bool short_e = (g->e_size <= 32767);
         bool char_v  = (g->v_size <= 127);
         bool char_e  = (g->e_size <= 127);
 
         if(char_v && char_e) {
-            sg->sgraph_4 = new sgraph_temp<int8_t,  int8_t,  int8_t>;
+            sg->sgraph_4 = new sgraph_t<int8_t,  int8_t,  int8_t>;
             copy_graph<int, int, int, int8_t,  int8_t,  int8_t>(g, sg->sgraph_4);
             sg->type = DSG_CHAR_CHAR_CHAR;
             return;
         }
 
         if(char_v && short_e) {
-            sg->sgraph_3 = new sgraph_temp<int8_t,  int8_t,  int16_t>;
+            sg->sgraph_3 = new sgraph_t<int8_t,  int8_t,  int16_t>;
             copy_graph<int, int, int, int8_t,  int8_t,  int16_t>(g, sg->sgraph_3);
             sg->type = DSG_CHAR_CHAR_SHORT;
             return;
         }
 
         if(short_v && short_e) {
-            sg->sgraph_2 = new sgraph_temp<int16_t,  int16_t,  int16_t>;
+            sg->sgraph_2 = new sgraph_t<int16_t,  int16_t,  int16_t>;
             copy_graph<int, int, int, int16_t,  int16_t,  int16_t>(g, sg->sgraph_2);
             sg->type = DSG_SHORT_SHORT_SHORT;
             return;
         }
 
         if(short_v && !short_e) {
-            sg->sgraph_1 = new sgraph_temp<int16_t,  int16_t,  int>;
+            sg->sgraph_1 = new sgraph_t<int16_t,  int16_t,  int>;
             copy_graph<int, int, int, int16_t,  int16_t,  int>(g, sg->sgraph_1);
             sg->type = DSG_SHORT_SHORT_INT;
             return;
@@ -248,6 +248,6 @@ struct dynamic_sgraph {
 
 };
 
-typedef sgraph_temp<int, int, int> sgraph;
+typedef sgraph_t<int, int, int> sgraph;
 
 #endif //DEJAVU_GRAPH_H

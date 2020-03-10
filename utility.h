@@ -37,10 +37,10 @@ struct strategy_metrics {
     int    color_refinement_cost = 0;
 };
 
-template<class vertex_type>
-class shared_workspace_temp {
+template<class vertex_t>
+class shared_workspace {
 public:
-    shared_workspace_temp() {
+    shared_workspace() {
         done_shared_group.store(false);
         done_created_group.store(false);
         experimental_look_close.store(false);
@@ -75,7 +75,7 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, vertex_type*> leaf_store;
+    std::unordered_multimap<long, vertex_t*> leaf_store;
 
     std::mutex leaf_store_mutex;
 

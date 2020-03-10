@@ -10,22 +10,22 @@
 
 enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM};
 
-template<class vertex_type>
-struct strategy_temp {
-    bijection_temp<vertex_type>* leaf = nullptr;
+template<class vertex_t>
+struct strategy {
+    bijection<vertex_t>* leaf = nullptr;
     invariant* I    = nullptr;
     selector_type cell_selector_type = SELECTOR_FIRST;
     int           cell_selector_seed = 0;
 
-    strategy_temp() = default;
-    strategy_temp(bijection_temp<vertex_type>* leaf, invariant* I, selector_type cell_selector_type, int seed) {
+    strategy() = default;
+    strategy(bijection<vertex_t>* leaf, invariant* I, selector_type cell_selector_type, int seed) {
         this->leaf = leaf;
         this->I    = I;
         this->cell_selector_type = cell_selector_type;
         this->cell_selector_seed = seed;
     }
 
-    void replace(strategy_temp<vertex_type>* s) {
+    void replace(strategy<vertex_t>* s) {
         leaf = s->leaf;
         I    = s->I;
         cell_selector_type = s->cell_selector_type;
@@ -33,8 +33,8 @@ struct strategy_temp {
     }
 };
 
-template<class vertex_type, class degree_type, class edge_type>
-class selector_temp {
+template<class vertex_t, class degree_t, class edge_t>
+class selector {
     int skipstart = 0;
     int hint      = -1;
     int hint_sz   = -1;
@@ -44,7 +44,7 @@ class selector_temp {
     int init = false;
 
 public:
-    int seeded_select_color(coloring_temp<vertex_type> *c, int seed) {
+    int seeded_select_color(coloring<vertex_t> *c, int seed) {
         std::vector<int> cells;
         for(int i = 0; i < c->ptn_sz;){
             if(c->ptn[i] > 0) {
@@ -60,7 +60,7 @@ public:
         }
     }
 
-    int select_color_largest(coloring_temp<vertex_type> *c) {
+    int select_color_largest(coloring<vertex_t> *c) {
         if(!init) {
             largest_cache.initialize(c->lab_sz);
             non_trivial_list.initialize(c->lab_sz);
@@ -99,7 +99,7 @@ public:
         return largest_cell;
     }
 
-    int select_color_smallest(coloring_temp<vertex_type> *c) {
+    int select_color_smallest(coloring<vertex_t> *c) {
         int smallest_cell  = -1;
         int smallest_cell_sz = c->lab_sz + 1;
         bool only_trivial = true;
@@ -121,7 +121,7 @@ public:
         return smallest_cell;
     }
 
-    int select_color_first(coloring_temp<vertex_type> *c) {
+    int select_color_first(coloring<vertex_t> *c) {
         int first_cell  = -1;
 
         for(int i = skipstart; i < c->ptn_sz;){
@@ -142,7 +142,7 @@ public:
         largest_cache.reset();
     }
 
-    int select_color(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type> *c, int seed) {
+    int select_color(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, int seed) {
         if(c->cells == g->v_size)
             return -1;
         switch(config.CONFIG_IR_CELL_SELECTOR) {
@@ -158,8 +158,7 @@ public:
         }
     }
 
-    int select_color_dynamic(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type>  *c,
-                             strategy_temp<vertex_type> *s) {
+    int select_color_dynamic(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t>  *c, strategy<vertex_t> *s) {
         if(c->cells == g->v_size)
             return -1;
         switch(s->cell_selector_type) {
@@ -177,7 +176,5 @@ public:
         }
     }
 };
-
-// typedef selector_temp<int, int, int> selector;
 
 #endif // DEJAVU_SELECTOR_H

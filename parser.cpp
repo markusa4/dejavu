@@ -9,7 +9,7 @@
 using std::string;
 using std::vector;
 
-void parser::parse_dimacs_file_g(std::string filename, sgraph_temp<int, int, int>* g) {
+void parser::parse_dimacs_file_g(std::string filename, sgraph_t<int, int, int>* g) {
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>>   incidence_list;
@@ -74,7 +74,7 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph_temp<int, int, int
     assert(2 * ne == g->e_size);
 }
 
-void parser::parse_dimacs_file(std::string filename, sgraph_temp<int, int, int>* g) {
+void parser::parse_dimacs_file(std::string filename, sgraph_t<int, int, int>* g) {
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>> incidence_list;
@@ -145,7 +145,7 @@ void parser::parse_dimacs_file(std::string filename, sgraph_temp<int, int, int>*
     assert(2 * ne == g->e_size);
 }
 
-void parser::parse_dimacs_file_digraph(std::string filename, sgraph_temp<int, int, int>* g) {
+void parser::parse_dimacs_file_digraph(std::string filename, sgraph_t<int, int, int>* g) {
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>>      incidence_list;

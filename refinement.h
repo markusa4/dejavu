@@ -54,7 +54,7 @@ public:
 
 // sorting utilizing minimal sorting networks for n <= 6
 template<class T>
-void sort_temp(T* arr, int sz) {
+void sort_t(T* arr, int sz) {
 #define min(x, y) (x<y?x:y)
 #define max(x, y) (x<y?y:x)
 #define SWAP(x,y) { const T a = min(arr[x], arr[y]); \
@@ -114,7 +114,7 @@ void sort_temp(T* arr, int sz) {
 
 // work list / stack with fixed size limitation
 template<class T>
-class work_list_temp {
+class work_list_t {
 public:
     void initialize(int size) {
         arr     = new T[size];
@@ -152,14 +152,14 @@ public:
         cur_pos = 0;
     }
 
-    ~work_list_temp() {
+    ~work_list_t() {
         if(init) {
             delete[] arr;
         }
     }
 
     void sort() {
-        sort_temp<T>(arr, cur_pos);
+        sort_t<T>(arr, cur_pos);
     }
 
     int  cur_pos = 0;
@@ -169,8 +169,8 @@ private:
     int arr_sz = -1;
 };
 
-typedef work_list_temp<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
-typedef work_list_temp<int> work_list;
+typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
+typedef work_list_t<int> work_list;
 
 // queue with fixed size limitation
 class work_queue {
@@ -211,7 +211,7 @@ private:
 
 // work set with arbitrary type
 template<class T>
-class alignas(16) work_set_temp {
+class alignas(16) work_set_t {
 public:
     void initialize(int size) {
         s = new T[size];
@@ -268,7 +268,7 @@ public:
         ++s[index];
     }
 
-    ~work_set_temp() {
+    ~work_set_t() {
         if(init)
             delete[] s;
     }
@@ -280,8 +280,8 @@ private:
     int   sz;
 };
 
-typedef work_set_temp<int>  work_set_int;
-typedef work_set_temp<char> work_set_char;
+typedef work_set_t<int>  work_set_int;
+typedef work_set_t<char> work_set_char;
 
 // ring queue for pairs of integers
 class ring_pair {
@@ -319,8 +319,8 @@ public:
 };
 
 // worklist implementation for color refinement
-template<class vertex_type>
-class cell_worklist_temp {
+template<class vertex_t>
+class cell_worklist {
 public:
     void initialize(int domain_size) {
         arr = new int[domain_size];
@@ -338,7 +338,7 @@ public:
         return 0;
     }
 
-    int next_cell(work_set_int* queue_pointer, coloring_temp<vertex_type>* c) {
+    int next_cell(work_set_int* queue_pointer, coloring<vertex_t>* c) {
         // look at first 12 positions and pick the (first) smallest cell within these entries
         int sm_j = cur_pos - 1;
         for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
@@ -383,18 +383,18 @@ public:
     }
 
 private:
-    int* arr = nullptr;
+    int* arr     = nullptr;
     int  arr_sz  = -1;
     int  cur_pos = -1;
     bool init    = false;
 };
 
 // refinement manager, preserving the workspace between refinements
-template<class vertex_type, class degree_type, class edge_type>
-class refinement_temp {
+template<class vertex_t, class degree_t, class edge_t>
+class refinement {
 public:
-    bool refine_coloring(sgraph_temp<vertex_type, degree_type, edge_type> *g, coloring_temp<vertex_type> *c,
-                         invariant *I, int init_color_class, strategy_metrics *m, int cell_early) {
+    bool refine_coloring(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, invariant *I,
+                         int init_color_class, strategy_metrics *m, int cell_early) {
         bool comp = true;
         assure_initialized(g);
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
@@ -423,7 +423,7 @@ public:
 
             // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
-                const bool skip = !I->read_protocol(next_color_class);
+                const bool skip = !I->protocol_read(next_color_class);
                 if(skip && config.CONFIG_IR_CELL_EARLY) {
                     I->fast_forward(INV_MARK_ENDCELL);
                     continue;
@@ -440,17 +440,18 @@ public:
             if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
                 // singleton
                 comp = (comp) && refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                                            &color_class_splits, I);
+                                                              &color_class_splits, I);
             } else if(config.CONFIG_IR_DENSE) {
                 if(dense_dense) { // dense-dense
                     comp = (comp) && refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
-                                                                  &color_class_splits, I);
+                                                                    &color_class_splits, I);
                 } else { // dense-sparse
                     comp = (comp) && refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
-                                                            &color_class_splits, I);
+                                                              &color_class_splits, I);
                 }
             } else { // sparse
-                comp = (comp) && refine_color_class_sparse(g, c, next_color_class, next_color_class_sz, &color_class_splits, I);
+                comp = (comp) && refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
+                                                           &color_class_splits, I);
             }
 
             comp = comp && pre_comp;
@@ -497,10 +498,10 @@ public:
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     I->write_cells(c->cells);
-                    I->write_protocol(true, next_color_class);
-                    I->mark_protocol();
+                    I->protocol_write(true, next_color_class);
+                    I->protocol_mark();
                     if(I->no_write)
-                        I->skip_to_mark_protocol();
+                        I->protocol_skip_to_mark();
                     comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
                     comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
                     return comp;
@@ -509,7 +510,7 @@ public:
                 // partition is similar to that of target invariant, skip to the end of the entire refinement
                 if(c->cells == cell_early && comp) {
                     I->fast_forward(INV_MARK_ENDREF);
-                    I->skip_to_mark_protocol();
+                    I->protocol_skip_to_mark();
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     return comp;
@@ -540,15 +541,15 @@ public:
             const int new_cells = c->cells - pre_cells;
 
             // mark end of cell and denote whether this cell split
-            I->write_protocol(new_cells > 0, next_color_class);
+            I->protocol_write(new_cells > 0, next_color_class);
             comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
             if(!comp && deviation_expander <= 0) break;
         }
 
         if(comp) {
-            I->mark_protocol();
+            I->protocol_mark();
             if(I->no_write)
-                I->skip_to_mark_protocol();
+                I->protocol_skip_to_mark();
             I->write_cells(c->cells);
             comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
         }
@@ -556,7 +557,7 @@ public:
         return comp;
     }
 
-    int  individualize_vertex(coloring_temp<vertex_type>* c, int v) {
+    int  individualize_vertex(coloring<vertex_t>* c, int v) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -579,7 +580,7 @@ public:
         return color + color_class_size;
     }
 
-    bool refine_coloring_first(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_coloring_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                int init_color_class) {
         assure_initialized(g);
 
@@ -687,7 +688,7 @@ public:
         return true;
     }
 
-    bool certify_automorphism(sgraph_temp<vertex_type, degree_type, edge_type>  *g, bijection_temp<vertex_type> *p) {
+    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -723,28 +724,28 @@ public:
         return true;
     }
 
-    ~refinement_temp() {
+    ~refinement() {
         if(initialized)
             delete[] workspace_int;
     }
 
 private:
     bool initialized = false;
-    work_set_int  queue_pointer;
-    cell_worklist_temp<vertex_type> cell_todo;
-    mark_set      scratch_set;
-    work_list_temp<vertex_type> vertex_worklist;
-    work_set_temp<vertex_type>  color_vertices_considered;
-    work_set_temp<vertex_type>  neighbours; // degree type instead?
-    work_set_temp<vertex_type>  neighbour_sizes;
-    work_list_temp<vertex_type> singletons;
-    work_list_temp<vertex_type> old_color_classes;
-    work_list_pair_bool color_class_splits;
+    work_set_int           queue_pointer;
+    cell_worklist<vertex_t>cell_todo;
+    mark_set               scratch_set;
+    work_list_t<vertex_t>  vertex_worklist;
+    work_set_t<vertex_t>   color_vertices_considered;
+    work_set_t<vertex_t>   neighbours; // degree type instead?
+    work_set_t<vertex_t>   neighbour_sizes;
+    work_list_t<vertex_t>  singletons;
+    work_list_t<vertex_t>  old_color_classes;
+    work_list_pair_bool    color_class_splits;
 
-    vertex_type* scratch;
+    vertex_t* scratch;
     int* workspace_int;
 
-    void assure_initialized(sgraph_temp<vertex_type, degree_type, edge_type>  *g) {
+    void assure_initialized(sgraph_t<vertex_t, degree_t, edge_t>  *g) {
         if(!initialized) {
             const int n = g->v_size;
 
@@ -759,27 +760,27 @@ private:
             queue_pointer.initialize(n);
             color_vertices_considered.initialize(n);
 
-            scratch = (vertex_type*) workspace_int;
+            scratch = (vertex_t*) workspace_int;
             scratch_set.initialize_from_array(workspace_int + n, n);
 
             color_class_splits.initialize(n);
             cell_todo.initialize(n * 2);
 
-            memset(scratch, 0, n * sizeof(vertex_type));
+            memset(scratch, 0, n * sizeof(vertex_t));
             initialized = true;
         }
     }
 
-    bool refine_color_class_sparse(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_sparse(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                    int color_class, int class_size,
                                    work_list_pair_bool* color_class_split_worklist, invariant* I) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
-        vertex_type* vertex_to_lab = c->vertex_to_lab;
-        vertex_type* lab           = c->lab;
-        vertex_type* ptn           = c->ptn;
-        vertex_type* vertex_to_col = c->vertex_to_col;
+        vertex_t* vertex_to_lab = c->vertex_to_lab;
+        vertex_t* lab           = c->lab;
+        vertex_t* ptn           = c->ptn;
+        vertex_t* vertex_to_col = c->vertex_to_col;
 
         cc = color_class; // iterate over color class
         comp = true;
@@ -953,7 +954,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_dense(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                   int color_class, int class_size,
                                   work_list_pair_bool* color_class_split_worklist, invariant* I) {
         bool comp;
@@ -1071,7 +1072,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
             //vertex_worklist.cur_pos = col_sz;
             pos = col_sz;
 
@@ -1111,7 +1112,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense_dense(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_dense_dense(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                         int color_class, int class_size,
                                         work_list_pair_bool* color_class_split_worklist, invariant* I) {
         bool comp;
@@ -1205,7 +1206,7 @@ private:
             vertex_worklist.reset();
 
             // copy cell for rearranging
-            memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(vertex_type));
+            memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(vertex_t));
             vertex_worklist.cur_pos = col_sz;
 
             // determine colors and rearrange
@@ -1245,7 +1246,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_singleton(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_singleton(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                       int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I) {
         bool comp;
@@ -1370,7 +1371,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_singleton_first(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_singleton_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                             int color_class, int class_size,
                                             work_list_pair_bool *color_class_split_worklist) {
         bool comp;
@@ -1456,7 +1457,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense_first(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_dense_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                         int color_class, int class_size,
                                         work_list_pair_bool *color_class_split_worklist) {
         int i, cc, acc, largest_color_class_size, pos;
@@ -1534,7 +1535,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
             pos = col_sz;
 
             // determine colors and rearrange
@@ -1573,7 +1574,7 @@ private:
         return true;
     }
 
-    bool refine_color_class_dense_dense_first(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_dense_dense_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                               int color_class, int class_size,
                                               work_list_pair_bool *color_class_split_worklist) {
         // for all vertices of the color class...
@@ -1642,7 +1643,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_type));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
             pos = col_sz;
 
             // determine colors and rearrange
@@ -1682,7 +1683,7 @@ private:
         return true;
     }
 
-    bool refine_color_class_sparse_first(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c,
+    bool refine_color_class_sparse_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                          int color_class, int class_size,
                                          work_list_pair_bool* color_class_split_worklist) {
         bool comp;
@@ -1817,7 +1818,5 @@ private:
         return comp;
     }
 };
-
-// typedef refinement_temp<int, int, int> refinement;
 
 #endif //DEJAVU_REFINEMENT_H

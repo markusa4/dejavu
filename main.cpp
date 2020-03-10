@@ -135,8 +135,8 @@ int commandline_mode(int argc, char **argv) {
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
-        bijection_temp<int> pr;
-        bijection_temp<int>::random_bijection(&pr, g->v_size, seed);
+        bijection<int> pr;
+        bijection<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
         delete g;
     } else {

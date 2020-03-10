@@ -8,11 +8,11 @@
 #include "utility.h"
 #include "configuration.h"
 
-template <class vertex_type, class degree_type, class edge_type>
-struct dejavu_workspace_temp;
+template <class vertex_t, class degree_t, class edge_t>
+struct dejavu_workspace;
 
-template <class vertex_type>
-class group_shared_temp {
+template <class vertex_t>
+class group_shared {
 public:
     // input and pipeline management
     moodycamel::ConcurrentQueue<std::pair<sift_type, bool>> sift_results
@@ -40,10 +40,10 @@ public:
     shared_schreier *gp;
     shared_permnode *gens;
 
-    group_shared_temp(int domain_size) {
+    group_shared(int domain_size) {
         this->domain_size = domain_size;
     }
-    void initialize(int domain_size, bijection_temp<vertex_type> *base_points) {
+    void initialize(int domain_size, bijection<vertex_t> *base_points) {
         shared_schreier_fails(-1);
         added = 0;
 
@@ -52,7 +52,7 @@ public:
         dequeue_space    = new std::pair<int,int>[128];
         dequeue_space_sz = 128;
 
-        if(std::is_same<vertex_type, int>::value) {
+        if(std::is_same<vertex_t, int>::value) {
             b = (int*) base_points->map;
         } else {
             b = new int[base_points->map_sz];
@@ -69,7 +69,7 @@ public:
         shared_getorbits(b, base_size, gp, &gens, domain_size);
     }
 
-    ~group_shared_temp() {
+    ~group_shared() {
         delete[] b;
         delete[] dequeue_space;
         if(generators_persistent) {
@@ -79,9 +79,9 @@ public:
         }
     }
 
-    bool add_permutation(bijection_temp<vertex_type>* p, int* idle_ms, bool* done) {
+    bool add_permutation(bijection<vertex_t>* p, int* idle_ms, bool* done) {
         int* map;
-        if(std::is_same<vertex_type, int>::value) {
+        if(std::is_same<vertex_t, int>::value) {
             map = (int*) p->map;
         } else {
             map = new int[p->map_sz];
@@ -121,7 +121,7 @@ public:
         std::cout << "Generators: " << shared_schreier_gens(gens) << std::endl;
     }
 
-    void manage_results(shared_workspace_temp<vertex_type>* switches) {
+    void manage_results(shared_workspace<vertex_t>* switches) {
         int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
         for(int j = 0; j < num; ++j) {
             switch(dequeue_space[j].first) {
