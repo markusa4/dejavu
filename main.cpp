@@ -48,6 +48,7 @@ int commandline_mode(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
+        std::replace(arg.begin(), arg.end(), '-', '_');
 
         if (arg == "--FILE") {
             if (i + 1 < argc) {
@@ -88,12 +89,18 @@ int commandline_mode(int argc, char **argv) {
             permute_graph = true;
         }
 
-        if (arg == "--REF_EARLYOUT") {
-            config.CONFIG_IR_CELL_EARLY = true;
+        if (arg == "--KDEVIATION") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
+            } else {
+                std::cerr << "--kdeviation option requires one argument." << std::endl;
+                return 1;
+            }
         }
 
-        if (arg == "--NOREF_EARLYOUT") {
-            config.CONFIG_IR_CELL_EARLY = false;
+        if (arg == "--NO_IDLESKIP") {
+            config.CONFIG_IR_IDLE_SKIP = false;
         }
 
         if (arg == "--COMPRESS") {

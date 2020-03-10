@@ -255,7 +255,7 @@ public:
                 }
             }
 
-            if(expected_size < config.CONFIG_IR_SIZE_FACTOR * domain_size * tolerance || config.CONFIG_IR_FULLBFS) {
+            if(expected_size < config.CONFIG_IR_SIZE_FACTOR * domain_size * tolerance || config.CONFIG_IR_FULL_BFS) {
                 level_reserved_sizes[current_level + 1] = expected_size;
                 level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
                 level_sizes[current_level + 1] = 0;

@@ -100,8 +100,8 @@ struct alignas(64) dejavu_workspace {
     };
 };
 
-template<class vertex_type>
-bool bfs_element_parent_sorter(bfs_element<vertex_type>* const& lhs, bfs_element<vertex_type>* const& rhs) {
+template<class vertex_t>
+bool bfs_element_parent_sorter(bfs_element<vertex_t>* const& lhs, bfs_element<vertex_t>* const& rhs) {
     if(lhs->parent < rhs->parent)
         return true;
     if(lhs->parent == rhs->parent) {
@@ -469,7 +469,7 @@ private:
                             int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
                             W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
                             int proposed_level = W.skiplevels + 1;
-                            if(config.CONFIG_IR_FULLBFS)
+                            if(config.CONFIG_IR_FULL_BFS)
                                 proposed_level = G->base_size + 1;
                             W.BW->target_level.store(proposed_level);
                             PRINT("[Strat] Proposed level for BFS: " << proposed_level);
@@ -1210,7 +1210,7 @@ private:
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
                        sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
                        invariant* I, int v, change_tracker* changes, strategy_metrics* m, int cell_early) {
-        if(!config.CONFIG_IR_CELL_EARLY)
+        if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
 
         const int init_color_class = w->R.individualize_vertex(c, v);

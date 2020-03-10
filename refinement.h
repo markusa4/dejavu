@@ -424,7 +424,7 @@ public:
             // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
                 const bool skip = !I->protocol_read(next_color_class);
-                if(skip && config.CONFIG_IR_CELL_EARLY) {
+                if(skip && config.CONFIG_IR_IDLE_SKIP) {
                     I->fast_forward(INV_MARK_ENDCELL);
                     continue;
                 }
