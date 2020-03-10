@@ -928,7 +928,8 @@ private:
         while(w->first_skiplevel <= w->skiplevels) {
             m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
             if(*done) return abort_code(0);
-            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m, -1);
+            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m,
+                          (*start_I->compareI->vec_cells)[w->first_skiplevel - 1]);
             w->first_skiplevel += 1;
             if(!w->is_foreign_base)
                 w->skip_schreier_level = w->skip_schreier_level->next;

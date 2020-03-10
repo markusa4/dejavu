@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cstring>
 
+// set specialized for quick resets
 class mark_set {
     int mark = 0;
     int *s;
@@ -51,6 +52,7 @@ public:
     }
 };
 
+// sorting utilizing minimal sorting networks for n <= 6
 template<class T>
 void sort_temp(T* arr, int sz) {
 #define min(x, y) (x<y?x:y)
@@ -110,7 +112,7 @@ void sort_temp(T* arr, int sz) {
 #undef max
 }
 
-
+// work list / stack with fixed size limitation
 template<class T>
 class work_list_temp {
 public:
@@ -170,6 +172,7 @@ private:
 typedef work_list_temp<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
 typedef work_list_temp<int> work_list;
 
+// queue with fixed size limitation
 class work_queue {
 public:
     void initialize(int size);
@@ -186,6 +189,7 @@ private:
     int  sz;
 };
 
+// work set using less space than mark set, but more expensive reset operation
 class work_set {
 public:
     void initialize(int size);
@@ -205,6 +209,7 @@ private:
     int sz;
 };
 
+// work set with arbitrary type
 template<class T>
 class alignas(16) work_set_temp {
 public:
@@ -278,6 +283,7 @@ private:
 typedef work_set_temp<int>  work_set_int;
 typedef work_set_temp<char> work_set_char;
 
+// ring queue for pairs of integers
 class ring_pair {
 public:
     void initialize(int size);
@@ -296,6 +302,7 @@ public:
     void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
+// currently not used
 class change_tracker {
     work_list l;
     work_set   s;
@@ -311,6 +318,7 @@ public:
     bool did_overflow();
 };
 
+// worklist implementation for color refinement
 template<class vertex_type>
 class cell_worklist_temp {
 public:
@@ -331,7 +339,7 @@ public:
     }
 
     int next_cell(work_set_int* queue_pointer, coloring_temp<vertex_type>* c) {
-        // look at first 12 positions and scramble if possible
+        // look at first 12 positions and pick the (first) smallest cell within these entries
         int sm_j = cur_pos - 1;
         for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
             if(c->ptn[arr[j]] < c->ptn[arr[sm_j]]) {
@@ -381,6 +389,7 @@ private:
     bool init    = false;
 };
 
+// refinement manager, preserving the workspace between refinements
 template<class vertex_type, class degree_type, class edge_type>
 class refinement_temp {
 public:
@@ -388,9 +397,6 @@ public:
                          invariant *I, int init_color_class, strategy_metrics *m, int cell_early) {
         bool comp = true;
         assure_initialized(g);
-
-        int   splitcost = 0;
-        int nosplitcost = 0;
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
 
         cell_todo.reset(&queue_pointer);
@@ -415,9 +421,10 @@ public:
                 m->color_refinement_cost += next_color_class_sz;
             comp = comp && I->write_top_and_compare(INV_MARK_STARTCELL);
 
+            // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
                 const bool skip = !I->read_protocol(next_color_class);
-                if(skip) {
+                if(skip && config.CONFIG_IR_CELL_EARLY) {
                     I->fast_forward(INV_MARK_ENDCELL);
                     continue;
                 }
@@ -486,12 +493,6 @@ public:
 
                 if(c->cells == g->v_size) {
                     const int new_cells = c->cells - pre_cells;
-                    if(new_cells == 0) {
-                        nosplitcost += next_color_class_sz;
-                    } else {
-                        splitcost   += next_color_class_sz;
-                    }
-                    //std::cout << I->no_write << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
 
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
@@ -505,9 +506,8 @@ public:
                     return comp;
                 }
 
-                // fast forward coloring
+                // partition is similar to that of target invariant, skip to the end of the entire refinement
                 if(c->cells == cell_early && comp) {
-                    //std::cout << "early out " << cell_todo.size() << std::endl;
                     I->fast_forward(INV_MARK_ENDREF);
                     I->skip_to_mark_protocol();
                     color_class_splits.reset();
@@ -537,23 +537,13 @@ public:
                     }
                 }
             }
-
             const int new_cells = c->cells - pre_cells;
 
-            if(new_cells == 0) {
-                nosplitcost += next_color_class_sz;
-            } else {
-                splitcost   += next_color_class_sz;
-            }
-
+            // mark end of cell and denote whether this cell split
             I->write_protocol(new_cells > 0, next_color_class);
             comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
             if(!comp && deviation_expander <= 0) break;
         }
-
-        //if(I->no_write == false) {
-        //std::cout << I->no_write << "split: " << splitcost << ", nosplit: " << nosplitcost << std::endl;
-        //}
 
         if(comp) {
             I->mark_protocol();
@@ -562,7 +552,6 @@ public:
             I->write_cells(c->cells);
             comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
         }
-        // assert((comp && !I->never_fail)?assert_is_equitable(g, c):true);
 
         return comp;
     }
@@ -734,50 +723,6 @@ public:
         return true;
     }
 
-    bool assert_is_equitable(sgraph_temp<vertex_type, degree_type, edge_type>  *g, coloring_temp<vertex_type> *c) {
-        std::vector<int> neighbour_col_canon;
-        std::vector<int> neighbour_col;
-        bool first_of_color = true;
-        bool test = true;
-
-        for(int i = 0; i < g->v_size; ++i) {
-            neighbour_col.clear();
-            int v = c->lab[i];
-            for(int j = g->v[v]; j < g->v[v] + g->d[v]; ++j) {
-                neighbour_col.push_back(c->vertex_to_col[g->e[j]]);
-            }
-            std::sort(neighbour_col.begin(), neighbour_col.end());
-            if(first_of_color) {
-                first_of_color = false;
-                neighbour_col_canon.swap(neighbour_col);
-            } else {
-                for (size_t j = 0; j < neighbour_col.size(); ++j) {
-                    test = test && (neighbour_col[j] == neighbour_col_canon[j]);
-                }
-            }
-
-            if(c->ptn[i] == 0) {
-                first_of_color = true;
-            }
-        }
-        int expect0 = 0;
-        bool expectsize = true;
-        for(int i = 0; i < c->lab_sz; ++i) {
-            if(expectsize) {
-                expectsize = false;
-                expect0 = c->ptn[i];
-            }
-            if(expect0 == 0) {
-                test = test && (c->ptn[i] == 0);
-                expectsize = true;
-            } else {
-                test = test && (c->ptn[i] > 0);
-            }
-            expect0 -= 1;
-        }
-        return test;
-    }
-
     ~refinement_temp() {
         if(initialized)
             delete[] workspace_int;
@@ -830,7 +775,11 @@ private:
                                    work_list_pair_bool* color_class_split_worklist, invariant* I) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
-        int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc, total;
+        int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
+        vertex_type* vertex_to_lab = c->vertex_to_lab;
+        vertex_type* lab           = c->lab;
+        vertex_type* ptn           = c->ptn;
+        vertex_type* vertex_to_col = c->vertex_to_col;
 
         cc = color_class; // iterate over color class
         comp = true;
@@ -845,16 +794,16 @@ private:
         acc_in = 0;
         singleton_inv1 = 0;
         singleton_inv2 = 0;
-        while (cc < end_cc) { // increment value of neighbours of vc by 1
-            const int vc = c->lab[cc];
+        while(cc < end_cc) { // increment value of neighbours of vc by 1
+            const int vc = lab[cc];
             const int pe = g->v[vc];
             const int end_i = pe + g->d[vc];
-            for (i = pe; i < end_i; i++) {
+            for(i = pe; i < end_i; i++) {
                 const int v   = g->e[i];
-                const int col = c->vertex_to_col[v];
-                if (c->ptn[col] == 0) {
-                    singleton_inv1 += (col + 1) * (423733 - (col + 1));
-                    singleton_inv2 += (col + 3) * (723732 - (col + 2));
+                const int col = vertex_to_col[v];
+                if(ptn[col] == 0) {
+                    singleton_inv1 += MASH2(col);
+                    //singleton_inv2 += (col + 3) * (723732 - (col + 2));
                     continue;
                 }
                 neighbours.inc_nr(v);
@@ -862,9 +811,9 @@ private:
                     color_vertices_considered.inc_nr(col);
                     assert(col + color_vertices_considered.get(col) < g->v_size);
                     scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
-                    if (!scratch_set.get(col)) {
+                    if(!scratch_set.get(col)) {
                         old_color_classes.push_back(col);
-                        acc_in += (col + 1) * (423233 - (col + 1));
+                        acc_in += MASH3(col);
                         scratch_set.set(col);
                     }
                 }
@@ -879,7 +828,7 @@ private:
 
         // early out before sorting color classes
         if(!comp) {
-            while (!old_color_classes.empty()) {
+            while(!old_color_classes.empty()) {
                 const int _col = old_color_classes.pop_back();
                 for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
                     neighbours.set(scratch[_col + i], -1);
@@ -894,15 +843,13 @@ private:
         // split color classes according to neighbour count
         while(!old_color_classes.empty()) {
             const int _col    = old_color_classes.pop_back();
-            const int _col_sz = c->ptn[_col] + 1;
+            const int _col_sz = ptn[_col] + 1;
             neighbour_sizes.reset();
             vertex_worklist.reset();
 
-            total = 0;
             for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
-                const int v = scratch[_col + i];
-                int index = neighbours.get(v) + 1;
-                total += 1;
+                const int v     = scratch[_col + i];
+                const int index = neighbours.get(v) + 1;
                 if(neighbour_sizes.inc(index) == 0)
                     vertex_worklist.push_back(index);
             }
@@ -919,10 +866,10 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                    if(__col != _col)
-                        c->ptn[__col] = -1;
                     comp = comp && I->write_top_and_compare(__col + v_degree * g->v_size);
                     comp = comp && I->write_top_and_compare(g->v_size * 7 + val + 1);
+                    if(__col != _col)
+                        ptn[__col] = -1;
                 }
             }
 
@@ -956,7 +903,6 @@ private:
                 color_vertices_considered.reset();
                 return comp;
             }
-            //
 
             vertex_worklist.reset();
             j = 0;
@@ -973,40 +919,32 @@ private:
                 if(v_new_color == _col)
                     continue;
 
-                const int vertex_old_pos = c->vertex_to_lab[v];
-                const int vertex_at_pos  = c->lab[v_new_color + c->ptn[v_new_color] + 1];
-                c->lab[vertex_old_pos]          = vertex_at_pos;
-                c->vertex_to_lab[vertex_at_pos] = vertex_old_pos;
+                const int lab_pt = v_new_color + ptn[v_new_color] + 1;
+                ptn[v_new_color] += 1;
+                ptn[_col] -= (_col != v_new_color);
 
-                const int new_color_sz = c->ptn[v_new_color] + 1;
-                c->lab[v_new_color + new_color_sz] = v;
-                c->vertex_to_col[v] = v_new_color;
-                c->vertex_to_lab[v] = v_new_color + new_color_sz;
-                c->ptn[v_new_color] += 1;
-
-                if (_col != v_new_color) {
-                    assert(v_new_color > _col);
-                    c->ptn[_col] -= 1;
-                } else assert(false);
+                const int vertex_old_pos     = vertex_to_lab[v];
+                const int vertex_at_pos      = lab[lab_pt];
+                lab[vertex_old_pos]          = vertex_at_pos;
+                vertex_to_lab[vertex_at_pos] = vertex_old_pos;
+                lab[lab_pt] = v;
+                vertex_to_col[v] = v_new_color;
+                vertex_to_lab[v] = lab_pt;
             }
 
             // add new colors to worklist
             largest_color_class_size = -1;
             for(i = _col; i < _col + _col_sz;) {
-                assert(i >= 0 && i < c->ptn_sz);
-                assert(c->ptn[i] + 1 > 0);
-                mark_as_largest = largest_color_class_size < (c->ptn[i] + 1);
-                largest_color_class_size = mark_as_largest?(c->ptn[i] + 1):largest_color_class_size;
+                assert(i >= 0 && i < ptn_sz);
+                assert(ptn[i] + 1 > 0);
+                mark_as_largest = largest_color_class_size < (ptn[i] + 1);
+                largest_color_class_size = mark_as_largest?(ptn[i] + 1):largest_color_class_size;
 
                 color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
                         std::pair<int, int>(_col, i), mark_as_largest));
-                if(i != 0)
-                    c->ptn[i - 1] = 0;
-                i += c->ptn[i] + 1;
-            }
 
-            if(i != 0)
-                c->ptn[i - 1] = 0;
+                i += ptn[i] + 1;
+            }
         }
 
         neighbour_sizes.reset();
@@ -1049,7 +987,7 @@ private:
                     if(config.CONFIG_IR_FULL_INVARIANT)
                         vertex_worklist.push_back(col);
                     else {
-                        singleton_inv += (col + 1) * (23524361 - col * 3);
+                        singleton_inv += MASH4(col);
                     }
                 }
             }
@@ -1333,7 +1271,7 @@ private:
                 if(config.CONFIG_IR_FULL_INVARIANT)
                     vertex_worklist.push_back(col); // treat singletons in separate list (more efficient sorting)
                 else
-                    singleton_inv += (col + 1) * (23524361 - col * 3);
+                    singleton_inv += MASH5(col);
                 continue;
             }
 

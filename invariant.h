@@ -6,6 +6,7 @@
 #include <vector>
 #include <iostream>
 #include "assert.h"
+#include "utility.h"
 
 enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
 
@@ -29,7 +30,7 @@ public:
 
     // currently a bit convoluted, really should be split into 2 functions...
     inline bool write_top_and_compare(int i) {
-        acc += i * (35235237 - i * 5);
+        acc += MASH0(i) ;
         if(no_write) {
             const bool comp = (comp_fail_pos == -2) && ((*compare_vec)[++cur_pos] == i);
             if(!comp) {
@@ -38,7 +39,7 @@ public:
                     comp_fail_val = i;
                     comp_fail_acc = i;
                 }
-                comp_fail_acc += i * (352355 - i * 3); // could just use acc instead
+                comp_fail_acc += MASH1(i); // could just use acc instead
             }
             return (comp || never_fail);
         } else {
