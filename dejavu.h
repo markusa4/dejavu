@@ -480,6 +480,10 @@ private:
                                 W.skip_schreier_level = W.skip_schreier_level->next;
 
                             W.base_size = G->base_size;
+                            // suppress extended deviation on last level, if there is only one level...
+                            if(W.base_size == 1)
+                                config.CONFIG_IR_EXPAND_DEVIATION = 0;
+
                             foreign_base_done = true;
                             switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
                             switches->done_created_group = true;
