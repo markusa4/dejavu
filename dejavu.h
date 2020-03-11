@@ -1000,7 +1000,9 @@ private:
                 skipped_level = w->first_skiplevel > 1;
             }
 
-            int s = S->select_color_dynamic(g, c, canon_strategy);
+            // extract cell selection from compare invariant, no need to use my own selector
+            int s = extract_selector(I, level - 1);
+            // int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 // we can derive an automorphism!
                 bijection<vertex_t> leaf;
@@ -1168,7 +1170,8 @@ private:
                 S->empty_cache();
             }
 
-            const int s = S->select_color_dynamic(g, c, canon_strategy);
+            const int s = extract_selector(I, level - 1);
+            //const int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 // we can derive an automorphism!
                 bijection<vertex_t> leaf;
@@ -1211,11 +1214,20 @@ private:
         }
     }
 
+    int extract_selector(invariant* I, int base_point) {
+        if((I->compareI->vec_selections)->size() <= base_point)
+            return - 1;
+        return (*I->compareI->vec_selections)[base_point];
+    }
+
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
                        sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
                        invariant* I, int v, change_tracker* changes, strategy_metrics* m, int cell_early) {
         if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
+
+        // protocol of selector choice
+        I->selection_write(c->vertex_to_col[v]);
 
         const int init_color_class = w->R.individualize_vertex(c, v);
         bool comp = I->write_top_and_compare(INT32_MIN);

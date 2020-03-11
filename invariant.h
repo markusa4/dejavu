@@ -12,9 +12,10 @@ enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
 
 class alignas(16) invariant {
 public:
-    std::vector<int>*  vec_cells     = nullptr;
+    std::vector<int>*        vec_cells     = nullptr;
+    std::vector<int>*        vec_selections= nullptr;
     std::vector<cell_state>* vec_protocol  = nullptr;
-    std::vector<int>*  vec_invariant = nullptr;
+    std::vector<int>*        vec_invariant = nullptr;
 
     invariant*        compareI;
     std::vector<int>* compare_vec;
@@ -61,6 +62,16 @@ public:
         }
     }
 
+    inline void selection_write(int cell) {
+        if(!no_write) {
+            vec_selections->push_back(cell);
+        }
+    }
+
+    inline int selection_read(int base_point) {
+        return (*vec_selections)[base_point];
+    }
+
     inline void protocol_write(bool active_cell, int c) {
         if(!no_write) {
             ++protocol_pos;
@@ -104,9 +115,11 @@ public:
         vec_cells     = new std::vector<int>();
         vec_protocol  = new std::vector<cell_state>();
         vec_invariant = new std::vector<int>();
-        vec_cells->reserve(prealloc);
-        vec_protocol->reserve(prealloc);
+        vec_selections= new std::vector<int>();
+        vec_cells->reserve(prealloc + 16);
+        vec_protocol->reserve(prealloc + 16);
         vec_invariant->reserve(prealloc * 20);
+        vec_selections->reserve(prealloc + 16);
     }
 
     /*~invariant() {

@@ -100,23 +100,26 @@ public:
     }
 
     int select_color_smallest(coloring<vertex_t> *c) {
-        int smallest_cell  = -1;
+        int smallest_cell    = -1;
         int smallest_cell_sz = c->lab_sz + 1;
-        bool only_trivial = true;
-        for(int i = skipstart; i < c->ptn_sz;){
-            if (c->ptn[i] != 0 && only_trivial) {
-                skipstart = i;
-                only_trivial = false;
+        bool only_trivial    = true;
+        for(int i = skipstart; i < c->ptn_sz; i += c->ptn[i] + 1){
+            if(c->ptn[i] != 0) {
+                if(only_trivial) {
+                    skipstart = i;
+                    only_trivial = false;
+                }
+                if ((c->ptn[i] + 1) < smallest_cell_sz) {
+                    smallest_cell = i;
+                    smallest_cell_sz = (c->ptn[i] + 1);
+                    if (smallest_cell_sz == 2) {
+                        break;
+                    }
+                    if (smallest_cell_sz == c->smallest_cell_lower_bound + 1) {
+                        break;
+                    }
+                }
             }
-            if((c->ptn[i] + 1) < smallest_cell_sz && c->ptn[i] > 0) {
-                smallest_cell = i;
-                smallest_cell_sz = (c->ptn[i] + 1);
-                if(smallest_cell_sz == 2)
-                    break;
-                if(smallest_cell_sz == c->smallest_cell_lower_bound)
-                    break;
-            }
-            i += c->ptn[i] + 1;
         }
         return smallest_cell;
     }

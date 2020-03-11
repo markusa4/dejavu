@@ -477,7 +477,7 @@ public:
 
                 c->cells += (old_class != new_class);
                 const int class_size = c->ptn[new_class];
-                c->smallest_cell_lower_bound = (class_size < c->smallest_cell_lower_bound)?
+                c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
 
 #ifndef NDEBUG // debug code

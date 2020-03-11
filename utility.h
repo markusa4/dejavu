@@ -22,8 +22,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
 
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,

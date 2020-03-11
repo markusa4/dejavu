@@ -127,6 +127,7 @@ public:
         ptn_sz = c->ptn_sz;
 
         cells = c->cells;
+        smallest_cell_lower_bound = c->smallest_cell_lower_bound;
         init = true;
     }
 
@@ -139,15 +140,15 @@ public:
         }
 
         if(!init) {
-        std::pair<vertex_t*, vertex_t*> alloc = coloring_bulk_allocator<vertex_t>(c->lab_sz * 4);
-        bulk_alloc = alloc.first;
-        bulk_pt    = alloc.second;
+            std::pair<vertex_t*, vertex_t*> alloc = coloring_bulk_allocator<vertex_t>(c->lab_sz * 4);
+            bulk_alloc = alloc.first;
+            bulk_pt    = alloc.second;
 
-        lab           = bulk_pt;
-        ptn           = lab + c->lab_sz;
-        vertex_to_col = lab + c->lab_sz * 2;
-        vertex_to_lab = lab + c->lab_sz * 3;
-        efficient_alloc = true;
+            lab           = bulk_pt;
+            ptn           = lab + c->lab_sz;
+            vertex_to_col = lab + c->lab_sz * 2;
+            vertex_to_lab = lab + c->lab_sz * 3;
+            efficient_alloc = true;
         }
 
         if(c->cells > c->ptn_sz / 4) {
@@ -167,7 +168,7 @@ public:
         ptn_sz = c->ptn_sz;
 
         cells = c->cells;
-
+        smallest_cell_lower_bound = c->smallest_cell_lower_bound;
         init = true;
     }
 
