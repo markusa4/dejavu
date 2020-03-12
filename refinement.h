@@ -546,10 +546,9 @@ public:
             if(!comp && deviation_expander <= 0) break;
         }
 
-        if(I->no_write)
-            I->protocol_skip_to_mark();
-
         if(comp) {
+            if(I->no_write)
+                I->protocol_skip_to_mark();
             I->protocol_mark();
             I->write_cells(c->cells);
             comp = I->write_top_and_compare(INV_MARK_ENDREF, true) && comp;
@@ -828,6 +827,17 @@ private:
         comp = I->write_top_and_compare(singleton_inv2) && comp;
         comp = I->write_top_and_compare(-acc_in) && comp;
 
+        // early out before sorting color classes
+        if(!comp) {
+            while(!old_color_classes.empty()) {
+                const int _col = old_color_classes.pop_back();
+                for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
+                    neighbours.set(scratch[_col + i], -1);
+                color_vertices_considered.set(_col, -1);
+            }
+            return comp;
+        }
+
         // sort split color classes
         old_color_classes.sort();
 
@@ -865,6 +875,36 @@ private:
             }
 
             const int vcount = color_vertices_considered.get(_col);
+
+            // early out
+            if(!comp) {
+                bool hard_reset = false;
+                if(2 * vcount > g->v_size) {
+                    neighbours.reset_hard();
+                    hard_reset = true;
+                } else {
+                    j = 0;
+                    while (j < vcount + 1) {
+                        const int v = scratch[_col + j];
+                        neighbours.set(v, -1);
+                        ++j;
+                    }
+                }
+                color_vertices_considered.set(_col, -1);
+                while (!old_color_classes.empty()) {
+                    const int __col = old_color_classes.pop_back();
+                    if(!hard_reset) {
+                        for (i = 0; i < color_vertices_considered.get(__col) + 1; ++i)
+                            neighbours.set(scratch[__col + i], -1);
+                    }
+                    color_vertices_considered.set(__col, -1);
+                }
+                neighbour_sizes.reset();
+                vertex_worklist.reset();
+                color_vertices_considered.reset();
+                return comp;
+            }
+
             vertex_worklist.reset();
             j = 0;
             color_vertices_considered.set(_col, -1);
