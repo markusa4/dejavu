@@ -419,7 +419,7 @@ public:
             const int next_color_class_sz = c->ptn[next_color_class] + 1;
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
-            comp = comp && I->write_top_and_compare(INV_MARK_STARTCELL);
+            comp = I->write_top_and_compare(INV_MARK_STARTCELL, true) && comp;
 
             // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
@@ -435,22 +435,21 @@ public:
             bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
             const bool pre_comp = comp;
-            comp = true;
 
             if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
                 // singleton
-                comp = (comp) && refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
+                comp = refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
                                                               &color_class_splits, I);
             } else if(config.CONFIG_IR_DENSE) {
                 if(dense_dense) { // dense-dense
-                    comp = (comp) && refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
+                    comp = refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
                                                                     &color_class_splits, I);
                 } else { // dense-sparse
-                    comp = (comp) && refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
+                    comp = refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
                                                               &color_class_splits, I);
                 }
             } else { // sparse
-                comp = (comp) && refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
+                comp = refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
                                                            &color_class_splits, I);
             }
 
@@ -502,15 +501,16 @@ public:
                     I->protocol_mark();
                     if(I->no_write)
                         I->protocol_skip_to_mark();
-                    comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
-                    comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
+                    comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
+                    comp = I->write_top_and_compare(INV_MARK_ENDREF, true)  && comp;
                     return comp;
                 }
 
                 // partition is similar to that of target invariant, skip to the end of the entire refinement
                 if(c->cells == cell_early && comp) {
                     I->fast_forward(INV_MARK_ENDREF);
-                    I->protocol_skip_to_mark();
+                    if(I->no_write)
+                        I->protocol_skip_to_mark();
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     return comp;
@@ -542,16 +542,17 @@ public:
 
             // mark end of cell and denote whether this cell split
             I->protocol_write(new_cells > 0, next_color_class);
-            comp = comp && I->write_top_and_compare(INV_MARK_ENDCELL);
+            comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
             if(!comp && deviation_expander <= 0) break;
         }
 
+        if(I->no_write)
+            I->protocol_skip_to_mark();
+
         if(comp) {
             I->protocol_mark();
-            if(I->no_write)
-                I->protocol_skip_to_mark();
             I->write_cells(c->cells);
-            comp = comp && I->write_top_and_compare(INV_MARK_ENDREF);
+            comp = I->write_top_and_compare(INV_MARK_ENDREF, true) && comp;
         }
 
         return comp;
@@ -823,20 +824,9 @@ private:
         }
 
         // write invariant for singleton color classes
-        comp = comp && I->write_top_and_compare(singleton_inv1);
-        comp = comp && I->write_top_and_compare(singleton_inv2);
-        comp = comp && I->write_top_and_compare(-acc_in);
-
-        // early out before sorting color classes
-        if(!comp) {
-            while(!old_color_classes.empty()) {
-                const int _col = old_color_classes.pop_back();
-                for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
-                    neighbours.set(scratch[_col + i], -1);
-                color_vertices_considered.set(_col, -1);
-            }
-            return comp;
-        }
+        comp = I->write_top_and_compare(singleton_inv1) && comp;
+        comp = I->write_top_and_compare(singleton_inv2) && comp;
+        comp = I->write_top_and_compare(-acc_in) && comp;
 
         // sort split color classes
         old_color_classes.sort();
@@ -867,44 +857,14 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                    comp = comp && I->write_top_and_compare(__col + v_degree * g->v_size);
-                    comp = comp && I->write_top_and_compare(g->v_size * 7 + val + 1);
+                    comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
+                    comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
                         ptn[__col] = -1;
                 }
             }
 
             const int vcount = color_vertices_considered.get(_col);
-
-            // early out
-            if(!comp) {
-                bool hard_reset = false;
-                if(2 * vcount > g->v_size) {
-                    neighbours.reset_hard();
-                    hard_reset = true;
-                } else {
-                    j = 0;
-                    while (j < vcount + 1) {
-                        const int v = scratch[_col + j];
-                        neighbours.set(v, -1);
-                        ++j;
-                    }
-                }
-                color_vertices_considered.set(_col, -1);
-                while (!old_color_classes.empty()) {
-                    const int __col = old_color_classes.pop_back();
-                    if(!hard_reset) {
-                        for (i = 0; i < color_vertices_considered.get(__col) + 1; ++i)
-                            neighbours.set(scratch[__col + i], -1);
-                    }
-                    color_vertices_considered.set(__col, -1);
-                }
-                neighbour_sizes.reset();
-                vertex_worklist.reset();
-                color_vertices_considered.reset();
-                return comp;
-            }
-
             vertex_worklist.reset();
             j = 0;
             color_vertices_considered.set(_col, -1);
@@ -936,7 +896,7 @@ private:
             // add new colors to worklist
             largest_color_class_size = -1;
             for(i = _col; i < _col + _col_sz;) {
-                assert(i >= 0 && i < ptn_sz);
+                //assert(i >= 0 && i < ptn_sz);
                 assert(ptn[i] + 1 > 0);
                 mark_as_largest = largest_color_class_size < (ptn[i] + 1);
                 largest_color_class_size = mark_as_largest?(ptn[i] + 1):largest_color_class_size;
@@ -997,21 +957,17 @@ private:
 
         // write singletons
 
-        comp = comp && I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos);
-
-        // if(!comp) return comp;
+        comp = I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos) && comp;
 
         if(config.CONFIG_IR_FULL_INVARIANT) {
             vertex_worklist.sort();
             while (!vertex_worklist.empty()) {
                 const int col = vertex_worklist.pop_back();
-                comp = comp && I->write_top_and_compare(g->v_size * 9 + col);
+                comp = I->write_top_and_compare(g->v_size * 9 + col) && comp;
             }
         } else {
-            comp = comp && I->write_top_and_compare(singleton_inv);
+            comp = I->write_top_and_compare(singleton_inv) && comp;
         }
-
-        // if(!comp) return comp;
 
         old_color_classes.sort();
 
@@ -1042,13 +998,12 @@ private:
             neighbour_sizes.inc(first_index);
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
-            comp = comp && I->write_top_and_compare(vertex_worklist.cur_pos);
-            // if(!comp) return comp;
+            comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
                 const int v_degree = neighbours.get(c->lab[col]);
-                comp = comp && I->write_top_and_compare(col + g->v_size * v_degree);
+                comp = I->write_top_and_compare(col + g->v_size * v_degree) && comp;
                 continue;
             }
 
@@ -1065,9 +1020,8 @@ private:
                     c->ptn[_col] = -1; // this is val - 1, actually...
 
                     const int v_degree = i;
-                    comp = comp && I->write_top_and_compare(_col + g->v_size * v_degree);
-                    comp = comp && I->write_top_and_compare(_col + val + 1);
-                    // if(!comp) return comp;
+                    comp = I->write_top_and_compare(_col + g->v_size * v_degree) && comp;
+                    comp = I->write_top_and_compare(_col + val + 1) && comp;
                 }
             }
 
@@ -1146,8 +1100,7 @@ private:
                 const int v_degree = neighbours.get(c->lab[col]) + 1;
                 if(v_degree == -1) // not connected! skip...
                     continue;
-                comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
-                //if(!comp) {neighbours.reset_hard(); return comp;}
+                comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
                 continue;
             }
 
@@ -1170,16 +1123,15 @@ private:
             neighbour_sizes.inc(first_index);
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
-            comp = comp && I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos);
+            comp = I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos) && comp;
             // if(!comp) {neighbours.reset_hard(); return comp;}
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
                 const int v_degree = neighbours.get(c->lab[col]);
                 //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
-                comp = comp && I->write_top_and_compare(col + v_degree * g->v_size);
-                comp = comp && I->write_top_and_compare(col + c->ptn[col] + 1);
-                // if(!comp) {neighbours.reset_hard(); return comp;}
+                comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
+                comp = I->write_top_and_compare(col + c->ptn[col] + 1) && comp;
                 continue;
             }
 
@@ -1196,10 +1148,9 @@ private:
                     c->ptn[_col] = -1; // this is val - 1, actually...
 
                     const int v_degree = i;
-                    comp = comp && I->write_top_and_compare(-g->v_size * 5 - _col);
-                    comp = comp && I->write_top_and_compare(_col + v_degree);
-                    comp = comp && I->write_top_and_compare(_col + val + 1);
-                    // if(!comp) {neighbours.reset_hard(); return comp;}
+                    comp = I->write_top_and_compare(-g->v_size * 5 - _col) && comp;
+                    comp = I->write_top_and_compare(_col + v_degree) && comp;
+                    comp = I->write_top_and_compare(_col + val + 1) && comp;
                 }
             }
 
@@ -1289,20 +1240,14 @@ private:
 
         singleton_inv += old_color_classes.cur_pos;
         if(!config.CONFIG_IR_FULL_INVARIANT)
-            comp = comp && I->write_top_and_compare(g->v_size * 3 + singleton_inv);
-
-        /*if(!comp) {
-            while(!old_color_classes.empty())
-                neighbours.set(old_color_classes.pop_back(), -1);
-            return comp;
-        }*/
+            comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
 
         old_color_classes.sort();
 
         // write invariant first...
         for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
             //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-            comp = comp && I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes.arr[i]));
+            comp = I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes.arr[i])) && comp;
             // contains information about color degree (= 1)
         }
 
@@ -1311,15 +1256,9 @@ private:
             vertex_worklist.sort();
 
         for(i = 0; i < vertex_worklist.cur_pos; ++i) {
-            comp = comp && I->write_top_and_compare(g->v_size * 11 + vertex_worklist.arr[i]); // size
+            comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist.arr[i]) && comp; // size
             // should contain information about color degree
         }
-
-        /*if(!comp) {
-            while(!old_color_classes.empty())
-                neighbours.set(old_color_classes.pop_back(), -1);
-            return comp;
-        }*/
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();

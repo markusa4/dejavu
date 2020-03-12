@@ -31,6 +31,12 @@ public:
 
     // currently a bit convoluted, really should be split into 2 functions...
     inline bool write_top_and_compare(int i) {
+        return write_top_and_compare(i, false);
+    }
+
+    inline bool write_top_and_compare(int j, bool override) {
+        const int i = (((j <= (INT32_MAX - 20)) || override)?(j):(j - 20));
+
         acc += MASH0(i) ;
         if(no_write) {
             const bool comp = (comp_fail_pos == -2) && ((*compare_vec)[++cur_pos] == i);
@@ -99,7 +105,7 @@ public:
 
     inline void fast_forward(int abort_marker) {
         while((*compare_vec)[cur_pos] != abort_marker) {
-            write_top_and_compare((*compare_vec)[cur_pos + 1]);
+            write_top_and_compare((*compare_vec)[cur_pos + 1], true);
         }
     }
 

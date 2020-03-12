@@ -1228,15 +1228,9 @@ private:
 
         // protocol of selector choice
         I->selection_write(c->vertex_to_col[v]);
-
         const int init_color_class = w->R.individualize_vertex(c, v);
-        bool comp = I->write_top_and_compare(INT32_MIN);
-        comp && I->write_top_and_compare(INT32_MIN);
-        comp = comp && I->write_top_and_compare(INT32_MAX);
-
+        bool comp = true;
         comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early);
-        comp = comp && I->write_top_and_compare(INT32_MAX);
-        comp = comp && I->write_top_and_compare(INT32_MIN);
         return comp;
     }
 
@@ -1357,6 +1351,7 @@ private:
                 // check in abort map
                 if (!elem->is_identity) {
                     bool comp_ = BFS->read_abort_map(level, elem->deviation_pos, elem->deviation_acc);
+
                     if(!comp_) {
                         if(elem->weight != 0 && elem->deviation_write.try_lock()) {
                             elem->weight = 0;
@@ -1769,12 +1764,13 @@ private:
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
             int cell_early = -1;
-            I->reset_deviation();
             if (look_close) {
                 I->never_fail = true;
             } else {
+                I->never_fail = false;
                 cell_early = (*I->compareI->vec_cells)[elem->base_sz];
             }
+            I->reset_deviation();
             comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
 
             if (!comp) { // fail on first level, set abort_val and abort_pos in elem
