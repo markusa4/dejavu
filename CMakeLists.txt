@@ -13,6 +13,7 @@ add_custom_target(nauty_target
         )
 
 add_executable(dejavu schreier_sequential.cpp utility.cpp main.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h)
+add_executable(vujade schreier_sequential.cpp utility.cpp vujade.h sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h vujade.cpp)
 
 if (DEFINED BENCH)
 	add_executable(bench schreier_sequential.cpp utility.cpp bench.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h)
