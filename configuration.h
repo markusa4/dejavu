@@ -9,6 +9,7 @@ struct configstruct {
     bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search tree (maybe good for asymmetric)
     bool CONFIG_IR_FORCE_SELECTOR = false;
     bool CONFIG_IR_IDLE_SKIP      = true;
+    bool CONFIG_IR_FAST_TOLERANCE_INC = true;
     int  CONFIG_IR_EXPAND_DEVIATION = 5;
 
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;

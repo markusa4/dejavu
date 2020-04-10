@@ -40,7 +40,6 @@ public:
     // synergy information for fast extension and deviation maps
     std::mutex deviation_write;
     int deviation_pos    = -1; // save more than one?
-    int deviation_val    = -1;
     long deviation_acc    = -1;
     int deviation_vertex = -1;
 

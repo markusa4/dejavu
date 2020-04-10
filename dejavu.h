@@ -621,6 +621,14 @@ private:
                             }
                         }
 
+                        if(config.CONFIG_IR_FAST_TOLERANCE_INC) {
+                            if (switches->experimental_paths * 16 < switches->experimental_deviation) {
+                                switches->iterate_tolerance();
+                                switches->iterate_tolerance();
+                                switches->iterate_tolerance();
+                            }
+                        }
+
                         switches->experimental_budget = -1;
                         switches->current_mode = modes::MODE_WAIT;
                         switches->done_fast = true;
@@ -1771,18 +1779,19 @@ private:
                 cell_early = (*I->compareI->vec_cells)[elem->base_sz];
             }
             I->reset_deviation();
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
-
-            if (!comp) { // fail on first level, set abort_val and abort_pos in elem
-                // need to sync this write?
-                ++switches->experimental_deviation;
-                if (elem->deviation_write.try_lock()) {
-                    elem->deviation_pos = I->comp_fail_pos;
-                    elem->deviation_val = I->comp_fail_val;
-                    elem->deviation_acc = I->comp_fail_acc;
-                    elem->deviation_vertex = v;
-                    elem->deviation_write.unlock();
+            if(v != elem->deviation_vertex) {
+                comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+                if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
+                    ++switches->experimental_deviation;
+                    if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
+                        elem->deviation_pos = I->comp_fail_pos;
+                        elem->deviation_acc = I->comp_fail_acc;
+                        elem->deviation_vertex = v;
+                        elem->deviation_write.unlock();
+                    }
+                    return false;
                 }
+            } else {
                 return false;
             }
         }

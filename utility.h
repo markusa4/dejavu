@@ -44,7 +44,6 @@ public:
         done_shared_group.store(false);
         done_created_group.store(false);
         experimental_look_close.store(false);
-        base1_skip.store(0);
         _ack_done.store(0);
         win_id.store(-2);
         checked.store(0);
@@ -78,9 +77,6 @@ public:
     std::unordered_multimap<long, vertex_t*> leaf_store;
 
     std::mutex leaf_store_mutex;
-
-    // variable used to synchronize base 1 tournament skip heuristic
-    std::atomic_int    base1_skip;
 
     int tolerance = 1;
 
