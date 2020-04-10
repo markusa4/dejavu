@@ -15,6 +15,8 @@ struct abort_code {
     int reason = 0;
 };
 
+enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BFS};
+
 template <class vertex_t, class degree_t, class edge_t>
 struct alignas(64) dejavu_workspace {
     // workspace for normal search
@@ -40,7 +42,8 @@ struct alignas(64) dejavu_workspace {
     int          my_base_points_sz;
     bool is_foreign_base;
 
-    coloring<vertex_t>* start_c;
+    coloring<vertex_t>* start_c1;
+    coloring<vertex_t>* start_c2;
     invariant start_I;
 
     // indicates which thread this is
@@ -54,7 +57,8 @@ struct alignas(64) dejavu_workspace {
     int         generator_fix_base_size;
 
     // bfs_workspace workspace
-    bfs_workspace<vertex_t>* BW;
+    bfs_workspace<vertex_t>* BW1;
+    bfs_workspace<vertex_t>* BW2;
     std::tuple<bfs_element<vertex_t>*, int, int>* todo_dequeue;
     int todo_deque_sz        = -1;
     std::pair<bfs_element<vertex_t> *, int>* finished_elements;
@@ -73,7 +77,8 @@ struct alignas(64) dejavu_workspace {
 
         delete work_c;
         delete work_I;
-        delete start_c;
+        delete start_c1;
+        delete start_c2;
     };
 };
 
@@ -108,16 +113,16 @@ public:
             }
         }
 
-        shared_workspace<vertex_t> switches;
-        return worker_thread(g1, g2, true, &switches, nullptr, nullptr, -1,
-                             nullptr);
+        shared_iso_workspace<vertex_t> switches;
+        return worker_thread(g1, g2, true, &switches, nullptr, nullptr, nullptr,
+                -1,nullptr, nullptr);
     }
 
 private:
     bool worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g1_, sgraph_t<vertex_t, degree_t, edge_t> *g2_, bool master,
-                       shared_workspace<vertex_t> *switches,
-                       coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
-                       int communicator_id, bfs_workspace<vertex_t> *bwork) {
+                       shared_iso_workspace<vertex_t> *switches, coloring<vertex_t> *start_c1,
+                       coloring<vertex_t> *start_c2, strategy<vertex_t>* canon_strategy,
+                       int communicator_id, bfs_workspace<vertex_t> *bwork1, bfs_workspace<vertex_t> *bwork2) {
         sgraph_t<vertex_t, degree_t, edge_t> *g1 = g1_;
         sgraph_t<vertex_t, degree_t, edge_t> *g2 = g2_;
         dejavu_workspace<vertex_t, degree_t, edge_t> W;
@@ -128,8 +133,10 @@ private:
         // preprocessing
         if(master) {
             config.CONFIG_IR_DENSE = !(g1->e_size<g1->v_size||g1->e_size/g1->v_size<g1->v_size/(g1->e_size/g1->v_size));
-            start_c = new coloring<vertex_t>;
-            g1->initialize_coloring(start_c);
+            start_c1 = new coloring<vertex_t>;
+            g1->initialize_coloring(start_c1);
+            start_c2 = new coloring<vertex_t>;
+            g2->initialize_coloring(start_c2);
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -137,9 +144,6 @@ private:
         }
 
         double cref;
-
-        bool *done             = &switches->done;
-        bool *done_fast        = &switches->done_fast;
 
         std::vector<std::thread> work_threads;
         bijection<vertex_t> base_points;
@@ -149,21 +153,37 @@ private:
         int selector_seed = seed;
 
         invariant start_I;
+        invariant *my_canon_I;
+        bijection<vertex_t> *my_canon_leaf;
+        my_canon_I = new invariant;
+        my_canon_I->has_compare = false;
+        my_canon_I->compare_vec = nullptr;
+        my_canon_I->compareI    = nullptr;
+        my_canon_leaf = new bijection<vertex_t>;
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
-            PRINT("[Dej] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+            PRINT("[Vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
             switches->current_mode = modes::MODE_TOURNAMENT;
 
             // first color refinement
             canon_strategy = new strategy<vertex_t>;
-            W.start_c = start_c;
-            W.R.refine_coloring_first(g1, start_c, -1);
-            PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
+            my_canon_I->create_vector(g1->v_size);
+            W.start_c1 = start_c1;
+            strategy_metrics m;
+            bool comp;
+            W.R.refine_coloring(g1, start_c1, my_canon_I, -1, &m, -1);
+            W.start_I.set_compare_invariant(my_canon_I);
+            W.start_c2 = start_c2;
+            comp = W.R.refine_coloring(g2, start_c2, &W.start_I, -1, &m, -1);
+            delete my_canon_I;
+            my_canon_I = new invariant;
+            if(!comp)
+                return comp;
+            PRINT("[Vuj] First refinement: " << cref / 1000000.0 << "ms");
 
-            int init_c = W.S.select_color(g1, start_c, selector_seed);
+            int init_c = W.S.select_color(g1, start_c1, selector_seed);
             if(init_c == -1) {
-                *done = true;
                 std::cout << "First coloring discrete." << std::endl;
                 std::cout << "Base size: 0" << std::endl;
                 std::cout << "Group size: 1" << std::endl;
@@ -174,62 +194,69 @@ private:
             }
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
-                if (start_c->cells == 1) {
-                    for (int i = 0; i < start_c->lab_sz; ++i) {
-                        start_c->lab[i] = i;
-                        start_c->vertex_to_lab[i] = i;
+                if (start_c1->cells == 1) {
+                    for (int i = 0; i < start_c1->lab_sz; ++i) {
+                        start_c1->lab[i] = i;
+                        start_c1->vertex_to_lab[i] = i;
+                    }
+                    for (int i = 0; i < start_c2->lab_sz; ++i) {
+                        start_c2->lab[i] = i;
+                        start_c2->vertex_to_lab[i] = i;
                     }
                 }
 
                 g1->sort_edgelist();
+                g2->sort_edgelist();
             }
 
             // create some objects that are initialized after tournament
-            W.BW = new bfs_workspace<vertex_t>();
-            bwork = W.BW;
+            W.BW1 = new bfs_workspace<vertex_t>();
+            bwork1 = W.BW1;
+
+            W.BW2 = new bfs_workspace<vertex_t>();
+            bwork2 = W.BW2;
 
             W.S.empty_cache();
             // launch worker threads
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
                 work_threads.emplace_back(
                         std::thread(&vujade_t<vertex_t, degree_t, edge_t>::worker_thread,
-                                    vujade_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c,
-                                    canon_strategy, i, W.BW));
-            PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
+                                    vujade_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
+                                    canon_strategy, i, W.BW1, W.BW2));
+            PRINT("[Vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
-            W.start_c = new coloring<vertex_t>;
-            W.start_c->copy_force(start_c);
+            W.start_c1 = new coloring<vertex_t>;
+            W.start_c1->copy_force(start_c1);
+            W.start_c2 = new coloring<vertex_t>;
+            W.start_c2->copy_force(start_c2);
             W.id        = -1;
         }
 
         int sampled_paths = 0;
         int restarts = 0;
         int idle_ms = 0;
-        invariant *my_canon_I;
-        bijection<vertex_t> *my_canon_leaf;
+        int base_sz = 0;
         bool switched1 = false;
         bool switched2 = false;
 
-        W.skip_c.copy_force(start_c);
+        W.skip_c.copy_force(start_c1);
         W.work_c = new coloring<vertex_t>;
         W.work_I = new invariant;
-        W.BW = bwork;
+        W.BW1 = bwork1;
+        W.BW2 = bwork2;
         W.skiplevels = 0;
 
         if (!master) {
-            W.start_c = new coloring<vertex_t>;
-            W.start_c->copy_force(start_c);
+            W.start_c1 = new coloring<vertex_t>;
+            W.start_c1->copy_force(start_c1);
+            W.start_c2 = new coloring<vertex_t>;
+            W.start_c2->copy_force(start_c2);
             W.id = communicator_id;
         }
 
         strategy<vertex_t>* my_strategy;
 
-        my_canon_I = new invariant;
-        my_canon_I->has_compare = false;
-        my_canon_I->compare_vec = nullptr;
-        my_canon_I->compareI    = nullptr;
-        my_canon_leaf = new bijection<vertex_t>;
         auto rst = (selector_type) ((communicator_id + 2) % 3);
         if(config.CONFIG_IR_FORCE_SELECTOR)
             rst = (selector_type) config.CONFIG_IR_CELL_SELECTOR;
@@ -238,6 +265,7 @@ private:
 
         W.S.empty_cache();
         find_first_leaf(&W, g1, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+        base_sz = base_points.map_sz;
         if(std::is_same<vertex_t, int>::value) {
             W.my_base_points = (int*) base_points.map;
         } else {
@@ -250,6 +278,44 @@ private:
         W.my_base_points_sz = base_points.map_sz;
         W.is_foreign_base   = true;
 
+        if(master) {
+            canon_strategy->replace(my_strategy);
+            actual_base = base_points;
+            base_points.not_deletable();
+            PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
+            bfs_element<vertex_t> *root_elem1 = new bfs_element<vertex_t>;
+            root_elem1->id = 0;
+            root_elem1->c = new coloring<vertex_t>;
+            root_elem1->I = new invariant;
+            root_elem1->c->copy_force(start_c1);
+            root_elem1->base_sz = 0;
+            root_elem1->is_identity = true;
+            *root_elem1->I = start_I;
+
+            bfs_element<vertex_t> *root_elem2 = new bfs_element<vertex_t>;
+            root_elem2->id = 0;
+            root_elem2->c = new coloring<vertex_t>;
+            root_elem2->I = new invariant;
+            root_elem2->c->copy_force(start_c2);
+            root_elem2->base_sz = 0;
+            root_elem2->is_identity = true;
+            *root_elem2->I = start_I;
+            W.S.empty_cache();
+            int init_c = W.S.select_color_dynamic(g1, start_c1, my_strategy);
+            W.BW1->initialize(root_elem1, init_c, g1->v_size, base_sz);
+            W.BW2->initialize(root_elem2, init_c, g2->v_size, base_sz);
+            W.base_size = base_sz;
+            // suppress extended deviation on last level, if there is only one level...
+            if(W.base_size == 1)
+                config.CONFIG_IR_EXPAND_DEVIATION = 0;
+            switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
+            switches->done_created_group = true;
+        }
+
+        while(!switches->done_created_group) {
+            continue;
+        }
+
         int n_found    = 0;
         int n_restarts = 0;
         int rotate_i   = 0;
@@ -260,33 +326,65 @@ private:
         bool is_canon_strategy = false;
         int required_level     = -1;
 
+        vujade_modes mode = VU_MODE_BIDIRECTIONAL;
+        int g_id = communicator_id % 2;
+
         // main loop
-        while(true) {
-            break;
+        while(!switches->done && (switches->noniso_counter <= config.CONFIG_RAND_ABORT)) {
+            switch(mode) {
+                case VU_MODE_BIDIRECTIONAL:
+                {
+                    g_id = (g_id + 1) % 2;
+                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
+
+                    // pick initial path from BFS level that is allocated to me
+                    --switches->experimental_budget;
+                    bijection<vertex_t> automorphism;
+                    bfs_element<vertex_t> *elem;
+                    int bfs_level    = bwork->current_level - 1;
+                    int max_weight   = bwork->level_maxweight[bfs_level];
+                    int bfs_level_sz = bwork->level_sizes[bfs_level];
+                    double picked_weight, rand_weight;
+                    do {
+                        int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
+                        elem = bwork->level_states[bfs_level][pick_elem];
+                        picked_weight = elem->weight;
+                        assert(max_weight > 0);
+                        rand_weight   = doubleRand(1, max_weight, selector_seed);
+                        if(rand_weight > picked_weight) continue;
+                    } while (elem->weight <= 0 && !switches->done); // && elem->deviation_vertex == -1
+                    // compute one experimental path
+                    bool comp = uniform_from_bfs_search_with_storage(&W, g1, g2, g_id, switches, elem, selector_seed,
+                                                                     canon_strategy, &automorphism,
+                                                                     true);
+                    if(comp) {
+                        switches->done = true;
+                        break;
+                    }
+                }
+                    break;
+
+                case VU_MODE_BFS:
+
+                    break;
+            }
         }
 
         if(master && !dejavu_kill_request) {
-            PRINT("[Dej] Cleanup...")
-            delete bwork;
-
-            delete canon_strategy->I;
-            delete canon_strategy->leaf;
-            delete canon_strategy;
+            while (!work_threads.empty()) {
+                work_threads[work_threads.size() - 1].join();
+                work_threads.pop_back();
+            }
+            PRINT("[Vuj] Cleanup...");
+            PRINT(switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size());
         }
-
-        if(!is_canon_strategy) {
-            delete my_canon_I;
-            delete my_canon_leaf;
-            delete my_strategy;
-        }
-
-        return false;
+        return switches->found_iso;
     }
 
     void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
-                         bijection<vertex_t> *automorphism, shared_workspace<vertex_t> *switches,
+                         bijection<vertex_t> *automorphism, shared_iso_workspace<vertex_t> *switches,
                          int selector_seed) {
         const bool* done = &switches->done;
 
@@ -295,7 +393,7 @@ private:
         selector<vertex_t, degree_t, edge_t> *S = &w->S;
         coloring<vertex_t> *c = &w->c;
         invariant *I = &w->I;
-        coloring<vertex_t> *start_c  = w->start_c;
+        coloring<vertex_t> *start_c  = w->start_c1;
         invariant *start_I = &w->start_I;
 
         S->empty_cache();
@@ -607,10 +705,17 @@ private:
     }
 
     bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
-                                              sgraph_t<vertex_t, degree_t, edge_t>  *g,
-                                              shared_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
+                                              sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
+                                              int g_id, shared_iso_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
+        sgraph_t<vertex_t, degree_t, edge_t>* g;
+        if(g_id == 0) {
+            g = g1;
+        } else {
+            g = g2;
+        }
+
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
         c->copy_force(elem->c);
@@ -663,7 +768,7 @@ private:
             comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
         } while(comp);
 
-        if(comp && (strat->I->acc == I->acc)) { // automorphism computed
+        /*if(comp && (strat->I->acc == I->acc)) { // automorphism computed
             bijection<vertex_t> leaf;
             leaf.read_from_coloring(c);
             leaf.not_deletable();
@@ -676,52 +781,59 @@ private:
             } else {
                 automorphism->certified = true;
             }
-        } else {
+        } else {*/
             bijection<vertex_t> leaf;
             leaf.read_from_coloring(c);
             leaf.not_deletable();
             // consider leaf store...
-            std::vector<vertex_t*> pointers;
 
-            switches->leaf_store_mutex.lock();
-            auto range = switches->leaf_store.equal_range(I->acc);
-            for (auto it = range.first; it != range.second; ++it)
-                pointers.push_back(it->second);
-            if(pointers.empty()) {
-                switches->leaf_store.insert(std::pair<long, vertex_t*>(I->acc, leaf.map));
-            }
-            switches->leaf_store_mutex.unlock();
+            for (int gi = 0; gi <= 1; ++gi) {
+                std::vector<vertex_t*> pointers;
+                switches->leaf_store_mutex[gi].lock();
+                auto range = switches->leaf_store[gi].equal_range(I->acc);
+                for (auto it = range.first; it != range.second; ++it)
+                    pointers.push_back(it->second);
+                if (pointers.empty()) {
+                    if(gi == g_id)
+                        switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
+                }
+                switches->leaf_store_mutex[gi].unlock();
 
-            comp = false;
+                comp = false;
 
-            for(size_t i = 0; i < pointers.size(); ++i) {
-                *automorphism = leaf;
-                automorphism->inverse();
-                bijection<vertex_t> fake_leaf;
-                fake_leaf.map = pointers[i];
-                fake_leaf.map_sz = g->v_size;
-                fake_leaf.not_deletable();
-                automorphism->compose(&fake_leaf);
+                for (size_t i = 0; i < pointers.size(); ++i) {
+                    automorphism->copy(&leaf);
+                    automorphism->inverse();
+                    bijection<vertex_t> fake_leaf;
+                    fake_leaf.map = pointers[i];
+                    fake_leaf.map_sz = g->v_size;
+                    fake_leaf.not_deletable();
+                    automorphism->compose(&fake_leaf);
 
-                int j;
-                for(j = 0; j < automorphism->map_sz; ++j)
-                    if(automorphism->map[j] != j) break;
+                    if(gi == g_id) {
+                        if (w->R.certify_automorphism_iso(g, automorphism)) {
+                            switches->noniso_counter++;
+                            PRINT("Found uniform automorphism.");
+                            automorphism->certified = true;
+                            automorphism->non_uniform = false;
+                            break;
+                        }
+                    } else {
+                        if (w->R.certify_isomorphism(g1, g2, automorphism)) {
+                            switches->found_iso.store(true);
+                            switches->noniso_counter.store(-10);
+                            return true;
+                        }
+                    }
+                }
 
-                if(j == automorphism->map_sz) {comp = false; break;}
-
-                if(w->R.certify_automorphism(g, automorphism)) {
-                    automorphism->certified = true;
-                    automorphism->non_uniform = false;
-                    comp = true;
-                    break;
-                } else {
-                    comp = false;
+                if(!pointers.empty() && gi == g_id) {
+                    switches->leaf_store_mutex[gi].lock();
+                    switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
+                    switches->leaf_store_mutex[gi].unlock();
                 }
             }
-
-        }
-
-        return comp;
+        return false;
     }
 };
 
@@ -760,17 +872,17 @@ typedef vujade_t<int, int, int> vujade;
         }
             break;
     }
-}
-
-void vujade_automorphisms(sgraph_t<int, int, int> *g, shared_permnode **gens) {
-    if(config.CONFIG_PREPROCESS_COMPRESS) {
-        dynamic_sgraph sg;
-        dynamic_sgraph::read(g, &sg);
-        dejavu_automorphisms_dispatch(&sg, gens);
-    } else {
-        vujade d;
-        d.automorphisms(g, gens);
-    }
 }*/
+
+bool vujade_iso(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2) {
+    vujade v;
+    bool res = v.iso(g1, g2);
+    if(res) {
+        PRINT("ISOMORPHIC");
+    } else {
+        PRINT("NON_ISOMORPHIC");
+    }
+    return res;
+}
 
 #endif //DEJAVU_VUJADE_H

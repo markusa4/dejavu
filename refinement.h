@@ -724,6 +724,78 @@ public:
         return true;
     }
 
+    bool certify_automorphism_iso(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
+        assert(p->map_sz == g->v_size);
+        int i, found;
+
+        for(i = 0; i < g->v_size; ++i) {
+            const int image_i = p->map_vertex(i);
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p->map_vertex(vertex_j);
+                scratch_set.set(image_j);
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool certify_isomorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
+                             bijection<vertex_t> *p) {
+        if(g1 == g2) {
+            PRINT("g1 == g2, no need to test isomorphism");
+        }
+        assert(p->map_sz == g1->v_size);
+        int i, found;
+
+        for(i = 0; i < g1->v_size; ++i) {
+            const int image_i = p->map_vertex(i);
+            if(g1->d[i] != g2->d[image_i]) // degrees must be equal
+                return false;
+
+            scratch_set.reset();
+            // isomorphism must preserve neighbours
+            found = 0;
+            for(int j = g1->v[i]; j < g1->v[i] + g1->d[i]; ++j) {
+                const int vertex_j = g1->e[j];
+                const int image_j  = p->map_vertex(vertex_j);
+                scratch_set.set(image_j);
+                found += 1;
+            }
+            for(int j = g2->v[image_i]; j < g2->v[image_i] + g2->d[image_i]; ++j) {
+                const int vertex_j = g2->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     ~refinement() {
         if(initialized)
             delete[] workspace_int;

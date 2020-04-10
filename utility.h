@@ -140,4 +140,58 @@ public:
     }
 };
 
+template<class vertex_t>
+class shared_iso_workspace {
+public:
+    shared_iso_workspace() {
+        done_created_group.store(false);
+        experimental_look_close.store(false);
+        _ack_done.store(0);
+        win_id.store(-2);
+        checked.store(0);
+        noniso_counter.store(0);
+        found_iso.store(false);
+        exit_counter.store(0);
+        experimental_paths.store(0);
+        experimental_deviation.store(0);
+        leaf_store[0] = std::unordered_multimap<long, vertex_t*>();
+        leaf_store[1] = std::unordered_multimap<long, vertex_t*>();
+    };
+
+    bool done = false;
+    bool done_fast = false;
+    std::atomic_bool done_created_group;
+
+    // solver mode
+    std::atomic<modes> current_mode;
+    std::atomic_int    exit_counter;
+    std::atomic_int    noniso_counter;
+    std::atomic_bool   found_iso;
+
+    // tournament variables
+    std::mutex         tournament_mutex;
+    std::atomic_int    checked;
+    strategy_metrics   win_metrics;
+    std::atomic_int    win_id;
+    std::atomic_int    _ack_done;
+    bool               all_no_restart = true;
+
+    // used for leaf storage decisions and the leaf storage
+    std::atomic_int    experimental_budget;
+    std::atomic_int    experimental_paths;
+    std::atomic_int    experimental_deviation;
+    std::atomic_bool   experimental_look_close;
+    std::unordered_multimap<long, vertex_t*> leaf_store[2];
+    std::mutex leaf_store_mutex[2];
+    int tolerance = 1;
+
+    void iterate_tolerance() {
+        tolerance *= 2;
+    }
+
+    void reset_tolerance(int size, int domain_size) {
+        tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
+    }
+};
+
 #endif //DEJAVU_UTILITY_H
