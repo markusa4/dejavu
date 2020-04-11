@@ -272,6 +272,8 @@ private:
         W.my_base_points_sz = base_points.map_sz;
         W.is_foreign_base   = true;
 
+        // ToDo: add first leaf to leaf store
+
         if(master) {
             canon_strategy->replace(my_strategy);
             actual_base = base_points;

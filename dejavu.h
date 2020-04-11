@@ -457,17 +457,10 @@ private:
                             base_points.not_deletable();
                             G->initialize(g->v_size, &actual_base);
                             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
-                            bfs_element<vertex_t> *root_elem = new bfs_element<vertex_t>;
-                            root_elem->id = 0;
-                            root_elem->c = new coloring<vertex_t>;
-                            root_elem->I = new invariant;
-                            root_elem->c->copy_force(start_c);
-                            root_elem->base_sz = 0;
-                            root_elem->is_identity = true;
-                            *root_elem->I = start_I;
                             W.S.empty_cache();
                             int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
-                            W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
+                            W.BW->initialize(bfs_element<vertex_t>::root_element(start_c, &start_I), init_c,
+                                             g->v_size, G->base_size);
                             int proposed_level = W.skiplevels + 1;
                             if(config.CONFIG_IR_FULL_BFS)
                                 proposed_level = G->base_size + 1;
