@@ -283,6 +283,7 @@ private:
             actual_base = base_points;
             base_points.not_deletable();
             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
+            PRINT("[Strat] Combinatorial base size:" << W.my_base_points_sz);
             bfs_element<vertex_t> *root_elem1 = new bfs_element<vertex_t>;
             root_elem1->id = 0;
             root_elem1->c = new coloring<vertex_t>;
@@ -375,8 +376,9 @@ private:
                 work_threads[work_threads.size() - 1].join();
                 work_threads.pop_back();
             }
+
+            PRINT("[Vuj] Store " << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size());
             PRINT("[Vuj] Cleanup...");
-            PRINT(switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size());
         }
         return switches->found_iso;
     }
@@ -397,7 +399,7 @@ private:
         invariant *start_I = &w->start_I;
 
         S->empty_cache();
-
+        start_I->reset_compare_invariant();
         start_I->create_vector(g->v_size * 2);
         automorphism->map    = new vertex_t[g->v_size];
         automorphism->map_sz = 0;
@@ -813,13 +815,14 @@ private:
                     if(gi == g_id) {
                         if (w->R.certify_automorphism_iso(g, automorphism)) {
                             switches->noniso_counter++;
-                            PRINT("Found uniform automorphism.");
+                            PRINT("[Bid] Found uniform automorphism. (" << g_id << ")");
                             automorphism->certified = true;
                             automorphism->non_uniform = false;
                             break;
                         }
                     } else {
-                        if (w->R.certify_isomorphism(g1, g2, automorphism)) {
+                        if (w->R.certify_isomorphism(g_id?g2:g1, (1-g_id)?g2:g1, automorphism)) {
+                            PRINT("[Bid] Found isomorphism. (" << g_id << ")");
                             switches->found_iso.store(true);
                             switches->noniso_counter.store(-10);
                             return true;

@@ -117,6 +117,18 @@ public:
 
     void set_compare_invariant(invariant *I);
 
+    void reset_compare_invariant() {
+        has_compare = false;
+        no_write    = false;
+        never_fail  = false;
+        comp_fail_pos = -2;
+        comp_fail_val = -1;
+        comp_fail_acc = -1;
+        cur_pos = -1;
+        protocol_pos = -1;
+        acc     = 0;
+    }
+
     void create_vector(int prealloc) {
         vec_cells     = new std::vector<int>();
         vec_protocol  = new std::vector<cell_state>();
