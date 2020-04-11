@@ -16,6 +16,7 @@ struct abort_code {
 };
 
 enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BFS};
+enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO};
 
 template <class vertex_t, class degree_t, class edge_t>
 struct alignas(64) dejavu_workspace {
@@ -322,12 +323,20 @@ private:
                         if(rand_weight > picked_weight) continue;
                     } while (elem->weight <= 0 && !switches->done); // && elem->deviation_vertex == -1
                     // compute one experimental path
-                    bool comp = uniform_from_bfs_search_with_storage(&W, g1, g2, g_id, switches, elem, selector_seed,
-                                                                     canon_strategy, &automorphism,
-                                                                     true);
-                    if(comp) {
-                        switches->done = true;
-                        break;
+                    uniform_outcome res = uniform_from_bfs_search_with_storage(&W, g1, g2, g_id, switches, elem, selector_seed,
+                                                                     canon_strategy, &automorphism,true);
+
+                    switch(res) {
+                        case OUT_AUTO:
+                            switches->noniso_counter++;
+                            break;
+                        case OUT_ISO:
+                            switches->done = true;
+                            switches->found_iso.store(true);
+                            switches->noniso_counter.store(-10);
+                            break;
+                        default:
+                            break;
                     }
                 }
                     break;
@@ -673,7 +682,7 @@ private:
         }
     }
 
-    bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
+    uniform_outcome uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                               sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
                                               int g_id, shared_iso_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
@@ -692,6 +701,7 @@ private:
         I->set_compare_invariant(strat->I);
 
         bool comp;
+        bool found_auto = false;
 
         // first individualization
         {
@@ -716,10 +726,10 @@ private:
                         elem->deviation_vertex = v;
                         elem->deviation_write.unlock();
                     }
-                    return false;
+                    return OUT_NONE;
                 }
             } else {
-                return false;
+                return OUT_NONE;
             }
         }
 
@@ -728,7 +738,7 @@ private:
 
         I->never_fail = true;
         do {
-            if(switches->done_fast) return false;
+            if(switches->done_fast) return OUT_NONE;
             const int col = w->S.select_color_dynamic(g, c, strat);
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
@@ -768,8 +778,10 @@ private:
                 }
                 switches->leaf_store_mutex[gi].unlock();
 
-                comp = false;
-
+                //if(pointers.size() > 1) {
+                 //   PRINT("iacc: " << I->acc);
+                 //   PRINT("psize: " << pointers.size());
+                //}
                 for (size_t i = 0; i < pointers.size(); ++i) {
                     automorphism->copy(&leaf);
                     automorphism->inverse();
@@ -781,29 +793,31 @@ private:
 
                     if(gi == g_id) {
                         if (w->R.certify_automorphism_iso(g, automorphism)) {
-                            switches->noniso_counter++;
-                            PRINT("[Bid] Found uniform automorphism. (" << g_id << ")");
+
+                            int j;
+                            for(j = 0; j < automorphism->map_sz; ++j)
+                                if(automorphism->map[j] != j) break;
+
+                            PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
                             automorphism->certified = true;
                             automorphism->non_uniform = false;
-                            break;
+                            found_auto = true;
                         }
                     } else {
                         if (w->R.certify_isomorphism(g_id?g2:g1, (1-g_id)?g2:g1, automorphism)) {
                             PRINT("[Bid] Found isomorphism. (" << g_id << ")");
-                            switches->found_iso.store(true);
-                            switches->noniso_counter.store(-10);
-                            return true;
+                            return OUT_ISO;
                         }
                     }
                 }
 
-                if(!pointers.empty() && gi == g_id) {
+                if(!pointers.empty() && gi == g_id && !found_auto) {
                     switches->leaf_store_mutex[gi].lock();
                     switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
                     switches->leaf_store_mutex[gi].unlock();
                 }
             }
-        return false;
+        return found_auto?OUT_AUTO:OUT_NONE;
     }
 };
 

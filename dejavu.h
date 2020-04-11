@@ -1850,11 +1850,11 @@ private:
                 fake_leaf.not_deletable();
                 automorphism->compose(&fake_leaf);
 
-                int j;
-                for(j = 0; j < automorphism->map_sz; ++j)
-                    if(automorphism->map[j] != j) break;
+                //int j;
+                //for(j = 0; j < automorphism->map_sz; ++j)
+                //    if(automorphism->map[j] != j) break;
 
-                if(j == automorphism->map_sz) {comp = false; break;}
+                //if(j == automorphism->map_sz) {comp = false; break;}
 
                 if(w->R.certify_automorphism(g, automorphism)) {
                     automorphism->certified = true;
