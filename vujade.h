@@ -313,7 +313,10 @@ private:
                     int bfs_level    = bwork->current_level - 1;
                     int max_weight   = bwork->level_maxweight[bfs_level];
                     int bfs_level_sz = bwork->level_sizes[bfs_level];
-                    double picked_weight, rand_weight;
+                    int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
+                    elem = bwork->level_states[bfs_level][pick_elem];
+
+                    /*double picked_weight, rand_weight;
                     do {
                         int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
                         elem = bwork->level_states[bfs_level][pick_elem];
@@ -321,7 +324,7 @@ private:
                         assert(max_weight > 0);
                         rand_weight   = doubleRand(1, max_weight, selector_seed);
                         if(rand_weight > picked_weight) continue;
-                    } while (elem->weight <= 0 && !switches->done); // && elem->deviation_vertex == -1
+                    } while (elem->weight <= 0 && !switches->done); // && elem->deviation_vertex == -1*/
                     // compute one experimental path
                     uniform_outcome res = uniform_from_bfs_search_with_storage(&W, g1, g2, g_id, switches, elem, selector_seed,
                                                                      canon_strategy, &automorphism,true);
@@ -817,7 +820,7 @@ private:
                     switches->leaf_store_mutex[gi].unlock();
                 }
             }
-        return found_auto?OUT_AUTO:OUT_NONE;
+        return (found_auto?OUT_AUTO:OUT_NONE);
     }
 };
 

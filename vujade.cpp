@@ -11,6 +11,8 @@ bool finished = false;
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
+thread_local int numnodes;
+thread_local int colorcost;
 
 void kill_thread(volatile int* kill_switch, int timeout) {
     Clock::time_point start = Clock::now();

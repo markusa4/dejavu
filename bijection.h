@@ -24,8 +24,8 @@ public:
     }
 
     void copy(bijection* p) {
-        if(init)
-            delete[] map;
+        if(!init)
+            map = new int[p->map_sz];
         init = p->init;
         mark = p->mark;
         map_sz = p->map_sz;
