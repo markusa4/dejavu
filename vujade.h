@@ -148,7 +148,6 @@ private:
         std::vector<std::thread> work_threads;
         bijection<vertex_t> base_points;
         bijection<vertex_t> actual_base;
-        int trash_int = 0;
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id * 5) * 5135235);
         int selector_seed = seed;
 
@@ -233,13 +232,7 @@ private:
             W.id        = -1;
         }
 
-        int sampled_paths = 0;
-        int restarts = 0;
-        int idle_ms = 0;
         int base_sz = 0;
-        bool switched1 = false;
-        bool switched2 = false;
-
         W.skip_c.copy_force(start_c1);
         W.work_c = new coloring<vertex_t>;
         W.work_I = new invariant;
@@ -284,27 +277,10 @@ private:
             base_points.not_deletable();
             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
             PRINT("[Strat] Combinatorial base size:" << W.my_base_points_sz);
-            bfs_element<vertex_t> *root_elem1 = new bfs_element<vertex_t>;
-            root_elem1->id = 0;
-            root_elem1->c = new coloring<vertex_t>;
-            root_elem1->I = new invariant;
-            root_elem1->c->copy_force(start_c1);
-            root_elem1->base_sz = 0;
-            root_elem1->is_identity = true;
-            *root_elem1->I = start_I;
-
-            bfs_element<vertex_t> *root_elem2 = new bfs_element<vertex_t>;
-            root_elem2->id = 0;
-            root_elem2->c = new coloring<vertex_t>;
-            root_elem2->I = new invariant;
-            root_elem2->c->copy_force(start_c2);
-            root_elem2->base_sz = 0;
-            root_elem2->is_identity = true;
-            *root_elem2->I = start_I;
             W.S.empty_cache();
             int init_c = W.S.select_color_dynamic(g1, start_c1, my_strategy);
-            W.BW1->initialize(root_elem1, init_c, g1->v_size, base_sz);
-            W.BW2->initialize(root_elem2, init_c, g2->v_size, base_sz);
+            W.BW1->initialize(bfs_element<vertex_t>::root_element(start_c1, &start_I), init_c, g1->v_size, base_sz);
+            W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, base_sz);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
             if(W.base_size == 1)
@@ -317,16 +293,7 @@ private:
             continue;
         }
 
-        int n_found    = 0;
-        int n_restarts = 0;
-        int rotate_i   = 0;
         strategy_metrics m;
-        bool foreign_base_done        = false;
-        bool reset_non_uniform_switch = true;
-        bool increase_budget   = true;
-        bool is_canon_strategy = false;
-        int required_level     = -1;
-
         vujade_modes mode = VU_MODE_BIDIRECTIONAL;
         int g_id = communicator_id % 2;
 
