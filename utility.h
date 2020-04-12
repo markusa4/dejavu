@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <random>
 #include <unordered_map>
+#include <bits/unordered_set.h>
 #include "configuration.h"
 
 #ifndef DEJAVU_UTILITY_H
@@ -156,6 +157,8 @@ public:
         experimental_deviation.store(0);
         leaf_store[0] = std::unordered_multimap<long, vertex_t*>();
         leaf_store[1] = std::unordered_multimap<long, vertex_t*>();
+        deviation_store[0] = std::unordered_set<long>();
+        deviation_store[1] = std::unordered_set<long>();
     };
 
     bool done = false;
@@ -183,6 +186,9 @@ public:
     std::atomic_bool   experimental_look_close;
     std::unordered_multimap<long, vertex_t*> leaf_store[2];
     std::mutex leaf_store_mutex[2];
+
+    std::unordered_set<long> deviation_store[2];
+    std::mutex deviation_store_mutex[2];
     int tolerance = 1;
 
     void iterate_tolerance() {

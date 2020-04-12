@@ -398,6 +398,7 @@ public:
         bool comp = true;
         assure_initialized(g);
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
+        if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
 
         cell_todo.reset(&queue_pointer);
 

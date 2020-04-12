@@ -15,8 +15,8 @@ struct abort_code {
     int reason = 0;
 };
 
-enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BFS};
-enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO};
+enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BIDIRECTIONAL_DEVIATION, VU_MODE_BFS};
+enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
 
 template <class vertex_t, class degree_t, class edge_t>
 struct alignas(64) dejavu_workspace {
@@ -133,6 +133,7 @@ private:
 
         // preprocessing
         if(master) {
+            config.CONFIG_IR_FORCE_EXPAND_DEVIATION = true;
             config.CONFIG_IR_DENSE = !(g1->e_size<g1->v_size||g1->e_size/g1->v_size<g1->v_size/(g1->e_size/g1->v_size));
             start_c1 = new coloring<vertex_t>;
             g1->initialize_coloring(start_c1);
@@ -339,6 +340,68 @@ private:
                             switches->done = true;
                             switches->found_iso.store(true);
                             switches->noniso_counter.store(-10);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                    break;
+
+                case VU_MODE_BIDIRECTIONAL_DEVIATION:
+                {
+                    g_id = (g_id + 1) % 2;
+                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
+
+                    // pick initial path from BFS level that is allocated to me
+                    --switches->experimental_budget;
+                    bijection<vertex_t> automorphism;
+                    bfs_element<vertex_t> *elem;
+                    int bfs_level    = bwork->current_level - 1;
+                    int max_weight   = bwork->level_maxweight[bfs_level];
+                    int bfs_level_sz = bwork->level_sizes[bfs_level];
+                    int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
+                    elem = bwork->level_states[bfs_level][pick_elem];
+
+                    /*double picked_weight, rand_weight;
+                    do {
+                        int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
+                        elem = bwork->level_states[bfs_level][pick_elem];
+                        picked_weight = elem->weight;
+                        assert(max_weight > 0);
+                        rand_weight   = doubleRand(1, max_weight, selector_seed);
+                        if(rand_weight > picked_weight) continue;
+                    } while (elem->weight <= 0 && !switches->done); // && elem->deviation_vertex == -1*/
+                    // compute one experimental path
+                    uniform_outcome res = uniform_deviation_from_bfs_search_with_storage(&W, g1, g2, g_id, switches, elem, selector_seed,
+                                                                               canon_strategy, &automorphism,false);
+                    switch(res) {
+                        case OUT_AUTO:
+                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 10) {
+                                mode = VU_MODE_BIDIRECTIONAL;
+                                continue;
+                            }
+                            switches->noniso_counter++;
+                            break;
+                        case OUT_ISO:
+                            switches->done = true;
+                            switches->found_iso.store(true);
+                            switches->noniso_counter.store(-10);
+                            break;
+                        case OUT_AUTO_DEV:
+                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 15) {
+                                mode = VU_MODE_BIDIRECTIONAL;
+                                continue;
+                            }
+                            switches->noniso_counter++;
+                            break;
+                        case OUT_ISO_DEV:
+                            switches->noniso_counter.store(0);
+                            config.CONFIG_RAND_ABORT += 1;
+                            config.CONFIG_IR_EXPAND_DEVIATION *= 2;
+                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 15) {
+                                mode = VU_MODE_BIDIRECTIONAL;
+                                continue;
+                            }
                             break;
                         default:
                             break;
@@ -743,7 +806,7 @@ private:
 
         I->never_fail = true;
         do {
-            if(switches->done_fast) return OUT_NONE;
+            if(switches->done) return OUT_NONE;
             const int col = w->S.select_color_dynamic(g, c, strat);
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
@@ -752,41 +815,116 @@ private:
             comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
         } while(comp);
 
-        /*if(comp && (strat->I->acc == I->acc)) { // automorphism computed
-            bijection<vertex_t> leaf;
-            leaf.read_from_coloring(c);
-            leaf.not_deletable();
-            *automorphism = leaf;
-            automorphism->inverse();
-            automorphism->compose(strat->leaf);
-            automorphism->non_uniform = false;
-            if(!config.CONFIG_IR_FULL_INVARIANT && !w->R.certify_automorphism(g, automorphism)) {
-                comp = false;
-            } else {
-                automorphism->certified = true;
-            }
-        } else {*/
-            bijection<vertex_t> leaf;
-            leaf.read_from_coloring(c);
-            leaf.not_deletable();
-            // consider leaf store...
+        bijection<vertex_t> leaf;
+        leaf.read_from_coloring(c);
+        leaf.not_deletable();
 
+        // consider leaf store...
+        for (int gi = 0; gi <= 1; ++gi) {
+            std::vector<vertex_t*> pointers;
+            switches->leaf_store_mutex[gi].lock();
+            auto range = switches->leaf_store[gi].equal_range(I->acc);
+            for (auto it = range.first; it != range.second; ++it)
+                pointers.push_back(it->second);
+            if (pointers.empty()) {
+                if(gi == g_id)
+                    switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
+            }
+            switches->leaf_store_mutex[gi].unlock();
+
+            for (size_t i = 0; i < pointers.size(); ++i) {
+                automorphism->copy(&leaf);
+                automorphism->inverse();
+                bijection<vertex_t> fake_leaf;
+                fake_leaf.map = pointers[i];
+                fake_leaf.map_sz = g->v_size;
+                fake_leaf.not_deletable();
+                automorphism->compose(&fake_leaf);
+
+                if(gi == g_id) {
+                    if (w->R.certify_automorphism_iso(g, automorphism)) {
+
+                        int j;
+                        for(j = 0; j < automorphism->map_sz; ++j)
+                            if(automorphism->map[j] != j) break;
+
+                        PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
+                        automorphism->certified = true;
+                        automorphism->non_uniform = false;
+                        found_auto = true;
+                    }
+                } else {
+                    if (w->R.certify_isomorphism(g_id?g2:g1, (1-g_id)?g2:g1, automorphism)) {
+                        PRINT("[Bid] Found isomorphism. (" << g_id << ")");
+                        return OUT_ISO;
+                    }
+                }
+            }
+
+            if(!pointers.empty() && gi == g_id && !found_auto) {
+                switches->leaf_store_mutex[gi].lock();
+                switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
+                switches->leaf_store_mutex[gi].unlock();
+            }
+        }
+        return (found_auto?OUT_AUTO:OUT_NONE);
+    }
+
+    uniform_outcome uniform_deviation_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
+                                                         sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
+                                                         int g_id, shared_iso_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
+                                                         int selector_seed, strategy<vertex_t> *strat,
+                                                         bijection<vertex_t> *automorphism, bool look_close) {
+        sgraph_t<vertex_t, degree_t, edge_t>* g;
+        if(g_id == 0) {
+            g = g1;
+        } else {
+            g = g2;
+        }
+
+        coloring<vertex_t>* c = &w->c;
+        invariant* I = &w->I;
+        c->copy_force(elem->c);
+        *I = *elem->I;
+        I->set_compare_invariant(strat->I);
+        I->reset_deviation();
+        I->never_fail = false;
+
+        bool comp = true;
+        bool found_auto = false;
+        w->S.empty_cache();
+
+        int level = 0;
+
+        do {
+            ++level;
+            if(switches->done) return OUT_NONE;
+            const int col = w->S.select_color_dynamic(g, c, strat);
+            if(col == -1) break;
+            const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
+            const int v    = c->lab[rpos];
+            const int cell_early = (*I->compareI->vec_cells)[elem->base_sz];
+            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+        } while(comp);
+
+        if(comp) {
+            bijection<vertex_t> leaf;
+            leaf.read_from_coloring(c);
+            leaf.not_deletable();
+
+            // consider leaf store...
             for (int gi = 0; gi <= 1; ++gi) {
-                std::vector<vertex_t*> pointers;
+                std::vector<vertex_t *> pointers;
                 switches->leaf_store_mutex[gi].lock();
                 auto range = switches->leaf_store[gi].equal_range(I->acc);
                 for (auto it = range.first; it != range.second; ++it)
                     pointers.push_back(it->second);
                 if (pointers.empty()) {
-                    if(gi == g_id)
+                    if (gi == g_id)
                         switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
                 }
                 switches->leaf_store_mutex[gi].unlock();
 
-                //if(pointers.size() > 1) {
-                 //   PRINT("iacc: " << I->acc);
-                 //   PRINT("psize: " << pointers.size());
-                //}
                 for (size_t i = 0; i < pointers.size(); ++i) {
                     automorphism->copy(&leaf);
                     automorphism->inverse();
@@ -796,33 +934,60 @@ private:
                     fake_leaf.not_deletable();
                     automorphism->compose(&fake_leaf);
 
-                    if(gi == g_id) {
+                    if (gi == g_id) {
                         if (w->R.certify_automorphism_iso(g, automorphism)) {
 
                             int j;
-                            for(j = 0; j < automorphism->map_sz; ++j)
-                                if(automorphism->map[j] != j) break;
+                            for (j = 0; j < automorphism->map_sz; ++j)
+                                if (automorphism->map[j] != j) break;
 
-                            PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
+                            PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz)
+                                                                        << ")");
                             automorphism->certified = true;
                             automorphism->non_uniform = false;
                             found_auto = true;
                         }
                     } else {
-                        if (w->R.certify_isomorphism(g_id?g2:g1, (1-g_id)?g2:g1, automorphism)) {
+                        if (w->R.certify_isomorphism(g_id ? g2 : g1, (1 - g_id) ? g2 : g1, automorphism)) {
                             PRINT("[Bid] Found isomorphism. (" << g_id << ")");
                             return OUT_ISO;
                         }
                     }
                 }
 
-                if(!pointers.empty() && gi == g_id && !found_auto) {
+                if (!pointers.empty() && gi == g_id && !found_auto) {
                     switches->leaf_store_mutex[gi].lock();
                     switches->leaf_store[gi].insert(std::pair<long, vertex_t *>(I->acc, leaf.map));
                     switches->leaf_store_mutex[gi].unlock();
                 }
             }
-        return (found_auto?OUT_AUTO:OUT_NONE);
+            return (found_auto ? OUT_AUTO : OUT_NONE);
+        } else {
+            long acc = I->comp_fail_acc;
+            // consider deviation stores...
+            for (int gi = 0; gi <= 1; ++gi) {
+                switches->deviation_store_mutex[gi].lock();
+                auto find = switches->deviation_store[gi].find(acc);
+                bool found = !(find == switches->deviation_store[gi].end());
+                if (!found) {
+                    if (gi == g_id)
+                        switches->deviation_store[gi].insert(acc);
+                }
+                switches->deviation_store_mutex[gi].unlock();
+                if(!found) {
+                    continue;
+                } else {
+                    if (gi == g_id) {
+                        found_auto = true;
+                        PRINT("[Bid] Found uniform auto deviation. (" << g_id << ")" << "(" << level << ")");
+                    } else {
+                        PRINT("[Bid] Found iso deviation. (" << g_id << ")" << "(" << level << ")");
+                        return OUT_ISO_DEV;
+                    }
+                }
+            }
+            return (found_auto ? OUT_AUTO_DEV : OUT_NONE);
+        }
     }
 };
 

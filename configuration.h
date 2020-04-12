@@ -11,6 +11,7 @@ struct configstruct {
     bool CONFIG_IR_IDLE_SKIP      = true;
     bool CONFIG_IR_FAST_TOLERANCE_INC = true;
     int  CONFIG_IR_EXPAND_DEVIATION = 5;
+    bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;
 
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;
