@@ -29,6 +29,7 @@ double doubleRand(const double & min, const double & max, int seed);
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,
             MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BIDIRECTIONAL_DEVIATION, VU_MODE_BFS};
 
 // metrics used to compare strategies
 struct strategy_metrics {
@@ -166,7 +167,8 @@ public:
     std::atomic_bool done_created_group;
 
     // solver mode
-    std::atomic<modes> current_mode;
+    std::atomic<vujade_modes> current_mode;
+    std::mutex switch_mode_mutex;
     std::atomic_int    exit_counter;
     std::atomic_int    noniso_counter;
     std::atomic_bool   found_iso;

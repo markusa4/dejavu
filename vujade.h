@@ -15,7 +15,6 @@ struct abort_code {
     int reason = 0;
 };
 
-enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BIDIRECTIONAL_DEVIATION, VU_MODE_BFS};
 enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
 
 template <class vertex_t, class degree_t, class edge_t>
@@ -165,7 +164,7 @@ private:
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
             PRINT("[Vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
-            switches->current_mode = modes::MODE_TOURNAMENT;
+            switches->current_mode = vujade_modes ::VU_MODE_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
             canon_strategy = new strategy<vertex_t>;
@@ -273,7 +272,11 @@ private:
         W.my_base_points_sz = base_points.map_sz;
         W.is_foreign_base   = true;
 
-        // ToDo: add first leaf to leaf store
+        // add first leaf to leaf store
+        switches->leaf_store_mutex[0].lock();
+        my_canon_leaf->not_deletable();
+        switches->leaf_store[0].insert(std::pair<long, vertex_t*>(my_canon_I->acc, my_canon_leaf->map));
+        switches->leaf_store_mutex[0].unlock();
 
         if(master) {
             canon_strategy->replace(my_strategy);
@@ -287,9 +290,13 @@ private:
             W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, base_sz);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
-            if(W.base_size == 1)
+            if(W.base_size == 1) {
+                switches->current_mode = vujade_modes::VU_MODE_BIDIRECTIONAL;
                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
-            switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
+            } else {
+                config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
+                std::cout << "[Dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION << std::endl;
+            }
             switches->done_created_group = true;
         }
 
@@ -298,12 +305,11 @@ private:
         }
 
         strategy_metrics m;
-        vujade_modes mode = VU_MODE_BIDIRECTIONAL;
-        int g_id = communicator_id % 2;
+        int g_id = (communicator_id + 1) % 2;
 
         // main loop
         while(!switches->done && (switches->noniso_counter <= config.CONFIG_RAND_ABORT)) {
-            switch(mode) {
+            switch(switches->current_mode ) {
                 case VU_MODE_BIDIRECTIONAL:
                 {
                     g_id = (g_id + 1) % 2;
@@ -376,10 +382,6 @@ private:
                                                                                canon_strategy, &automorphism,false);
                     switch(res) {
                         case OUT_AUTO:
-                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 10) {
-                                mode = VU_MODE_BIDIRECTIONAL;
-                                continue;
-                            }
                             switches->noniso_counter++;
                             break;
                         case OUT_ISO:
@@ -388,20 +390,21 @@ private:
                             switches->noniso_counter.store(-10);
                             break;
                         case OUT_AUTO_DEV:
-                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 15) {
-                                mode = VU_MODE_BIDIRECTIONAL;
-                                continue;
-                            }
                             switches->noniso_counter++;
                             break;
                         case OUT_ISO_DEV:
-                            switches->noniso_counter.store(0);
+                            switches->switch_mode_mutex.lock();
                             config.CONFIG_RAND_ABORT += 1;
-                            config.CONFIG_IR_EXPAND_DEVIATION *= 2;
-                            if(config.CONFIG_IR_EXPAND_DEVIATION >= 15) {
-                                mode = VU_MODE_BIDIRECTIONAL;
+                            //config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
+                            if(switches->current_mode != VU_MODE_BIDIRECTIONAL) {
+                                switches->current_mode = VU_MODE_BIDIRECTIONAL;
+                                switches->noniso_counter.store(0);
+                                switches->switch_mode_mutex.unlock();
                                 continue;
                             }
+                            //} else {
+                            switches->switch_mode_mutex.unlock();
+                            //}
                             break;
                         default:
                             break;
@@ -421,7 +424,8 @@ private:
                 work_threads.pop_back();
             }
 
-            PRINT("[Vuj] Store " << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size());
+            PRINT("[Vuj] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
+            << "), " << "devs(" << switches->deviation_store[0].size() << ":" << switches->deviation_store[1].size() << ")");
             PRINT("[Vuj] Cleanup...");
         }
         return switches->found_iso;
