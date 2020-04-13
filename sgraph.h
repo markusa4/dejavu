@@ -42,12 +42,10 @@ public:
         c->init = true;
 
         for(int i = 0; i < v_size; i++) {
-            c->vertex_to_col[i] = -1;
-            c->vertex_to_lab[i] = -1;
             c->lab[i] = i;
-            c->ptn[i] = 1;
         }
 
+        std::memset(c->ptn, 1, sizeof(int) * v_size);
         std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
 
         int cells = 0;
@@ -72,6 +70,26 @@ public:
         }
 
         c->cells = cells;
+    }
+
+    void initialize_coloring_raw(coloring<vertex_t> *c) {
+        c->lab = new vertex_t[this->v_size];
+        c->ptn = new vertex_t[this->v_size];
+        c->vertex_to_col = new vertex_t[this->v_size];
+        c->vertex_to_lab = new vertex_t[this->v_size];
+        c->lab_sz = this->v_size;
+        c->ptn_sz = this->v_size;
+        c->init = true;
+
+        for(int i = 0; i < v_size; i++) {
+            c->lab[i] = i;
+            c->vertex_to_lab[i] = i;
+        }
+
+        std::memset(c->vertex_to_col, 0, sizeof(int) * v_size);
+        c->ptn[0] = v_size - 1;
+        c->ptn[v_size - 1] = 0;
+        c->cells = 1;
     }
 
     // certify that a permutation is an automorphism of the sgraph

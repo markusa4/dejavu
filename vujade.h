@@ -135,9 +135,9 @@ private:
             config.CONFIG_IR_FORCE_EXPAND_DEVIATION = true;
             config.CONFIG_IR_DENSE = !(g1->e_size<g1->v_size||g1->e_size/g1->v_size<g1->v_size/(g1->e_size/g1->v_size));
             start_c1 = new coloring<vertex_t>;
-            g1->initialize_coloring(start_c1);
+            g1->initialize_coloring_raw(start_c1);
             start_c2 = new coloring<vertex_t>;
-            g2->initialize_coloring(start_c2);
+            g2->initialize_coloring_raw(start_c2);
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -175,7 +175,7 @@ private:
             W.R.refine_coloring(g1, start_c1, my_canon_I, -1, &m, -1);
             W.start_I.set_compare_invariant(my_canon_I);
             W.start_c2 = start_c2;
-            comp = W.R.refine_coloring(g2, start_c2, &W.start_I, -1, &m, -1);
+            comp = W.R.refine_coloring(g2, start_c2, &W.start_I, -1, &m, start_c2->cells);
             delete my_canon_I;
             my_canon_I = new invariant;
             if(!comp)
@@ -258,7 +258,12 @@ private:
         my_strategy = new strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
 
         W.S.empty_cache();
-        find_first_leaf(&W, g1, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+        const int gid_first = communicator_id % 2 == 0;
+        if(gid_first == 0) {
+            find_first_leaf(&W, g1, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+        } else {
+            find_first_leaf(&W, g2, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+        }
         base_sz = base_points.map_sz;
         if(std::is_same<vertex_t, int>::value) {
             W.my_base_points = (int*) base_points.map;
@@ -273,10 +278,10 @@ private:
         W.is_foreign_base   = true;
 
         // add first leaf to leaf store
-        switches->leaf_store_mutex[0].lock();
+        switches->leaf_store_mutex[gid_first].lock();
         my_canon_leaf->not_deletable();
-        switches->leaf_store[0].insert(std::pair<long, vertex_t*>(my_canon_I->acc, my_canon_leaf->map));
-        switches->leaf_store_mutex[0].unlock();
+        switches->leaf_store[gid_first].insert(std::pair<long, vertex_t*>(my_canon_I->acc, my_canon_leaf->map));
+        switches->leaf_store_mutex[gid_first].unlock();
 
         if(master) {
             canon_strategy->replace(my_strategy);
@@ -286,8 +291,8 @@ private:
             PRINT("[Strat] Combinatorial base size:" << W.my_base_points_sz);
             W.S.empty_cache();
             int init_c = W.S.select_color_dynamic(g1, start_c1, my_strategy);
-            W.BW1->initialize(bfs_element<vertex_t>::root_element(start_c1, &start_I), init_c, g1->v_size, base_sz);
-            W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, base_sz);
+            W.BW1->initialize(bfs_element<vertex_t>::root_element(start_c1, &start_I), init_c, g1->v_size, 2);
+            W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, 2);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
             if(W.base_size == 1) {
@@ -901,10 +906,11 @@ private:
         int level = 0;
 
         do {
-            ++level;
             if(switches->done) return OUT_NONE;
-            const int col = w->S.select_color_dynamic(g, c, strat);
-            if(col == -1) break;
+            if(c->cells == g->v_size) break;
+            //const int col = w->S.select_color_dynamic(g, c, strat);
+            const int col = strat->I->selection_read(level);
+            ++level;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
             const int cell_early = (*I->compareI->vec_cells)[elem->base_sz];
