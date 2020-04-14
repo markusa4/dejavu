@@ -49,13 +49,6 @@ struct alignas(64) dejavu_workspace {
     // indicates which thread this is
     int id;
 
-    // deprecated workspace for simple orbit method
-    work_set  orbit_considered;
-    work_list orbit_vertex_worklist;
-    work_list orbit;
-    int canonical_v;
-    int         generator_fix_base_size;
-
     // bfs_workspace workspace
     bfs_workspace<vertex_t>* BW1;
     bfs_workspace<vertex_t>* BW2;
@@ -102,11 +95,11 @@ public:
 
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
-            if (g1->v_size <= 100) {
+            if (g1->v_size <= 150) {
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = std::min(0, max_threads - 1);
-            } else if(g1->v_size <= 150) {
-                config.CONFIG_THREADS_REFINEMENT_WORKERS = std::min(1, max_threads - 1);
             } else if(g1->v_size <= 200) {
+                config.CONFIG_THREADS_REFINEMENT_WORKERS = std::min(1, max_threads - 1);
+            } else if(g1->v_size <= 250) {
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = std::min(3, max_threads - 1);
             } else {
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = max_threads - 1;
@@ -163,7 +156,7 @@ private:
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
-            PRINT("[Vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+            PRINT("[vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
             switches->current_mode = vujade_modes ::VU_MODE_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
@@ -180,7 +173,7 @@ private:
             my_canon_I = new invariant;
             if(!comp)
                 return comp;
-            PRINT("[Vuj] First refinement: " << cref / 1000000.0 << "ms");
+            PRINT("[vuj] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g1, start_c1, selector_seed);
             if(init_c == -1) {
@@ -228,7 +221,7 @@ private:
                         std::thread(&vujade_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     vujade_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
                                     canon_strategy, i, W.BW1, W.BW2));
-            PRINT("[Vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
+            PRINT("[vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
             W.start_c1 = new coloring<vertex_t>;
@@ -292,8 +285,8 @@ private:
             canon_strategy->replace(my_strategy);
             actual_base = base_points;
             base_points.not_deletable();
-            PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
-            PRINT("[Strat] Combinatorial base size:" << W.my_base_points_sz);
+            PRINT("[strat] Chosen strategy: " << canon_strategy->cell_selector_type);
+            PRINT("[strat] Combinatorial base size:" << W.my_base_points_sz);
             W.S.empty_cache();
             int init_c = W.S.select_color_dynamic(g1, start_c1, my_strategy);
             W.BW1->initialize(bfs_element<vertex_t>::root_element(start_c1, &start_I), init_c, g1->v_size, 2);
@@ -305,7 +298,7 @@ private:
                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
             } else {
                 config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
-                std::cout << "[Dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION << std::endl;
+                std::cout << "[dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION << std::endl;
             }
             switches->done_created_group = true;
         }
@@ -434,9 +427,9 @@ private:
                 work_threads.pop_back();
             }
 
-            PRINT("[Vuj] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
+            PRINT("[vuj] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
             << "), " << "devs(" << switches->deviation_store[0].size() << ":" << switches->deviation_store[1].size() << ")");
-            PRINT("[Vuj] Cleanup...");
+            PRINT("[vuj] Cleanup...");
         }
         return switches->found_iso;
     }
@@ -486,18 +479,6 @@ private:
             automorphism->map[automorphism->map_sz] = v;
             automorphism->map_sz += 1;
         }
-    }
-
-    void reset_skiplevels(dejavu_workspace<vertex_t, degree_t, edge_t> *w) {
-        w->skip_c.copy_force(w->start_c);
-        w->skip_I = w->start_I;
-        w->skiplevels = 0;
-        w->skip_schreier_level = w->G->gp;
-        w->first_skiplevel = 1;
-        w->skiplevel_is_uniform = true;
-        w->my_base_points    = w->G->b;
-        w->my_base_points_sz = w->G->base_size;
-        w->is_foreign_base   = false;
     }
 
     int extract_selector(invariant* I, int base_point) {
@@ -704,13 +685,13 @@ private:
                                 std::tuple<bfs_element<vertex_t> *, int, int>(elem, elem->c->lab[i], -1));
                     }
                     if (elem->is_identity) {
-                        PRINT("[BFS] Abort map expecting: " << c_size);
+                        PRINT("[bfs] Abort map expecting: " << c_size);
                         w->BW->level_abort_map_done[w->BW->current_level] = c_size;
                     }
                 }
             }
         } else {
-            PRINT("[BFS] Filling with orbits...");
+            PRINT("[bfs] Filling with orbits...");
 
             // swap identity to first position...
             for (int j = 0; j < w->BW->level_sizes[w->BW->current_level - 1]; ++j) {
@@ -741,7 +722,7 @@ private:
                         added += 1;
                     }
                     if (elem->is_identity) {
-                        PRINT("[BFS] Abort map expecting: " << added);
+                        PRINT("[bfs] Abort map expecting: " << added);
                         w->BW->level_abort_map_done[w->BW->current_level] = added;
                     }
                 }
@@ -862,14 +843,14 @@ private:
                         for(j = 0; j < automorphism->map_sz; ++j)
                             if(automorphism->map[j] != j) break;
 
-                        PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
+                        PRINT("[bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
                         automorphism->certified = true;
                         automorphism->non_uniform = false;
                         found_auto = true;
                     }
                 } else {
                     if (w->R.certify_isomorphism(g_id?g2:g1, (1-g_id)?g2:g1, automorphism)) {
-                        PRINT("[Bid] Found isomorphism. (" << g_id << ")");
+                        PRINT("[bid] Found isomorphism. (" << g_id << ")");
                         return OUT_ISO;
                     }
                 }
@@ -956,7 +937,7 @@ private:
                             for (j = 0; j < automorphism->map_sz; ++j)
                                 if (automorphism->map[j] != j) break;
 
-                            PRINT("[Bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz)
+                            PRINT("[bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz)
                                                                         << ")");
                             automorphism->certified = true;
                             automorphism->non_uniform = false;
@@ -964,7 +945,7 @@ private:
                         }
                     } else {
                         if (w->R.certify_isomorphism(g_id ? g2 : g1, (1 - g_id) ? g2 : g1, automorphism)) {
-                            PRINT("[Bid] Found isomorphism. (" << g_id << ")");
+                            PRINT("[bid] Found isomorphism. (" << g_id << ")");
                             return OUT_ISO;
                         }
                     }
@@ -994,9 +975,9 @@ private:
                 } else {
                     if (gi == g_id) {
                         found_auto = true;
-                        PRINT("[Bid] Found uniform auto deviation. (" << g_id << ")" << "(" << level << ")");
+                        PRINT("[bid] Found uniform auto deviation. (" << g_id << ")" << "(" << level << ")");
                     } else {
-                        PRINT("[Bid] Found iso deviation. (" << g_id << ")" << "(" << level << ")");
+                        PRINT("[bid] Found iso deviation. (" << g_id << ")" << "(" << level << ")");
                         return OUT_ISO_DEV;
                     }
                 }

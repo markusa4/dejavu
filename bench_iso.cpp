@@ -7,7 +7,10 @@ extern "C" {
 #include "nauty/traces.h"
 }
 
-#include "nauty/naugroup.h"
+extern "C" {
+#include "conauto/conauto.h"
+}
+    #include "nauty/naugroup.h"
 #include "configuration.h"
 #include <chrono>
 #include <string>
@@ -33,6 +36,47 @@ void kill_thread(volatile int* kill_switch, int timeout) {
             *kill_switch = 1;
         }
     }
+}
+
+void sgraph_to_adjgraph(sgraph* g, adjgraph* ag) {
+    ag->num_vert = g->v_size;
+    ag->num_arc  = g->e_size / 2; 
+    ag->deg = new uint64_t[g->v_size];
+    for(int i = 0; i < g->v_size; ++i)
+        ag->deg[i] = g->d[i];
+
+    ag->adj = new int8_t*[g->v_size];
+
+    for (int from = 0; from < g->v_size; from++ ) {
+        ag->adj[from] = new int8_t[g->v_size];
+        for (int to = 0; to < g->v_size; to++ )
+            ag->adj[from][to] = NOT_ADJ;
+    }
+
+    for(int i = 0; i < g->v_size; ++i) {
+        for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+            ag->adj[i][g->e[j]] = ARC_IO;
+        }
+    }
+    std::cout << "Converted" << std::endl;
+}
+
+void bench_conauto(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
+    // touch the graph (mitigate cache variance)
+    adjgraph adj_g1;
+    adjgraph adj_g2;
+    sgraph_to_adjgraph(g1, &adj_g1);
+    sgraph_to_adjgraph(g2, &adj_g2);
+
+    Clock::time_point timer = Clock::now();
+    int iso = are_isomorphic(&adj_g1, &adj_g2);
+    *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    if(iso) {
+        std::cout << "ISOMORPHIC" << std::endl;
+    } else {
+        std::cout << "NON_ISOMORPHIC" << std::endl;
+    }
+    finished = true;
 }
 
 void bench_nauty(sgraph* g1, sgraph* g2, double* nauty_solve_time) {
@@ -224,6 +268,7 @@ int commandline_mode(int argc, char **argv) {
     bool comp_nauty = true;
     bool comp_traces = true;
     bool comp_dejavu = true;
+    bool comp_conauto = true;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
@@ -301,6 +346,10 @@ int commandline_mode(int argc, char **argv) {
 
         if (arg == "__NO_DEJAVU") {
             comp_dejavu = false;
+        }
+
+        if (arg == "__NO_CONAUTO") {
+            comp_conauto = false;
         }
 
         if (arg == "__NO_IDLESKIP") {
@@ -425,8 +474,25 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    // std::cout << "Compare (nauty): " << nauty_solve_time / dejavu_solve_time << std::endl;
-    // std::cout << "Compare (Traces): " << traces_solve_time / dejavu_solve_time << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "conauto" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+
+    double conauto_solve_time;
+    if(comp_conauto) {
+        finished = false;
+        nauty_kill_request = 0;
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &nauty_kill_request, timeout);
+        bench_conauto(_g1, _g2, &conauto_solve_time);
+        if(timeout > 0)
+            killer.join();
+    }
+    std::cout << "Solve time: " << conauto_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
 
     if (entered_stat_file) {
         stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
@@ -439,6 +505,8 @@ int commandline_mode(int argc, char **argv) {
             stat_file << nauty_solve_time  / 1000000.0 << " ";
         if(comp_traces)
             stat_file << traces_solve_time / 1000000.0 << " ";
+        if(comp_conauto)
+            stat_file << conauto_solve_time / 1000000.0 << " ";
         stat_file << "\n";
         stat_file.close();
     }
