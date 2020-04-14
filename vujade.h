@@ -184,13 +184,18 @@ private:
 
             int init_c = W.S.select_color(g1, start_c1, selector_seed);
             if(init_c == -1) {
-                std::cout << "First coloring discrete." << std::endl;
-                std::cout << "Base size: 0" << std::endl;
-                std::cout << "Group size: 1" << std::endl;
+                std::cout << "First coloring discrete, checking isomorphism." << std::endl;
+                bijection<vertex_t> automorphism;
+                automorphism.read_from_coloring(start_c1);
+                bijection<vertex_t> leaf2;
+                leaf2.read_from_coloring(start_c2);
+                automorphism.inverse();
+                automorphism.compose(&leaf2);
                 W.work_c = new coloring<vertex_t>;
                 W.work_I = new invariant;
                 delete canon_strategy;
-                return false;
+
+                return (W.R.certify_isomorphism(g1, g2, &automorphism));
             }
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
