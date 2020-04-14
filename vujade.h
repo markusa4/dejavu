@@ -89,10 +89,6 @@ template<class vertex_t, class degree_t, class edge_t>
 class vujade_t {
 public:
     bool iso(sgraph_t<vertex_t, degree_t, edge_t> *g1, sgraph_t<vertex_t, degree_t, edge_t> *g2) {
-        bool simple_check = (g1->v_size == g2->v_size) && (g1->e_size == g2->e_size) && (g1->d_size == g2->d_size);
-        if(!simple_check)
-            return false;
-
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g1->v_size <= 150) {
@@ -171,8 +167,12 @@ private:
             comp = W.R.refine_coloring(g2, start_c2, &W.start_I, -1, &m, start_c2->cells);
             delete my_canon_I;
             my_canon_I = new invariant;
-            if(!comp)
+            if(!comp) {
+                W.work_c = new coloring<vertex_t>;
+                W.work_I = new invariant;
+                delete canon_strategy;
                 return comp;
+            }
             PRINT("[vuj] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g1, start_c1, selector_seed);
@@ -1025,8 +1025,11 @@ typedef vujade_t<int, int, int> vujade;
 }*/
 
 bool vujade_iso(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2) {
-    vujade v;
-    bool res = v.iso(g1, g2);
+    bool res = (g1->v_size == g2->v_size) && (g1->e_size == g2->e_size) && (g1->d_size == g2->d_size);
+    if(res) {
+        vujade v;
+        res = v.iso(g1, g2);
+    }
     if(res) {
         PRINT("ISOMORPHIC");
     } else {

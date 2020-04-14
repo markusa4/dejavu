@@ -40,7 +40,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 
 void sgraph_to_adjgraph(sgraph* g, adjgraph* ag) {
     ag->num_vert = g->v_size;
-    ag->num_arc  = g->e_size / 2; 
+    ag->num_arc  = g->e_size / 2;
     ag->deg = new uint64_t[g->v_size];
     for(int i = 0; i < g->v_size; ++i)
         ag->deg[i] = g->d[i];
@@ -324,6 +324,16 @@ int commandline_mode(int argc, char **argv) {
         if (arg == "__COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
+        }
+
+        if (arg == "__ERR") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_RAND_ABORT = atoi(argv[i]);
+            } else {
+                std::cerr << "--err option requires one argument." << std::endl;
+                return 1;
+            }
         }
 
         if (arg == "__KDEVIATION") {
