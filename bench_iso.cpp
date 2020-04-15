@@ -40,10 +40,13 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 
 void sgraph_to_adjgraph(sgraph* g, adjgraph* ag) {
     ag->num_vert = g->v_size;
-    ag->num_arc  = g->e_size / 2;
+    ag->num_arc  = g->e_size;
     ag->deg = new uint64_t[g->v_size];
-    for(int i = 0; i < g->v_size; ++i)
-        ag->deg[i] = g->d[i];
+    for(int i = 0; i < g->v_size; ++i) {
+        ag->deg[i] = (uint64_t)0;
+        /*for (int j = 0; j < g->d[i]; ++j)
+            ag->deg[i] += (uint64_t)UINT64_C(0x1000000000000);*/
+    }
 
     ag->adj = new int8_t*[g->v_size];
 
@@ -55,7 +58,20 @@ void sgraph_to_adjgraph(sgraph* g, adjgraph* ag) {
 
     for(int i = 0; i < g->v_size; ++i) {
         for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
-            ag->adj[i][g->e[j]] = ARC_IO;
+            uint16_t from = i;
+            uint16_t to   = g->e[j];
+            if ( ag->adj[from][to] == NOT_ADJ )
+            {
+                ag->deg[from] = ag->deg[from] + UINT64_C(0x100000000) + (uint64_t)(from!=to);
+                ag->deg[to] = ag->deg[to] + UINT64_C(0x10000) + (uint64_t)(from!=to);
+            }
+            else
+            {
+                ag->deg[from] = ag->deg[from] - UINT64_C(0x10000) + UINT64_C(0x1000000000000);
+                ag->deg[to]   = ag->deg[to] - UINT64_C(0x100000000) + UINT64_C(0x1000000000000);
+            }
+            ag->adj[from][to] = ag->adj[from][to] | ARC_OUT;
+            ag->adj[to][from] = ag->adj[to][from] | ARC_IN;
         }
     }
     std::cout << "Converted" << std::endl;
