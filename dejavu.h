@@ -1905,50 +1905,79 @@ private:
 
 typedef dejavu_t<int, int, int> dejavu;
 
-/*void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
+void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, int* colmap, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
             PRINT("[Dispatch] <int32, int32, int32>");
             dejavu_t<int, int, int> d;
-            d.automorphisms(sgraph->sgraph_0, gens);
+
+            d.automorphisms(sgraph->sgraph_0, colmap, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_INT: {
             PRINT("[Dispatch] <int16, int16, int>");
             dejavu_t<int16_t, int16_t, int> d;
-            d.automorphisms(sgraph->sgraph_1, gens);
+            const int v_size = sgraph->sgraph_1->v_size;
+            int16_t* colmap_16 = nullptr;
+            if(colmap != nullptr) {
+                colmap_16 = new int16_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_1, colmap_16, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_SHORT: {
             PRINT("[Dispatch] <int16, int16, int16>");
             dejavu_t<int16_t, int16_t, int16_t> d;
-            d.automorphisms(sgraph->sgraph_2, gens);
+            const int v_size = sgraph->sgraph_2->v_size;
+            int16_t* colmap_16 = nullptr;
+            if(colmap != nullptr) {
+                colmap_16 = new int16_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_2, colmap_16, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_SHORT:{
             PRINT("[Dispatch] <int8, int8, int16>");
             dejavu_t<int8_t, int8_t, int16_t> d;
-            d.automorphisms(sgraph->sgraph_3, gens);
+            const int v_size = sgraph->sgraph_3->v_size;
+            int8_t* colmap_8 = nullptr;
+            if(colmap != nullptr) {
+                colmap_8 = new int8_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_3, colmap_8, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_CHAR: {
             PRINT("[Dispatch] <int8, int8, int8>");
             dejavu_t<int8_t, int8_t, int8_t> d;
-            d.automorphisms(sgraph->sgraph_4, gens);
+            const int v_size = sgraph->sgraph_4->v_size;
+            int8_t* colmap_8 = nullptr;
+            if(colmap != nullptr) {
+                colmap_8 = new int8_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_4, colmap_8, gens);
         }
             break;
     }
-}*/
+}
 
 void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
-    /*if(config.CONFIG_PREPROCESS_COMPRESS) {
+    if(config.CONFIG_PREPROCESS_COMPRESS) {
         dynamic_sgraph sg;
         dynamic_sgraph::read(g, &sg);
-        dejavu_automorphisms_dispatch(&sg, gens);
-    } else {*/
+        dejavu_automorphisms_dispatch(&sg, colmap, gens);
+    } else {
         dejavu d;
         d.automorphisms(g, colmap, gens);
-    //}
+    }
 }
 
 #endif //DEJAVU_DEJAVU_H

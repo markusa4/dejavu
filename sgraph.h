@@ -24,7 +24,7 @@ class alignas(16) sgraph_t {
     struct vertexComparatorColor {
         vertexComparatorColor(const sgraph_t<vertex_t, degree_t, edge_t>& g, const vertex_t* vertex_to_col) : g(g), vertex_to_col(vertex_to_col) {}
         const sgraph_t& g;
-        const int* vertex_to_col;
+        const vertex_t* vertex_to_col;
 
         bool operator()(const vertex_t & v1, const vertex_t & v2) {
             return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));

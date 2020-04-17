@@ -166,12 +166,14 @@ int commandline_mode(int argc, char **argv) {
         return 1;
     }
     parser p;
+    int* colmap1 = nullptr;
+    int* colmap2 = nullptr;
     sgraph *g1 = new sgraph;
     std::cout << "Parsing " << filename1 << "..." << std::endl;
-    p.parse_dimacs_file(filename1, g1);
+    p.parse_dimacs_file(filename1, g1, &colmap1);
     sgraph *g2 = new sgraph;
     std::cout << "Parsing " << filename2 << "..." << std::endl;
-    p.parse_dimacs_file(filename2, g2);
+    p.parse_dimacs_file(filename2, g2, &colmap2);
     sgraph *_g1 = new sgraph;
     sgraph *_g2 = new sgraph;
     if(permute_graph) {
@@ -179,11 +181,15 @@ int commandline_mode(int argc, char **argv) {
         bijection<int> pr1;
         bijection<int>::random_bijection(&pr1, g1->v_size, seed);
         g1->permute_graph(_g1, &pr1); // permute graph
+        if(colmap1 != nullptr)
+            permute_colmap(&colmap1, g1->v_size, pr1.map);
         delete g1;
 
         bijection<int> pr2;
         bijection<int>::random_bijection(&pr2, g2->v_size, seed * 123);
         g2->permute_graph(_g2, &pr2); // permute graph
+        if(colmap2 != nullptr)
+            permute_colmap(&colmap2, g2->v_size, pr2.map);
         delete g2;
     } else {
         _g1 = g1;

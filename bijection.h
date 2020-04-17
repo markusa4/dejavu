@@ -25,7 +25,7 @@ public:
 
     void copy(bijection* p) {
         if(!init)
-            map = new int[p->map_sz];
+            map = new vertex_t[p->map_sz];
         init = p->init;
         mark = p->mark;
         map_sz = p->map_sz;
