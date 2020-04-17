@@ -12,6 +12,7 @@ struct configstruct {
     bool CONFIG_IR_FAST_TOLERANCE_INC = true;
     int  CONFIG_IR_EXPAND_DEVIATION = 5;
     bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;
+    int  CONFIG_IR_LEAF_STORE_LIMIT = 128;
 
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;

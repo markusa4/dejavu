@@ -362,6 +362,16 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
+        if (arg == "__LEAF_LIMIT") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
+            } else {
+                std::cerr << "--leaf-limit option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
         if (arg == "__NO_NAUTY") {
             comp_nauty = false;
         }
