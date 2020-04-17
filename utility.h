@@ -40,6 +40,19 @@ struct strategy_metrics {
 };
 
 template<class vertex_t>
+struct bfs_element;
+
+template<class vertex_t>
+struct stored_leaf {
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) : map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bfs_element<vertex_t>* start_elem) : map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), start_elem(start_elem) {};
+    bool      explicit_leaf;
+    int       map_sz;
+    vertex_t* map;
+    bfs_element<vertex_t>* start_elem;
+};
+
+template<class vertex_t>
 class shared_workspace {
 public:
     shared_workspace() {
@@ -52,6 +65,7 @@ public:
         exit_counter.store(0);
         experimental_paths.store(0);
         experimental_deviation.store(0);
+        leaf_store_explicit.store(0);
     };
 
     bool done = false;
@@ -76,8 +90,8 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, vertex_t*> leaf_store;
-
+    std::unordered_multimap<long, stored_leaf<vertex_t>> leaf_store;
+    std::atomic_int    leaf_store_explicit;
     std::mutex leaf_store_mutex;
 
     int tolerance = 1;
@@ -140,14 +154,6 @@ public:
         ichecked = true;
         return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
     }
-};
-
-template<class vertex_t>
-struct stored_leaf {
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) : map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
-    bool      explicit_leaf;
-    int       map_sz;
-    vertex_t* map;
 };
 
 template<class vertex_t>

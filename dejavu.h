@@ -113,7 +113,7 @@ bool bfs_element_parent_sorter(bfs_element<vertex_t>* const& lhs, bfs_element<ve
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_t {
 public:
-    void automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, shared_permnode **gens) {
+    void automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 100) {
@@ -127,8 +127,11 @@ public:
             }
         }
 
+        coloring<vertex_t> start_c;
+        start_c.vertex_to_col = colmap;
+        start_c.init = false;
         shared_workspace<vertex_t> switches;
-        worker_thread(g, true, &switches, nullptr, nullptr, nullptr, -1,
+        worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
                       nullptr, nullptr, nullptr, gens, nullptr);
     }
 
@@ -147,8 +150,9 @@ private:
         // preprocessing
         if(master) {
             config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
+            coloring<vertex_t>* init_c  = start_c;
             start_c = new coloring<vertex_t>;
-            g->initialize_coloring(start_c);
+            g->initialize_coloring(start_c, init_c->vertex_to_col);
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -1746,11 +1750,33 @@ private:
         return new_gen;
     }
 
+    void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
+                          sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
+                          int base_sz, bijection<vertex_t> *leaf) {
+        coloring<vertex_t>* c = &w->c;
+        invariant* I = &w->I;
+        c->copy_force(start_c);
+        I->never_fail = true;
+        for(int pos = 0; pos < base_sz; ++pos) {
+            const int v = base[pos];
+            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+        };
+        leaf->read_from_coloring(c);
+    }
+
     bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                               sgraph_t<vertex_t, degree_t, edge_t>  *g,
                                               shared_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
+        thread_local work_list_t<vertex_t> collect_base;
+        thread_local int collect_base_sz;
+
+        if(!collect_base.init)
+            collect_base.initialize(g->v_size);
+        collect_base.reset();
+        collect_base_sz = 0;
+
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
         c->copy_force(elem->c);
@@ -1764,6 +1790,8 @@ private:
             const int col = elem->target_color;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
+            collect_base.push_back(v);
+            collect_base_sz += 1;
             int cell_early = -1;
             if (look_close) {
                 I->never_fail = true;
@@ -1799,7 +1827,8 @@ private:
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
-
+            collect_base.push_back(v);
+            collect_base_sz += 1;
             comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
         } while(comp);
 
@@ -1821,44 +1850,53 @@ private:
             leaf.read_from_coloring(c);
             leaf.not_deletable();
             // consider leaf store...
-            std::vector<vertex_t*> pointers;
+            std::vector<stored_leaf<vertex_t>> pointers;
 
             switches->leaf_store_mutex.lock();
             auto range = switches->leaf_store.equal_range(I->acc);
             for (auto it = range.first; it != range.second; ++it)
                 pointers.push_back(it->second);
             if(pointers.empty()) {
-                switches->leaf_store.insert(std::pair<long, vertex_t*>(I->acc, leaf.map));
+                if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
+                    switches->leaf_store_explicit++;
+                    switches->leaf_store.insert(std::pair<long,
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g->v_size, true)));
+                } else {
+                    vertex_t* base = new vertex_t[collect_base_sz];
+                    memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
+                    switches->leaf_store.insert(std::pair<long,
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, elem)));
+                    leaf.deletable();
+                }
             }
             switches->leaf_store_mutex.unlock();
 
             comp = false;
 
             for(size_t i = 0; i < pointers.size(); ++i) {
-                *automorphism = leaf;
+                automorphism->copy(&leaf);
                 automorphism->inverse();
                 bijection<vertex_t> fake_leaf;
-                fake_leaf.map = pointers[i];
+
+                if(pointers[i].explicit_leaf) {
+                    fake_leaf.map = pointers[i].map;
+                    fake_leaf.not_deletable();
+                } else {
+                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf);
+                    fake_leaf.deletable();
+                }
+
                 fake_leaf.map_sz = g->v_size;
-                fake_leaf.not_deletable();
                 automorphism->compose(&fake_leaf);
-
-                //int j;
-                //for(j = 0; j < automorphism->map_sz; ++j)
-                //    if(automorphism->map[j] != j) break;
-
-                //if(j == automorphism->map_sz) {comp = false; break;}
 
                 if(w->R.certify_automorphism(g, automorphism)) {
                     automorphism->certified = true;
                     automorphism->non_uniform = false;
                     comp = true;
-                    break;
                 } else {
                     comp = false;
                 }
             }
-
         }
 
         return comp;
@@ -1867,7 +1905,7 @@ private:
 
 typedef dejavu_t<int, int, int> dejavu;
 
-void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
+/*void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
             PRINT("[Dispatch] <int32, int32, int32>");
@@ -1900,17 +1938,17 @@ void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gen
         }
             break;
     }
-}
+}*/
 
-void dejavu_automorphisms(sgraph_t<int, int, int> *g, shared_permnode **gens) {
-    if(config.CONFIG_PREPROCESS_COMPRESS) {
+void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
+    /*if(config.CONFIG_PREPROCESS_COMPRESS) {
         dynamic_sgraph sg;
         dynamic_sgraph::read(g, &sg);
         dejavu_automorphisms_dispatch(&sg, gens);
-    } else {
+    } else {*/
         dejavu d;
-        d.automorphisms(g, gens);
-    }
+        d.automorphisms(g, colmap, gens);
+    //}
 }
 
 #endif //DEJAVU_DEJAVU_H

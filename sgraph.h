@@ -16,8 +16,18 @@ class alignas(16) sgraph_t {
         vertexComparator(const sgraph_t<vertex_t, degree_t, edge_t>& g) : g(g) {}
         const sgraph_t& g;
 
-        bool operator()(const vertex_t & v1, const vertex_t & v2) {
+         bool operator()(const vertex_t & v1, const vertex_t & v2) {
             return g.d[v1] < g.d[v2];
+        }
+    };
+
+    struct vertexComparatorColor {
+        vertexComparatorColor(const sgraph_t<vertex_t, degree_t, edge_t>& g, const vertex_t* vertex_to_col) : g(g), vertex_to_col(vertex_to_col) {}
+        const sgraph_t& g;
+        const int* vertex_to_col;
+
+        bool operator()(const vertex_t & v1, const vertex_t & v2) {
+            return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));
         }
     };
 public:
@@ -32,7 +42,7 @@ public:
     int max_degree;
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
-    void initialize_coloring(coloring<vertex_t> *c) {
+    void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
         c->lab = new vertex_t[this->v_size];
         c->ptn = new vertex_t[this->v_size];
         c->vertex_to_col = new vertex_t[this->v_size];
@@ -46,30 +56,55 @@ public:
         }
 
         std::memset(c->ptn, 1, sizeof(int) * v_size);
-        std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
 
         int cells = 0;
         int last_new_cell   = 0;
-        for(int i = 0; i < c->lab_sz; i++) {
-            c->vertex_to_col[c->lab[i]] = last_new_cell;
-            c->vertex_to_lab[c->lab[i]] = i;
-            if(i + 1 == c->lab_sz) {
-                cells += 1;
-                c->ptn[last_new_cell] = i - last_new_cell;
-                c->ptn[i] = 0;
-                break;
+
+        if(vertex_to_col == nullptr) {
+            std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
+            for(int i = 0; i < c->lab_sz; i++) {
+                c->vertex_to_col[c->lab[i]] = last_new_cell;
+                c->vertex_to_lab[c->lab[i]] = i;
+                if(i + 1 == c->lab_sz) {
+                    cells += 1;
+                    c->ptn[last_new_cell] = i - last_new_cell;
+                    c->ptn[i] = 0;
+                    break;
+                }
+                assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
+                if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]) {
+                    c->ptn[i] = 0;
+                    cells += 1;
+                    c->ptn[last_new_cell] = i - last_new_cell;
+                    last_new_cell = i + 1;
+                    continue;
+                }
             }
-            assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
-            if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]) {
-                c->ptn[i] = 0;
-                cells += 1;
-                c->ptn[last_new_cell] = i - last_new_cell;
-                last_new_cell = i + 1;
-                continue;
+        } else {
+            std::sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));
+            for(int i = 0; i < c->lab_sz; i++) {
+                c->vertex_to_col[c->lab[i]] = last_new_cell;
+                c->vertex_to_lab[c->lab[i]] = i;
+                if(i + 1 == c->lab_sz) {
+                    cells += 1;
+                    c->ptn[last_new_cell] = i - last_new_cell;
+                    c->ptn[i] = 0;
+                    break;
+                }
+                assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
+                if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]  || (this->d[c->lab[i]] == this->d[c->lab[i + 1]]
+                && (vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]))) {
+                    c->ptn[i] = 0;
+                    cells += 1;
+                    c->ptn[last_new_cell] = i - last_new_cell;
+                    last_new_cell = i + 1;
+                    continue;
+                }
             }
         }
 
         c->cells = cells;
+
     }
 
     void initialize_coloring_raw(coloring<vertex_t> *c) {
@@ -267,5 +302,16 @@ struct dynamic_sgraph {
 };
 
 typedef sgraph_t<int, int, int> sgraph;
+
+template<class vertex_t>
+void permute_colmap(int** colmap, int colmap_sz, vertex_t* p) {
+    int* new_colmap = new vertex_t[colmap_sz];
+    for(int i = 0; i < colmap_sz; ++i) {
+        new_colmap[i] = (*colmap)[p[i]];
+    }
+    int* old_colmap = *colmap;
+    *colmap = new_colmap;
+    delete[] old_colmap;
+}
 
 #endif //DEJAVU_GRAPH_H

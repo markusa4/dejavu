@@ -27,10 +27,10 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void bench_dejavu(sgraph *g, double* dejavu_solve_time) {
+void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    dejavu_automorphisms(g, nullptr);
+    dejavu_automorphisms(g, colmap, nullptr);
     //dejavu d;
     //d.automorphisms(g, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
@@ -67,6 +67,26 @@ int commandline_mode(int argc, char **argv) {
                 timeout = atoi(argv[i]);
             } else {
                 std::cerr << "--timeout option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__ERR") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_RAND_ABORT = atoi(argv[i]);
+            } else {
+                std::cerr << "--err option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__LEAF_LIMIT") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
+            } else {
+                std::cerr << "--leaf-limit option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -138,13 +158,16 @@ int commandline_mode(int argc, char **argv) {
     parser p;
     sgraph *g = new sgraph;
     std::cout << "Parsing " << filename << "..." << std::endl;
-    p.parse_dimacs_file(filename, g);
+    int* colmap = nullptr;
+    p.parse_dimacs_file(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
         bijection<int> pr;
         bijection<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
+        if(colmap != nullptr)
+            permute_colmap(&colmap, g->v_size, pr.map);
         delete g;
     } else {
         _g = g;
@@ -159,7 +182,7 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bench_dejavu(_g, &dejavu_solve_time);
+    bench_dejavu(_g, colmap, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
 
