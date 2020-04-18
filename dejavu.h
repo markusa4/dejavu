@@ -94,9 +94,9 @@ struct alignas(64) dejavu_workspace {
             _freeschreier(&sequential_gp, &sequential_gens);
         }
 
-        delete work_c;
-        delete work_I;
-        delete start_c;
+        //delete work_c;
+        //delete work_I;
+        //delete start_c;
     };
 };
 
@@ -844,7 +844,12 @@ private:
             delete my_strategy;
         }
 
-        FreeAll();
+        switches->buffer_buffer[communicator_id + 1].swap(n_buffer.all_buffers);
+        if(master) {
+            for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+                FreeBuf(&switches->buffer_buffer[i]);
+            }
+        }
 
         return;
     }
@@ -1824,7 +1829,7 @@ private:
 
         I->never_fail = true;
         do {
-            if(switches->done_fast) return false;
+            if(switches->done) return false;
             const int col = w->S.select_color_dynamic(g, c, strat);
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
@@ -1884,6 +1889,7 @@ private:
                     fake_leaf.map = pointers[i].map;
                     fake_leaf.not_deletable();
                 } else {
+                    if(switches->done) return false;
                     reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf);
                     fake_leaf.deletable();
                 }

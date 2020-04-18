@@ -43,9 +43,8 @@ static void *NFAlloc(size_t size) {
     thread_local size_t buffer_pos = 0;
     thread_local size_t next_buffer_sz = 4096;
     if(buffer_sz <= (buffer_pos + size)) {
-        if(n_buffer.buffer != nullptr)
-            n_buffer.all_buffers.push_back(n_buffer.buffer);
         n_buffer.buffer = new unsigned char[next_buffer_sz];
+        n_buffer.all_buffers.push_back(n_buffer.buffer);
         buffer_sz  = next_buffer_sz;
         next_buffer_sz *= 2;
         buffer_pos = 0;
@@ -62,6 +61,14 @@ static void FreeAll() {
     }
     n_buffer.all_buffers.clear();
 }
+
+static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
+    for(int i = 0; i < all_buffers->size(); ++i) {
+        delete[] (*all_buffers)[i];
+    }
+    all_buffers->clear();
+}
+
 
 
 // modes of the solver
@@ -104,6 +111,10 @@ public:
         experimental_paths.store(0);
         experimental_deviation.store(0);
         leaf_store_explicit.store(0);
+        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+            buffer_buffer[i] = std::vector<unsigned char*>();
+        }
     };
 
     bool done = false;
@@ -114,6 +125,8 @@ public:
     // solver mode
     std::atomic<modes> current_mode;
     std::atomic_int    exit_counter;
+
+    std::vector<unsigned char*>* buffer_buffer;
 
     // tournament variables
     std::mutex         tournament_mutex;
@@ -213,6 +226,10 @@ public:
         leaf_store_explicit.store(0);
         deviation_store[0] = std::unordered_set<long>();
         deviation_store[1] = std::unordered_set<long>();
+        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+            buffer_buffer[i] = std::vector<unsigned char*>();
+        }
     };
 
     bool done = false;
@@ -225,6 +242,8 @@ public:
     std::atomic_int    exit_counter;
     std::atomic_int    noniso_counter;
     std::atomic_bool   found_iso;
+
+    std::vector<unsigned char*>* buffer_buffer;
 
     // tournament variables
     std::mutex         tournament_mutex;
