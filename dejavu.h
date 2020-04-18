@@ -232,14 +232,29 @@ private:
             W.BW = new bfs_workspace<vertex_t>();
             bwork = W.BW;
 
+            const int master_sched = sched_getcpu();
+
             W.S.empty_cache();
+            {
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(master_sched, &cpuset);
+                int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            }
             // launch worker threads
-            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&dejavu_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     dejavu_t<vertex_t, degree_t, edge_t>(), g, false, switches, G, start_c,
                                     canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens,
                                     &_shared_group_size));
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(i + (i >= master_sched), &cpuset);
+                int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
+                                                sizeof(cpu_set_t), &cpuset);
+            }
+
             PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
