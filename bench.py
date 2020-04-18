@@ -25,10 +25,10 @@ def bench(dir, setname, timeout, nauty_timeout, selector):
 		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --threads 1 --force_selector {} --no_nauty --no_traces --file \"{}{}\" --stat_file {}.dejavu2.dat".format(seeds[i], timeout, selector, dir, f[i], setname), shell=True)
 	for i in range(len(f)):
 		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --threads 0 --force_selector {} --no_nauty --no_traces --file \"{}{}\" --stat_file {}.dejavu1.dat".format(seeds[i], timeout, selector, dir, f[i], setname), shell=True)
-#	for i in range(len(f)):
-#		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_nauty --no_dejavu --file \"{}{}\" --stat_file {}.traces.dat".format(seeds[i], timeout, dir, f[i], setname), shell=True)
-#	for i in range(len(f)):
-#		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_traces --no_dejavu --file \"{}{}\" --stat_file {}.nauty.dat".format(seeds[i], nauty_timeout, dir, f[i], setname), shell=True)
+	for i in range(len(f)):
+		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_nauty --no_dejavu --file \"{}{}\" --stat_file {}.traces.dat".format(seeds[i], timeout, dir, f[i], setname), shell=True)
+	for i in range(len(f)):
+		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_traces --no_dejavu --file \"{}{}\" --stat_file {}.nauty.dat".format(seeds[i], nauty_timeout, dir, f[i], setname), shell=True)
 
 def bench_force(dir, setname, timeout, nauty_timeout, selector):
 	f     = []
@@ -49,10 +49,10 @@ def bench_force(dir, setname, timeout, nauty_timeout, selector):
 		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --threads 1 --force_selector {} --no_nauty --no_traces --file \"{}{}\" --stat_file {}.dejavu2.dat".format(seeds[i], timeout, selector, dir, f[i], setname), shell=True)
 	for i in range(len(f)):
 		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --threads 0 --force_selector {} --no_nauty --no_traces --file \"{}{}\" --stat_file {}.dejavu1.dat".format(seeds[i], timeout, selector, dir, f[i], setname), shell=True)
-#	for i in range(len(f)):
-#		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_nauty --no_dejavu --file \"{}{}\" --stat_file {}.traces.dat".format(seeds[i], timeout, dir, f[i], setname), shell=True)
-#	for i in range(len(f)):
-#		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_traces --no_dejavu --file \"{}{}\" --stat_file {}.nauty.dat".format(seeds[i], nauty_timeout, dir, f[i], setname), shell=True)
+	for i in range(len(f)):
+		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_nauty --no_dejavu --file \"{}{}\" --stat_file {}.traces.dat".format(seeds[i], timeout, dir, f[i], setname), shell=True)
+	for i in range(len(f)):
+		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_traces --no_dejavu --file \"{}{}\" --stat_file {}.nauty.dat".format(seeds[i], nauty_timeout, dir, f[i], setname), shell=True)
 
 bench("./graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/", "results/mz-aug2", -1, 30, 1)
 bench("./graphs/cfi-rigid-t2-tar/cfi-rigid-t2/small/", "results/small-multipede", 30, 30, 2)
