@@ -17,10 +17,10 @@ add_executable(vujade schreier_sequential.cpp utility.cpp vujade.h sgraph.h naur
 
 set(conauto_source_list "conauto/conauto.o;conauto/factor.o;conauto/graph.o;conauto/groups.o;conauto/mismatches.o;conauto/orbits.o;conauto/refinements.o;conauto/seqpart.o;conauto/sort.o")
 
-add_executable(bench_iso ${conauto_source_list} schreier_sequential.cpp utility.cpp bench_iso.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h vujade.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h)
-add_dependencies(bench_iso nauty_target)
+add_executable(bench-iso ${conauto_source_list} schreier_sequential.cpp utility.cpp bench_iso.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h vujade.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h)
+add_dependencies(bench-iso nauty_target)
 
-if (DEFINED BENCH)
+#if (DEFINED BENCH)
 	add_executable(bench schreier_sequential.cpp utility.cpp bench.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu.cpp dejavu.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h conauto/conauto.h)
 	add_dependencies(bench nauty_target)
-endif ()
+#endif ()

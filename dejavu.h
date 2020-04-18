@@ -844,6 +844,8 @@ private:
             delete my_strategy;
         }
 
+        FreeAll();
+
         return;
     }
 

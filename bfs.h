@@ -9,6 +9,7 @@
 #include "coloring.h"
 #include "invariant.h"
 #include "configuration.h"
+#include "utility.h"
 
 struct pair_hash {
     inline std::size_t operator()(const std::pair<int,int> & v) const {
@@ -30,6 +31,8 @@ public:
         *root_elem->I = *start_I;
         return root_elem;
     }
+
+    bfs_element() {};
     // coloring and invariant for the specified path / base
     bfs_element<vertex_t>* parent = nullptr;
     coloring<vertex_t>*    c = nullptr;
@@ -65,6 +68,13 @@ public:
             delete I;
         if(init_base)
             delete base;
+    }
+
+    bool rm_point = false;
+    static void* operator new(size_t size) {
+        return NFAlloc(size);
+    }
+    static void operator delete(void *p) {
     }
 };
 
@@ -116,8 +126,8 @@ public:
             delete level_abort_map_mutex[i];
 
         for(int i = 0; i < current_level; ++i) {
-            for(int j = 0; j < level_sizes[i]; ++j)
-                delete level_states[i][j];
+            //for(int j = 0; j < level_sizes[i]; ++j)
+                //delete level_states[i][j];
             delete[] level_states[i];
         }
 
@@ -141,7 +151,7 @@ public:
         current_level = 1;
         target_level  = -1;
         level_states  = new bfs_element<vertex_t>**[base_size + 2];
-        level_sizes          = new int[(base_size + 2) * 4];
+        level_sizes   = new int[(base_size + 2) * 4];
         level_reserved_sizes = level_sizes + base_size + 2;
         level_maxweight = new double[(base_size + 2) * 2];
         level_minweight = level_maxweight + base_size + 2;

@@ -10,7 +10,7 @@
 
 enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
 
-class alignas(16) invariant {
+class invariant {
 public:
     std::vector<int>*        vec_cells     = nullptr;
     std::vector<int>*        vec_selections= nullptr;
@@ -144,6 +144,12 @@ public:
         if(vec_invariant != nullptr)
             delete vec_invariant;
     }*/
+
+    static void* operator new(size_t size) {
+        return NFAlloc(size);
+    }
+    static void operator delete(void *p) {
+    }
 };
 
 

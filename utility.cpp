@@ -13,3 +13,5 @@ double doubleRand(const double & min, const double & max, int seed) {
     std::uniform_real_distribution<double> distribution(min,max);
     return floor(distribution(generator));
 }
+
+thread_local NFAllocBuf n_buffer;

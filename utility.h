@@ -23,8 +23,46 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
+
+class NFAllocBuf {
+public:
+    NFAllocBuf() {
+        all_buffers.reserve(1024);
+    }
+    unsigned char* buffer = nullptr;
+    std::vector<unsigned char*> all_buffers = std::vector<unsigned char*>();
+};
+
+extern thread_local NFAllocBuf n_buffer;
+
+static void *NFAlloc(size_t size) {
+    //return malloc(size);
+    thread_local size_t buffer_sz  = 0;
+    thread_local size_t buffer_pos = 0;
+    thread_local size_t next_buffer_sz = 4096;
+    if(buffer_sz <= (buffer_pos + size)) {
+        if(n_buffer.buffer != nullptr)
+            n_buffer.all_buffers.push_back(n_buffer.buffer);
+        n_buffer.buffer = new unsigned char[next_buffer_sz];
+        buffer_sz  = next_buffer_sz;
+        next_buffer_sz *= 2;
+        buffer_pos = 0;
+    }
+
+    void* alloc_p = (void*) (n_buffer.buffer + buffer_pos);
+    buffer_pos += size;
+    return alloc_p;
+}
+
+static void FreeAll() {
+    for(int i = 0; i < n_buffer.all_buffers.size(); ++i) {
+        delete[] n_buffer.all_buffers[i];
+    }
+    n_buffer.all_buffers.clear();
+}
+
 
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,

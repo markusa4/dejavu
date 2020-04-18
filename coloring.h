@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include "utility.h"
 
 template <class vertex_t>
 std::pair<vertex_t*, vertex_t*> coloring_bulk_allocator(int domain_size) {
@@ -37,7 +38,7 @@ void coloring_bulk_deallocator(vertex_type* bulk_domain) {
 }
 
 template <class vertex_t>
-class alignas(16) coloring {
+class coloring {
 public:
     vertex_t* bulk_alloc;
     vertex_t* bulk_pt;
@@ -196,6 +197,12 @@ public:
             comp = comp && (lab[vertex_to_lab[i]] == i);
         }
         return comp;
+    }
+
+    static void* operator new(size_t size) {
+        return NFAlloc(size);
+    }
+    static void operator delete(void *p) {
     }
 };
 
