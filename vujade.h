@@ -214,13 +214,27 @@ private:
             W.BW2 = new bfs_workspace<vertex_t>();
             bwork2 = W.BW2;
 
+            const int master_sched = sched_getcpu();
+            
             W.S.empty_cache();
+            {
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(master_sched, &cpuset);
+                int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            }
             // launch worker threads
-            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&vujade_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     vujade_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
                                     canon_strategy, i, W.BW1, W.BW2));
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(i + (i >= master_sched), &cpuset);
+                int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
+                                                sizeof(cpu_set_t), &cpuset);
+            }
             PRINT("[vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables

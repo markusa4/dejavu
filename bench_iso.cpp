@@ -27,6 +27,37 @@ thread_local int colorcost;
 
 bool finished = false;
 
+struct colorComparator {
+    colorComparator(const int* colmap) : colmap(colmap) {}
+    const int* colmap;
+
+    bool operator()(const int & v1, const int & v2) {
+        return (colmap[v1] < colmap[v2]);
+    }
+};
+
+void make_lab_ptn_from_colmap(int* lab, int* ptn, int* colmap, int colmap_sz) {
+    for(int i = 0; i < colmap_sz; ++i) {
+        lab[i] = i;
+        ptn[i] = 1;
+    }
+    int last_new_cell = 0;
+    std::sort(lab, lab + colmap_sz, colorComparator(colmap));
+    for(int i = 0; i < colmap_sz; i++) {
+        if (i + 1 == colmap_sz) {
+            ptn[last_new_cell] = (i - last_new_cell) > 0;
+            ptn[i] = 0;
+            break;
+        }
+        if (colmap[lab[i]] < colmap[lab[i + 1]]) {
+            ptn[i] = 0;
+            ptn[last_new_cell] = (i - last_new_cell) > 0;
+            last_new_cell = i + 1;
+            continue;
+        }
+    }
+}
+
 void kill_thread(volatile int* kill_switch, int timeout) {
     Clock::time_point start = Clock::now();
     while(!finished) {
@@ -272,6 +303,69 @@ void bench_traces(sgraph *g1, sgraph *g2, double* traces_solve_time) {
     finished = true;
 }
 
+void bench_traces_auto(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_time) {
+    //sleep(1);
+    TracesStats stats;
+    //statsblk stats;
+    sparsegraph sg;
+
+    DYNALLSTAT(int, lab, lab_sz);
+    DYNALLSTAT(int, ptn, ptn_sz);
+    DYNALLSTAT(int, orbits, orbits_sz);
+    //static DEFAULTOPTIONS_SPARSEGRAPH(options);
+
+    SG_INIT(sg);
+    int m = SETWORDSNEEDED(g->v_size);
+    nauty_check(WORDSIZE, m, g->v_size, NAUTYVERSIONID);
+    SG_ALLOC(sg, g->v_size, g->e_size, "malloc");
+    sg.nv = g->v_size;
+    sg.nde = g->e_size;
+    static DEFAULTOPTIONS_TRACES(options);
+    // static DEFAULTOPTIONS_SPARSEGRAPH(options);
+    //options.schreier = true;
+    // options.writeautoms = true;
+    //schreier_fails(10);
+    options.defaultptn = false;
+
+    DYNALLOC1(int, lab, lab_sz, sg.nv, "malloc");
+    DYNALLOC1(int, ptn, ptn_sz, sg.nv, "malloc");
+    DYNALLOC1(int, orbits, orbits_sz, sg.nv, "malloc");
+
+    for (int i = 0; i < g->v_size; ++i) {
+        lab[i] = i;
+        ptn[i] = 1;
+        sg.v[i] = g->v[i];
+        sg.d[i] = g->d[i];
+    }
+    ptn[g->v_size - 1] = 0;
+    if(colmap != nullptr) {
+        make_lab_ptn_from_colmap(lab, ptn, colmap, g->v_size);
+    }
+
+    for (int i = 0; i < g->e_size; ++i) {
+        sg.e[i] = g->e[i];
+    }
+
+    // touch the graph (mitigate cache variance
+    int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += sg.v[i] + sg.d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += sg.e[i];
+    }
+    Clock::time_point timer = Clock::now();
+
+    //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
+    Traces(&sg, lab, ptn, orbits, &options, &stats, NULL);
+    std::cout << "Group size: ";
+    writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
+    std::cout << std::endl;
+    std::cout << "Num nodes: " << stats.numnodes << std::endl;
+    *traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    finished = true;
+}
+
 int commandline_mode(int argc, char **argv) {
     std::string filename1 = "";
     std::string filename2 = "";
@@ -283,6 +377,7 @@ int commandline_mode(int argc, char **argv) {
     bool entered_stat_file = true;
     bool comp_nauty = true;
     bool comp_traces = true;
+    bool comp_traces_disjoint = true;
     bool comp_dejavu = true;
     bool comp_conauto = true;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -378,6 +473,10 @@ int commandline_mode(int argc, char **argv) {
 
         if (arg == "__NO_TRACES") {
             comp_traces = false;
+        }
+
+        if (arg == "__NO_TRACES_DISJOINT") {
+            comp_traces_disjoint = false;
         }
 
         if (arg == "__NO_DEJAVU") {
@@ -516,6 +615,24 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << "Traces (disjoint union)" << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+
+    double traces_disjoint_solve_time;
+    if(comp_traces_disjoint) {
+        finished = false;
+        nauty_kill_request = 0;
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &nauty_kill_request, timeout);
+        sgraph* union_g = disjoint_union(_g1, _g2);
+        bench_traces_auto(union_g, nullptr, &traces_disjoint_solve_time);
+        if(timeout > 0)
+            killer.join();
+    }
+    std::cout << "Solve time: " << traces_disjoint_solve_time / 1000000.0 << "ms" << std::endl;
+
+    std::cout << "------------------------------------------------------------------" << std::endl;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "conauto" << std::endl;
@@ -547,6 +664,8 @@ int commandline_mode(int argc, char **argv) {
             stat_file << nauty_solve_time  / 1000000.0 << " ";
         if(comp_traces)
             stat_file << traces_solve_time / 1000000.0 << " ";
+        if(comp_traces_disjoint)
+            stat_file << traces_disjoint_solve_time / 1000000.0 << " ";
         if(comp_conauto)
             stat_file << conauto_solve_time / 1000000.0 << " ";
         stat_file << "\n";

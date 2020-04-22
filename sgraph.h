@@ -298,8 +298,45 @@ struct dynamic_sgraph {
         sg->type = DSG_INT_INT_INT;
         return;
     }
-
 };
+
+
+template<class vertex_t, class degree_t, class edge_t>
+sgraph_t<vertex_t, degree_t, edge_t>* disjoint_union(sgraph_t<vertex_t, degree_t, edge_t>* g1,
+                                                     sgraph_t<vertex_t, degree_t, edge_t>* g2) {
+    sgraph_t<vertex_t, degree_t, edge_t>* union_g = new  sgraph_t<vertex_t, degree_t, edge_t>();
+    union_g->v_size = g1->v_size + g2->v_size;
+    union_g->e_size = g1->e_size + g2->e_size;
+    union_g->d_size = g1->d_size + g2->d_size;
+
+    int g2_vshift= g1->v_size;
+    int g2_eshift= g1->e_size;
+    int g2_dshift= g1->d_size;
+
+    union_g->v = new edge_t[union_g->v_size];
+    union_g->d = new degree_t[union_g->d_size];
+    union_g->e = new vertex_t[union_g->e_size];
+
+    for(int i = 0; i < g1->v_size; ++i)
+        union_g->v[i] = g1->v[i];
+    for(int i = 0; i < g2->v_size; ++i)
+        union_g->v[i + g2_vshift] = g2->v[i] + g2_eshift;
+
+    for(int i = 0; i < g1->d_size; ++i)
+        union_g->d[i] = g1->d[i];
+    for(int i = 0; i < g2->d_size; ++i)
+        union_g->d[i + g2_dshift] = g2->d[i];
+
+    for(int i = 0; i < g1->e_size; ++i)
+        union_g->e[i] = g1->e[i];
+    for(int i = 0; i < g2->e_size; ++i)
+        union_g->e[i + g2_eshift] = g2->e[i] + g2_vshift;
+
+    union_g->max_degree = std::max(g1->max_degree, g2->max_degree);
+
+    return union_g;
+}
+
 
 typedef sgraph_t<int, int, int> sgraph;
 
