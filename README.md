@@ -15,7 +15,7 @@ make
 Compilation produces two binaries (`dejavu` and `bench`), which are however similar in usage. dejavu is the binary of the actual solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
 
 ## dejavu
-The solver only accepts files in the DIMACS graph format. The solver accepts the following command line arguments:
+The solver only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
@@ -44,9 +44,9 @@ Command Line Argument | Effect
 By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `dejavu_automorphisms`:
 ```cpp
 shared_permnode* gens;
-dejavu_automorphisms(&g, &gens);
+dejavu_automorphisms(&g, nullptr, &gens);
 ```
-Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (analogous to the commandline arguments).
+Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (analogous to the commandline arguments). The second argument defines the initial colors of vertices. If the graph is uncolored, a null pointer can be passed. Otherwise, an integer array mapping vertices to colors is expected.
 
 # License
 The source code contains modified source code of the [nauty / Traces](http://pallini.di.uniroma1.it) distribution, as well as the lock-free queue implementation described [here](http://moodycamel.com/blog/2014/a-fast-general-purpose-lock-free-queue-for-c++). 
