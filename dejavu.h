@@ -36,13 +36,13 @@ struct alignas(64) dejavu_workspace {
     int skiplevels = 1;
     int first_skiplevel = 1;
     coloring<vertex_t> skip_c;
-    invariant  skip_I;
-    shared_schreier* skip_schreier_level;
-    bool       skiplevel_is_uniform = false;
+    invariant          skip_I;
+    shared_schreier*   skip_schreier_level;
+    bool               skiplevel_is_uniform = false;
 
     int*         my_base_points;
     int          my_base_points_sz;
-    bool is_foreign_base;
+    bool         is_foreign_base;
 
     group_shared<vertex_t>* G;
 
@@ -53,16 +53,16 @@ struct alignas(64) dejavu_workspace {
     int id;
 
     // shared orbit and generators
-    int** shared_orbit;
-    int** shared_orbit_weights;
+    int**             shared_orbit;
+    int**             shared_orbit_weights;
     shared_permnode** shared_generators;
-    int*  shared_generators_size;
-    int   generator_fix_base_alloc = -1;
+    int*              shared_generators_size;
+    int               generator_fix_base_alloc = -1;
 
     // sequential, local group
     sequential_permnode*      sequential_gens;
     sequential_schreierlevel* sequential_gp;
-    bool            sequential_init = false;
+    bool                      sequential_init = false;
 
     // deprecated workspace for simple orbit method
     work_set  orbit_considered;
@@ -878,11 +878,11 @@ private:
 
         // workspace
         refinement<vertex_t, degree_t, edge_t> *R = &w->R;
-        selector<vertex_t, degree_t, edge_t> *S = &w->S;
-        coloring<vertex_t> *c = &w->c;
-        invariant *I = &w->I;
+        selector<vertex_t, degree_t, edge_t> *S   = &w->S;
+        coloring<vertex_t> *c        = &w->c;
+        invariant *I                 = &w->I;
         coloring<vertex_t> *start_c  = w->start_c;
-        invariant *start_I = &w->start_I;
+        invariant *start_I           = &w->start_I;
 
         S->empty_cache();
 
@@ -928,14 +928,14 @@ private:
         // workspace
         refinement<vertex_t, degree_t, edge_t> *R = &w->R;
         selector<vertex_t, degree_t, edge_t>   *S = &w->S;
-        coloring<vertex_t> *c       = &w->c;
-        invariant *I  = &w->I;
+        coloring<vertex_t> *c                     = &w->c;
+        invariant *I                              = &w->I;
 
-        coloring<vertex_t> *start_c = &w->skip_c;
-        invariant *start_I     = &w->skip_I;
+        coloring<vertex_t> *start_c  = &w->skip_c;
+        invariant *start_I           = &w->skip_I;
         shared_schreier *group_level = w->skip_schreier_level;
 
-        invariant* canon_I    = canon_strategy->I;
+        invariant* canon_I              = canon_strategy->I;
         bijection<vertex_t>* canon_leaf = canon_strategy->leaf;
 
         automorphism->non_uniform = false;
@@ -974,7 +974,7 @@ private:
         level = w->first_skiplevel;
         if(!w->is_foreign_base)
             group_level = w->skip_schreier_level;
-        skipped_level = w->first_skiplevel > 1;
+        skipped_level    = w->first_skiplevel > 1;
         full_orbit_check = w->skiplevel_is_uniform;
 
         int it = 0;
@@ -1121,10 +1121,10 @@ private:
 
         refinement<vertex_t, degree_t, edge_t>  *R = &w->R;
         selector<vertex_t,   degree_t, edge_t>  *S = &w->S;
-        coloring<vertex_t> *c = &w->c;
-        invariant *I = &w->I;
-        invariant* canon_I    = canon_strategy->I;
-        bijection<vertex_t>* canon_leaf = canon_strategy->leaf;
+        coloring<vertex_t> *c                      = &w->c;
+        invariant *I                               = &w->I;
+        invariant* canon_I                         = canon_strategy->I;
+        bijection<vertex_t>* canon_leaf            = canon_strategy->leaf;
 
         S->empty_cache();
 
@@ -1581,7 +1581,7 @@ private:
                         // depends on earlier sorting
                         int* orbits = _getorbits(elem->base, elem->base_sz - 1, w->sequential_gp, &w->sequential_gens,
                                                  domain_size, w->G->b, &orbits_sz);
-#ifdef NDEBUG
+#ifndef NDEBUG
                         int calc_sz = 0;
                         for(int ii = 0; ii < domain_size; ++ii) {
                             assert(orbits[ii] >= 0 && orbits[ii] < domain_size);

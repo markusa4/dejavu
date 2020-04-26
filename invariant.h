@@ -12,6 +12,7 @@ enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
 
 class invariant {
 public:
+    invariant* created                     = nullptr;
     std::vector<int>*        vec_cells     = nullptr;
     std::vector<int>*        vec_selections= nullptr;
     std::vector<cell_state>* vec_protocol  = nullptr;
@@ -23,7 +24,6 @@ public:
     bool no_write    = false;
     bool never_fail  = false;
     int  comp_fail_pos = -2;
-    int  comp_fail_val = -1;
     long comp_fail_acc = -1;
     int  cur_pos = -1;
     int  protocol_pos = -1;
@@ -43,7 +43,6 @@ public:
             if(!comp) {
                 if(comp_fail_pos == -2) {
                     comp_fail_pos = cur_pos;
-                    comp_fail_val = i;
                     comp_fail_acc = i;
                 }
                 comp_fail_acc += MASH1(i); // could just use acc instead
@@ -111,7 +110,6 @@ public:
 
     void reset_deviation() {
         comp_fail_pos = -2;
-        comp_fail_val = -1;
         comp_fail_acc = -1;
     }
 
@@ -122,7 +120,6 @@ public:
         no_write    = false;
         never_fail  = false;
         comp_fail_pos = -2;
-        comp_fail_val = -1;
         comp_fail_acc = -1;
         cur_pos = -1;
         protocol_pos = -1;
@@ -130,6 +127,7 @@ public:
     }
 
     void create_vector(int prealloc) {
+        created       = this;
         vec_cells     = new std::vector<int>();
         vec_protocol  = new std::vector<cell_state>();
         vec_invariant = new std::vector<int>();
@@ -140,10 +138,14 @@ public:
         vec_selections->reserve(prealloc + 16);
     }
 
-    /*~invariant() {
-        if(vec_invariant != nullptr)
-            delete vec_invariant;
-    }*/
+    ~invariant() {
+        if(created == this) {
+            //delete vec_invariant;
+            //delete vec_protocol;
+            //delete vec_cells;
+            //delete vec_selections;
+        }
+    }
 
     static void* operator new(size_t size) {
         return NFAlloc(size);

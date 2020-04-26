@@ -89,8 +89,10 @@ struct bfs_element;
 
 template<class vertex_t>
 struct stored_leaf {
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) : map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bfs_element<vertex_t>* start_elem) : map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), start_elem(start_elem) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bfs_element<vertex_t>* start_elem) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), start_elem(start_elem) {};
     bool      explicit_leaf;
     int       map_sz;
     vertex_t* map;

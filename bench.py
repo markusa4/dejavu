@@ -54,9 +54,6 @@ def bench_force(dir, setname, timeout, nauty_timeout, selector):
 	for i in range(len(f)):
 		subprocess.run("nice -15 ./bench --permute_seed {} --timeout {} --no_traces --no_dejavu --file \"{}{}\" --stat_file {}.nauty.dat".format(seeds[i], nauty_timeout, dir, f[i], setname), shell=True)
 
-bench("./graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/", "results/mz-aug2", -1, 30, 1)
-bench("./graphs/cfi-rigid-t2-tar/cfi-rigid-t2/small/", "results/small-multipede", 30, 30, 2)
-bench_force("./graphs/cfi-rigid-t2-tar/cfi-rigid-t2/small/", "results/small-multipede-force", 30, 30, 2)
 bench("./graphs/undirected_dim/undirected_dim/k/k/", "results/k", -1, -1, 1)
 bench("./graphs/undirected_dim/undirected_dim/grid/grid/", "results/grid", -1, -1, 1)
 bench("./graphs/undirected_dim/undirected_dim/lattice/lattice/", "results/lattice", -1, -1, 1)
@@ -99,3 +96,7 @@ bench("./graphs/dac/dac/pipe/", "results/dac_pipe", -1, -1, 1)
 bench("./graphs/combinatorial/combinatorial/", "results/combinatorial", 60, 60, 1)
 bench("./graphs/undirected_dim/undirected_dim/pp/pp/pp16/", "results/pp16", -1, 60, 1)
 bench("./graphs/undirected_dim/undirected_dim/pp/pp/pp25/", "results/pp25", 60, 60, 1)
+#
+bench("./graphs/undirected_dim/undirected_dim/mz-aug2/mz-aug2/", "results/mz-aug2", -1, 30, 1)
+bench("./graphs/cfi-rigid-t2-tar/cfi-rigid-t2/small/", "results/small-multipede", 30, 30, 2)
+bench_force("./graphs/cfi-rigid-t2-tar/cfi-rigid-t2/larger/", "results/small-multipede-force", 30, 30, 2)
