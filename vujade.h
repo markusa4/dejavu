@@ -106,6 +106,8 @@ private:
         sgraph_t<vertex_t, degree_t, edge_t> *g2 = g2_;
         dejavu_workspace<vertex_t, degree_t, edge_t> W;
 
+        config.CONFIG_VUJADE = true; // some things ought to work differently now...
+
         numnodes  = 0;
         colorcost = 0;
 
@@ -298,11 +300,11 @@ private:
             W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, 2);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
-            if(W.base_size == 1) {
+            if(W.base_size == 0) {
                 switches->current_mode = vujade_modes::VU_MODE_BIDIRECTIONAL;
                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
             } else {
-                config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
+                config.CONFIG_IR_EXPAND_DEVIATION = floor(1.5*sqrt(g1->v_size));
                 std::cout << "[dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION << std::endl;
             }
             switches->done_created_group = true;
@@ -313,7 +315,9 @@ private:
         }
 
         strategy_metrics m;
-        int g_id = (communicator_id + 1) % 2;
+        int  g_id = (communicator_id + 1) % 2;
+        int  end_test = (g_id + 1) % 2;
+        bool found_auto = false;
 
         // main loop
         while(!switches->done && (switches->noniso_counter <= config.CONFIG_RAND_ABORT)) {
@@ -339,7 +343,11 @@ private:
 
                     switch(res) {
                         case OUT_AUTO:
-                            switches->noniso_counter++;
+                            found_auto = true;
+                            if(g_id == end_test && found_auto) {
+                                switches->noniso_counter++;
+                                found_auto = false;
+                            }
                             break;
                         case OUT_ISO:
                             switches->done = true;
@@ -372,7 +380,11 @@ private:
                                                                                canon_strategy, &automorphism,false);
                     switch(res) {
                         case OUT_AUTO:
-                            switches->noniso_counter++;
+                            found_auto = true;
+                            if(g_id == end_test && found_auto) {
+                                switches->noniso_counter++;
+                                found_auto = false;
+                            }
                             break;
                         case OUT_ISO:
                             switches->done = true;
@@ -380,11 +392,15 @@ private:
                             switches->noniso_counter.store(-10);
                             break;
                         case OUT_AUTO_DEV:
-                            switches->noniso_counter++;
+                            found_auto = true;
+                            if(g_id == end_test && found_auto) {
+                                switches->noniso_counter++;
+                                found_auto = false;
+                            }
                             break;
                         case OUT_ISO_DEV:
                             switches->switch_mode_mutex.lock();
-                            config.CONFIG_RAND_ABORT += 1;
+                            // config.CONFIG_RAND_ABORT = 1;
                             //config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
                             if(switches->current_mode != VU_MODE_BIDIRECTIONAL) {
                                 switches->current_mode = VU_MODE_BIDIRECTIONAL;

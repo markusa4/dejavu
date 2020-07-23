@@ -638,6 +638,9 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "conauto" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
 
+    if(_g1->v_size > 3000)
+        comp_conauto = false;
+
     double conauto_solve_time;
     if(comp_conauto) {
         finished = false;

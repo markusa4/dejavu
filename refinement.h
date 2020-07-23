@@ -901,7 +901,7 @@ private:
         comp = I->write_top_and_compare(-acc_in) && comp;
 
         // early out before sorting color classes
-        if(!comp) {
+        /*if(!comp) {
             while(!old_color_classes.empty()) {
                 const int _col = old_color_classes.pop_back();
                 for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
@@ -909,7 +909,7 @@ private:
                 color_vertices_considered.set(_col, -1);
             }
             return comp;
-        }
+        }*/
 
         // sort split color classes
         old_color_classes.sort();
@@ -950,7 +950,7 @@ private:
             const int vcount = color_vertices_considered.get(_col);
 
             // early out
-            if(!comp) {
+            /*if(!comp) {
                 bool hard_reset = false;
                 if(2 * vcount > g->v_size) {
                     neighbours.reset_hard();
@@ -976,7 +976,7 @@ private:
                 vertex_worklist.reset();
                 color_vertices_considered.reset();
                 return comp;
-            }
+            }*/
 
             vertex_worklist.reset();
             j = 0;
