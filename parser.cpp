@@ -74,12 +74,13 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph_t<int, int, int>* 
     assert(2 * ne == g->e_size);
 }
 
-void parser::parse_dimacs_file(std::string filename, sgraph_t<int, int, int>* g) {
+void parser::parse_dimacs_file(std::string filename, sgraph_t<int, int, int>* g, int** colmap) {
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     vector<vector<int>> incidence_list;
     vector<std::set<int>>    incidence_set;
     std::set<int> degrees;
+    std::set<int> colors;
     string line;
     int nv, ne;
     while (std::getline(infile, line)) {
@@ -103,6 +104,13 @@ void parser::parse_dimacs_file(std::string filename, sgraph_t<int, int, int>* g)
                 iss >> nv1 >> nv2;
                 incidence_list[nv1 - 1].push_back(nv2 - 1);
                 incidence_list[nv2 - 1].push_back(nv1 - 1);
+                break;
+            case 'n':
+                if(*colmap == nullptr)
+                    *colmap = new int[nv];
+                int v, col;
+                iss >> v >> col;
+                (*colmap)[v - 1] = col;
                 break;
             default:
                 break;

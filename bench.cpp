@@ -33,7 +33,38 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void bench_nauty(sgraph_t<int, int, int> *g, double* nauty_solve_time) {
+struct colorComparator {
+    colorComparator(const int* colmap) : colmap(colmap) {}
+    const int* colmap;
+
+    bool operator()(const int & v1, const int & v2) {
+        return (colmap[v1] < colmap[v2]);
+    }
+};
+
+void make_lab_ptn_from_colmap(int* lab, int* ptn, int* colmap, int colmap_sz) {
+    for(int i = 0; i < colmap_sz; ++i) {
+        lab[i] = i;
+        ptn[i] = 1;
+    }
+    int last_new_cell = 0;
+    std::sort(lab, lab + colmap_sz, colorComparator(colmap));
+    for(int i = 0; i < colmap_sz; i++) {
+        if (i + 1 == colmap_sz) {
+            ptn[last_new_cell] = (i - last_new_cell) > 0;
+            ptn[i] = 0;
+            break;
+        }
+        if (colmap[lab[i]] < colmap[lab[i + 1]]) {
+            ptn[i] = 0;
+            ptn[last_new_cell] = (i - last_new_cell) > 0;
+            last_new_cell = i + 1;
+            continue;
+        }
+    }
+}
+
+void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_time) {
     //TracesStats stats;
     statsblk stats;
     sparsegraph sg;
@@ -66,8 +97,10 @@ void bench_nauty(sgraph_t<int, int, int> *g, double* nauty_solve_time) {
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
-
     ptn[g->v_size - 1] = 0;
+    if(colmap != nullptr) {
+        make_lab_ptn_from_colmap(lab, ptn, colmap, g->v_size);
+    }
 
     for (int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
@@ -93,7 +126,7 @@ void bench_nauty(sgraph_t<int, int, int> *g, double* nauty_solve_time) {
 }
 
 
-void bench_dejavu(sgraph_t<int, int, int> *g, double* dejavu_solve_time) {
+void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     int acc = 0;
     for(int i = 0; i < g->v_size; ++i) {
@@ -104,12 +137,12 @@ void bench_dejavu(sgraph_t<int, int, int> *g, double* dejavu_solve_time) {
     }
 
     Clock::time_point timer = Clock::now();
-    dejavu_automorphisms(g, nullptr);
+    dejavu_automorphisms(g, colmap, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }
 
-void bench_traces(sgraph_t<int, int, int> *g, double* traces_solve_time) {
+void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_time) {
     //sleep(1);
     TracesStats stats;
     //statsblk stats;
@@ -143,8 +176,10 @@ void bench_traces(sgraph_t<int, int, int> *g, double* traces_solve_time) {
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
-
     ptn[g->v_size - 1] = 0;
+    if(colmap != nullptr) {
+        make_lab_ptn_from_colmap(lab, ptn, colmap, g->v_size);
+    }
 
     for (int i = 0; i < g->e_size; ++i) {
         sg.e[i] = g->e[i];
@@ -236,6 +271,26 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
+        if (arg == "__ERR") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_RAND_ABORT = atoi(argv[i]);
+            } else {
+                std::cerr << "--err option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__LEAF_LIMIT") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
+            } else {
+                std::cerr << "--leaf-limit option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
         if (arg == "__NO_NAUTY") {
             comp_nauty = false;
         }
@@ -297,13 +352,16 @@ int commandline_mode(int argc, char **argv) {
     sgraph *g = new sgraph;
    // p.parse_dimacs_file_digraph(filename, g);
     std::cout << "Parsing " << filename << "..." << std::endl;
-    p.parse_dimacs_file(filename, g);
+    int* colmap = nullptr;
+    p.parse_dimacs_file(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
         bijection<int> pr;
         bijection<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
+        if(colmap != nullptr)
+            permute_colmap(&colmap, g->v_size, pr.map);
         delete g;
     } else {
         _g = g;
@@ -319,7 +377,7 @@ int commandline_mode(int argc, char **argv) {
         std::thread killer;
         if(timeout > 0)
             killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-        bench_dejavu(_g, &dejavu_solve_time);
+        bench_dejavu(_g, colmap, &dejavu_solve_time);
         if(timeout > 0)
             killer.join();
     }
@@ -337,7 +395,7 @@ int commandline_mode(int argc, char **argv) {
         std::thread killer;
         if(timeout > 0)
             killer = std::thread(kill_thread, &nauty_kill_request, timeout);
-        bench_nauty(_g, &nauty_solve_time);
+        bench_nauty(_g, colmap, &nauty_solve_time);
         if(timeout > 0)
             killer.join();
     }
@@ -354,7 +412,7 @@ int commandline_mode(int argc, char **argv) {
         std::thread killer;
         if(timeout > 0)
             killer = std::thread(kill_thread, &nauty_kill_request, timeout);
-        bench_traces(_g, &traces_solve_time);
+        bench_traces(_g, colmap, &traces_solve_time);
         if(timeout > 0)
             killer.join();
     }

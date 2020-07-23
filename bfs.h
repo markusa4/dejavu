@@ -9,6 +9,7 @@
 #include "coloring.h"
 #include "invariant.h"
 #include "configuration.h"
+#include "utility.h"
 
 struct pair_hash {
     inline std::size_t operator()(const std::pair<int,int> & v) const {
@@ -19,6 +20,19 @@ struct pair_hash {
 template<class vertex_t>
 class bfs_element {
 public:
+    static bfs_element<vertex_t>* root_element(coloring<vertex_t>* start_c, invariant* start_I) {
+        bfs_element<vertex_t> *root_elem = new bfs_element<vertex_t>;
+        root_elem->id = 0;
+        root_elem->c = new coloring<vertex_t>;
+        root_elem->I = new invariant;
+        root_elem->c->copy_force(start_c);
+        root_elem->base_sz = 0;
+        root_elem->is_identity = true;
+        *root_elem->I = *start_I;
+        return root_elem;
+    }
+
+    bfs_element() {};
     // coloring and invariant for the specified path / base
     bfs_element<vertex_t>* parent = nullptr;
     coloring<vertex_t>*    c = nullptr;
@@ -40,7 +54,6 @@ public:
     // synergy information for fast extension and deviation maps
     std::mutex deviation_write;
     int deviation_pos    = -1; // save more than one?
-    int deviation_val    = -1;
     long deviation_acc    = -1;
     int deviation_vertex = -1;
 
@@ -55,6 +68,13 @@ public:
             delete I;
         if(init_base)
             delete base;
+    }
+
+    bool rm_point = false;
+    static void* operator new(size_t size) {
+        return NFAlloc(size);
+    }
+    static void operator delete(void *p) {
     }
 };
 
@@ -106,8 +126,8 @@ public:
             delete level_abort_map_mutex[i];
 
         for(int i = 0; i < current_level; ++i) {
-            for(int j = 0; j < level_sizes[i]; ++j)
-                delete level_states[i][j];
+            //for(int j = 0; j < level_sizes[i]; ++j)
+                //delete level_states[i][j];
             delete[] level_states[i];
         }
 
@@ -131,7 +151,7 @@ public:
         current_level = 1;
         target_level  = -1;
         level_states  = new bfs_element<vertex_t>**[base_size + 2];
-        level_sizes          = new int[(base_size + 2) * 4];
+        level_sizes   = new int[(base_size + 2) * 4];
         level_reserved_sizes = level_sizes + base_size + 2;
         level_maxweight = new double[(base_size + 2) * 2];
         level_minweight = level_maxweight + base_size + 2;

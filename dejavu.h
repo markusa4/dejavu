@@ -36,13 +36,13 @@ struct alignas(64) dejavu_workspace {
     int skiplevels = 1;
     int first_skiplevel = 1;
     coloring<vertex_t> skip_c;
-    invariant  skip_I;
-    shared_schreier* skip_schreier_level;
-    bool       skiplevel_is_uniform = false;
+    invariant          skip_I;
+    shared_schreier*   skip_schreier_level;
+    bool               skiplevel_is_uniform = false;
 
     int*         my_base_points;
     int          my_base_points_sz;
-    bool is_foreign_base;
+    bool         is_foreign_base;
 
     group_shared<vertex_t>* G;
 
@@ -53,16 +53,16 @@ struct alignas(64) dejavu_workspace {
     int id;
 
     // shared orbit and generators
-    int** shared_orbit;
-    int** shared_orbit_weights;
+    int**             shared_orbit;
+    int**             shared_orbit_weights;
     shared_permnode** shared_generators;
-    int*  shared_generators_size;
-    int   generator_fix_base_alloc = -1;
+    int*              shared_generators_size;
+    int               generator_fix_base_alloc = -1;
 
     // sequential, local group
     sequential_permnode*      sequential_gens;
     sequential_schreierlevel* sequential_gp;
-    bool            sequential_init = false;
+    bool                      sequential_init = false;
 
     // deprecated workspace for simple orbit method
     work_set  orbit_considered;
@@ -94,9 +94,9 @@ struct alignas(64) dejavu_workspace {
             _freeschreier(&sequential_gp, &sequential_gens);
         }
 
-        delete work_c;
-        delete work_I;
-        delete start_c;
+        //delete work_c;
+        //delete work_I;
+        //delete start_c;
     };
 };
 
@@ -113,7 +113,7 @@ bool bfs_element_parent_sorter(bfs_element<vertex_t>* const& lhs, bfs_element<ve
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_t {
 public:
-    void automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, shared_permnode **gens) {
+    void automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 100) {
@@ -127,8 +127,11 @@ public:
             }
         }
 
+        coloring<vertex_t> start_c;
+        start_c.vertex_to_col = colmap;
+        start_c.init = false;
         shared_workspace<vertex_t> switches;
-        worker_thread(g, true, &switches, nullptr, nullptr, nullptr, -1,
+        worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
                       nullptr, nullptr, nullptr, gens, nullptr);
     }
 
@@ -147,8 +150,9 @@ private:
         // preprocessing
         if(master) {
             config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
+            coloring<vertex_t>* init_c  = start_c;
             start_c = new coloring<vertex_t>;
-            g->initialize_coloring(start_c);
+            g->initialize_coloring(start_c, init_c->vertex_to_col);
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -228,14 +232,29 @@ private:
             W.BW = new bfs_workspace<vertex_t>();
             bwork = W.BW;
 
+            const int master_sched = sched_getcpu();
+
             W.S.empty_cache();
+            {
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(master_sched, &cpuset);
+                int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+            }
             // launch worker threads
-            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++)
+            for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&dejavu_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     dejavu_t<vertex_t, degree_t, edge_t>(), g, false, switches, G, start_c,
                                     canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens,
                                     &_shared_group_size));
+                cpu_set_t cpuset;
+                CPU_ZERO(&cpuset);
+                CPU_SET(i + (i >= master_sched), &cpuset);
+                int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
+                                                sizeof(cpu_set_t), &cpuset);
+            }
+
             PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
@@ -457,17 +476,10 @@ private:
                             base_points.not_deletable();
                             G->initialize(g->v_size, &actual_base);
                             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
-                            bfs_element<vertex_t> *root_elem = new bfs_element<vertex_t>;
-                            root_elem->id = 0;
-                            root_elem->c = new coloring<vertex_t>;
-                            root_elem->I = new invariant;
-                            root_elem->c->copy_force(start_c);
-                            root_elem->base_sz = 0;
-                            root_elem->is_identity = true;
-                            *root_elem->I = start_I;
                             W.S.empty_cache();
                             int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
-                            W.BW->initialize(root_elem, init_c, g->v_size, G->base_size);
+                            W.BW->initialize(bfs_element<vertex_t>::root_element(start_c, &start_I), init_c,
+                                             g->v_size, G->base_size);
                             int proposed_level = W.skiplevels + 1;
                             if(config.CONFIG_IR_FULL_BFS)
                                 proposed_level = G->base_size + 1;
@@ -618,6 +630,14 @@ private:
                                     PRINT("[UStore] Switching to close look...");
                                     continue;
                                 }
+                            }
+                        }
+
+                        if(config.CONFIG_IR_FAST_TOLERANCE_INC) {
+                            if (switches->experimental_paths * 16 < switches->experimental_deviation) {
+                                switches->iterate_tolerance();
+                                switches->iterate_tolerance();
+                                switches->iterate_tolerance();
                             }
                         }
 
@@ -839,6 +859,13 @@ private:
             delete my_strategy;
         }
 
+        switches->buffer_buffer[communicator_id + 1].swap(n_buffer.all_buffers);
+        if(master) {
+            for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+                FreeBuf(&switches->buffer_buffer[i]);
+            }
+        }
+
         return;
     }
 
@@ -851,11 +878,11 @@ private:
 
         // workspace
         refinement<vertex_t, degree_t, edge_t> *R = &w->R;
-        selector<vertex_t, degree_t, edge_t> *S = &w->S;
-        coloring<vertex_t> *c = &w->c;
-        invariant *I = &w->I;
+        selector<vertex_t, degree_t, edge_t> *S   = &w->S;
+        coloring<vertex_t> *c        = &w->c;
+        invariant *I                 = &w->I;
         coloring<vertex_t> *start_c  = w->start_c;
-        invariant *start_I = &w->start_I;
+        invariant *start_I           = &w->start_I;
 
         S->empty_cache();
 
@@ -901,14 +928,14 @@ private:
         // workspace
         refinement<vertex_t, degree_t, edge_t> *R = &w->R;
         selector<vertex_t, degree_t, edge_t>   *S = &w->S;
-        coloring<vertex_t> *c       = &w->c;
-        invariant *I  = &w->I;
+        coloring<vertex_t> *c                     = &w->c;
+        invariant *I                              = &w->I;
 
-        coloring<vertex_t> *start_c = &w->skip_c;
-        invariant *start_I     = &w->skip_I;
+        coloring<vertex_t> *start_c  = &w->skip_c;
+        invariant *start_I           = &w->skip_I;
         shared_schreier *group_level = w->skip_schreier_level;
 
-        invariant* canon_I    = canon_strategy->I;
+        invariant* canon_I              = canon_strategy->I;
         bijection<vertex_t>* canon_leaf = canon_strategy->leaf;
 
         automorphism->non_uniform = false;
@@ -947,7 +974,7 @@ private:
         level = w->first_skiplevel;
         if(!w->is_foreign_base)
             group_level = w->skip_schreier_level;
-        skipped_level = w->first_skiplevel > 1;
+        skipped_level    = w->first_skiplevel > 1;
         full_orbit_check = w->skiplevel_is_uniform;
 
         int it = 0;
@@ -1094,10 +1121,10 @@ private:
 
         refinement<vertex_t, degree_t, edge_t>  *R = &w->R;
         selector<vertex_t,   degree_t, edge_t>  *S = &w->S;
-        coloring<vertex_t> *c = &w->c;
-        invariant *I = &w->I;
-        invariant* canon_I    = canon_strategy->I;
-        bijection<vertex_t>* canon_leaf = canon_strategy->leaf;
+        coloring<vertex_t> *c                      = &w->c;
+        invariant *I                               = &w->I;
+        invariant* canon_I                         = canon_strategy->I;
+        bijection<vertex_t>* canon_leaf            = canon_strategy->leaf;
 
         S->empty_cache();
 
@@ -1554,7 +1581,7 @@ private:
                         // depends on earlier sorting
                         int* orbits = _getorbits(elem->base, elem->base_sz - 1, w->sequential_gp, &w->sequential_gens,
                                                  domain_size, w->G->b, &orbits_sz);
-#ifdef NDEBUG
+#ifndef NDEBUG
                         int calc_sz = 0;
                         for(int ii = 0; ii < domain_size; ++ii) {
                             assert(orbits[ii] >= 0 && orbits[ii] < domain_size);
@@ -1745,11 +1772,33 @@ private:
         return new_gen;
     }
 
+    void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
+                          sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
+                          int base_sz, bijection<vertex_t> *leaf) {
+        coloring<vertex_t>* c = &w->c;
+        invariant* I = &w->I;
+        c->copy_force(start_c);
+        I->never_fail = true;
+        for(int pos = 0; pos < base_sz; ++pos) {
+            const int v = base[pos];
+            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+        };
+        leaf->read_from_coloring(c);
+    }
+
     bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                               sgraph_t<vertex_t, degree_t, edge_t>  *g,
                                               shared_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
+        thread_local work_list_t<vertex_t> collect_base;
+        thread_local int collect_base_sz;
+
+        if(!collect_base.init)
+            collect_base.initialize(g->v_size);
+        collect_base.reset();
+        collect_base_sz = 0;
+
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
         c->copy_force(elem->c);
@@ -1763,6 +1812,8 @@ private:
             const int col = elem->target_color;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
+            collect_base.push_back(v);
+            collect_base_sz += 1;
             int cell_early = -1;
             if (look_close) {
                 I->never_fail = true;
@@ -1771,18 +1822,19 @@ private:
                 cell_early = (*I->compareI->vec_cells)[elem->base_sz];
             }
             I->reset_deviation();
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
-
-            if (!comp) { // fail on first level, set abort_val and abort_pos in elem
-                // need to sync this write?
-                ++switches->experimental_deviation;
-                if (elem->deviation_write.try_lock()) {
-                    elem->deviation_pos = I->comp_fail_pos;
-                    elem->deviation_val = I->comp_fail_val;
-                    elem->deviation_acc = I->comp_fail_acc;
-                    elem->deviation_vertex = v;
-                    elem->deviation_write.unlock();
+            if(v != elem->deviation_vertex) {
+                comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+                if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
+                    ++switches->experimental_deviation;
+                    if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
+                        elem->deviation_pos = I->comp_fail_pos;
+                        elem->deviation_acc = I->comp_fail_acc;
+                        elem->deviation_vertex = v;
+                        elem->deviation_write.unlock();
+                    }
+                    return false;
                 }
+            } else {
                 return false;
             }
         }
@@ -1792,12 +1844,13 @@ private:
 
         I->never_fail = true;
         do {
-            if(switches->done_fast) return false;
+            if(switches->done) return false;
             const int col = w->S.select_color_dynamic(g, c, strat);
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
-
+            collect_base.push_back(v);
+            collect_base_sz += 1;
             comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
         } while(comp);
 
@@ -1819,44 +1872,54 @@ private:
             leaf.read_from_coloring(c);
             leaf.not_deletable();
             // consider leaf store...
-            std::vector<vertex_t*> pointers;
+            std::vector<stored_leaf<vertex_t>> pointers;
 
             switches->leaf_store_mutex.lock();
             auto range = switches->leaf_store.equal_range(I->acc);
             for (auto it = range.first; it != range.second; ++it)
                 pointers.push_back(it->second);
             if(pointers.empty()) {
-                switches->leaf_store.insert(std::pair<long, vertex_t*>(I->acc, leaf.map));
+                if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
+                    switches->leaf_store_explicit++;
+                    switches->leaf_store.insert(std::pair<long,
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g->v_size, true)));
+                } else {
+                    vertex_t* base = new vertex_t[collect_base_sz];
+                    memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
+                    switches->leaf_store.insert(std::pair<long,
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, elem)));
+                    leaf.deletable();
+                }
             }
             switches->leaf_store_mutex.unlock();
 
             comp = false;
 
             for(size_t i = 0; i < pointers.size(); ++i) {
-                *automorphism = leaf;
+                automorphism->copy(&leaf);
                 automorphism->inverse();
                 bijection<vertex_t> fake_leaf;
-                fake_leaf.map = pointers[i];
+
+                if(pointers[i].explicit_leaf) {
+                    fake_leaf.map = pointers[i].map;
+                    fake_leaf.not_deletable();
+                } else {
+                    if(switches->done) return false;
+                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf);
+                    fake_leaf.deletable();
+                }
+
                 fake_leaf.map_sz = g->v_size;
-                fake_leaf.not_deletable();
                 automorphism->compose(&fake_leaf);
-
-                int j;
-                for(j = 0; j < automorphism->map_sz; ++j)
-                    if(automorphism->map[j] != j) break;
-
-                if(j == automorphism->map_sz) {comp = false; break;}
 
                 if(w->R.certify_automorphism(g, automorphism)) {
                     automorphism->certified = true;
                     automorphism->non_uniform = false;
                     comp = true;
-                    break;
                 } else {
                     comp = false;
                 }
             }
-
         }
 
         return comp;
@@ -1865,49 +1928,78 @@ private:
 
 typedef dejavu_t<int, int, int> dejavu;
 
-void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
+void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, int* colmap, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
             PRINT("[Dispatch] <int32, int32, int32>");
             dejavu_t<int, int, int> d;
-            d.automorphisms(sgraph->sgraph_0, gens);
+
+            d.automorphisms(sgraph->sgraph_0, colmap, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_INT: {
             PRINT("[Dispatch] <int16, int16, int>");
             dejavu_t<int16_t, int16_t, int> d;
-            d.automorphisms(sgraph->sgraph_1, gens);
+            const int v_size = sgraph->sgraph_1->v_size;
+            int16_t* colmap_16 = nullptr;
+            if(colmap != nullptr) {
+                colmap_16 = new int16_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_1, colmap_16, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_SHORT: {
             PRINT("[Dispatch] <int16, int16, int16>");
             dejavu_t<int16_t, int16_t, int16_t> d;
-            d.automorphisms(sgraph->sgraph_2, gens);
+            const int v_size = sgraph->sgraph_2->v_size;
+            int16_t* colmap_16 = nullptr;
+            if(colmap != nullptr) {
+                colmap_16 = new int16_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_2, colmap_16, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_SHORT:{
             PRINT("[Dispatch] <int8, int8, int16>");
             dejavu_t<int8_t, int8_t, int16_t> d;
-            d.automorphisms(sgraph->sgraph_3, gens);
+            const int v_size = sgraph->sgraph_3->v_size;
+            int8_t* colmap_8 = nullptr;
+            if(colmap != nullptr) {
+                colmap_8 = new int8_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_3, colmap_8, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_CHAR: {
             PRINT("[Dispatch] <int8, int8, int8>");
             dejavu_t<int8_t, int8_t, int8_t> d;
-            d.automorphisms(sgraph->sgraph_4, gens);
+            const int v_size = sgraph->sgraph_4->v_size;
+            int8_t* colmap_8 = nullptr;
+            if(colmap != nullptr) {
+                colmap_8 = new int8_t[v_size];
+                for (int i = 0; i < v_size; ++i)
+                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
+            }
+            d.automorphisms(sgraph->sgraph_4, colmap_8, gens);
         }
             break;
     }
 }
 
-void dejavu_automorphisms(sgraph_t<int, int, int> *g, shared_permnode **gens) {
+void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
     if(config.CONFIG_PREPROCESS_COMPRESS) {
         dynamic_sgraph sg;
         dynamic_sgraph::read(g, &sg);
-        dejavu_automorphisms_dispatch(&sg, gens);
+        dejavu_automorphisms_dispatch(&sg, colmap, gens);
     } else {
         dejavu d;
-        d.automorphisms(g, gens);
+        d.automorphisms(g, colmap, gens);
     }
 }
 

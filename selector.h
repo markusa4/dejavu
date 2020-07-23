@@ -28,6 +28,8 @@ struct strategy {
     void replace(strategy<vertex_t>* s) {
         leaf = s->leaf;
         I    = s->I;
+        I->created    = I;
+        s->I->created = nullptr;
         cell_selector_type = s->cell_selector_type;
         cell_selector_seed = s->cell_selector_seed;
     }

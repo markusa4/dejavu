@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <random>
 #include <unordered_map>
+#include <bits/unordered_set.h>
 #include "configuration.h"
 
 #ifndef DEJAVU_UTILITY_H
@@ -22,12 +23,58 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
+
+class NFAllocBuf {
+public:
+    NFAllocBuf() {
+        all_buffers.reserve(1024);
+    }
+    unsigned char* buffer = nullptr;
+    std::vector<unsigned char*> all_buffers = std::vector<unsigned char*>();
+};
+
+extern thread_local NFAllocBuf n_buffer;
+
+static void *NFAlloc(size_t size) {
+    //return malloc(size);
+    thread_local size_t buffer_sz  = 0;
+    thread_local size_t buffer_pos = 0;
+    thread_local size_t next_buffer_sz = 4096;
+    if(buffer_sz <= (buffer_pos + size)) {
+        n_buffer.buffer = new unsigned char[next_buffer_sz];
+        n_buffer.all_buffers.push_back(n_buffer.buffer);
+        buffer_sz  = next_buffer_sz;
+        next_buffer_sz *= 2;
+        buffer_pos = 0;
+    }
+
+    void* alloc_p = (void*) (n_buffer.buffer + buffer_pos);
+    buffer_pos += size;
+    return alloc_p;
+}
+
+static void FreeAll() {
+    for(int i = 0; i < n_buffer.all_buffers.size(); ++i) {
+        delete[] n_buffer.all_buffers[i];
+    }
+    n_buffer.all_buffers.clear();
+}
+
+static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
+    for(int i = 0; i < all_buffers->size(); ++i) {
+        delete[] (*all_buffers)[i];
+    }
+    all_buffers->clear();
+}
+
+
 
 // modes of the solver
 enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_NON_UNIFORM_FROM_BFS, MODE_NON_UNIFORM_PROBE_IT,
             MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
+enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BIDIRECTIONAL_DEVIATION, VU_MODE_BFS};
 
 // metrics used to compare strategies
 struct strategy_metrics {
@@ -38,19 +85,38 @@ struct strategy_metrics {
 };
 
 template<class vertex_t>
+struct bfs_element;
+
+template<class vertex_t>
+struct stored_leaf {
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bfs_element<vertex_t>* start_elem) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), start_elem(start_elem) {};
+    bool      explicit_leaf;
+    int       map_sz;
+    vertex_t* map;
+    bfs_element<vertex_t>* start_elem;
+};
+
+template<class vertex_t>
 class shared_workspace {
 public:
     shared_workspace() {
         done_shared_group.store(false);
         done_created_group.store(false);
         experimental_look_close.store(false);
-        base1_skip.store(0);
         _ack_done.store(0);
         win_id.store(-2);
         checked.store(0);
         exit_counter.store(0);
         experimental_paths.store(0);
         experimental_deviation.store(0);
+        leaf_store_explicit.store(0);
+        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+            buffer_buffer[i] = std::vector<unsigned char*>();
+        }
     };
 
     bool done = false;
@@ -61,6 +127,8 @@ public:
     // solver mode
     std::atomic<modes> current_mode;
     std::atomic_int    exit_counter;
+
+    std::vector<unsigned char*>* buffer_buffer;
 
     // tournament variables
     std::mutex         tournament_mutex;
@@ -75,12 +143,9 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, vertex_t*> leaf_store;
-
+    std::unordered_multimap<long, stored_leaf<vertex_t>> leaf_store;
+    std::atomic_int    leaf_store_explicit;
     std::mutex leaf_store_mutex;
-
-    // variable used to synchronize base 1 tournament skip heuristic
-    std::atomic_int    base1_skip;
 
     int tolerance = 1;
 
@@ -141,6 +206,74 @@ public:
 
         ichecked = true;
         return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+    }
+};
+
+template<class vertex_t>
+class shared_iso_workspace {
+public:
+    shared_iso_workspace() {
+        done_created_group.store(false);
+        experimental_look_close.store(false);
+        _ack_done.store(0);
+        win_id.store(-2);
+        checked.store(0);
+        noniso_counter.store(0);
+        found_iso.store(false);
+        exit_counter.store(0);
+        experimental_paths.store(0);
+        experimental_deviation.store(0);
+        leaf_store[0] = std::unordered_multimap<long, stored_leaf<vertex_t>>();
+        leaf_store[1] = std::unordered_multimap<long, stored_leaf<vertex_t>>();
+        leaf_store_explicit.store(0);
+        deviation_store[0] = std::unordered_set<long>();
+        deviation_store[1] = std::unordered_set<long>();
+        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+            buffer_buffer[i] = std::vector<unsigned char*>();
+        }
+    };
+
+    bool done = false;
+    bool done_fast = false;
+    std::atomic_bool done_created_group;
+
+    // solver mode
+    std::atomic<vujade_modes> current_mode;
+    std::mutex switch_mode_mutex;
+    std::atomic_int    exit_counter;
+    std::atomic_int    noniso_counter;
+    std::atomic_bool   found_iso;
+
+    std::vector<unsigned char*>* buffer_buffer;
+
+    // tournament variables
+    std::mutex         tournament_mutex;
+    std::atomic_int    checked;
+    strategy_metrics   win_metrics;
+    std::atomic_int    win_id;
+    std::atomic_int    _ack_done;
+    bool               all_no_restart = true;
+
+    // used for leaf storage decisions and the leaf storage
+    std::atomic_int    experimental_budget;
+    std::atomic_int    experimental_paths;
+    std::atomic_int    experimental_deviation;
+    std::atomic_bool   experimental_look_close;
+    std::unordered_multimap<long, stored_leaf<vertex_t>> leaf_store[2];
+    std::mutex leaf_store_mutex[2];
+    std::atomic_int    leaf_store_explicit;
+
+    std::unordered_set<long> deviation_store[2];
+    std::mutex deviation_store_mutex[2];
+    int tolerance = 1;
+
+    void iterate_tolerance() {
+        tolerance *= 2;
+    }
+
+    void reset_tolerance(int size, int domain_size) {
+        tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
     }
 };
 

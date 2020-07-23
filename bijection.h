@@ -23,6 +23,18 @@ public:
         return map[v];
     }
 
+    void copy(bijection* p) {
+        if(!init)
+            map = new vertex_t[p->map_sz];
+        init = p->init;
+        mark = p->mark;
+        map_sz = p->map_sz;
+        non_uniform = p->non_uniform;
+        foreign_base = p->foreign_base;
+        certified = p->certified;
+        memcpy(map, p->map, p->map_sz * sizeof(vertex_t));
+    }
+
     void print() {
         for(int i = 0; i < map_sz; ++i)
             std::cout << map[i] << " ";

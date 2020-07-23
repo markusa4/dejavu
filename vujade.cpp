@@ -1,20 +1,18 @@
+#include "vujade.h"
 #include <iostream>
 #include "parser.h"
-#include "dejavu.h"
 #include <assert.h>
 #include "configuration.h"
 #include <chrono>
 #include <string>
-#include <fstream>
 
 typedef std::chrono::high_resolution_clock Clock;
-
-class time_point;
+bool finished = false;
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
-
-bool finished = false;
+thread_local int numnodes;
+thread_local int colorcost;
 
 void kill_thread(volatile int* kill_switch, int timeout) {
     Clock::time_point start = Clock::now();
@@ -27,19 +25,20 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
+void bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    dejavu_automorphisms(g, colmap, nullptr);
-    //dejavu d;
-    //d.automorphisms(g, nullptr);
+    vujade_iso(g1, g2);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }
 
 int commandline_mode(int argc, char **argv) {
-    std::string filename = "";
-    bool entered_file = false;
+    std::string filename1 = "";
+    std::string filename2 = "";
+    bool entered_file1 = false;
+    bool entered_file2 = false;
+
     int  timeout = -1;
     bool comp_dejavu = true;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -50,13 +49,24 @@ int commandline_mode(int argc, char **argv) {
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
         std::replace(arg.begin(), arg.end(), '-', '_');
 
-        if (arg == "__FILE") {
+        if ((arg == "__FILE1") || (arg == "__F1")) {
             if (i + 1 < argc) {
                 i++;
-                filename = argv[i];
-                entered_file = true;
+                filename1 = argv[i];
+                entered_file1 = true;
             } else {
-                std::cerr << "--file option requires one argument." << std::endl;
+                std::cerr << "--file1 requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if ((arg == "__FILE2") || (arg == "__F2")) {
+            if (i + 1 < argc) {
+                i++;
+                filename2 = argv[i];
+                entered_file2 = true;
+            } else {
+                std::cerr << "--file2 requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -67,6 +77,20 @@ int commandline_mode(int argc, char **argv) {
                 timeout = atoi(argv[i]);
             } else {
                 std::cerr << "--timeout option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__WRITE_AUTO") {
+            config.CONFIG_WRITE_AUTOMORPHISMS = true;
+        }
+
+        if (arg == "__THREADS") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
+            } else {
+                std::cerr << "--threads option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -87,20 +111,6 @@ int commandline_mode(int argc, char **argv) {
                 config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
             } else {
                 std::cerr << "--leaf-limit option requires one argument." << std::endl;
-                return 1;
-            }
-        }
-
-        if (arg == "__WRITE_AUTO") {
-            config.CONFIG_WRITE_AUTOMORPHISMS = true;
-        }
-
-        if (arg == "__THREADS") {
-            if (i + 1 < argc) {
-                i++;
-                config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
-            } else {
-                std::cerr << "--threads option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -151,30 +161,43 @@ int commandline_mode(int argc, char **argv) {
         }
     }
 
-    if (!entered_file) {
-        std::cerr << "--file not specified" << std::endl;
+    if (!entered_file1 || !entered_file2) {
+        std::cerr << "--file1 or --file2 not specified" << std::endl;
         return 1;
     }
     parser p;
-    sgraph *g = new sgraph;
-    std::cout << "Parsing " << filename << "..." << std::endl;
-    int* colmap = nullptr;
-    p.parse_dimacs_file(filename, g, &colmap);
-    sgraph *_g = new sgraph;
+    int* colmap1 = nullptr;
+    int* colmap2 = nullptr;
+    sgraph *g1 = new sgraph;
+    std::cout << "Parsing " << filename1 << "..." << std::endl;
+    p.parse_dimacs_file(filename1, g1, &colmap1);
+    sgraph *g2 = new sgraph;
+    std::cout << "Parsing " << filename2 << "..." << std::endl;
+    p.parse_dimacs_file(filename2, g2, &colmap2);
+    sgraph *_g1 = new sgraph;
+    sgraph *_g2 = new sgraph;
     if(permute_graph) {
-        std::cout << "Permuting graph..." << std::endl;
-        bijection<int> pr;
-        bijection<int>::random_bijection(&pr, g->v_size, seed);
-        g->permute_graph(_g, &pr); // permute graph
-        if(colmap != nullptr)
-            permute_colmap(&colmap, g->v_size, pr.map);
-        delete g;
+        std::cout << "Permuting graphs..." << std::endl;
+        bijection<int> pr1;
+        bijection<int>::random_bijection(&pr1, g1->v_size, seed);
+        g1->permute_graph(_g1, &pr1); // permute graph
+        if(colmap1 != nullptr)
+            permute_colmap(&colmap1, g1->v_size, pr1.map);
+        delete g1;
+
+        bijection<int> pr2;
+        bijection<int>::random_bijection(&pr2, g2->v_size, seed * 123);
+        g2->permute_graph(_g2, &pr2); // permute graph
+        if(colmap2 != nullptr)
+            permute_colmap(&colmap2, g2->v_size, pr2.map);
+        delete g2;
     } else {
-        _g = g;
+        _g1 = g1;
+        _g2 = g2;
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu" << std::endl;
+    std::cout << "vujade" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
@@ -182,7 +205,7 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bench_dejavu(_g, colmap, &dejavu_solve_time);
+    bench_vujade(_g1, _g2, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
 
@@ -193,8 +216,5 @@ int commandline_mode(int argc, char **argv) {
 
 
 int main(int argc, char *argv[]) {
-    std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu" << std::endl;
-    std::cout << "------------------------------------------------------------------" << std::endl;
     return commandline_mode(argc, argv);
 }
