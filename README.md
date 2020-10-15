@@ -15,7 +15,7 @@ make
 Compilation produces (up to) three binaries (`dejavu`, `dejavu-iso` and `bench`), which are however similar in usage. dejavu is the binary of the automorphism solver, dejavu-iso of the isomorphism solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
 
 ## dejavu
-The automorphism solver only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
+The automorphism solver `dejavu` only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
@@ -30,7 +30,7 @@ Command Line Argument | Effect
 `--kdeviation` | determine the number of additional refinement steps for deviation values
 
 ## dejavu-iso
-The isomorphism solver accepts the same arguments, however, it requires two input files.
+The isomorphism solver `dejavu-iso` mainly accepts the same arguments, however, it requires two input files.
 
 Command Line Argument | Effect
 --- | ---
@@ -38,14 +38,14 @@ Command Line Argument | Effect
 `--file2` | specifies the second graph input file in DIMACS format
 
 ## bench
-`bench` understands the same command line arguments, with the addition of the following: 
+The benchmark utility `bench` again understands the same command line arguments as `dejavu`, with the addition of the following: 
 
 Command Line Argument | Effect
 --- | ---
 `--no-nauty` | does not run nauty
 `--no-traces` | does not run Traces
 `--no-dejavu` | does not run dejavu
-`--stat-file` | specify a file to which measurements shall be written
+`--stat-file` | specifies a file to which measurements are written
 
 # API
 By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `dejavu_automorphisms`:
