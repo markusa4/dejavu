@@ -1,5 +1,5 @@
 # Compilation
-If only the dejavu solver is to be compiled the project should compile without any further dependencies:
+If only the dejavu automorphism and isomorphism solvers are to be compiled the project should compile without any further dependencies:
 ```
 cmake .
 make 
@@ -12,10 +12,10 @@ make
 ```
 
 # Usage
-Compilation produces two binaries (`dejavu` and `bench`), which are however similar in usage. dejavu is the binary of the actual solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
+Compilation produces (up to) three binaries (`dejavu`, `dejavu-iso` and `bench`), which are however similar in usage. dejavu is the binary of the automorphism solver, dejavu-iso of the isomorphism solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
 
 ## dejavu
-The solver only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
+The automorphism solver only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
@@ -26,9 +26,16 @@ Command Line Argument | Effect
 `--permute` | permutes the input graph randomly
 `--permute-seed` | specify a fixed seed for the previous argument
 `--force-selector` | forces a specific cell selector (0 is first, 1 is smallest, 2 is largest)
-`--compress` | try to use small types (short, char) instead of int
 `--no-idleskip` | suppresses skipping of idle cells, i.e., cells that cause splits
 `--kdeviation` | determine the number of additional refinement steps for deviation values
+
+## dejavu-iso
+The isomorphism solver accepts the same arguments, however, it requires two input files.
+
+Command Line Argument | Effect
+--- | ---
+`--file1` | specifies the first graph input file in DIMACS format
+`--file2` | specifies the second graph input file in DIMACS format
 
 ## bench
 `bench` understands the same command line arguments, with the addition of the following: 
@@ -54,7 +61,3 @@ The source code contains modified source code of the [nauty / Traces](http://pal
 1. All files not listed below, copyright Markus Anders.
 2. `naudefs.h`, `naurng.cpp`, `naurng.h`, `schreier_sequential.cpp`, `schreier_sequential.h`, `schreier_shared.cpp`, `schreier_shared.h` are (derivative) work, originally copyright Brendan McKay. Licensed under the Apache License, Version 2.0 (see `LICENSE`).
 3. `concurrentqueue.h`, copyright Cameron Desrochers. Licensed under the Simplified BSD license (see `concurrentqueue.h`)
-
-
-
-

@@ -1,6 +1,13 @@
 import subprocess, csv
 from os import walk
 
+
+def line_prepender(filename, line):
+    with open(filename, 'r+') as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write(line.rstrip('\r\n') + '\n' + content)
+
 def process(setname, solver):
 	print(setname)
 	print(solver)
@@ -41,6 +48,7 @@ def process(setname, solver):
 	cntfile.write("{}".format(cnt))
 	print(cnt)
 	sumfile.close()
+	line_prepender("{}.{}.dat".format(setname, solver), "file V time")
 
 def process_set(setname):
 	process(setname, "dejavu8")
@@ -51,26 +59,28 @@ def process_set(setname):
 	process(setname, "traces")
 	process(setname, "nauty")
 
-process_set("results/lattice")
-process_set("results/grid")
-process_set("results/ag")
-process_set("results/latin")
 process_set("results/k")
-process_set("results/latin-sw")
-process_set("results/sts")
-process_set("results/sts-sw")
-process_set("results/had")
-process_set("results/had-sw")
 process_set("results/cfi")
-process_set("results/rantree")
-process_set("results/ranreg")
-process_set("results/hypercubes")
-process_set("results/dac_pipe")
-process_set("results/ran2")
-process_set("results/ran10")
-process_set("results/ransq")
 process_set("results/dac_other")
+process_set("results/dac_pipe")
 process_set("results/tran")
+process_set("results/mz-aug2")
+process_set("results/small-multipede")
+process_set("results/small-multipede-force")
+process_set("results/large-cfi")
 process_set("results/combinatorial")
 process_set("results/pp16")
 process_set("results/pp25")
+process_set("results/latin")
+process_set("results/latin-sw")
+process_set("results/had")
+process_set("results/had-sw")
+process_set("results/sts")
+process_set("results/sts-sw")
+process_set("results/ran2")
+process_set("results/ransq")
+process_set("results/ran10")
+process_set("results/ranreg")
+process_set("results/rantree")
+process_set("results/hypercubes")
+
