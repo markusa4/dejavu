@@ -25,12 +25,13 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
+bool bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    vujade_iso(g1, g2);
+    bool res = vujade_iso(g1, g2);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
+    return res;
 }
 
 int commandline_mode(int argc, char **argv) {
@@ -165,6 +166,17 @@ int commandline_mode(int argc, char **argv) {
         std::cerr << "--file1 or --file2 not specified" << std::endl;
         return 1;
     }
+
+    if(!file_exists(filename1)) {
+        std::cerr << "File '" << filename1 << "' does not exist." << std::endl;
+        return 1;
+    }
+
+    if(!file_exists(filename2)) {
+        std::cerr  << "File '" << filename2 << "' does not exist." << std::endl;
+        return 1;
+    }
+
     parser p;
     int* colmap1 = nullptr;
     int* colmap2 = nullptr;
@@ -197,7 +209,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "vujade" << std::endl;
+    std::cout << "dejavu-iso" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
@@ -205,9 +217,15 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bench_vujade(_g1, _g2, &dejavu_solve_time);
+    bool res = bench_vujade(_g1, _g2, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
+
+    if(res) {
+        std::cout << "ISOMORPHIC" << std::endl;
+    } else {
+        std::cout << "NON_ISOMORPHIC" << std::endl;
+    }
 
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;

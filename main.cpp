@@ -155,6 +155,12 @@ int commandline_mode(int argc, char **argv) {
         std::cerr << "--file not specified" << std::endl;
         return 1;
     }
+
+    if(!file_exists(filename)) {
+        std::cerr << "File '" << filename << "' does not exist." << std::endl;
+        return 1;
+    }
+
     parser p;
     sgraph *g = new sgraph;
     std::cout << "Parsing " << filename << "..." << std::endl;

@@ -3,8 +3,9 @@
 #include <algorithm>
 #include <random>
 #include <unordered_map>
-#include <bits/unordered_set.h>
+#include <unordered_set>
 #include "configuration.h"
+#include <fstream>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -276,5 +277,10 @@ public:
         tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
     }
 };
+
+inline bool file_exists(const std::string& name) {
+    std::ifstream f(name.c_str());
+    return f.good();
+}
 
 #endif //DEJAVU_UTILITY_H

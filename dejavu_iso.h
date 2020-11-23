@@ -305,7 +305,7 @@ private:
                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
             } else {
                 config.CONFIG_IR_EXPAND_DEVIATION = floor(1.5*sqrt(g1->v_size));
-                std::cout << "[dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION << std::endl;
+                PRINT("[dev] Expansion: " << config.CONFIG_IR_EXPAND_DEVIATION);
             }
             switches->done_created_group = true;
         }
@@ -847,11 +847,6 @@ bool vujade_iso(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2) {
     if(res) {
         vujade v;
         res = v.iso(g1, g2);
-    }
-    if(res) {
-        PRINT("ISOMORPHIC");
-    } else {
-        PRINT("NON_ISOMORPHIC");
     }
     return res;
 }

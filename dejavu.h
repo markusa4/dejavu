@@ -401,6 +401,9 @@ private:
                 // we are done
                 if(switches->done) {
                     if(!dejavu_kill_request) {
+                        PRINT("Numnodes (master): " << numnodes);
+                        PRINT("Colorcost (master): " << colorcost);
+
                         std::cout << "Base size:  " << G->base_size << std::endl;
                         while (!work_threads.empty()) {
                             work_threads[work_threads.size() - 1].join();
@@ -425,10 +428,6 @@ private:
                                 *gens = G->gens;
                             }
                         }
-
-                        std::cout << "Join: " << cref / 1000000.0 << "ms" << std::endl;
-                        std::cout << "Numnodes (master): " << numnodes << std::endl;
-                        std::cout << "Colorcost (master): " << colorcost << std::endl;
                     } else {
                         while (!work_threads.empty()) {
                             work_threads[work_threads.size() - 1].join();
