@@ -1,4 +1,4 @@
-#include "dejavu_iso.h"
+#include "dejavu_api.h"
 #include <iostream>
 #include "parser.h"
 #include <assert.h>
@@ -25,22 +25,21 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-bool bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
+bool bench_dejavu_api(sgraph *g1, int max_length, int num, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    bool res = dejavu_isomorphic(g1, g2);
+    random_paths(g1, max_length, num);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
-    return res;
 }
 
 int commandline_mode(int argc, char **argv) {
     std::string filename1 = "";
-    std::string filename2 = "";
     bool entered_file1 = false;
-    bool entered_file2 = false;
 
     int  timeout = -1;
+    int max_length = 1;
+    int num = 1;
     bool comp_dejavu = true;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
@@ -50,24 +49,13 @@ int commandline_mode(int argc, char **argv) {
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
         std::replace(arg.begin(), arg.end(), '-', '_');
 
-        if ((arg == "__FILE1") || (arg == "__F1")) {
+        if ((arg == "__FILE") || (arg == "__F")) {
             if (i + 1 < argc) {
                 i++;
                 filename1 = argv[i];
                 entered_file1 = true;
             } else {
-                std::cerr << "--file1 requires one argument." << std::endl;
-                return 1;
-            }
-        }
-
-        if ((arg == "__FILE2") || (arg == "__F2")) {
-            if (i + 1 < argc) {
-                i++;
-                filename2 = argv[i];
-                entered_file2 = true;
-            } else {
-                std::cerr << "--file2 requires one argument." << std::endl;
+                std::cerr << "--file requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -92,6 +80,26 @@ int commandline_mode(int argc, char **argv) {
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
             } else {
                 std::cerr << "--threads option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__MAX_LENGTH") {
+            if (i + 1 < argc) {
+                i++;
+                max_length = atoi(argv[i]);
+            } else {
+                std::cerr << "--max-length option requires one argument." << std::endl;
+                return 1;
+            }
+        }
+
+        if (arg == "__NUM") {
+            if (i + 1 < argc) {
+                i++;
+                num = atoi(argv[i]);
+            } else {
+                std::cerr << "--num option requires one argument." << std::endl;
                 return 1;
             }
         }
@@ -162,18 +170,13 @@ int commandline_mode(int argc, char **argv) {
         }
     }
 
-    if (!entered_file1 || !entered_file2) {
-        std::cerr << "--file1 or --file2 not specified" << std::endl;
+    if (!entered_file1) {
+        std::cerr << "--file not specified" << std::endl;
         return 1;
     }
 
     if(!file_exists(filename1)) {
         std::cerr << "File '" << filename1 << "' does not exist." << std::endl;
-        return 1;
-    }
-
-    if(!file_exists(filename2)) {
-        std::cerr  << "File '" << filename2 << "' does not exist." << std::endl;
         return 1;
     }
 
@@ -183,33 +186,11 @@ int commandline_mode(int argc, char **argv) {
     sgraph *g1 = new sgraph;
     std::cout << "Parsing " << filename1 << "..." << std::endl;
     p.parse_dimacs_file(filename1, g1, &colmap1);
-    sgraph *g2 = new sgraph;
-    std::cout << "Parsing " << filename2 << "..." << std::endl;
-    p.parse_dimacs_file(filename2, g2, &colmap2);
     sgraph *_g1 = new sgraph;
-    sgraph *_g2 = new sgraph;
-    if(permute_graph) {
-        std::cout << "Permuting graphs..." << std::endl;
-        bijection<int> pr1;
-        bijection<int>::random_bijection(&pr1, g1->v_size, seed);
-        g1->permute_graph(_g1, &pr1); // permute graph
-        if(colmap1 != nullptr)
-            permute_colmap(&colmap1, g1->v_size, pr1.map);
-        delete g1;
-
-        bijection<int> pr2;
-        bijection<int>::random_bijection(&pr2, g2->v_size, seed * 123);
-        g2->permute_graph(_g2, &pr2); // permute graph
-        if(colmap2 != nullptr)
-            permute_colmap(&colmap2, g2->v_size, pr2.map);
-        delete g2;
-    } else {
-        _g1 = g1;
-        _g2 = g2;
-    }
+    _g1 = g1;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu-iso" << std::endl;
+    std::cout << "dejavu-api" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
@@ -217,15 +198,9 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bool res = bench_vujade(_g1, _g2, &dejavu_solve_time);
+    bool res = bench_dejavu_api(_g1, max_length, num, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
-
-    if(res) {
-        std::cout << "ISOMORPHIC" << std::endl;
-    } else {
-        std::cout << "NON_ISOMORPHIC" << std::endl;
-    }
 
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;

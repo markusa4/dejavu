@@ -76,7 +76,7 @@ struct alignas(64) dejavu_workspace {
 };
 
 template<class vertex_t, class degree_t, class edge_t>
-class vujade_t {
+class dejavu_iso_t {
 public:
     bool iso(sgraph_t<vertex_t, degree_t, edge_t> *g1, sgraph_t<vertex_t, degree_t, edge_t> *g2) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
@@ -108,8 +108,8 @@ private:
 
         config.CONFIG_VUJADE = true; // some things ought to work differently now...
 
-        numnodes  = 0;
-        colorcost = 0;
+        //numnodes  = 0;
+        //colorcost = 0;
 
         // preprocessing
         if(master) {
@@ -122,7 +122,7 @@ private:
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
-            assert(start_c->check());
+            assert(start_c1->check());
         }
 
         double cref;
@@ -218,8 +218,8 @@ private:
             // launch worker threads
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
-                        std::thread(&vujade_t<vertex_t, degree_t, edge_t>::worker_thread,
-                                    vujade_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
+                        std::thread(&dejavu_iso_t<vertex_t, degree_t, edge_t>::worker_thread,
+                                    dejavu_iso_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
                                     canon_strategy, i, W.BW1, W.BW2));
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
@@ -805,7 +805,7 @@ private:
     }
 };
 
-typedef vujade_t<int, int, int> vujade;
+typedef dejavu_iso_t<int, int, int> dejavu_iso;
 
 /*void vujade_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
     switch(sgraph->type) {
@@ -842,10 +842,10 @@ typedef vujade_t<int, int, int> vujade;
     }
 }*/
 
-bool vujade_iso(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2) {
+bool dejavu_isomorphic(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2) {
     bool res = (g1->v_size == g2->v_size) && (g1->e_size == g2->e_size) && (g1->d_size == g2->d_size);
     if(res) {
-        vujade v;
+        dejavu_iso v;
         res = v.iso(g1, g2);
     }
     return res;

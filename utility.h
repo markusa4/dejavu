@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include "configuration.h"
 #include <fstream>
+#include <set>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -24,8 +25,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-//#define PRINT(str) std::cout << str << std::endl;
-#define PRINT(str) (void)0;
+#define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) (void)0;
 
 class NFAllocBuf {
 public:
@@ -267,7 +268,12 @@ public:
 
     std::unordered_set<long> deviation_store[2];
     std::mutex deviation_store_mutex[2];
+
+    // used for API
+    std::set<std::pair<int*, long>> node_store;
+
     int tolerance = 1;
+
 
     void iterate_tolerance() {
         tolerance *= 2;

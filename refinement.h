@@ -431,7 +431,7 @@ public:
                 }
             }
 
-            colorcost += next_color_class_sz;
+            // colorcost += next_color_class_sz;
 
             bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
