@@ -28,9 +28,11 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 bool bench_dejavu_api(sgraph *g1, int max_length, int num, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    random_paths(g1, max_length, num);
+    std::set<std::pair<int*, long>> paths;
+    random_paths(g1, max_length, num, &paths);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
+    return true;
 }
 
 int commandline_mode(int argc, char **argv) {

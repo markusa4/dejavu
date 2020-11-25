@@ -2,12 +2,11 @@
 #define DEJAVU_DEJAVU_API_H
 
 #include "dejavu_iso.h"
-#include <boost/python.hpp>
 
 class dejavu_api {
 public:
 public:
-    bool random_paths(sgraph_t<int, int, int> *g, int max_length, int num) {
+    bool random_paths(sgraph_t<int, int, int> *g, int max_length, int num, std::set<std::pair<int*, long>>* paths) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 150) {
@@ -22,6 +21,7 @@ public:
         }
 
         shared_iso_workspace<int> switches;
+        switches.node_store = paths;
         return worker_thread(g, true, &switches, nullptr, nullptr,
                              -1,nullptr, nullptr, max_length, num);
     }
@@ -160,7 +160,7 @@ private:
                 switches->leaf_store_mutex->lock();
                 int* save_c = new int[g->v_size];
                 memcpy(save_c, W.c.vertex_to_col, g->v_size * sizeof(int));
-                switches->node_store.insert(std::pair<int*, long>(save_c, W.I.acc));
+                switches->node_store->insert(std::pair<int*, long>(save_c, W.I.acc));
                 switches->leaf_store_mutex->unlock();
             }
             if(switches->experimental_paths >= num) {
@@ -193,7 +193,7 @@ private:
 
         S->empty_cache();
         start_I->reset_compare_invariant();
-        start_I->create_vector(g->v_size * 2);
+        start_I->create_vector(1);
         automorphism->map    = new int[g->v_size];
         automorphism->map_sz = 0;
 
@@ -222,10 +222,6 @@ private:
 
             // check if max_length reached
             length += 1;
-
-            // base point
-            //automorphism->map[automorphism->map_sz] = v;
-            //automorphism->map_sz += 1;
         }
     }
 
@@ -244,11 +240,9 @@ private:
     }
 };
 
-void random_paths(sgraph* g, int max_length, int num) {
+void random_paths(sgraph* g, int max_length, int num, std::set<std::pair<int*, long>>* paths) {
     dejavu_api v;
-    v.random_paths(g, max_length, num);
-
-    // ToDo how to return stuff?
+    v.random_paths(g, max_length, num, paths);
 }
 
 #endif //DEJAVU_DEJAVU_API_H

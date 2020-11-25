@@ -270,7 +270,7 @@ public:
     std::mutex deviation_store_mutex[2];
 
     // used for API
-    std::set<std::pair<int*, long>> node_store;
+    std::set<std::pair<int*, long>>* node_store;
 
     int tolerance = 1;
 
