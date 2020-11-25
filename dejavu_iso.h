@@ -108,8 +108,8 @@ private:
 
         config.CONFIG_VUJADE = true; // some things ought to work differently now...
 
-        //numnodes  = 0;
-        //colorcost = 0;
+        numnodes  = 0;
+        colorcost = 0;
 
         // preprocessing
         if(master) {
