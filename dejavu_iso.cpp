@@ -59,9 +59,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--file1 requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if ((arg == "__FILE2") || (arg == "__F2")) {
+        } else if ((arg == "__FILE2") || (arg == "__F2")) {
             if (i + 1 < argc) {
                 i++;
                 filename2 = argv[i];
@@ -70,9 +68,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--file2 requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__TIMEOUT") {
+        } else if (arg == "__TIMEOUT") {
             if (i + 1 < argc) {
                 i++;
                 timeout = atoi(argv[i]);
@@ -80,13 +76,9 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--timeout option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__WRITE_AUTO") {
+        } else if (arg == "__WRITE_AUTO") {
             config.CONFIG_WRITE_AUTOMORPHISMS = true;
-        }
-
-        if (arg == "__THREADS") {
+        } else if (arg == "__THREADS") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
@@ -94,9 +86,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--threads option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__ERR") {
+        } else if (arg == "__ERR") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_RAND_ABORT = atoi(argv[i]);
@@ -104,9 +94,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--err option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__LEAF_LIMIT") {
+        } else if (arg == "__LEAF_LIMIT") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
@@ -114,13 +102,9 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--leaf-limit option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__PERMUTE") {
+        } else if (arg == "__PERMUTE") {
             permute_graph = true;
-        }
-
-        if (arg == "__KDEVIATION") {
+        } else if (arg == "__KDEVIATION") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
@@ -128,18 +112,12 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--kdeviation option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__NO_IDLESKIP") {
+        } else if (arg == "__NO_IDLESKIP") {
             config.CONFIG_IR_IDLE_SKIP = false;
-        }
-
-        if (arg == "__COMPRESS") {
+        } else if (arg == "__COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
-        }
-
-        if (arg == "__PERMUTE_SEED") {
+        } else if (arg == "__PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
                 permute_graph = true;
@@ -148,9 +126,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--permute_seed option requires one argument." << std::endl;
                 return 1;
             }
-        }
-
-        if (arg == "__FORCE_SELECTOR") {
+        } else if (arg == "__FORCE_SELECTOR") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
@@ -159,6 +135,20 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--force_selector option requires one argument." << std::endl;
                 return 1;
             }
+        } else if (argv[i][0] != '-'){
+            if(!entered_file1) {
+                filename1 = argv[i];
+                entered_file1 = true;
+            } else if(!entered_file2) {
+                filename2 = argv[i];
+                entered_file2 = true;
+            }  else {
+                std::cout << "Extraneous file '" << argv[i] << "'. Only 2 files required." << std::endl;
+                return 1;
+            }
+        } else {
+            std::cout << "Invalid commandline option '" << argv[i] << "'." << std::endl;
+            return 1;
         }
     }
 
