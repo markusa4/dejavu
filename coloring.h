@@ -199,11 +199,11 @@ public:
         return comp;
     }
 
-    static void* operator new(size_t size) {
+    /*static void* operator new(size_t size) {
         return NFAlloc(size);
     }
     static void operator delete(void *p) {
-    }
+    }*/
 };
 
 #endif //DEJAVU_COLORING_H

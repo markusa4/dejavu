@@ -220,7 +220,6 @@ int commandline_mode(int argc, char **argv) {
     return 0;
 }
 
-
 int main(int argc, char *argv[]) {
     return commandline_mode(argc, argv);
 }

@@ -857,12 +857,12 @@ private:
             delete my_strategy;
         }
 
-        switches->buffer_buffer[communicator_id + 1].swap(n_buffer.all_buffers);
+        /*switches->buffer_buffer[communicator_id + 1].swap(n_buffer.all_buffers);
         if(master) {
             for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
                 FreeBuf(&switches->buffer_buffer[i]);
             }
-        }
+        }*/
 
         return;
     }

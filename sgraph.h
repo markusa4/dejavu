@@ -31,6 +31,7 @@ class alignas(16) sgraph_t {
         }
     };
 public:
+    bool initialized = false;
     edge_t*   v;
     degree_t* d;
     vertex_t* e;
@@ -40,6 +41,13 @@ public:
     int e_size;
 
     int max_degree;
+
+    void initialize(int nv, int ne) {
+        initialized = true;
+        v = new edge_t[nv];
+        d = new degree_t[nv];
+        e = new vertex_t[ne];
+    }
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
     void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
@@ -160,9 +168,7 @@ public:
     }
 
     void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection<vertex_t>* p) {
-        ng->v = new edge_t[v_size];
-        ng->d = new degree_t[d_size];
-        ng->e = new vertex_t[e_size];
+        initialize(v_size, e_size);
         ng->v_size = v_size;
         ng->d_size = d_size;
         ng->e_size = e_size;
@@ -204,9 +210,12 @@ public:
     }
 
     void copy_graph(sgraph_t<vertex_t, degree_t, edge_t>* g) {
-        v = new edge_t[g->v_size];
-        d = new degree_t[g->d_size];
-        e = new vertex_t[g->e_size];
+        if(initialized) {
+            delete[] v;
+            delete[] d;
+            delete[] e;
+        }
+        initialize(g->v_size, g->e_size);
 
         memcpy(v, g->v, g->v_size*sizeof(edge_t));
         memcpy(d, g->d, g->d_size*sizeof(degree_t));
@@ -224,6 +233,14 @@ public:
             std::sort(e + estart, e + eend);
         }
     }
+
+    ~sgraph_t() {
+        if(initialized) {
+            delete[] v;
+            delete[] d;
+            delete[] e;
+        }
+    }
 };
 
 
@@ -236,9 +253,7 @@ static void copy_graph(sgraph_t<vertex_type_src, degree_type_src, edge_type_src>
     g2->e_size = g1->e_size;
     g2->max_degree = g1->max_degree;
 
-    g2->v = new edge_type_tgt[g2->v_size];
-    g2->d = new degree_type_tgt[g2->d_size];
-    g2->e = new vertex_type_tgt[g2->e_size];
+    g2->initialize(g2->v_size, g2->e_size);
 
     for(int i = 0; i < g1->v_size; ++i) {
         g2->v[i] = static_cast<edge_type_tgt>(g1->v[i]);
@@ -313,9 +328,7 @@ sgraph_t<vertex_t, degree_t, edge_t>* disjoint_union(sgraph_t<vertex_t, degree_t
     int g2_eshift= g1->e_size;
     int g2_dshift= g1->d_size;
 
-    union_g->v = new edge_t[union_g->v_size];
-    union_g->d = new degree_t[union_g->d_size];
-    union_g->e = new vertex_t[union_g->e_size];
+    union_g->initialize(union_g->v_size, union_g->e_size);
 
     for(int i = 0; i < g1->v_size; ++i)
         union_g->v[i] = g1->v[i];

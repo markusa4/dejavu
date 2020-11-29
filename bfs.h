@@ -71,11 +71,11 @@ public:
     }
 
     bool rm_point = false;
-    static void* operator new(size_t size) {
+    /*static void* operator new(size_t size) {
         return NFAlloc(size);
     }
     static void operator delete(void *p) {
-    }
+    }*/
 };
 
 template<class vertex_t>

@@ -14,4 +14,4 @@ double doubleRand(const double & min, const double & max, int seed) {
     return floor(distribution(generator));
 }
 
-thread_local NFAllocBuf n_buffer;
+// thread_local NFAllocBuf n_buffer;

@@ -25,9 +25,7 @@ void parser::parse_dimacs_file_g(std::string filename, sgraph_t<int, int, int>* 
         switch(first) {
             case true:
                 iss >> nv >> ne;
-                g->v = new int[nv];
-                g->d = new int[nv];
-                g->e = new int[ne * 2];
+                g->initialize(nv, ne * 2);
                 for(int i = 0; i < nv; ++i) {
                     incidence_list.emplace_back(vector<int>());
                 }
@@ -92,9 +90,7 @@ void parser::parse_dimacs_file(std::string filename, sgraph_t<int, int, int>* g,
             case 'p':
                 iss.ignore(6);
                 iss >> nv >> ne;
-                g->v = new int[nv];
-                g->d = new int[nv];
-                g->e = new int[ne * 2];
+                g->initialize(nv, ne * 2);
                 for(int i = 0; i < nv; ++i) {
                     incidence_list.emplace_back(vector<int>());
                 }
@@ -169,9 +165,7 @@ void parser::parse_dimacs_file_digraph(std::string filename, sgraph_t<int, int, 
             case 'p':
                 iss.ignore(6);
                 iss >> nv >> ne;
-                g->v = new int[nv];
-                g->d = new int[nv];
-                g->e = new int[ne];
+                g->initialize(nv, ne);
                 for(int i = 0; i < nv; ++i) {
                     incidence_list.emplace_back(vector<int>());
                     //incidence_set.emplace_back(std::set<int>());

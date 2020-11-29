@@ -131,7 +131,7 @@ public:
         vec_cells     = new std::vector<int>();
         vec_protocol  = new std::vector<cell_state>();
         vec_invariant = new std::vector<int>();
-        vec_selections= new std::vector<int>();
+        vec_selections= new std::vector<int>(); // should also include size, for future blueprint uses
         vec_cells->reserve(prealloc + 16);
         vec_protocol->reserve(prealloc + 16);
         vec_invariant->reserve(prealloc * 20);
@@ -147,11 +147,11 @@ public:
         }
     }
 
-    static void* operator new(size_t size) {
+    /*static void* operator new(size_t size) {
         return NFAlloc(size);
     }
     static void operator delete(void *p) {
-    }
+    }*/
 };
 
 

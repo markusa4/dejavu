@@ -28,7 +28,7 @@ double doubleRand(const double & min, const double & max, int seed);
 #define PRINT(str) std::cout << str << std::endl;
 //#define PRINT(str) (void)0;
 
-class NFAllocBuf {
+/*class NFAllocBuf {
 public:
     NFAllocBuf() {
         all_buffers.reserve(1024);
@@ -69,7 +69,7 @@ static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
         delete[] (*all_buffers)[i];
     }
     all_buffers->clear();
-}
+}*/
 
 
 

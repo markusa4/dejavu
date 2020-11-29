@@ -18,14 +18,11 @@ public:
         edges.emplace_back(std::pair<int, int>(from, to));
     }
 
-    sgraph to_sgraph() {
-        sgraph_t<int, int, int> g;
+    void to_sgraph(sgraph* g) {
         std::vector<std::vector<int>> incidence_list;
         const int nv = vertices;
         const int ne = edges.size();
-        g.v = new int[nv];
-        g.d = new int[nv];
-        g.e = new int[ne * 2];
+        g->initialize(nv, ne * 2);
         for(int i = 0; i < nv; ++i) {
             incidence_list.emplace_back(std::vector<int>());
         }
@@ -42,23 +39,23 @@ public:
         int maxd = 0;
 
         for(size_t i = 0; i < incidence_list.size(); ++i) {
-            g.v[vpos] = epos;
-            g.d[vpos] = incidence_list[i].size();
-            if(g.d[vpos] > maxd)
-                maxd = g.d[vpos];
+            g->v[vpos] = epos;
+            g->d[vpos] = incidence_list[i].size();
+            if(g->d[vpos] > maxd)
+                maxd = g->d[vpos];
             vpos += 1;
             for(size_t j = 0; j < incidence_list[i].size(); ++j) {
-                g.e[epos] = incidence_list[i][j];
+                g->e[epos] = incidence_list[i][j];
                 epos += 1;
             }
         }
 
-        g.v_size = nv;
-        g.d_size = nv;
-        g.e_size = 2 * ne;
+        g->v_size = nv;
+        g->d_size = nv;
+        g->e_size = 2 * ne;
 
-        g.max_degree = maxd;
-        return g;
+        g->max_degree = maxd;
+        return;
     }
 };
 
@@ -100,7 +97,9 @@ public:
 
 
 nodes _random_paths(graph g, int max_length, int num) {
-    sgraph sg = g.to_sgraph();
+    sgraph sg;
+    g.to_sgraph(&sg);
+
     std::set<std::pair<int*, long>> paths;
     random_paths(&sg, max_length, num, &paths);
     std::set<std::pair<int*, long>>::iterator it;
@@ -112,7 +111,7 @@ nodes _random_paths(graph g, int max_length, int num) {
         new_node->set_vertex_to_col(f.first, sg.v_size);
         delete[] f.first;
     }
-    // ToDo delete sg
+    // ToDo delete sg (?)
     return n;
 }
 
