@@ -12,10 +12,10 @@ make
 ```
 
 # Usage
-Compilation produces (up to) three binaries (`dejavu`, `dejavu-iso` and `bench`), which are however similar in usage. dejavu is the binary of the automorphism solver, dejavu-iso of the isomorphism solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
+Compilation produces (up to) three binaries (`dejavu-auto`, `dejavu-iso` and `bench`), which are however similar in usage. dejavu is the binary of the automorphism solver, dejavu-iso of the isomorphism solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
 
-## dejavu
-The automorphism solver `dejavu` only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
+## dejavu-auto
+The automorphism solver `dejavu-auto` only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
@@ -48,7 +48,7 @@ Command Line Argument | Effect
 `--stat-file` | specifies a file to which measurements are written
 
 # API
-By including "dejavu.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `dejavu_automorphisms`:
+By including "dejavu_auto.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `dejavu_automorphisms`:
 ```cpp
 shared_permnode* gens;
 dejavu_automorphisms(&g, nullptr, &gens);

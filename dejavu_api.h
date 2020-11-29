@@ -20,7 +20,7 @@ public:
             }
         }
 
-        shared_iso_workspace<int> switches;
+        shared_workspace_iso<int> switches;
         switches.node_store = paths;
         return worker_thread(g, true, &switches, nullptr, nullptr,
                              -1,nullptr, nullptr, max_length, num);
@@ -28,7 +28,7 @@ public:
 
 private:
     bool worker_thread(sgraph_t<int, int, int> *g_, bool master,
-                       shared_iso_workspace<int> *switches, coloring<int> *start_c, strategy<int>* canon_strategy,
+                       shared_workspace_iso<int> *switches, coloring<int> *start_c, strategy<int>* canon_strategy,
                        int communicator_id, bfs_workspace<int> *bwork1, bfs_workspace<int> *bwork2, int max_length,
                        int num) {
         sgraph_t<int, int, int> *g = g_;
@@ -180,7 +180,7 @@ private:
     }
 
     bool random_path_bounded(dejavu_workspace<int, int, int> *w, sgraph *g, strategy<int>* canon_strategy,
-                             bijection<int> *automorphism, shared_iso_workspace<int> *switches,
+                             bijection<int> *automorphism, shared_workspace_iso<int> *switches,
                              int selector_seed, int max_length) {
         const bool* done = &switches->done;
 

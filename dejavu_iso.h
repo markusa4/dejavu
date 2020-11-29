@@ -92,14 +92,14 @@ public:
             }
         }
 
-        shared_iso_workspace<vertex_t> switches;
+        shared_workspace_iso<vertex_t> switches;
         return worker_thread(g1, g2, true, &switches, nullptr, nullptr, nullptr,
                 -1,nullptr, nullptr);
     }
 
 private:
     bool worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g1_, sgraph_t<vertex_t, degree_t, edge_t> *g2_, bool master,
-                       shared_iso_workspace<vertex_t> *switches, coloring<vertex_t> *start_c1,
+                       shared_workspace_iso<vertex_t> *switches, coloring<vertex_t> *start_c1,
                        coloring<vertex_t> *start_c2, strategy<vertex_t>* canon_strategy,
                        int communicator_id, bfs_workspace<vertex_t> *bwork1, bfs_workspace<vertex_t> *bwork2) {
         sgraph_t<vertex_t, degree_t, edge_t> *g1 = g1_;
@@ -440,7 +440,7 @@ private:
     void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
-                         bijection<vertex_t> *automorphism, shared_iso_workspace<vertex_t> *switches,
+                         bijection<vertex_t> *automorphism, shared_workspace_iso<vertex_t> *switches,
                          int selector_seed) {
         const bool* done = &switches->done;
 
@@ -519,10 +519,10 @@ private:
     }
 
     uniform_outcome uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
-                                              sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
-                                              int g_id, shared_iso_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
-                                              int selector_seed, strategy<vertex_t> *strat,
-                                              bijection<vertex_t> *automorphism, bool look_close) {
+                                                         sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
+                                                         int g_id, shared_workspace_iso<vertex_t>* switches, bfs_element<vertex_t> *elem,
+                                                         int selector_seed, strategy<vertex_t> *strat,
+                                                         bijection<vertex_t> *automorphism, bool look_close) {
         sgraph_t<vertex_t, degree_t, edge_t>* g;
         thread_local work_list_t<vertex_t> collect_base;
         thread_local int collect_base_sz;
@@ -675,10 +675,10 @@ private:
     }
 
     uniform_outcome uniform_deviation_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
-                                                         sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
-                                                         int g_id, shared_iso_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
-                                                         int selector_seed, strategy<vertex_t> *strat,
-                                                         bijection<vertex_t> *automorphism, bool look_close) {
+                                                                   sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
+                                                                   int g_id, shared_workspace_iso<vertex_t>* switches, bfs_element<vertex_t> *elem,
+                                                                   int selector_seed, strategy<vertex_t> *strat,
+                                                                   bijection<vertex_t> *automorphism, bool look_close) {
         sgraph_t<vertex_t, degree_t, edge_t>* g;
         if(g_id == 0) {
             g = g1;

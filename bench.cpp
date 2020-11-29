@@ -1,6 +1,6 @@
 #include <iostream>
 #include "parser.h"
-#include "dejavu.h"
+#include "dejavu_auto.h"
 #include <assert.h>
 
 extern "C" {

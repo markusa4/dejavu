@@ -1,5 +1,5 @@
-#ifndef DEJAVU_DEJAVU_H
-#define DEJAVU_DEJAVU_H
+#ifndef DEJAVU_DEJAVU_AUTO_H
+#define DEJAVU_DEJAVU_AUTO_H
 
 
 #include <random>
@@ -31,7 +31,6 @@ struct alignas(64) dejavu_workspace {
     invariant* work_I;
 
     // workspace for base aligned search
-    int first_level = 1;
     int base_size = 0;
     int skiplevels = 1;
     int first_skiplevel = 1;
@@ -130,14 +129,14 @@ public:
         coloring<vertex_t> start_c;
         start_c.vertex_to_col = colmap;
         start_c.init = false;
-        shared_workspace<vertex_t> switches;
+        shared_workspace_auto<vertex_t> switches;
         worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
                       nullptr, nullptr, nullptr, gens, nullptr);
     }
 
 private:
     void worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
-                       shared_workspace<vertex_t> *switches, group_shared<vertex_t> *G,
+                       shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
                        coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
                        int communicator_id, int **shared_orbit, int** shared_orbit_weights,
                        bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
@@ -871,7 +870,7 @@ private:
     void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
-                         bijection<vertex_t> *automorphism, shared_workspace<vertex_t> *switches,
+                         bijection<vertex_t> *automorphism, shared_workspace_auto<vertex_t> *switches,
                          int selector_seed) {
         const bool* done = &switches->done;
 
@@ -918,7 +917,7 @@ private:
     abort_code base_aligned_search(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                    sgraph_t<vertex_t, degree_t, edge_t> *g,
                                    strategy<vertex_t> *canon_strategy, bijection<vertex_t> *automorphism,
-                                   strategy_metrics *m, bool *done, shared_workspace<vertex_t> *switches,
+                                   strategy_metrics *m, bool *done, shared_workspace_auto<vertex_t> *switches,
                                    int selector_seed) {
         bool backtrack = false;
         bool skipped_level = false;
@@ -1114,7 +1113,7 @@ private:
     abort_code uniform_from_bfs_search(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                        sgraph_t<vertex_t, degree_t, edge_t> *g,
                                        strategy<vertex_t>* canon_strategy, bijection<vertex_t> *automorphism,
-                                       int *restarts, shared_workspace<vertex_t> *switches, int selector_seed) {
+                                       int *restarts, shared_workspace_auto<vertex_t> *switches, int selector_seed) {
         bool backtrack = false;
         bool* done = &switches->done;
 
@@ -1787,7 +1786,7 @@ private:
 
     bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                               sgraph_t<vertex_t, degree_t, edge_t>  *g,
-                                              shared_workspace<vertex_t>* switches, bfs_element<vertex_t> *elem,
+                                              shared_workspace_auto<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
         thread_local work_list_t<vertex_t> collect_base;
@@ -2002,4 +2001,4 @@ void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permno
     }
 }
 
-#endif //DEJAVU_DEJAVU_H
+#endif //DEJAVU_DEJAVU_AUTO_H

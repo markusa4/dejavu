@@ -102,9 +102,9 @@ struct stored_leaf {
 };
 
 template<class vertex_t>
-class shared_workspace {
+class shared_workspace_auto {
 public:
-    shared_workspace() {
+    shared_workspace_auto() {
         done_shared_group.store(false);
         done_created_group.store(false);
         experimental_look_close.store(false);
@@ -186,10 +186,10 @@ public:
         } else {
             if (!ichecked) {
                 if (win_id != -2 && (m->restarts > win_metrics.restarts || win_metrics.restarts == 0)) {
+                    // we can already concede to currently best strategy
                     tournament_mutex.lock();
                     if(m->restarts > 0)
                         all_no_restart = false;
-                    //std::cout << "early concede" << m->color_refinement_cost << std::endl;
                     checked++;
                     tournament_mutex.unlock();
                     ichecked = true;
@@ -212,9 +212,9 @@ public:
 };
 
 template<class vertex_t>
-class shared_iso_workspace {
+class shared_workspace_iso {
 public:
-    shared_iso_workspace() {
+    shared_workspace_iso() {
         done_created_group.store(false);
         experimental_look_close.store(false);
         _ack_done.store(0);

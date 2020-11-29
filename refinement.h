@@ -1069,7 +1069,6 @@ private:
         }
 
         // write singletons
-
         comp = I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos) && comp;
 
         if(config.CONFIG_IR_FULL_INVARIANT) {

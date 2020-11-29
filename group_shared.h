@@ -121,7 +121,7 @@ public:
         std::cout << "Generators: " << shared_schreier_gens(gens) << std::endl;
     }
 
-    void manage_results(shared_workspace<vertex_t>* switches) {
+    void manage_results(shared_workspace_auto<vertex_t>* switches) {
         int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
         for(int j = 0; j < num; ++j) {
             switch(dequeue_space[j].first) {

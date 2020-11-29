@@ -1,6 +1,6 @@
 #include <iostream>
 #include "parser.h"
-#include "dejavu.h"
+#include "dejavu_auto.h"
 #include <assert.h>
 #include "configuration.h"
 #include <chrono>
@@ -13,6 +13,8 @@ class time_point;
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
+thread_local int numnodes;
+thread_local int colorcost;
 
 bool finished = false;
 

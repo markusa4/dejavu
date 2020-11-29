@@ -26,7 +26,6 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 }
 
 bool bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
-    // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
     bool res = dejavu_isomorphic(g1, g2);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
@@ -41,7 +40,6 @@ int commandline_mode(int argc, char **argv) {
     bool entered_file2 = false;
 
     int  timeout = -1;
-    bool comp_dejavu = true;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
