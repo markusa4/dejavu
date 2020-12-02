@@ -231,7 +231,9 @@ private:
             W.BW = new bfs_workspace<vertex_t>();
             bwork = W.BW;
 
+            #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
+            #endif
 
             W.S.empty_cache();
             {
@@ -460,6 +462,8 @@ private:
 
             // high-level solver mode
             switch(switches->current_mode) {
+                // In the tournament mode, threads compete for the best strategy (cell selector, target leaf).
+                // After the tournament, the best strategy will be chosen as the canonical strategy (canon_strategy).
                 case modes::MODE_TOURNAMENT:
                     m.restarts = 0;
                     m.expected_bfs_size = 0;
@@ -518,7 +522,11 @@ private:
                     if((*done_fast && !automorphism.certified)) continue;
                     break;
 
+                // In this mode, base-aligned (non-uniform) search is performed.
                 case modes::MODE_NON_UNIFORM_PROBE:
+                    // This heuristic balances finding automorphisms aligned to the strategy of this thread (automorphisms
+                    // might be more distinct but might cause higher sifting cost) as opposed to the canonical strategy
+                    // (automorphisms of threads might be quite similar, but sifting cost is reduced).
                     if(!foreign_base_done) {
                         base_aligned_search(&W, g, my_strategy, &automorphism, &m, done_fast, switches,
                                             selector_seed);
@@ -542,6 +550,7 @@ private:
                     if((*done_fast && !automorphism.non_uniform )) continue;
                     break;
 
+                // Same as "MODE_NON_UNIFORM_PROBE", but after breadth-first search and uniform probing has been performed.
                 case modes::MODE_NON_UNIFORM_PROBE_IT:
                     // automorphism search from initial bfs_workspace pieces
                     if(!*done_fast) {
@@ -618,8 +627,8 @@ private:
                     }
                     if ((*done_fast && !automorphism.non_uniform)) continue;
                     break;
-
-                case modes::MODE_NON_UNIFORM_FROM_BFS:
+                // Probes paths uniformly from the current breadth-first level and stores additional leaves.
+                case modes::MODE_UNIFORM_WITH_LEAF_STORAGE:
                 {
                     // pick initial path from BFS level that is allocated to me
                     --switches->experimental_budget;
@@ -700,6 +709,7 @@ private:
                 }
                     break;
 
+                // Performs breadth-first search.
                 case modes::MODE_BFS:
                     reset_non_uniform_switch = true;
                     if(W.is_foreign_base) {
@@ -765,7 +775,7 @@ private:
                                 switches->experimental_budget.store(bwork->level_sizes[bwork->current_level - 1] * budget_fac);
                                 switches->experimental_paths.store(0);
                                 switches->experimental_deviation.store(0);
-                                switches->current_mode = modes::MODE_NON_UNIFORM_FROM_BFS;
+                                switches->current_mode = modes::MODE_UNIFORM_WITH_LEAF_STORAGE;
                                 continue;
                             }
                         }
@@ -773,6 +783,7 @@ private:
                     continue;
                     break;
 
+                // Performs uniform probing without additional leaf storage.
                 case modes::MODE_UNIFORM_PROBE:
                     reset_non_uniform_switch = true;
                     if(W.id == 0 && !switched2) {
@@ -804,6 +815,7 @@ private:
                     automorphism.mark = true;
                     break;
 
+                // Do nothing, for now.
                 case modes::MODE_WAIT:
                     continue;
             }
@@ -815,6 +827,8 @@ private:
                     continue;
             }
 
+            // If the current iteration of the main mode produced an automorphism, we want to sift it into the shared
+            // Schreier structure.
             bool test = true;
             if(switches->done_created_group && automorphism.mark && automorphism.certified) {
                 test = G->add_permutation(&automorphism, &idle_ms, done);

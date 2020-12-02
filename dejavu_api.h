@@ -100,7 +100,9 @@ private:
             W.BW2 = new bfs_workspace<int>();
             bwork2 = W.BW2;
 
+            #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
+            #endif
 
             W.S.empty_cache();
             {
