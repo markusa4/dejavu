@@ -210,10 +210,12 @@ private:
             
             W.S.empty_cache();
             {
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(master_sched, &cpuset);
                 int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+                #endif
             }
             // launch worker threads
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
@@ -221,11 +223,13 @@ private:
                         std::thread(&dejavu_iso_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     dejavu_iso_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
                                     canon_strategy, i, W.BW1, W.BW2));
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(i + (i >= master_sched), &cpuset);
                 int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
                                                 sizeof(cpu_set_t), &cpuset);
+                #endif
             }
             PRINT("[vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 

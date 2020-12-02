@@ -104,10 +104,12 @@ private:
 
             W.S.empty_cache();
             {
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(master_sched, &cpuset);
                 int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+                #endif
             }
             // launch worker threads
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
@@ -115,11 +117,13 @@ private:
                         std::thread(&dejavu_api::worker_thread,
                                     dejavu_api(), g, false, switches, start_c,
                                     canon_strategy, i, W.BW1, W.BW2, max_length, num));
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(i + (i >= master_sched), &cpuset);
                 int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
                                                 sizeof(cpu_set_t), &cpuset);
+                #endif
             }
             PRINT("[api] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 

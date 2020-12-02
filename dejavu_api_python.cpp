@@ -111,7 +111,6 @@ nodes _random_paths(graph g, int max_length, int num) {
         new_node->set_vertex_to_col(f.first, sg.v_size);
         delete[] f.first;
     }
-    // ToDo delete sg (?)
     return n;
 }
 

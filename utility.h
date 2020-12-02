@@ -11,6 +11,11 @@
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
 
+
+#if (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__))
+    #define OS_WINDOWS
+#endif
+
 int intRand(const int & min, const int & max, int seed);
 double doubleRand(const double & min, const double & max, int seed);
 

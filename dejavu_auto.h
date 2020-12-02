@@ -235,10 +235,12 @@ private:
 
             W.S.empty_cache();
             {
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(master_sched, &cpuset);
                 int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+                #endif
             }
             // launch worker threads
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
@@ -247,11 +249,13 @@ private:
                                     dejavu_t<vertex_t, degree_t, edge_t>(), g, false, switches, G, start_c,
                                     canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens,
                                     &_shared_group_size));
+                #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(i + (i >= master_sched), &cpuset);
                 int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
                                                 sizeof(cpu_set_t), &cpuset);
+                #endif
             }
 
             PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
