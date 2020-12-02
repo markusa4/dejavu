@@ -1,4 +1,4 @@
-// extracted from "nauty.h" of nauty distribution
+// extracted from "nauty.h" of nauty 2.5R9
 
 #ifndef DEJAVU_NAUDEFS_H
 #define DEJAVU_NAUDEFS_H
@@ -9,12 +9,6 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define SETWD(pos) ((pos)>>6)
-#define SETBT(pos) ((pos)&0x3F)
-#define TIMESWORDSIZE(w) ((w)<<6)    /* w*WORDSIZE */
-#define SETWORDSNEEDED(n) ((((n)-1)>>6)+1)
-#define BITT bit
 
 #define ALLOCS(x,y) malloc((size_t)(x)*(size_t)(y))
 #define REALLOCS(p,x) realloc(p,(size_t)(x))

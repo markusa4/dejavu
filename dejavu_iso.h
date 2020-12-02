@@ -1,5 +1,5 @@
-#ifndef DEJAVU_VUJADE_H
-#define DEJAVU_VUJADE_H
+#ifndef DEJAVU_ISO_H
+#define DEJAVU_ISO_H
 
 
 #include <random>
@@ -855,4 +855,4 @@ bool dejavu_isomorphic(sgraph_t<int, int, int> *g1, sgraph_t<int, int, int> *g2)
     return res;
 }
 
-#endif //DEJAVU_VUJADE_H
+#endif //DEJAVU_ISO_H
