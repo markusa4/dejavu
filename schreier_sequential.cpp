@@ -10,6 +10,7 @@
 #include "schreier_sequential.h"
 #include "naurng.h"
 #include "naudefs.h"
+#include "utility.h"
 
 static sequential_permnode id_permnode;
 #define ID_PERMNODE (&id_permnode)
@@ -17,8 +18,6 @@ DYNALLSTAT(int,workperm,workperm_sz);
 DYNALLSTAT(int,workperm2,workperm2_sz);
 DYNALLSTAT(int,workpermA,workpermA_sz);
 DYNALLSTAT(int,workpermB,workpermB_sz);
-DYNALLSTAT(set,workset,workset_sz);
-DYNALLSTAT(set,workset2,workset2_sz);
 
 
 static sequential_schreier *_schreier_freelist = NULL;
@@ -367,40 +366,38 @@ static void _applyperm(int *wp, int *p, int k, int n) {
     }
     else
     {
-        m = SETWORDSNEEDED(n);
-#if !MAXN
-        DYNALLOC1(int,workpermA,workpermA_sz,n,"applyperm");
-        DYNALLOC1(int,workpermB,workpermB_sz,n,"applyperm");
-        DYNALLOC1(set,workset2,workset2_sz,m,"applyperm");
-#endif
+        // should make these thread_local
+        mark_set workset_marks;
+        workset_marks.initialize(n);
 
-        EMPTYSET(workset2,m);
-
+        DYNALLOC1(int, workpermA, workpermA_sz, n, "applyperm");
+        DYNALLOC1(int, workpermB, workpermB_sz, n, "applyperm");
         /* We will construct p^k in workpermB one cycle at a time. */
 
-        for (i = 0; i < n; ++i)
-        {
-            if (ISELEMENT(workset2,i)) continue;
+        for (i = 0; i < n; ++i) {
+            //if (ISELEMENT(mworkset2, i)) continue;
+            if (workset_marks.get(i)) continue;
             if (p[i] == i)
                 workpermB[i] = i;
-            else
-            {
+            else {
                 cyclen = 1;
                 workpermA[0] = i;
-                for (j = p[i]; j != i; j = p[j])
-                {
+                for (j = p[i]; j != i; j = p[j]) {
                     workpermA[cyclen++] = j;
-                            ADDELEMENT(workset2,j);
+                    //ADDELEMENT(mworkset2, j);
+                    workset_marks.set(j);
                 }
                 kk = k % cyclen;
-                for (j = 0; j < cyclen; ++j)
-                {
+                for (j = 0; j < cyclen; ++j) {
                     workpermB[workpermA[j]] = workpermA[kk];
                     if (++kk == cyclen) kk = 0;
                 }
             }
         }
         for (i = 0; i < n; ++i) wp[i] = workpermB[wp[i]];
+
+        DYNFREE(workpermA, workpermA_sz);
+        DYNFREE(workpermB, workpermB_sz);
     }
 }
 
@@ -612,7 +609,5 @@ void _schreier_freedyn(void) {
     DYNFREE(workperm2,workperm2_sz);
     DYNFREE(workpermA,workpermA_sz);
     DYNFREE(workpermB,workpermB_sz);
-    DYNFREE(workset,workset_sz);
-    DYNFREE(workset2,workset2_sz);
     _clearfreelists();
 }

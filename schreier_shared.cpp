@@ -15,6 +15,7 @@
 #include "schreier_shared.h"
 #include "naurng.h"
 #include "naudefs.h"
+#include "utility.h"
 
 char pad1[128];
 std::mutex circ_mutex;
@@ -335,20 +336,19 @@ void mapplyperm(int *wp, int *p, int k, int n) {
             for (i = 0; i < n; ++i) wp[i] = p[p[mworkpermA[wp[i]]]];
         DYNFREE(mworkpermA, mworkpermA_sz);
     } else {
-        m = SETWORDSNEEDED(n);
+        // should make these thread_local
         DYNALL(int, mworkpermA, mworkpermA_sz);
         DYNALL(int, mworkpermB, mworkpermB_sz);
-        DYNALL(set, mworkset2, mworkset2_sz);
+        mark_set mworkset_marks;
+        mworkset_marks.initialize(n);
+
         DYNALLOC1(int, mworkpermA, mworkpermA_sz, n, "applyperm");
         DYNALLOC1(int, mworkpermB, mworkpermB_sz, n, "applyperm");
-        DYNALLOC1(set, mworkset2, mworkset2_sz, m, "applyperm");
-
-        EMPTYSET(mworkset2, m);
-
         /* We will construct p^k in workpermB one cycle at a time. */
 
         for (i = 0; i < n; ++i) {
-            if (ISELEMENT(mworkset2, i)) continue;
+            //if (ISELEMENT(mworkset2, i)) continue;
+            if (mworkset_marks.get(i)) continue;
             if (p[i] == i)
                 mworkpermB[i] = i;
             else {
@@ -356,7 +356,8 @@ void mapplyperm(int *wp, int *p, int k, int n) {
                 mworkpermA[0] = i;
                 for (j = p[i]; j != i; j = p[j]) {
                     mworkpermA[cyclen++] = j;
-                            ADDELEMENT(mworkset2, j);
+                            //ADDELEMENT(mworkset2, j);
+                            mworkset_marks.set(j);
                 }
                 kk = k % cyclen;
                 for (j = 0; j < cyclen; ++j) {
@@ -369,7 +370,6 @@ void mapplyperm(int *wp, int *p, int k, int n) {
 
         DYNFREE(mworkpermA, mworkpermA_sz);
         DYNFREE(mworkpermB, mworkpermB_sz);
-        DYNFREE(mworkset2, mworkset2_sz);
     }
 }
 

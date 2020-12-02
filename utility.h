@@ -1,4 +1,5 @@
 #include <atomic>
+#include <iostream>
 #include <mutex>
 #include <algorithm>
 #include <random>
@@ -7,6 +8,7 @@
 #include "configuration.h"
 #include <fstream>
 #include <set>
+#include <cstring>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -293,5 +295,47 @@ inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
     return f.good();
 }
+
+// set specialized for quick resets
+class mark_set {
+    int mark = 0;
+    int *s;
+    int sz;
+    bool init = false;
+public:
+    void initialize(int size) {
+        s = new int[size];
+        sz = size;
+        init = true;
+        memset(s, mark, sz * sizeof(int));
+        reset();
+    }
+    void initialize_from_array(int* arr, int size) {
+        s  = arr;
+        sz = size;
+        init = false;
+        memset(s, mark, sz * sizeof(int));
+        reset();
+    }
+    bool get(int pos) {
+        return s[pos] == mark;
+    }
+    void set(int pos) {
+        s[pos] = mark;
+    }
+    void unset(int pos) {
+        s[pos] = mark - 1;
+    }
+    void reset() {
+        if(mark == -1) {
+            memset(s, mark, sz * sizeof(int));
+        }
+        ++mark;
+    }
+    ~mark_set() {
+        if(init)
+            delete[] s;
+    }
+};
 
 #endif //DEJAVU_UTILITY_H
