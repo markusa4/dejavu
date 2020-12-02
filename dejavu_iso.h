@@ -294,6 +294,7 @@ private:
                 stored_leaf<vertex_t>(my_canon_leaf->map, g1->v_size, true)));
         switches->leaf_store_mutex[gid_first].unlock();
 
+        // we need to perform some unnecessary initializations which are mostly not utilized in the isomorphism solver
         if(master) {
             canon_strategy->replace(my_strategy);
             actual_base = base_points;
@@ -328,6 +329,7 @@ private:
         // main loop
         while(!switches->done && (switches->noniso_counter <= config.CONFIG_RAND_ABORT)) {
             switch(switches->current_mode ) {
+                // Perform bidirectional search.
                 case VU_MODE_BIDIRECTIONAL:
                 {
                     g_id = (g_id + 1) % 2;
@@ -366,6 +368,7 @@ private:
                 }
                     break;
 
+                // Perform bidirectional search on k-deviation trees.
                 case VU_MODE_BIDIRECTIONAL_DEVIATION:
                 {
                     g_id = (g_id + 1) % 2;
@@ -424,12 +427,14 @@ private:
                 }
                     break;
 
+                // Not used.
                 case VU_MODE_BFS:
 
                     break;
             }
         }
 
+        // we are done can join this thread with all of the launched helper threads
         if(master && !dejavu_kill_request) {
             while (!work_threads.empty()) {
                 work_threads[work_threads.size() - 1].join();
@@ -443,6 +448,8 @@ private:
         return switches->found_iso;
     }
 
+    // Probes a random leaf of the tree and writes down an invariant. The invariant will be utilized for blueprints and
+    // other comparisons.
     void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
@@ -481,7 +488,7 @@ private:
             const int v = c->lab[rpos];
 
             // individualize and refine
-            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            proceed_state(w, g, c, I, v, nullptr, -1);
             assert(c->vertex_to_col[v] > 0);
 
             // base point
@@ -490,15 +497,10 @@ private:
         }
     }
 
-    int extract_selector(invariant* I, int base_point) {
-        if((I->compareI->vec_selections)->size() <= base_point)
-            return - 1;
-        return (*I->compareI->vec_selections)[base_point];
-    }
-
+    // Performs one individualization followed by one refinement on the given coloring with the given settings.
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
                        sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
-                       invariant* I, int v, change_tracker* changes, strategy_metrics* m, int cell_early) {
+                       invariant* I, int v, strategy_metrics* m, int cell_early) {
         if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
 
@@ -510,6 +512,7 @@ private:
         return comp;
     }
 
+    // Computes a leaf of the tree by following the path given in base.
     void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                           sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
                           int base_sz, bijection<vertex_t> *leaf) {
@@ -519,11 +522,12 @@ private:
         I->never_fail = true;
         for(int pos = 0; pos < base_sz; ++pos) {
             const int v    = base[pos];
-            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            proceed_state(w, g, c, I, v,  nullptr, -1);
         };
         leaf->read_from_coloring(c);
     }
 
+    // Performs uniform probing with additional leaf storage.
     uniform_outcome uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                                          sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
                                                          int g_id, shared_workspace_iso<vertex_t>* switches, bfs_element<vertex_t> *elem,
@@ -569,7 +573,7 @@ private:
             }
             I->reset_deviation();
             if(v != elem->deviation_vertex) {
-                comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+                comp = proceed_state(w, g, c, I, v, nullptr, cell_early);
                 if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
                     ++switches->experimental_deviation;
                     if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
@@ -597,7 +601,7 @@ private:
             const int v    = c->lab[rpos];
             collect_base.push_back(v);
             collect_base_sz += 1;
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            comp = proceed_state(w, g, c, I, v, nullptr, -1);
         } while(comp);
 
         bijection<vertex_t> leaf;
@@ -680,6 +684,7 @@ private:
         return (found_auto?OUT_AUTO:OUT_NONE);
     }
 
+    // Performs uniform probing with additional leaf storage on k-deviation tree.
     uniform_outcome uniform_deviation_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                                                    sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
                                                                    int g_id, shared_workspace_iso<vertex_t>* switches, bfs_element<vertex_t> *elem,
@@ -715,7 +720,7 @@ private:
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
             const int cell_early = (*I->compareI->vec_cells)[elem->base_sz];
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+            comp = proceed_state(w, g, c, I, v, nullptr, cell_early);
         } while(comp);
 
         if(comp) {

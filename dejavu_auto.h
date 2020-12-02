@@ -885,6 +885,8 @@ private:
         return;
     }
 
+    // Probes a random leaf of the tree and writes down an invariant. The invariant will be utilized for blueprints and
+    // other comparisons.
     void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
@@ -923,7 +925,7 @@ private:
             const int v = c->lab[rpos];
 
             // individualize and refine
-            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            proceed_state(w, g, c, I, v, nullptr, -1);
             assert(c->vertex_to_col[v] > 0);
 
             // base point
@@ -974,7 +976,7 @@ private:
         while(w->first_skiplevel <= w->skiplevels) {
             m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
             if(*done) return abort_code(0);
-            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], nullptr, m,
+            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m,
                           (*start_I->compareI->vec_cells)[w->first_skiplevel - 1]);
             w->first_skiplevel += 1;
             if(!w->is_foreign_base)
@@ -1019,8 +1021,7 @@ private:
 
                 if(w->first_skiplevel <= w->skiplevels) {
                     m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
-                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1],
-                            nullptr, m, -1);
+                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m, -1);
                     w->first_skiplevel += 1;
                     if(!w->is_foreign_base) {
                         w->skip_schreier_level = w->skip_schreier_level->next;
@@ -1103,7 +1104,7 @@ private:
             }
 
             const int cell_early = (*I->compareI->vec_cells)[level - 1];
-            bool comp = proceed_state(w, g, c, I, v, nullptr, m, cell_early);
+            bool comp = proceed_state(w, g, c, I, v, m, cell_early);
             level += 1;
 
             if(!comp) {
@@ -1248,7 +1249,7 @@ private:
 
             group_level = group_level->next;
             level += 1;
-            const bool comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            const bool comp = proceed_state(w, g, c, I, v, nullptr, -1);
 
             if(!comp) {
                 backtrack = true;
@@ -1257,15 +1258,17 @@ private:
         }
     }
 
+    //  Extracts which color was chosen in the path of the given invariant at a given base point.
     int extract_selector(invariant* I, int base_point) {
         if((I->compareI->vec_selections)->size() <= base_point)
             return - 1;
         return (*I->compareI->vec_selections)[base_point];
     }
 
+    // Performs one individualization followed by one refinement on the given coloring with the given settings.
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
                        sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
-                       invariant* I, int v, change_tracker* changes, strategy_metrics* m, int cell_early) {
+                       invariant* I, int v, strategy_metrics* m, int cell_early) {
         if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
 
@@ -1432,7 +1435,7 @@ private:
                 // compute next coloring
                 w->work_I->reset_deviation();
                 const int cells_early = (*w->work_I->compareI->vec_cells)[elem->base_sz];
-                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, nullptr, cells_early); // &w->changes
+                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, cells_early); // &w->changes
 
                 // manage abort map counter
                 if (comp && elem->is_identity && level > 1) {
@@ -1788,6 +1791,7 @@ private:
         return new_gen;
     }
 
+    // Computes a leaf of the tree by following the path given in base.
     void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                           sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
                           int base_sz, bijection<vertex_t> *leaf) {
@@ -1797,11 +1801,12 @@ private:
         I->never_fail = true;
         for(int pos = 0; pos < base_sz; ++pos) {
             const int v = base[pos];
-            proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            proceed_state(w, g, c, I, v, nullptr, -1);
         };
         leaf->read_from_coloring(c);
     }
 
+    // Performs uniform probing with additional leaf storage.
     bool uniform_from_bfs_search_with_storage(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                               sgraph_t<vertex_t, degree_t, edge_t>  *g,
                                               shared_workspace_auto<vertex_t>* switches, bfs_element<vertex_t> *elem,
@@ -1839,7 +1844,7 @@ private:
             }
             I->reset_deviation();
             if(v != elem->deviation_vertex) {
-                comp = proceed_state(w, g, c, I, v, nullptr, nullptr, cell_early);
+                comp = proceed_state(w, g, c, I, v, nullptr, cell_early);
                 if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
                     ++switches->experimental_deviation;
                     if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
@@ -1867,7 +1872,7 @@ private:
             const int v    = c->lab[rpos];
             collect_base.push_back(v);
             collect_base_sz += 1;
-            comp = proceed_state(w, g, c, I, v, nullptr, nullptr, -1);
+            comp = proceed_state(w, g, c, I, v, nullptr, -1);
         } while(comp);
 
         if(comp && (strat->I->acc == I->acc)) { // automorphism computed
