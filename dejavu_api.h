@@ -6,7 +6,7 @@
 class dejavu_api {
 public:
 public:
-    bool random_paths(sgraph_t<int, int, int> *g, int max_length, int num, std::set<std::pair<int*, long>>* paths) {
+    bool random_paths(sgraph_t<int, int, int> *g, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 150) {
@@ -45,6 +45,7 @@ private:
             config.CONFIG_IR_DENSE = !(g->e_size < g->v_size ||
                                        g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
             start_c = new coloring<int>;
+            // TODO: use initialize_coloring with start_c instead
             g->initialize_coloring_raw(start_c);
             if (config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
@@ -165,8 +166,14 @@ private:
                 ++switches->experimental_paths;
                 switches->leaf_store_mutex->lock();
                 int* save_c = new int[g->v_size];
+                int* save_b = new int[base_points.map_sz];
                 memcpy(save_c, W.c.vertex_to_col, g->v_size * sizeof(int));
-                switches->node_store->insert(std::pair<int*, long>(save_c, W.I.acc));
+                memcpy(save_b, base_points.map, base_points.map_sz * sizeof(int));
+
+                switches->node_store->insert(std::tuple<int*, int, int*, long>(save_b, base_points.map_sz, save_c, W.I.acc));
+
+                // TODO: cleanup automorphism?
+                delete[] base_points.map;
                 switches->leaf_store_mutex->unlock();
             }
             if(switches->experimental_paths >= num) {
@@ -227,6 +234,8 @@ private:
             assert(c->vertex_to_col[v] > 0);
 
             // check if max_length reached
+            automorphism->map[length] = v;
+            automorphism->map_sz = length + 1;
             length += 1;
         }
     }
@@ -246,7 +255,7 @@ private:
     }
 };
 
-void random_paths(sgraph* g, int max_length, int num, std::set<std::pair<int*, long>>* paths) {
+void random_paths(sgraph* g, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
     dejavu_api v;
     v.random_paths(g, max_length, num, paths);
 }
