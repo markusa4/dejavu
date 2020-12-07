@@ -221,6 +221,10 @@ public:
 template<class vertex_t>
 class shared_workspace_iso {
 public:
+    ~shared_workspace_iso() {
+        //delete buffer_buffer;
+    }
+
     shared_workspace_iso() {
         done_created_group.store(false);
         experimental_look_close.store(false);

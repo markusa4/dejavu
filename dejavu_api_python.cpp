@@ -109,22 +109,6 @@ public:
     }
 };
 
-class pybase {
-    std::vector<int> base;
-public:
-    void initialize(std::vector<int> base, int len) {
-        for (int i = 0; i < len; i++) {
-            this->base.push_back(base[i]);
-        }
-    }
-    int get_size() {
-        return base.size();
-    }
-    int get_base_point(int i) {
-        return base[i];
-    }
-};
-
 class node {
     std::vector<int> vertex_to_col;
     long invariant;

@@ -260,22 +260,6 @@ public:
     void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
-// currently not used
-class change_tracker {
-    work_list l;
-    work_set   s;
-    int    limit   = -1;
-    int       sz   = -1;
-    bool  overflow = false;
-public:
-    void initialize(int limit, int domain_size);
-    void reset();
-    void track(int oldcolor);
-    int  pop();
-    bool empty();
-    bool did_overflow();
-};
-
 // worklist implementation for color refinement
 template<class vertex_t>
 class cell_worklist {
@@ -285,6 +269,10 @@ public:
         arr_sz = domain_size;
         init = true;
         cur_pos = 0;
+    }
+
+    ~cell_worklist() {
+        delete[] arr;
     }
 
     int add_cell(work_set_int* queue_pointer, int col) {

@@ -115,6 +115,7 @@ public:
     int base_size;
     int chunk_size = 32; // ToDo: dynamically adapt this
     bool reached_initial_target = true;
+    bool initialized = false;
     int initial_target_level;
 
     std::pair<bfs_element<vertex_t>*, int>* finished_elems;
@@ -122,27 +123,30 @@ public:
 
     bfs_workspace() {}
     ~bfs_workspace() {
-        for(int i = 0; i < base_size + 2; ++i)
-            delete level_abort_map_mutex[i];
+        if(initialized) {
+            for (int i = 0; i < base_size + 2; ++i)
+                delete level_abort_map_mutex[i];
 
-        for(int i = 0; i < current_level; ++i) {
-            //for(int j = 0; j < level_sizes[i]; ++j)
+            for (int i = 0; i < current_level; ++i) {
+                //for(int j = 0; j < level_sizes[i]; ++j)
                 //delete level_states[i][j];
-            delete[] level_states[i];
-        }
+                delete[] level_states[i];
+            }
 
-        delete[] level_states;
-        delete[] level_sizes;
-        //delete[] level_reserved_sizes;
-        delete[] level_maxweight;
-        // delete[] level_minweight;
-        // delete[] level_abort_map_done;
-        delete[] level_abort_map_mutex;
-        delete[] level_abort_map;
-        // delete[] level_expecting_finished;
+            delete[] level_states;
+            delete[] level_sizes;
+            //delete[] level_reserved_sizes;
+            delete[] level_maxweight;
+            // delete[] level_minweight;
+            // delete[] level_abort_map_done;
+            delete[] level_abort_map_mutex;
+            delete[] level_abort_map;
+            // delete[] level_expecting_finished;
+        }
     }
 
     void initialize(bfs_element<vertex_t>* root_elem, int init_c, int domain_size, int base_size) {
+        initialized = true;
         bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>[base_size + 2];
         bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>[base_size + 2];
 

@@ -138,6 +138,16 @@ public:
         vec_selections->reserve(prealloc + 16);
     }
 
+    void purge() {
+        if(created != nullptr) {
+            delete vec_cells;
+            delete vec_protocol;
+            delete vec_invariant;
+            delete vec_selections;
+            created = nullptr;
+        }
+    }
+
     ~invariant() {
         if(created == this) {
             //delete vec_invariant;

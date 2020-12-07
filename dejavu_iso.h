@@ -72,6 +72,8 @@ struct alignas(64) dejavu_workspace {
         delete work_I;
         delete start_c1;
         delete start_c2;
+        delete BW1;
+        delete BW2;
     };
 };
 
