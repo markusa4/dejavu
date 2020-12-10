@@ -25,25 +25,17 @@ struct alignas(64) dejavu_workspace {
     coloring<vertex_t> c;
     invariant  I;
 
-    // workspace for bfs_workspace
-    coloring<vertex_t>*  work_c;
-    invariant* work_I;
-
     // workspace for base aligned search
     int first_level = 1;
     int base_size = 0;
     int skiplevels = 1;
     int first_skiplevel = 1;
     coloring<vertex_t> skip_c;
-    invariant  skip_I;
-    bool       skiplevel_is_uniform = false;
+    invariant skip_I;
+    bool      skiplevel_is_uniform = false;
 
-    int*         my_base_points;
-    int          my_base_points_sz;
-    bool is_foreign_base;
-
-    coloring<vertex_t>* start_c1;
-    coloring<vertex_t>* start_c2;
+    coloring<vertex_t> start_c1;
+    coloring<vertex_t> start_c2;
     invariant start_I;
 
     // indicates which thread this is
@@ -52,26 +44,13 @@ struct alignas(64) dejavu_workspace {
     // bfs_workspace workspace
     bfs_workspace<vertex_t>* BW1;
     bfs_workspace<vertex_t>* BW2;
-    std::tuple<bfs_element<vertex_t>*, int, int>* todo_dequeue;
-    int todo_deque_sz        = -1;
-    std::pair<bfs_element<vertex_t> *, int>* finished_elements;
-    int finished_elements_sz = -1;
-    std::pair<bfs_element<vertex_t> *, int>* todo_elements;
-    int todo_elements_sz     = -1;
     bfs_element<vertex_t>* prev_bfs_element = nullptr;
     bool init_bfs = false;
 
-    ~dejavu_workspace() {
-        if(init_bfs) {
-            delete[] todo_dequeue;
-            delete[] todo_elements,
-            delete[] finished_elements;
-        }
+    dejavu_workspace() {
+    }
 
-        delete work_c;
-        delete work_I;
-        delete start_c1;
-        delete start_c2;
+    ~dejavu_workspace() {
         delete BW1;
         delete BW2;
     };
@@ -101,14 +80,14 @@ public:
 
 private:
     bool worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g1_, sgraph_t<vertex_t, degree_t, edge_t> *g2_, bool master,
-                       shared_workspace_iso<vertex_t> *switches, coloring<vertex_t> *start_c1,
-                       coloring<vertex_t> *start_c2, strategy<vertex_t>* canon_strategy,
+                       shared_workspace_iso<vertex_t> *switches, coloring<vertex_t> *_start_c1,
+                       coloring<vertex_t> *_start_c2, strategy<vertex_t>* canon_strategy,
                        int communicator_id, bfs_workspace<vertex_t> *bwork1, bfs_workspace<vertex_t> *bwork2) {
         sgraph_t<vertex_t, degree_t, edge_t> *g1 = g1_;
         sgraph_t<vertex_t, degree_t, edge_t> *g2 = g2_;
         dejavu_workspace<vertex_t, degree_t, edge_t> W;
 
-        config.CONFIG_VUJADE = true; // some things ought to work differently now...
+        config.CONFIG_SOLVE_ISO = true; // some things ought to work differently now...
 
         numnodes  = 0;
         colorcost = 0;
@@ -117,10 +96,8 @@ private:
         if(master) {
             config.CONFIG_IR_FORCE_EXPAND_DEVIATION = true;
             config.CONFIG_IR_DENSE = !(g1->e_size<g1->v_size||g1->e_size/g1->v_size<g1->v_size/(g1->e_size/g1->v_size));
-            start_c1 = new coloring<vertex_t>;
-            g1->initialize_coloring_raw(start_c1);
-            start_c2 = new coloring<vertex_t>;
-            g2->initialize_coloring_raw(start_c2);
+            g1->initialize_coloring_raw(&W.start_c1);
+            g2->initialize_coloring_raw(&W.start_c2);
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -147,53 +124,47 @@ private:
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
             PRINT("[vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
-            switches->current_mode = vujade_modes ::VU_MODE_BIDIRECTIONAL_DEVIATION;
+            switches->current_mode = modes_iso ::MODE_ISO_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
             canon_strategy = new strategy<vertex_t>;
             my_canon_I->create_vector(g1->v_size);
-            W.start_c1 = start_c1;
             strategy_metrics m;
             bool comp;
-            W.R.refine_coloring(g1, start_c1, my_canon_I, -1, &m, -1);
+            W.R.refine_coloring(g1, &W.start_c1, my_canon_I, -1, &m, -1);
             W.start_I.set_compare_invariant(my_canon_I);
-            W.start_c2 = start_c2;
-            comp = W.R.refine_coloring(g2, start_c2, &W.start_I, -1, &m, start_c2->cells);
+            comp = W.R.refine_coloring(g2, &W.start_c2, &W.start_I, -1, &m, W.start_c2.cells);
             delete my_canon_I;
             my_canon_I = new invariant;
             if(!comp) {
-                W.work_c = new coloring<vertex_t>;
-                W.work_I = new invariant;
                 delete canon_strategy;
                 return comp;
             }
             PRINT("[vuj] First refinement: " << cref / 1000000.0 << "ms");
 
-            int init_c = W.S.select_color(g1, start_c1, selector_seed);
+            int init_c = W.S.select_color(g1, &W.start_c1, selector_seed);
             if(init_c == -1) {
                 std::cout << "First coloring discrete, checking isomorphism." << std::endl;
                 bijection<vertex_t> automorphism;
-                automorphism.read_from_coloring(start_c1);
+                automorphism.read_from_coloring(&W.start_c1);
                 bijection<vertex_t> leaf2;
-                leaf2.read_from_coloring(start_c2);
+                leaf2.read_from_coloring(&W.start_c2);
                 automorphism.inverse();
                 automorphism.compose(&leaf2);
-                W.work_c = new coloring<vertex_t>;
-                W.work_I = new invariant;
                 delete canon_strategy;
 
                 return (W.R.certify_isomorphism(g1, g2, &automorphism));
             }
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
-                if (start_c1->cells == 1) {
-                    for (int i = 0; i < start_c1->lab_sz; ++i) {
-                        start_c1->lab[i] = i;
-                        start_c1->vertex_to_lab[i] = i;
+                if (W.start_c1.cells == 1) {
+                    for (int i = 0; i < W.start_c1.lab_sz; ++i) {
+                        W.start_c1.lab[i] = i;
+                        W.start_c1.vertex_to_lab[i] = i;
                     }
-                    for (int i = 0; i < start_c2->lab_sz; ++i) {
-                        start_c2->lab[i] = i;
-                        start_c2->vertex_to_lab[i] = i;
+                    for (int i = 0; i < W.start_c2.lab_sz; ++i) {
+                        W.start_c2.lab[i] = i;
+                        W.start_c2.vertex_to_lab[i] = i;
                     }
                 }
 
@@ -225,7 +196,7 @@ private:
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&dejavu_iso_t<vertex_t, degree_t, edge_t>::worker_thread,
-                                    dejavu_iso_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, start_c1, start_c2,
+                                    dejavu_iso_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, &W.start_c1, &W.start_c2,
                                     canon_strategy, i, W.BW1, W.BW2));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
@@ -238,26 +209,20 @@ private:
             PRINT("[vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
-            W.start_c1 = new coloring<vertex_t>;
-            W.start_c1->copy_force(start_c1);
-            W.start_c2 = new coloring<vertex_t>;
-            W.start_c2->copy_force(start_c2);
+            _start_c1 = &W.start_c1;
+            _start_c2 = &W.start_c2;
             W.id        = -1;
         }
 
         int base_sz = 0;
-        W.skip_c.copy_force(start_c1);
-        W.work_c = new coloring<vertex_t>;
-        W.work_I = new invariant;
+        W.skip_c.copy_force(_start_c1);
         W.BW1 = bwork1;
         W.BW2 = bwork2;
         W.skiplevels = 0;
 
         if (!master) {
-            W.start_c1 = new coloring<vertex_t>;
-            W.start_c1->copy_force(start_c1);
-            W.start_c2 = new coloring<vertex_t>;
-            W.start_c2->copy_force(start_c2);
+            W.start_c1.copy_force(_start_c1);
+            W.start_c2.copy_force(_start_c2);
             W.id = communicator_id;
         }
 
@@ -277,17 +242,7 @@ private:
             find_first_leaf(&W, g2, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
         }
         base_sz = base_points.map_sz;
-        if(std::is_same<vertex_t, int>::value) {
-            W.my_base_points = (int*) base_points.map;
-        } else {
-            W.my_base_points = new int[base_points.map_sz];
-            for(int i = 0; i < base_points.map_sz; ++i) {
-                W.my_base_points[i] = static_cast<int>(base_points.map[i]);
-            }
-            base_points.deletable();
-        }
-        W.my_base_points_sz = base_points.map_sz;
-        W.is_foreign_base   = true;
+        base_points.deletable();
 
         // add first leaf to leaf store
         switches->leaf_store_mutex[gid_first].lock();
@@ -304,13 +259,13 @@ private:
             PRINT("[strat] Chosen strategy: " << canon_strategy->cell_selector_type);
             PRINT("[strat] Combinatorial base size:" << W.my_base_points_sz);
             W.S.empty_cache();
-            int init_c = W.S.select_color_dynamic(g1, start_c1, my_strategy);
-            W.BW1->initialize(bfs_element<vertex_t>::root_element(start_c1, &start_I), init_c, g1->v_size, 2);
-            W.BW2->initialize(bfs_element<vertex_t>::root_element(start_c2, &start_I), init_c, g2->v_size, 2);
+            int init_c = W.S.select_color_dynamic(g1, &W.start_c1, my_strategy);
+            W.BW1->initialize(bfs_element<vertex_t>::root_element(&W.start_c1, &start_I), init_c, g1->v_size, 2);
+            W.BW2->initialize(bfs_element<vertex_t>::root_element(&W.start_c2, &start_I), init_c, g2->v_size, 2);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
             if(W.base_size == 0) {
-                switches->current_mode = vujade_modes::VU_MODE_BIDIRECTIONAL;
+                switches->current_mode = modes_iso::MODE_ISO_BIDIRECTIONAL;
                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
             } else {
                 config.CONFIG_IR_EXPAND_DEVIATION = floor(1.5*sqrt(g1->v_size));
@@ -323,16 +278,14 @@ private:
             continue;
         }
 
-        strategy_metrics m;
         int  g_id = (communicator_id + 1) % 2;
         int  end_test = (g_id + 1) % 2;
-        bool found_auto = false;
 
         // main loop
         while(!switches->done && (switches->noniso_counter <= config.CONFIG_RAND_ABORT)) {
             switch(switches->current_mode ) {
                 // Perform bidirectional search.
-                case VU_MODE_BIDIRECTIONAL:
+                case MODE_ISO_BIDIRECTIONAL:
                 {
                     g_id = (g_id + 1) % 2;
                     bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
@@ -342,7 +295,6 @@ private:
                     bijection<vertex_t> automorphism;
                     bfs_element<vertex_t> *elem;
                     int bfs_level    = bwork->current_level - 1;
-                    int max_weight   = bwork->level_maxweight[bfs_level];
                     int bfs_level_sz = bwork->level_sizes[bfs_level];
                     int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
                     elem = bwork->level_states[bfs_level][pick_elem];
@@ -353,10 +305,8 @@ private:
 
                     switch(res) {
                         case OUT_AUTO:
-                            found_auto = true;
-                            if(g_id == end_test && found_auto) {
+                            if(g_id == end_test) {
                                 switches->noniso_counter++;
-                                found_auto = false;
                             }
                             break;
                         case OUT_ISO:
@@ -371,7 +321,7 @@ private:
                     break;
 
                 // Perform bidirectional search on k-deviation trees.
-                case VU_MODE_BIDIRECTIONAL_DEVIATION:
+                case MODE_ISO_BIDIRECTIONAL_DEVIATION:
                 {
                     g_id = (g_id + 1) % 2;
                     bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
@@ -381,7 +331,6 @@ private:
                     bijection<vertex_t> automorphism;
                     bfs_element<vertex_t> *elem;
                     int bfs_level    = bwork->current_level - 1;
-                    int max_weight   = bwork->level_maxweight[bfs_level];
                     int bfs_level_sz = bwork->level_sizes[bfs_level];
                     int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
                     elem = bwork->level_states[bfs_level][pick_elem];
@@ -391,10 +340,8 @@ private:
                                                                                canon_strategy, &automorphism,false);
                     switch(res) {
                         case OUT_AUTO:
-                            found_auto = true;
-                            if(g_id == end_test && found_auto) {
+                            if(g_id == end_test) {
                                 switches->noniso_counter++;
-                                found_auto = false;
                             }
                             break;
                         case OUT_ISO:
@@ -403,25 +350,19 @@ private:
                             switches->noniso_counter.store(-10);
                             break;
                         case OUT_AUTO_DEV:
-                            found_auto = true;
-                            if(g_id == end_test && found_auto) {
+                            if(g_id == end_test) {
                                 switches->noniso_counter++;
-                                found_auto = false;
                             }
                             break;
                         case OUT_ISO_DEV:
                             switches->switch_mode_mutex.lock();
-                            // config.CONFIG_RAND_ABORT = 1;
-                            //config.CONFIG_IR_EXPAND_DEVIATION = floor(sqrt(g1->v_size));
-                            if(switches->current_mode != VU_MODE_BIDIRECTIONAL) {
-                                switches->current_mode = VU_MODE_BIDIRECTIONAL;
+                            if(switches->current_mode != MODE_ISO_BIDIRECTIONAL) {
+                                switches->current_mode = MODE_ISO_BIDIRECTIONAL;
                                 switches->noniso_counter.store(0);
                                 switches->switch_mode_mutex.unlock();
                                 continue;
                             }
-                            //} else {
                             switches->switch_mode_mutex.unlock();
-                            //}
                             break;
                         default:
                             break;
@@ -430,7 +371,7 @@ private:
                     break;
 
                 // Not used.
-                case VU_MODE_BFS:
+                case MODE_ISO_BFS:
 
                     break;
             }
@@ -464,7 +405,7 @@ private:
         selector<vertex_t, degree_t, edge_t> *S = &w->S;
         coloring<vertex_t> *c = &w->c;
         invariant *I = &w->I;
-        coloring<vertex_t> *start_c  = w->start_c1;
+        coloring<vertex_t> *start_c  = &w->start_c1;
         invariant *start_I = &w->start_I;
 
         S->empty_cache();
@@ -642,7 +583,7 @@ private:
                     fake_leaf.map = pointers[i].map;
                     fake_leaf.not_deletable();
                 } else {
-                    reconstruct_leaf(w, (gi==0)?g1:g2, (gi==0)?(w->start_c1):(w->start_c2),
+                    reconstruct_leaf(w, (gi==0)?g1:g2, (gi==0)?(&w->start_c1):(&w->start_c2),
                             pointers[i].map,pointers[i].map_sz, &fake_leaf);
                     fake_leaf.deletable();
                 }

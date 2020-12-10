@@ -182,7 +182,7 @@ private:
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
             PRINT("[Dej] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
-            switches->current_mode = modes::MODE_TOURNAMENT;
+            switches->current_mode = modes_auto::MODE_AUTO_TOURNAMENT;
 
             // first color refinement
             canon_strategy = new strategy<vertex_t>;
@@ -349,7 +349,7 @@ private:
                 if(switches->done_fast && !switches->done_shared_group && !switches->done) {
                     // wait for ack of done_fast
                     PRINT("[N] Waiting for ACK");
-                    switches->current_mode = modes::MODE_WAIT;
+                    switches->current_mode = modes_auto::MODE_AUTO_WAIT;
                     G->ack_done_shared();
                     reset_non_uniform_switch = true;
                     G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1, &switches->done);
@@ -400,7 +400,7 @@ private:
                     }
 
                     switches->done_shared_group = true;
-                    switches->current_mode      = modes::MODE_BFS;
+                    switches->current_mode      = modes_auto::MODE_AUTO_BFS;
                 }
 
                 // we are done
@@ -464,7 +464,7 @@ private:
             switch(switches->current_mode) {
                 // In the tournament mode, threads compete for the best strategy (cell selector, target leaf).
                 // After the tournament, the best strategy will be chosen as the canonical strategy (canon_strategy).
-                case modes::MODE_TOURNAMENT:
+                case modes_auto::MODE_AUTO_TOURNAMENT:
                     m.restarts = 0;
                     m.expected_bfs_size = 0;
                     W.skiplevel_is_uniform = false;
@@ -503,7 +503,7 @@ private:
                                 config.CONFIG_IR_EXPAND_DEVIATION = 0;
 
                             foreign_base_done = true;
-                            switches->current_mode = modes::MODE_NON_UNIFORM_PROBE;
+                            switches->current_mode = modes_auto::MODE_AUTO_NON_UNIFORM_PROBE;
                             switches->done_created_group = true;
                             PRINT("[Strat] Created shared group by " << communicator_id << " with restarts " << restarts);
                         }
@@ -523,7 +523,7 @@ private:
                     break;
 
                 // In this mode, base-aligned (non-uniform) search is performed.
-                case modes::MODE_NON_UNIFORM_PROBE:
+                case modes_auto::MODE_AUTO_NON_UNIFORM_PROBE:
                     // This heuristic balances finding automorphisms aligned to the strategy of this thread (automorphisms
                     // might be more distinct but might cause higher sifting cost) as opposed to the canonical strategy
                     // (automorphisms of threads might be quite similar, but sifting cost is reduced).
@@ -550,8 +550,8 @@ private:
                     if((*done_fast && !automorphism.non_uniform )) continue;
                     break;
 
-                // Same as "MODE_NON_UNIFORM_PROBE", but after breadth-first search and uniform probing has been performed.
-                case modes::MODE_NON_UNIFORM_PROBE_IT:
+                // Same as "MODE_AUTO_NON_UNIFORM_PROBE", but after breadth-first search and uniform probing has been performed.
+                case modes_auto::MODE_AUTO_NON_UNIFORM_PROBE_IT:
                     // automorphism search from initial bfs_workspace pieces
                     if(!*done_fast) {
                         if (reset_non_uniform_switch) {
@@ -628,7 +628,7 @@ private:
                     if ((*done_fast && !automorphism.non_uniform)) continue;
                     break;
                 // Probes paths uniformly from the current breadth-first level and stores additional leaves.
-                case modes::MODE_UNIFORM_WITH_LEAF_STORAGE:
+                case modes_auto::MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE:
                 {
                     // pick initial path from BFS level that is allocated to me
                     --switches->experimental_budget;
@@ -653,7 +653,7 @@ private:
                         }
 
                         switches->experimental_budget = -1;
-                        switches->current_mode = modes::MODE_WAIT;
+                        switches->current_mode = modes_auto::MODE_AUTO_WAIT;
                         switches->done_fast = true;
                         switches->done_shared_group = false;
                         continue;
@@ -710,7 +710,7 @@ private:
                     break;
 
                 // Performs breadth-first search.
-                case modes::MODE_BFS:
+                case modes_auto::MODE_AUTO_BFS:
                     reset_non_uniform_switch = true;
                     if(W.is_foreign_base) {
                         reset_skiplevels(&W);
@@ -755,7 +755,7 @@ private:
                                     continue;
                                 }
                                 PRINT("[UTarget] Starting uniform probe, tolerance: " << switches->tolerance)
-                                switches->current_mode = modes::MODE_UNIFORM_PROBE;
+                                switches->current_mode = modes_auto::MODE_AUTO_UNIFORM_PROBE;
                             } else {
                                 // did not reach the target level within tolerance? iterate!
                                 switches->iterate_tolerance();
@@ -775,7 +775,7 @@ private:
                                 switches->experimental_budget.store(bwork->level_sizes[bwork->current_level - 1] * budget_fac);
                                 switches->experimental_paths.store(0);
                                 switches->experimental_deviation.store(0);
-                                switches->current_mode = modes::MODE_UNIFORM_WITH_LEAF_STORAGE;
+                                switches->current_mode = modes_auto::MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE;
                                 continue;
                             }
                         }
@@ -784,7 +784,7 @@ private:
                     break;
 
                 // Performs uniform probing without additional leaf storage.
-                case modes::MODE_UNIFORM_PROBE:
+                case modes_auto::MODE_AUTO_UNIFORM_PROBE:
                     reset_non_uniform_switch = true;
                     if(W.id == 0 && !switched2) {
                         switched2 = true;
@@ -795,7 +795,7 @@ private:
                         continue;
 
                     if(A.reason == 1) { // too many restarts
-                        switches->current_mode = MODE_WAIT;
+                        switches->current_mode = MODE_AUTO_WAIT;
                         // manage
                         switches->iterate_tolerance();
                         switches->done_fast = false;
@@ -807,7 +807,7 @@ private:
                         PRINT("[Dej] Tolerance: " << switches->tolerance)
                         reset_skiplevels(&W);
                         foreign_base_done = true;
-                        switches->current_mode = MODE_NON_UNIFORM_PROBE_IT;
+                        switches->current_mode = MODE_AUTO_NON_UNIFORM_PROBE_IT;
                         required_level = W.BW->current_level + 1;
                         PRINT("[BFS] Requiring level " << required_level);
                         continue;
@@ -816,7 +816,7 @@ private:
                     break;
 
                 // Do nothing, for now.
-                case modes::MODE_WAIT:
+                case modes_auto::MODE_AUTO_WAIT:
                     continue;
             }
 
@@ -1001,7 +1001,7 @@ private:
 
             ++it;
             if(it % 3 == 0) {
-                if(switches->current_mode == modes::MODE_TOURNAMENT)
+                if(switches->current_mode == modes_auto::MODE_AUTO_TOURNAMENT)
                     switches->check_strategy_tournament(w->id, m, true);
                 if(w->id == -1) // but need to be able to reach proper state afterwads
                     w->G->manage_results(switches);
@@ -1058,7 +1058,7 @@ private:
                 automorphism->non_uniform = (skipped_level && !w->skiplevel_is_uniform);
 
                 if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base
-                   && switches->current_mode != MODE_TOURNAMENT) {
+                   && switches->current_mode != MODE_AUTO_TOURNAMENT) {
                     PRINT("[BA] Orbit equals cell abort");
                     return abort_code(1);
                 }
@@ -1175,7 +1175,7 @@ private:
 
         while (true) {
             if(*done) return abort_code();
-            if(switches->current_mode != modes::MODE_UNIFORM_PROBE) return abort_code(2);
+            if(switches->current_mode != modes_auto::MODE_AUTO_UNIFORM_PROBE) return abort_code(2);
             if (backtrack) {
 
                 // make some global checks

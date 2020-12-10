@@ -21,9 +21,10 @@ if (DEFINED COMPILE_PYTHON2API)
     # might need to replace "python" with "python2" or "python27"
     find_package(Boost COMPONENTS python REQUIRED)
     set(CMAKE_SHARED_MODULE_PREFIX "")
-    add_library(libdejavu_python MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
-    target_link_libraries(libdejavu_python ${Boost_LIBRARIES} ${Python3_LIBRARIES})
-    target_include_directories(libdejavu_python PRIVATE ${Python3_INCLUDE_DIRS})
+    add_library(dejavupy2 MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
+    set_target_properties(dejavupy2 PROPERTIES SUFFIX ".pyd")
+    target_link_libraries(dejavupy2 ${Boost_LIBRARIES} ${Python3_LIBRARIES})
+    target_include_directories(dejavupy2 PRIVATE ${Python3_INCLUDE_DIRS})
 endif ()
 
 if (DEFINED COMPILE_PYTHON3API)
@@ -36,9 +37,10 @@ if (DEFINED COMPILE_PYTHON3API)
     # might need to replace "python" with "python3" or "python36"
     find_package(Boost COMPONENTS python REQUIRED)
     set(CMAKE_SHARED_MODULE_PREFIX "")
-    add_library(libdejavu_python MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
-    target_link_libraries(libdejavu_python ${Boost_LIBRARIES} ${Python3_LIBRARIES})
-    target_include_directories(libdejavu_python PRIVATE ${Python3_INCLUDE_DIRS})
+    add_library(dejavupy3 MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
+    set_target_properties(dejavupy3 PROPERTIES SUFFIX ".pyd")
+    target_link_libraries(dejavupy3 ${Boost_LIBRARIES} ${Python3_LIBRARIES})
+    target_include_directories(dejavupy3 PRIVATE ${Python3_INCLUDE_DIRS})
 endif ()
 
 ####################################################################
@@ -61,19 +63,19 @@ if (DEFINED COMPILE_PYTHON3API_LINK_BOOST_MANUAL)
 
 
     set(CMAKE_SHARED_MODULE_PREFIX "")
-    add_library(libdejavu_python MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
-
+    add_library(dejavupy3 MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
+    set_target_properties(dejavupy3 PROPERTIES SUFFIX ".pyd")
     # uncomment for static link
     #set_target_properties(libdejavu_python PROPERTIES LINK_FLAGS "-static")
     #add_definitions(/DBOOST_PYTHON_STATIC_LIB)
 
-    target_link_directories(libdejavu_python PRIVATE ${BOOST_LIBRARYDIR})
+    target_link_directories(dejavupy3 PRIVATE ${BOOST_LIBRARYDIR})
     ####################################################################
     # Insert approriate library names here                             #
     ####################################################################
-    target_link_libraries(libdejavu_python libboost_python36-mgw9-mt-x64-1_74.dll.a libboost_python36-mgw9-mt-x64-1_74.dll  ${Python3_LIBRARIES})
+    target_link_libraries(dejavupy3 libboost_python36-mgw9-mt-x64-1_74.dll.a libboost_python36-mgw9-mt-x64-1_74.dll  ${Python3_LIBRARIES})
     ####################################################################
-    target_include_directories(libdejavu_python PRIVATE ${Python3_INCLUDE_DIRS} ${BOOST_INCLUDEDIR})
+    target_include_directories(dejavupy3 PRIVATE ${Python3_INCLUDE_DIRS} ${BOOST_INCLUDEDIR})
 endif ()
 
 set(source_list "nauty/gtnauty.o;nauty/gtools.o;nauty/gutil1.o;nauty/gutil2.o;nauty/naugraph.o;nauty/naugroup.o;nauty/naurng.o;nauty/nausparse.o;nauty/nautil.o;nauty/nautinv.o;nauty/naututil.o;nauty/nauty.o;nauty/traces.o;nauty/schreier.o")

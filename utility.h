@@ -80,10 +80,10 @@ static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
 
 
 
-// modes of the solver
-enum modes {MODE_TOURNAMENT, MODE_NON_UNIFORM_PROBE, MODE_UNIFORM_WITH_LEAF_STORAGE, MODE_NON_UNIFORM_PROBE_IT,
-            MODE_UNIFORM_PROBE, MODE_BFS, MODE_WAIT};
-enum vujade_modes {VU_MODE_BIDIRECTIONAL, VU_MODE_BIDIRECTIONAL_DEVIATION, VU_MODE_BFS};
+// modes_auto of the solver
+enum modes_auto {MODE_AUTO_TOURNAMENT, MODE_AUTO_NON_UNIFORM_PROBE, MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE,
+                 MODE_AUTO_NON_UNIFORM_PROBE_IT, MODE_AUTO_UNIFORM_PROBE, MODE_AUTO_BFS, MODE_AUTO_WAIT};
+enum modes_iso {MODE_ISO_BIDIRECTIONAL, MODE_ISO_BIDIRECTIONAL_DEVIATION, MODE_ISO_BFS};
 
 // metrics used to compare strategies
 struct strategy_metrics {
@@ -122,10 +122,10 @@ public:
         experimental_paths.store(0);
         experimental_deviation.store(0);
         leaf_store_explicit.store(0);
-        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        /*buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
         for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
             buffer_buffer[i] = std::vector<unsigned char*>();
-        }
+        }*/
     };
 
     bool done = false;
@@ -134,10 +134,10 @@ public:
     std::atomic_bool done_created_group;
 
     // solver mode
-    std::atomic<modes> current_mode;
+    std::atomic<modes_auto> current_mode;
     std::atomic_int    exit_counter;
 
-    std::vector<unsigned char*>* buffer_buffer;
+    //std::vector<unsigned char*>* buffer_buffer;
 
     // tournament variables
     std::mutex         tournament_mutex;
@@ -222,7 +222,7 @@ template<class vertex_t>
 class shared_workspace_iso {
 public:
     ~shared_workspace_iso() {
-        delete[] buffer_buffer;
+        //delete[] buffer_buffer;
     }
 
     shared_workspace_iso() {
@@ -241,18 +241,17 @@ public:
         leaf_store_explicit.store(0);
         deviation_store[0] = std::unordered_set<long>();
         deviation_store[1] = std::unordered_set<long>();
-        buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
-        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
-            buffer_buffer[i] = std::vector<unsigned char*>();
-        }
+        //buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
+        //for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
+        //    buffer_buffer[i] = std::vector<unsigned char*>();
+        //}
     };
 
     bool done = false;
-    bool done_fast = false;
     std::atomic_bool done_created_group;
 
     // solver mode
-    std::atomic<vujade_modes> current_mode;
+    std::atomic<modes_iso> current_mode;
     std::mutex switch_mode_mutex;
     std::atomic_int    exit_counter;
     std::atomic_int    noniso_counter;
@@ -284,15 +283,6 @@ public:
     std::set<std::tuple<int*, int, int*, long>>* node_store;
 
     int tolerance = 1;
-
-
-    void iterate_tolerance() {
-        tolerance *= 2;
-    }
-
-    void reset_tolerance(int size, int domain_size) {
-        tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
-    }
 };
 
 inline bool file_exists(const std::string& name) {

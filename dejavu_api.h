@@ -30,13 +30,13 @@ public:
 
 private:
     bool worker_thread(sgraph_t<int, int, int> *g_, int* vertex_to_col, bool master,
-                       shared_workspace_iso<int> *switches, coloring<int> *start_c, strategy<int>* canon_strategy,
+                       shared_workspace_iso<int> *switches, coloring<int> *_start_c, strategy<int>* canon_strategy,
                        int communicator_id, bfs_workspace<int> *bwork1, bfs_workspace<int> *bwork2, int max_length,
                        int num) {
         sgraph_t<int, int, int> *g = g_;
         dejavu_workspace<int, int, int> W;
 
-        config.CONFIG_VUJADE = true; // some things ought to work differently now...
+        config.CONFIG_SOLVE_ISO = true; // some things ought to work differently now...
 
         numnodes = 0;
         colorcost = 0;
@@ -46,8 +46,8 @@ private:
             config.CONFIG_IR_FORCE_EXPAND_DEVIATION = true;
             config.CONFIG_IR_DENSE = !(g->e_size < g->v_size ||
                                        g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
-            start_c = new coloring<int>;
-            g->initialize_coloring(start_c, vertex_to_col);
+            //start_c = new coloring<int>;
+            g->initialize_coloring(&W.start_c1, vertex_to_col);
             //g->initialize_coloring_raw(start_c);
             if (config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
@@ -75,22 +75,22 @@ private:
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
             PRINT("[api] Dense graph: " << (config.CONFIG_IR_DENSE ? "true" : "false"));
-            switches->current_mode = vujade_modes::VU_MODE_BIDIRECTIONAL_DEVIATION;
+            switches->current_mode = modes_iso::MODE_ISO_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
             canon_strategy = new strategy<int>;
             my_canon_I->create_vector(g->v_size);
-            W.start_c1 = start_c;
-            W.start_c2 = new coloring<int>;
+            //W.start_c1 = start_c;
+            //W.start_c2 = new coloring<int>;
             strategy_metrics m;
             bool comp;
-            W.R.refine_coloring(g, start_c, my_canon_I, -1, &m, -1);
+            W.R.refine_coloring(g, &W.start_c1, my_canon_I, -1, &m, -1);
             my_canon_I->purge();
             delete my_canon_I;
             my_canon_I = new invariant;
             PRINT("[api] First refinement: " << cref / 1000000.0 << "ms");
 
-            int init_c = W.S.select_color(g, start_c, selector_seed);
+            int init_c = W.S.select_color(g, &W.start_c1, selector_seed);
             if (init_c == -1) {
                 //std::cout << "First coloring discrete, special case." << std::endl;
                 //return 0;
@@ -120,7 +120,7 @@ private:
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&dejavu_api::worker_thread,
-                                    dejavu_api(), g, nullptr, false, switches, start_c,
+                                    dejavu_api(), g, nullptr, false, switches, &W.start_c1,
                                     canon_strategy, i, W.BW1, W.BW2, max_length, num));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
@@ -133,24 +133,23 @@ private:
             PRINT("[api] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
-            W.start_c1 = new coloring<int>;
-            W.start_c1->copy_force(start_c);
+            //W.start_c1 = new coloring<int>;
+            //W.start_c1->copy_force(start_c);
+            _start_c = &W.start_c1;
             W.id = -1;
         }
 
         //PRINT("[api] Initial management...");
         int base_sz = 0;
-        W.skip_c.copy_force(start_c);
-        W.work_c = new coloring<int>;
-        W.work_I = new invariant;
+        W.skip_c.copy_force(_start_c);
         W.BW1 = bwork1;
         W.BW2 = bwork2;
         W.skiplevels = 0;
 
         if (!master) {
-            W.start_c1 = new coloring<int>;
-            W.start_c2 = new coloring<int>;
-            W.start_c1->copy_force(start_c);
+            //W.start_c1 = new coloring<int>;
+            //W.start_c2 = new coloring<int>;
+            W.start_c1.copy_force(_start_c);
             W.id = communicator_id;
         }
 
@@ -212,7 +211,7 @@ private:
         selector<int, int, int> *S = &w->S;
         coloring<int> *c = &w->c;
         invariant *I = &w->I;
-        coloring<int> *start_c  = w->start_c1;
+        coloring<int> *start_c  = &w->start_c1;
         invariant *start_I = &w->start_I;
 
         S->empty_cache();

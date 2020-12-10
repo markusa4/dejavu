@@ -20,7 +20,7 @@ struct configstruct {
     bool CONFIG_PREPROCESS_COMPRESS      = false;
     bool CONFIG_PREPROCESS_EDGELIST_SORT = false;
     bool CONFIG_PREPROCESS               = false;
-    bool CONFIG_VUJADE                   = false;
+    bool CONFIG_SOLVE_ISO                   = false;
 
     int CONFIG_RAND_ABORT = 8;             // determines error probability (higher value means lower error probability)
                                            // error is at most (1 / 2)^(i-1), where i is the given value
