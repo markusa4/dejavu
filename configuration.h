@@ -13,6 +13,8 @@ struct configstruct {
     int  CONFIG_IR_EXPAND_DEVIATION = 5;
     bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;
     int  CONFIG_IR_LEAF_STORE_LIMIT = 64;
+    int  CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
+    bool CONFIG_IR_SELECTOR_FILL_GRAPH = false;
 
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;

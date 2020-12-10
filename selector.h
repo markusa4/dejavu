@@ -87,12 +87,12 @@ public:
                 skipstart = i;
                 only_trivial = false;
             }
-            if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
+            if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0 && c->lab[i] < config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL) {
                 largest_cell = i;
                 largest_cell_sz = c->ptn[i];
                 largest_cache.reset();
                 largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
-            } else if(c->ptn[i] == largest_cell_sz) {
+            } else if(c->ptn[i] == largest_cell_sz && c->lab[i] < config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL) {
                 largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
             }
 

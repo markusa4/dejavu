@@ -6,7 +6,7 @@
 class dejavu_api {
 public:
 public:
-    bool random_paths(sgraph_t<int, int, int> *g, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
+    bool random_paths(sgraph_t<int, int, int> *g, int* vertex_to_col, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 150) {
@@ -20,14 +20,16 @@ public:
             }
         }
 
+        bulk_domain_reset = true;
+
         shared_workspace_iso<int> switches;
         switches.node_store = paths;
-        return worker_thread(g, true, &switches, nullptr, nullptr,
+        return worker_thread(g, vertex_to_col, true, &switches, nullptr, nullptr,
                              -1,nullptr, nullptr, max_length, num);
     }
 
 private:
-    bool worker_thread(sgraph_t<int, int, int> *g_, bool master,
+    bool worker_thread(sgraph_t<int, int, int> *g_, int* vertex_to_col, bool master,
                        shared_workspace_iso<int> *switches, coloring<int> *start_c, strategy<int>* canon_strategy,
                        int communicator_id, bfs_workspace<int> *bwork1, bfs_workspace<int> *bwork2, int max_length,
                        int num) {
@@ -45,8 +47,8 @@ private:
             config.CONFIG_IR_DENSE = !(g->e_size < g->v_size ||
                                        g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
             start_c = new coloring<int>;
-            // TODO: use initialize_coloring with start_c instead
-            g->initialize_coloring_raw(start_c);
+            g->initialize_coloring(start_c, vertex_to_col);
+            //g->initialize_coloring_raw(start_c);
             if (config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -83,7 +85,6 @@ private:
             strategy_metrics m;
             bool comp;
             W.R.refine_coloring(g, start_c, my_canon_I, -1, &m, -1);
-            W.start_I.set_compare_invariant(my_canon_I);
             my_canon_I->purge();
             delete my_canon_I;
             my_canon_I = new invariant;
@@ -91,8 +92,8 @@ private:
 
             int init_c = W.S.select_color(g, start_c, selector_seed);
             if (init_c == -1) {
-                std::cout << "First coloring discrete, special case." << std::endl;
-                return 0;
+                //std::cout << "First coloring discrete, special case." << std::endl;
+                //return 0;
             }
 
             // create some objects that are initialized after tournament
@@ -119,7 +120,7 @@ private:
             for (int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS; i++) {
                 work_threads.emplace_back(
                         std::thread(&dejavu_api::worker_thread,
-                                    dejavu_api(), g, false, switches, start_c,
+                                    dejavu_api(), g, nullptr, false, switches, start_c,
                                     canon_strategy, i, W.BW1, W.BW2, max_length, num));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
@@ -137,6 +138,7 @@ private:
             W.id = -1;
         }
 
+        //PRINT("[api] Initial management...");
         int base_sz = 0;
         W.skip_c.copy_force(start_c);
         W.work_c = new coloring<int>;
@@ -155,13 +157,16 @@ private:
         strategy<int> *my_strategy;
 
         auto rst = SELECTOR_LARGEST;
+        //auto rst = SELECTOR_SMALLEST;
         if (config.CONFIG_IR_FORCE_SELECTOR)
             rst = (selector_type) config.CONFIG_IR_CELL_SELECTOR;
 
         my_strategy = new strategy<int>(my_canon_leaf, my_canon_I, rst, -1);
 
+        //PRINT("[api] Entering main loop...");
         W.S.empty_cache();
         while(!switches->done) {
+            //PRINT("[api] Computing path...");
             bool res = random_path_bounded(&W, g, my_strategy, &base_points, switches, selector_seed, max_length);
             if(res) {
                 ++switches->experimental_paths;
@@ -178,16 +183,16 @@ private:
                 switches->done = true;
             }
             delete[] base_points.map;
-            my_strategy->I->purge();
         }
         // TODO: check cleanup
         if (master && !dejavu_kill_request) {
+            //PRINT("[api] Joining threads...");
             while (!work_threads.empty()) {
                 work_threads[work_threads.size() - 1].join();
                 work_threads.pop_back();
             }
             PRINT("[api] Found " << switches->experimental_paths << " paths of maximum length " << max_length);
-            PRINT("[api] Cleanup...");
+            //PRINT("[api] Cleanup...");
 
             delete my_strategy;
             delete canon_strategy;
@@ -201,6 +206,7 @@ private:
                              bijection<int> *automorphism, shared_workspace_iso<int> *switches,
                              int selector_seed, int max_length) {
         const bool* done = &switches->done;
+        //PRINT("[api] Entering path routine...");
 
         // workspace
         selector<int, int, int> *S = &w->S;
@@ -221,12 +227,17 @@ private:
         c->copy(start_c);
 
         while (true) {
-            if(*done) return false;
+            if(*done) {
+                //PRINT("[api] Aborting path...");
+                start_I->purge();
+                return false;
+            }
             const int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1 || length == max_length) {
                 //canon_leaf->read_from_coloring(c);
                 //*canon_I = *I;
                 PRINT("[api] Found path of length " << length  << ", invariant " << I->acc);
+                start_I->purge();
                 return true;
             }
 
@@ -250,7 +261,7 @@ private:
                        invariant* I, int v, strategy_metrics* m, int cell_early) {
         if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
-
+        //PRINT("[api] Individualizing " << v << " and refining...");
         // protocol of selector choice
         I->selection_write(c->vertex_to_col[v]);
         const int init_color_class = w->R.individualize_vertex(c, v);
@@ -260,9 +271,9 @@ private:
     }
 };
 
-void random_paths(sgraph* g, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
+void random_paths(sgraph* g, int* vertex_to_col, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
     dejavu_api v;
-    v.random_paths(g, max_length, num, paths);
+    v.random_paths(g, vertex_to_col, max_length, num, paths);
 }
 
 #endif //DEJAVU_DEJAVU_API_H

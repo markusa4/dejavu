@@ -234,6 +234,19 @@ public:
         }
     }
 
+    void print() {
+        PRINT("[api] v_size: " << v_size);
+        PRINT("[api] d_size: " << d_size);
+        PRINT("[api] e_size: " << e_size);
+        /*for(int i = 0; i < v_size; ++i) {
+            const int estart = v[i];
+            const int eend   = estart + d[i];
+            for(int j = estart; j < eend; ++j) {
+                PRINT("[api] (" << i << ", " << e[j] << ")")
+            }
+        }*/
+    }
+
     ~sgraph_t() {
         if(initialized) {
             delete[] v;

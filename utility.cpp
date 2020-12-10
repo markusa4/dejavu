@@ -2,6 +2,8 @@
 #include "utility.h"
 #include "configuration.h"
 
+thread_local bool bulk_domain_reset = false;
+
 int intRand(const int & min, const int & max, int seed) {
     static thread_local std::mt19937 generator(seed);
     std::uniform_int_distribution<int> distribution(min,max);

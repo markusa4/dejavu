@@ -7,35 +7,44 @@
 #include <iostream>
 #include "utility.h"
 
-template <class vertex_t>
-std::pair<vertex_t*, vertex_t*> coloring_bulk_allocator(int domain_size) {
-    thread_local vertex_t* bulk_domain = nullptr;
-    thread_local int  buffer_const = 20;
-    thread_local int  bulk_domain_sz = -1, bulk_domain_cnt = -1;
+extern thread_local bool bulk_domain_reset;
 
-    if(bulk_domain_sz < 0) {
-        bulk_domain     = new vertex_t[buffer_const * domain_size + 1];
-        bulk_domain[0]  = 1;
-        bulk_domain_sz  = buffer_const * domain_size + 1;
-        bulk_domain_cnt = 1;
-        buffer_const *= 2;
+template<class vertex_t>
+class allocator {
+public:
+    static std::pair<vertex_t *, vertex_t *> coloring_bulk_allocator(int domain_size) {
+        thread_local vertex_t *bulk_domain = nullptr;
+        thread_local int buffer_const = 20;
+        thread_local int bulk_domain_sz = -1, bulk_domain_cnt = -1;
+
+        if (bulk_domain_sz < 0 || bulk_domain_reset) {
+            if (bulk_domain_reset)
+                buffer_const = 20;
+            bulk_domain_reset = false;
+            bulk_domain = new vertex_t[buffer_const * domain_size + 1];
+            bulk_domain[0] = 0;
+            bulk_domain_sz = buffer_const * domain_size + 1;
+            bulk_domain_cnt = 1;
+            buffer_const *= 2;
+        }
+
+        bulk_domain_cnt += domain_size;
+        if (bulk_domain_cnt == bulk_domain_sz)
+            bulk_domain_sz = -1;
+        else
+            bulk_domain[0] += 1;
+
+
+        return std::pair<vertex_t *, vertex_t *>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
     }
 
-    bulk_domain_cnt += domain_size;
-    if(bulk_domain_cnt == bulk_domain_sz)
-        bulk_domain_sz = -1;
-    else
-        bulk_domain[0]  += 1;
-
-
-    return std::pair<vertex_t*, vertex_t*>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
-}
-
-template <class vertex_type>
-void coloring_bulk_deallocator(vertex_type* bulk_domain) {
-    if(--bulk_domain[0] == 0)
-        delete[] bulk_domain;
-}
+    static void coloring_bulk_deallocator(vertex_t *bulk_domain) {
+        if (--bulk_domain[0] == 0) {
+            bulk_domain_reset = true;
+            delete[] bulk_domain;
+        }
+    }
+};
 
 template <class vertex_t>
 class coloring {
@@ -69,7 +78,7 @@ public:
             delete[] vertex_to_lab;
             delete[] vertex_to_col;
         } else {
-            coloring_bulk_deallocator<vertex_t>(bulk_alloc);
+            allocator<int>::coloring_bulk_deallocator(bulk_alloc);
         }
     };
 
@@ -100,7 +109,7 @@ public:
         }
 
         if(!init) {
-            std::pair<vertex_t*, vertex_t*> alloc = coloring_bulk_allocator<vertex_t>(c->lab_sz * 4);
+            std::pair<vertex_t*, vertex_t*> alloc = allocator<int>::coloring_bulk_allocator(c->lab_sz * 4);
             bulk_alloc = alloc.first;
             bulk_pt    = alloc.second;
 
@@ -133,15 +142,21 @@ public:
     }
 
     void copy_force(coloring<vertex_t> *c) {
+        PRINT("[api][copy] Starting copy...");
         if(init) {
+            PRINT("[api][copy] Coloring is initialized");
             if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
+                PRINT("[api][copy] Coloring must be re-initialized");
                 dealloc();
                 init = false;
             }
         }
 
         if(!init) {
-            std::pair<vertex_t*, vertex_t*> alloc = coloring_bulk_allocator<vertex_t>(c->lab_sz * 4);
+            PRINT("[api][copy] Coloring is not initialized");
+            std::pair<vertex_t*, vertex_t*> alloc = allocator<int>::coloring_bulk_allocator(c->lab_sz * 4);
+
+            PRINT("[api][copy] Allocated memory");
             bulk_alloc = alloc.first;
             bulk_pt    = alloc.second;
 
@@ -152,6 +167,7 @@ public:
             efficient_alloc = true;
         }
 
+        PRINT("[api][copy] Copying content , size" << c->ptn_sz);
         if(c->cells > c->ptn_sz / 4) {
             memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_t));
         } else {
@@ -174,7 +190,7 @@ public:
     }
 
     void initialize(int domain_size) {
-        std::pair<vertex_t*, vertex_t*> alloc = coloring_bulk_allocator<vertex_t>(domain_size * 4);
+        std::pair<vertex_t*, vertex_t*> alloc = allocator<int>::coloring_bulk_allocator(domain_size * 4);
         bulk_alloc = alloc.first;
         bulk_pt    = alloc.second;
 

@@ -32,8 +32,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
 
 /*class NFAllocBuf {
 public:
@@ -222,7 +222,7 @@ template<class vertex_t>
 class shared_workspace_iso {
 public:
     ~shared_workspace_iso() {
-        //delete buffer_buffer;
+        delete[] buffer_buffer;
     }
 
     shared_workspace_iso() {
