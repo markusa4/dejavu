@@ -19,33 +19,23 @@ enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
 
 template <class vertex_t, class degree_t, class edge_t>
 struct alignas(64) dejavu_workspace {
-    // workspace for normal search
+    // refinement and selector
     refinement<vertex_t, degree_t, edge_t> R;
     selector<vertex_t, degree_t, edge_t>   S;
+
+    // workspace
     coloring<vertex_t> c;
     invariant  I;
 
-    // workspace for base aligned search
-    int first_level = 1;
     int base_size = 0;
-    int skiplevels = 1;
-    int first_skiplevel = 1;
-    coloring<vertex_t> skip_c;
-    invariant skip_I;
-    bool      skiplevel_is_uniform = false;
 
+    // initial colorings and invariant
     coloring<vertex_t> start_c1;
     coloring<vertex_t> start_c2;
     invariant start_I;
 
     // indicates which thread this is
     int id;
-
-    dejavu_workspace() {
-    }
-
-    ~dejavu_workspace() {
-    };
 };
 
 template<class vertex_t, class degree_t, class edge_t>
@@ -65,20 +55,20 @@ public:
             }
         }
 
+        // some shared variables
         shared_workspace_iso<vertex_t> switches;
         bfs_workspace<vertex_t> BW1;
         bfs_workspace<vertex_t> BW2;
+
         return worker_thread(g1, g2, true, &switches, nullptr, nullptr, nullptr,
                 -1,&BW1, &BW2);
     }
 
 private:
-    bool worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g1_, sgraph_t<vertex_t, degree_t, edge_t> *g2_, bool master,
+    bool worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g1, sgraph_t<vertex_t, degree_t, edge_t> *g2, bool master,
                        shared_workspace_iso<vertex_t> *switches, coloring<vertex_t> *_start_c1,
                        coloring<vertex_t> *_start_c2, strategy<vertex_t>* canon_strategy,
                        int communicator_id, bfs_workspace<vertex_t> *bwork1, bfs_workspace<vertex_t> *bwork2) {
-        sgraph_t<vertex_t, degree_t, edge_t> *g1 = g1_;
-        sgraph_t<vertex_t, degree_t, edge_t> *g2 = g2_;
         dejavu_workspace<vertex_t, degree_t, edge_t> W;
 
         config.CONFIG_SOLVE_ISO = true; // some things ought to work differently now...
@@ -98,10 +88,7 @@ private:
             assert(start_c1->check());
         }
 
-        double cref;
-
         std::vector<std::thread> work_threads;
-        bijection<vertex_t> base_points;
         bijection<vertex_t> actual_base;
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id * 5) * 5135235);
         int selector_seed = seed;
@@ -117,7 +104,7 @@ private:
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
-            PRINT("[vuj] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+            PRINT("[iso] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
             switches->current_mode = modes_iso ::MODE_ISO_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
@@ -134,11 +121,11 @@ private:
                 delete canon_strategy;
                 return comp;
             }
-            PRINT("[vuj] First refinement: " << cref / 1000000.0 << "ms");
+            PRINT("[iso] First refinement done.");
 
             int init_c = W.S.select_color(g1, &W.start_c1, selector_seed);
             if(init_c == -1) {
-                std::cout << "First coloring discrete, checking isomorphism." << std::endl;
+                std::cout << "[iso] First coloring discrete, checking isomorphism." << std::endl;
                 bijection<vertex_t> automorphism;
                 automorphism.read_from_coloring(&W.start_c1);
                 bijection<vertex_t> leaf2;
@@ -165,13 +152,6 @@ private:
                 g1->sort_edgelist();
                 g2->sort_edgelist();
             }
-
-            // create some objects that are initialized after tournament
-            //W.BW1 = new bfs_workspace<vertex_t>();
-            //bwork1 = W.BW1;
-
-            //W.BW2 = new bfs_workspace<vertex_t>();
-            //bwork2 = W.BW2;
 
             #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
@@ -200,7 +180,7 @@ private:
                                                 sizeof(cpu_set_t), &cpuset);
                 #endif
             }
-            PRINT("[vuj] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
+            PRINT("[iso] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
             _start_c1 = &W.start_c1;
@@ -209,10 +189,6 @@ private:
         }
 
         int base_sz = 0;
-        W.skip_c.copy_force(_start_c1);
-        // W.BW1 = bwork1;
-        // W.BW2 = bwork2;
-        W.skiplevels = 0;
 
         if (!master) {
             W.start_c1.copy_force(_start_c1);
@@ -231,12 +207,10 @@ private:
         W.S.empty_cache();
         const int gid_first = communicator_id % 2 == 0;
         if(gid_first == 0) {
-            find_first_leaf(&W, g1, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+            base_sz = find_first_leaf(&W, g1, my_canon_I, my_canon_leaf, my_strategy, switches, selector_seed);
         } else {
-            find_first_leaf(&W, g2, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
+            base_sz = find_first_leaf(&W, g2, my_canon_I, my_canon_leaf, my_strategy, switches, selector_seed);
         }
-        base_sz = base_points.map_sz;
-        base_points.deletable();
 
         // add first leaf to leaf store
         switches->leaf_store_mutex[gid_first].lock();
@@ -248,10 +222,8 @@ private:
         // we need to perform some unnecessary initializations which are mostly not utilized in the isomorphism solver
         if(master) {
             canon_strategy->replace(my_strategy);
-            actual_base = base_points;
-            base_points.not_deletable();
             PRINT("[strat] Chosen strategy: " << canon_strategy->cell_selector_type);
-            PRINT("[strat] Combinatorial base size:" << W.my_base_points_sz);
+            PRINT("[strat] Combinatorial base size:" << base_sz);
             W.S.empty_cache();
             int init_c = W.S.select_color_dynamic(g1, &W.start_c1, my_strategy);
             bwork1->initialize(bfs_element<vertex_t>::root_element(&W.start_c1, &start_I), init_c, g1->v_size, 2);
@@ -378,19 +350,19 @@ private:
                 work_threads.pop_back();
             }
 
-            PRINT("[vuj] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
+            PRINT("[iso] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
             << "), " << "devs(" << switches->deviation_store[0].size() << ":" << switches->deviation_store[1].size() << ")");
-            PRINT("[vuj] Cleanup...");
+            PRINT("[iso] Cleanup...");
         }
         return switches->found_iso;
     }
 
     // Probes a random leaf of the tree and writes down an invariant. The invariant will be utilized for blueprints and
     // other comparisons.
-    void find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
+    int  find_first_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                          sgraph_t<vertex_t, degree_t, edge_t> *g, invariant *canon_I,
                          bijection<vertex_t> *canon_leaf, strategy<vertex_t>* canon_strategy,
-                         bijection<vertex_t> *automorphism, shared_workspace_iso<vertex_t> *switches,
+                         shared_workspace_iso<vertex_t> *switches,
                          int selector_seed) {
         const bool* done = &switches->done;
 
@@ -405,19 +377,19 @@ private:
         S->empty_cache();
         start_I->reset_compare_invariant();
         start_I->create_vector(g->v_size * 2);
-        automorphism->map    = new vertex_t[g->v_size];
-        automorphism->map_sz = 0;
 
         *I = *start_I;
         c->copy(start_c);
 
+        int base_sz = 0;
+
         while (true) {
-            if(*done) return;
+            if(*done) return base_sz;
             const int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 canon_leaf->read_from_coloring(c);
                 *canon_I = *I;
-                return;
+                return base_sz;
             }
 
             // choose random vertex of class
@@ -428,9 +400,7 @@ private:
             proceed_state(w, g, c, I, v, nullptr, -1);
             assert(c->vertex_to_col[v] > 0);
 
-            // base point
-            automorphism->map[automorphism->map_sz] = v;
-            automorphism->map_sz += 1;
+            ++base_sz;
         }
     }
 
@@ -755,7 +725,7 @@ private:
 
 typedef dejavu_iso_t<int, int, int> dejavu_iso;
 
-/*void vujade_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
+/*void isoade_automorphisms_dispatch(dynamic_sgraph *sgraph, shared_permnode **gens) {
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
             PRINT("[Dispatch] <int32, int32, int32>");
