@@ -72,7 +72,7 @@ struct alignas(64) dejavu_workspace {
     int         generator_fix_base_size;
 
     // bfs_workspace workspace
-    bfs_workspace<vertex_t>* BW;
+    // bfs_workspace<vertex_t>* BW;
     std::tuple<bfs_element<vertex_t>*, int, int>* todo_dequeue;
     int todo_deque_sz        = -1;
     std::pair<bfs_element<vertex_t> *, int>* finished_elements;
@@ -130,8 +130,10 @@ public:
         start_c.vertex_to_col = colmap;
         start_c.init = false;
         shared_workspace_auto<vertex_t> switches;
+        bfs_workspace<vertex_t> BW;
+
         worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
-                      nullptr, nullptr, nullptr, gens, nullptr);
+                      nullptr, nullptr, &BW, gens, nullptr);
     }
 
 private:
@@ -228,8 +230,8 @@ private:
 
             // create some objects that are initialized after tournament
             G    = new group_shared<vertex_t>(g->v_size);
-            W.BW = new bfs_workspace<vertex_t>();
-            bwork = W.BW;
+            // W.BW = new bfs_workspace<vertex_t>();
+            // bwork = W.BW;
 
             #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
@@ -249,7 +251,7 @@ private:
                 work_threads.emplace_back(
                         std::thread(&dejavu_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     dejavu_t<vertex_t, degree_t, edge_t>(), g, false, switches, G, start_c,
-                                    canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, W.BW, &_gens,
+                                    canon_strategy, i, shrd_orbit_, shrd_orbit_weights_, bwork, &_gens,
                                     &_shared_group_size));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
@@ -284,7 +286,7 @@ private:
         W.work_c = new coloring<vertex_t>;
         W.work_I = new invariant;
         W.G = G;
-        W.BW = bwork;
+        // W.BW = bwork;
         W.skiplevels = 0;
         W.skip_schreier_level = G->gp;
 
@@ -374,23 +376,23 @@ private:
 
                     *W.shared_generators_size   = G->number_of_generators();
 
-                    if(W.BW->current_level > 1) { // > 1
+                    if(bwork->current_level > 1) { // > 1
                         if(*W.shared_generators_size > 0) {
                             PRINT("[BFS] Reducing tree (" << n_found << ")");
                             assert(master && communicator_id == -1);
-                            bfs_reduce_tree(&W);
+                            bfs_reduce_tree(&W, bwork);
                         }
                         // check if expected size is still too large...
-                        if(W.BW->level_expecting_finished[W.BW->current_level] >=
+                        if(bwork->level_expecting_finished[bwork->current_level] >=
                            config.CONFIG_IR_SIZE_FACTOR * g->v_size * switches->tolerance) {
                             PRINT("[BFS] Expected size still too large, not going into BFS")
-                            W.BW->reached_initial_target = (W.BW->target_level == W.BW->current_level);
-                            W.BW->target_level.store(W.BW->current_level);
+                            bwork->reached_initial_target = (bwork->target_level == bwork->current_level);
+                            bwork->target_level.store(bwork->current_level);
                         } else {
-                            switches->reset_tolerance(W.BW->level_expecting_finished[W.BW->current_level], g->v_size);
+                            switches->reset_tolerance(bwork->level_expecting_finished[bwork->current_level], g->v_size);
                             PRINT("[Dej] Tolerance: " << switches->tolerance);
-                            PRINT("[BFS] Filling queue..." << W.BW->current_level << " -> " << W.BW->target_level)
-                            bfs_fill_queue(&W);
+                            PRINT("[BFS] Filling queue..." << bwork->current_level << " -> " << bwork->target_level)
+                            bfs_fill_queue(&W, bwork);
                         }
                     } else {
                         if(*W.shared_generators_size > 0) {
@@ -484,12 +486,12 @@ private:
                             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
                             W.S.empty_cache();
                             int init_c = W.S.select_color_dynamic(g, start_c, my_strategy);
-                            W.BW->initialize(bfs_element<vertex_t>::root_element(start_c, &start_I), init_c,
+                            bwork->initialize(bfs_element<vertex_t>::root_element(start_c, &start_I), init_c,
                                              g->v_size, G->base_size);
                             int proposed_level = W.skiplevels + 1;
                             if(config.CONFIG_IR_FULL_BFS)
                                 proposed_level = G->base_size + 1;
-                            W.BW->target_level.store(proposed_level);
+                            bwork->target_level.store(proposed_level);
                             PRINT("[Strat] Proposed level for BFS: " << proposed_level);
                             W.is_foreign_base = false;
                             W.skiplevel_is_uniform = W.skiplevels == 0;
@@ -615,8 +617,8 @@ private:
                                 proposed_level += 1;
                             if (proposed_level > G->base_size + 1)
                                 proposed_level = G->base_size + 1;
-                            if (proposed_level > W.BW->target_level)
-                                W.BW->target_level.store(proposed_level);
+                            if (proposed_level > bwork->target_level)
+                                bwork->target_level.store(proposed_level);
                         }
 
                         n_found += 1;
@@ -637,7 +639,7 @@ private:
                             if(switches->experimental_paths > switches->experimental_deviation) {
                                 if(!switches->experimental_look_close) {
                                     switches->experimental_look_close = true;
-                                    switches->experimental_budget += W.BW->level_sizes[W.BW->current_level - 1];
+                                    switches->experimental_budget += bwork->level_sizes[bwork->current_level - 1];
                                     PRINT("[UStore] Switching to close look...");
                                     continue;
                                 }
@@ -660,9 +662,9 @@ private:
                     }
 
                     bfs_element<vertex_t> *elem;
-                    int bfs_level    = W.BW->current_level - 1;
-                    int max_weight   = W.BW->level_maxweight[bfs_level];
-                    int bfs_level_sz = W.BW->level_sizes[bfs_level];
+                    int bfs_level    = bwork->current_level - 1;
+                    int max_weight   = bwork->level_maxweight[bfs_level];
+                    int bfs_level_sz = bwork->level_sizes[bfs_level];
                     if(reset_non_uniform_switch) {
                         rotate_i = bfs_level_sz / (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
                         rotate_i = rotate_i * (communicator_id + 1);
@@ -674,15 +676,15 @@ private:
                                 proposed_level += 1;
                             if (proposed_level > G->base_size + 1)
                                 proposed_level = G->base_size + 1;
-                            if (proposed_level > W.BW->target_level) {
-                                W.BW->target_level.store(proposed_level);
+                            if (proposed_level > bwork->target_level) {
+                                bwork->target_level.store(proposed_level);
                             }
                         }
                     }
                     double picked_weight, rand_weight;
                     do {
                         int pick_elem = intRand(0, bfs_level_sz - 1, selector_seed);
-                        elem = W.BW->level_states[bfs_level][pick_elem];
+                        elem = bwork->level_states[bfs_level][pick_elem];
                         picked_weight = elem->weight;
                         assert(max_weight > 0);
                         rand_weight   = doubleRand(1, max_weight, selector_seed);
@@ -716,37 +718,37 @@ private:
                         reset_skiplevels(&W);
                         foreign_base_done = true;
                     }
-                    if(W.BW->current_level != W.BW->target_level) {
-                        if (communicator_id == -1 && W.BW->target_level < 0) {
+                    if(bwork->current_level != bwork->target_level) {
+                        if (communicator_id == -1 && bwork->target_level < 0) {
                             int proposed_level = W.skiplevels + 1;
                             if (proposed_level == G->base_size)
                                 proposed_level += 1;
                             if (proposed_level > G->base_size + 1)
                                 proposed_level = G->base_size + 1;
-                            W.BW->target_level.store(proposed_level);
+                            bwork->target_level.store(proposed_level);
                         }
-                        if(switches->done_shared_group && W.BW->target_level >= 0) {
+                        if(switches->done_shared_group && bwork->target_level >= 0) {
                             if(master && !switched1) {
                                 switched1 = true;
                                 PRINT("[BA] Finished non-uniform automorphism search (" << *W.shared_generators_size
                                                                                           << " generators, " << n_restarts << " restarts)")
                                 PRINT("[BA] Ended in skiplevel " << W.skiplevels << ", found " << n_found)
                                 PRINT("[BA] " << cref / 1000000.0 << "ms")
-                                PRINT("[BFS] Determined target level: " << W.BW->target_level << "")
+                                PRINT("[BFS] Determined target level: " << bwork->target_level << "")
                             }
-                            bfs_chunk(&W, g, canon_strategy, done, selector_seed);
+                            bfs_chunk(&W, g, canon_strategy, bwork, done, selector_seed);
                             if(master) {
                                 bool fill = bwork->work_queues(switches->tolerance);
                                 if(fill)
-                                    bfs_fill_queue(&W);
+                                    bfs_fill_queue(&W, bwork);
                             }
                         }
                     } else {
                         if(master) {
                             bool fill = bwork->work_queues(switches->tolerance);
                             if(fill)
-                                bfs_fill_queue(&W);
-                            if(bwork->reached_initial_target) {
+                                bfs_fill_queue(&W, bwork);
+                            if(bwork->reached_initial_target && !config.CONFIG_IR_ALWAYS_STORE) { // should never go without leaf storage?
                                 // reached the desired target level? go to next phase!
                                 if(bwork->current_level - 1 >= 0 && bwork->level_sizes[bwork->current_level - 1] == 1
                                                                  && bwork->current_level == bwork->base_size + 1) {
@@ -768,7 +770,11 @@ private:
                                 PRINT("[UTarget] Iterating, tolerance: " << switches->tolerance)
                                 reset_skiplevels(&W);
                                 foreign_base_done = true;
-                                const int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
+                                if(config.CONFIG_IR_ALWAYS_STORE) {
+                                    required_level = bwork->current_level + 1;
+                                    PRINT("[BFS] Requiring level " << required_level);
+                                }
+                                int budget_fac = switches->experimental_look_close?std::max(switches->tolerance, 10):1;
 
                                 PRINT("[UStore] Switching to uniform with leaf storage, budget "
                                               << bwork->level_sizes[bwork->current_level - 1] * budget_fac)
@@ -790,7 +796,7 @@ private:
                         switched2 = true;
                         PRINT("[UTarget] " << cref / 1000000.0 << "ms")
                     }
-                    A = uniform_from_bfs_search(&W, g, canon_strategy, &automorphism, &restarts, switches, selector_seed);
+                    A = uniform_from_bfs_search(&W, g, canon_strategy, &automorphism, &restarts, switches, bwork, selector_seed);
                     if(A.reason == 2) // abort
                         continue;
 
@@ -808,7 +814,7 @@ private:
                         reset_skiplevels(&W);
                         foreign_base_done = true;
                         switches->current_mode = MODE_AUTO_NON_UNIFORM_PROBE_IT;
-                        required_level = W.BW->current_level + 1;
+                        required_level = bwork->current_level + 1;
                         PRINT("[BFS] Requiring level " << required_level);
                         continue;
                     }
@@ -862,7 +868,6 @@ private:
 
             G->generators_persistent = (gens == nullptr);
             delete G;
-            delete bwork;
 
             delete canon_strategy->I;
             delete canon_strategy->leaf;
@@ -1132,7 +1137,8 @@ private:
     abort_code uniform_from_bfs_search(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                                        sgraph_t<vertex_t, degree_t, edge_t> *g,
                                        strategy<vertex_t>* canon_strategy, bijection<vertex_t> *automorphism,
-                                       int *restarts, shared_workspace_auto<vertex_t> *switches, int selector_seed) {
+                                       int *restarts, shared_workspace_auto<vertex_t> *switches, bfs_workspace<vertex_t> *bwork,
+                                       int selector_seed) {
         bool backtrack = false;
         bool* done = &switches->done;
 
@@ -1154,8 +1160,8 @@ private:
         automorphism->certified = false;
 
         // pick start from BFS level
-        const int bfs_level    = w->BW->current_level - 1;
-        const int bfs_level_sz = w->BW->level_sizes[bfs_level];
+        const int bfs_level    = bwork->current_level - 1;
+        const int bfs_level_sz = bwork->level_sizes[bfs_level];
 
         shared_schreier* start_group_level = w->G->gp;
         for(int i = 0; i < bfs_level; i++)
@@ -1163,7 +1169,7 @@ private:
         shared_schreier* group_level = start_group_level;
 
         int rand_pos       = intRand(0, bfs_level_sz - 1, selector_seed);
-        bfs_element<vertex_t>* picked_elem = w->BW->level_states[bfs_level][rand_pos];
+        bfs_element<vertex_t>* picked_elem = bwork->level_states[bfs_level][rand_pos];
         bool base_aligned        = picked_elem->is_identity;
 
         *I = *picked_elem->I;
@@ -1195,13 +1201,13 @@ private:
 
                 // do uniform search
                 rand_pos    = intRand(0, bfs_level_sz - 1, selector_seed);
-                picked_elem = w->BW->level_states[bfs_level][rand_pos];
+                picked_elem = bwork->level_states[bfs_level][rand_pos];
                 group_level = start_group_level;
                 base_aligned = picked_elem->is_identity;
 
                 // consider the weight by redrawing
                 picked_weight = picked_elem->weight;
-                max_weight    = w->BW->level_maxweight[bfs_level];
+                max_weight    = bwork->level_maxweight[bfs_level];
                 assert(max_weight > 0);
                 rand_weight   = doubleRand(1, max_weight, selector_seed);
                 if(rand_weight > picked_weight) continue; // need to redraw
@@ -1363,14 +1369,13 @@ private:
 
     bool bfs_chunk(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                    sgraph_t<vertex_t, degree_t, edge_t>  *g, strategy<vertex_t> *canon_strategy,
-                   bool *done, int selector_seed) {
-        bfs_workspace<vertex_t> *BFS = w->BW;
-        int level = BFS->current_level;
-        int target_level = BFS->target_level;
+                   bfs_workspace<vertex_t>* bwork, bool *done, int selector_seed) {
+        int level = bwork->current_level;
+        int target_level = bwork->target_level;
         if (level == target_level) return false; // we are done with BFS!
 
         // initialize bfs_workspace structures
-        bfs_assure_init(w);
+        bfs_assure_init(w, bwork);
 
         if (w->generator_fix_base_alloc < *w->shared_generators_size) {
             delete[] w->generator_fix_base;
@@ -1380,7 +1385,7 @@ private:
         }
 
         // try to dequeue a chunk of work
-        size_t num = BFS->bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, w->BW->chunk_size);
+        size_t num = bwork->bfs_level_todo[level].try_dequeue_bulk(w->todo_dequeue, bwork->chunk_size);
         int finished_elements_sz = 0;
         int finished_elements_null_buffer = 0;
 
@@ -1396,7 +1401,7 @@ private:
             if(elem->deviation_pos > 0) {
                 // check in abort map
                 if (!elem->is_identity) {
-                    bool comp_ = BFS->read_abort_map(level, elem->deviation_pos, elem->deviation_acc);
+                    bool comp_ = bwork->read_abort_map(level, elem->deviation_pos, elem->deviation_acc);
 
                     if(!comp_) {
                         if(elem->weight != 0 && elem->deviation_write.try_lock()) {
@@ -1440,17 +1445,17 @@ private:
                 // manage abort map counter
                 if (comp && elem->is_identity && level > 1) {
                     // decrease abort map done...
-                    BFS->level_abort_map_mutex[level]->lock();
-                    BFS->level_abort_map_done[level]--;
-                    BFS->level_abort_map_mutex[level]->unlock();
+                    bwork->level_abort_map_mutex[level]->lock();
+                    bwork->level_abort_map_done[level]--;
+                    bwork->level_abort_map_mutex[level]->unlock();
                 }
 
                 // if !comp consider abort map
                 if (!comp && level > 1) {
                     if (elem->is_identity) { // save to abort map...
-                        BFS->write_abort_map(level, w->work_I->comp_fail_pos, w->work_I->comp_fail_acc);
+                        bwork->write_abort_map(level, w->work_I->comp_fail_pos, w->work_I->comp_fail_acc);
                     } else { // if abort map done, check abort map...
-                        bool comp_ = BFS->read_abort_map(level, w->work_I->comp_fail_pos, w->work_I->comp_fail_acc);
+                        bool comp_ = bwork->read_abort_map(level, w->work_I->comp_fail_pos, w->work_I->comp_fail_acc);
                         if (!comp_) {
                             elem->weight = 0; // element is pruned
                         }
@@ -1512,16 +1517,16 @@ private:
         }
 
         if (finished_elements_sz > 0)
-            BFS->bfs_level_finished_elements[level].enqueue_bulk(w->finished_elements, finished_elements_sz);
+            bwork->bfs_level_finished_elements[level].enqueue_bulk(w->finished_elements, finished_elements_sz);
 
         return true;
     }
 
-    void bfs_reduce_tree(dejavu_workspace<vertex_t, degree_t, edge_t> *w) {
+    void bfs_reduce_tree(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t> *bwork) {
         thread_local bool first_call = true;
 
         _schreier_fails(2);
-        bfs_assure_init(w);
+        bfs_assure_init(w, bwork);
 
         int domain_size = w->G->domain_size;
         bool new_gens = sequential_init_copy(w);
@@ -1541,11 +1546,10 @@ private:
 
         // step1: check on level i if orbits can be reduced
         int i, j, v;
-        bfs_workspace<vertex_t>* BFS = w->BW;
         int active = 0;
         bool found_canon = false;
-        for (j = 0; j < BFS->level_sizes[BFS->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = BFS->level_states[BFS->current_level - 1][j];
+        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
             active += (elem->weight > 0);
             found_canon = found_canon || (elem->base[elem->base_sz - 1] == w->G->b[elem->base_sz - 1]);
         }
@@ -1553,14 +1557,14 @@ private:
         PRINT("[BFS] Top level active (before): " << active);
 
 
-        for(i = 1; i < BFS->current_level; ++i) {
-            bfs_element<vertex_t>** arr = w->BW->level_states[i];
-            int arr_sz        = w->BW->level_sizes[i];
+        for(i = 1; i < bwork->current_level; ++i) {
+            bfs_element<vertex_t>** arr = bwork->level_states[i];
+            int arr_sz        = bwork->level_sizes[i];
             std::sort(arr, arr + arr_sz, &bfs_element_parent_sorter<vertex_t>);
 
             if(i == 1) {
-                for(j = 0; j < BFS->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t>* elem = BFS->level_states[i][j];
+                for(j = 0; j < bwork->level_sizes[i]; ++j) {
+                    bfs_element<vertex_t>* elem = bwork->level_states[i][j];
                     if(elem->weight > 0) {
                         v = elem->base[elem->base_sz - 1];
                         assert(v >= 0 && v < w->G->domain_size);
@@ -1576,8 +1580,8 @@ private:
                 }
             } else {
                 // update weights...
-                for(j = 0; j < BFS->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t> *elem = BFS->level_states[i][j];
+                for(j = 0; j < bwork->level_sizes[i]; ++j) {
+                    bfs_element<vertex_t> *elem = bwork->level_states[i][j];
                     assert(elem->parent != NULL);
                     if(elem->parent->weight == 0) {
                         elem->weight = 0;
@@ -1590,8 +1594,8 @@ private:
                 }
 
                 // reduce using orbits
-                for(j = 0; j < BFS->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t> *elem = BFS->level_states[i][j];
+                for(j = 0; j < bwork->level_sizes[i]; ++j) {
+                    bfs_element<vertex_t> *elem = bwork->level_states[i][j];
                     if(elem == nullptr)
                         continue;
                     assert(elem->parent != NULL);
@@ -1631,39 +1635,39 @@ private:
         }
 
         active = 0;
-        for (j = 0; j < BFS->level_sizes[BFS->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = BFS->level_states[BFS->current_level - 1][j];
+        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
             active += (elem->weight > 0);
         }
 
         PRINT("[BFS] Top level active (after): " << active);
         PRINT("[BFS] Emptying queue...");
         moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
-        BFS->bfs_level_todo[BFS->current_level].swap(throwaway_queue);
+        bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
 
 
         // do not fill this if there is no hope...
         int expecting_finished = 0;
-        for (j = 0; j < BFS->level_sizes[BFS->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = BFS->level_states[BFS->current_level - 1][j];
+        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
             if (elem->weight > 0) {
                 int c      = elem->target_color;
                 int c_size = elem->c->ptn[c] + 1;
                 expecting_finished += c_size;
             }
         }
-        BFS->level_expecting_finished[BFS->current_level] = expecting_finished;
+        bwork->level_expecting_finished[bwork->current_level] = expecting_finished;
         w->prev_bfs_element = nullptr;
         w->orbit.reset();
         w->orbit_vertex_worklist.reset();
         w->orbit_considered.reset();
     }
 
-    void bfs_fill_queue(dejavu_workspace<vertex_t, degree_t, edge_t> *w) {
-        if(w->BW->current_level == w->BW->target_level)
+    void bfs_fill_queue(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t>* bwork) {
+        if(bwork->current_level == bwork->target_level)
             return;
         moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
-        w->BW->bfs_level_todo[w->BW->current_level].swap(throwaway_queue);
+        bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
 
         int expected = 0;
 
@@ -1671,31 +1675,31 @@ private:
             sequential_init_copy(w);
 
         // swap identity to first position...
-        for (int j = 0; j < w->BW->level_sizes[w->BW->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = w->BW->level_states[w->BW->current_level - 1][j];
+        for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
             if(elem->is_identity) {
-                bfs_element<vertex_t> *first_elem = w->BW->level_states[w->BW->current_level - 1][0];
-                w->BW->level_states[w->BW->current_level - 1][j] = first_elem;
-                w->BW->level_states[w->BW->current_level - 1][0] = elem;
+                bfs_element<vertex_t> *first_elem = bwork->level_states[bwork->current_level - 1][0];
+                bwork->level_states[bwork->current_level - 1][j] = first_elem;
+                bwork->level_states[bwork->current_level - 1][0] = elem;
                 break;
             }
         }
 
         if(!w->sequential_init) {
             // then rest...
-            for (int j = 0; j < w->BW->level_sizes[w->BW->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = w->BW->level_states[w->BW->current_level - 1][j];
+            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
                 if (elem->weight > 0) {
                     int c = elem->target_color;
                     int c_size = elem->c->ptn[c] + 1;
                     for (int i = c; i < c + c_size; ++i) {
                         expected += 1;
-                        w->BW->bfs_level_todo[w->BW->current_level].enqueue(
+                        bwork->bfs_level_todo[bwork->current_level].enqueue(
                                 std::tuple<bfs_element<vertex_t> *, int, int>(elem, elem->c->lab[i], -1));
                     }
                     if (elem->is_identity) {
                         PRINT("[BFS] Abort map expecting: " << c_size);
-                        w->BW->level_abort_map_done[w->BW->current_level] = c_size;
+                        bwork->level_abort_map_done[bwork->current_level] = c_size;
                     }
                 }
             }
@@ -1703,27 +1707,27 @@ private:
             PRINT("[BFS] Filling with orbits...");
 
             // swap identity to first position...
-            for (int j = 0; j < w->BW->level_sizes[w->BW->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = w->BW->level_states[w->BW->current_level - 1][j];
+            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
                 if(elem->is_identity) {
-                    bfs_element<vertex_t> *first_elem = w->BW->level_states[w->BW->current_level - 1][0];
-                    w->BW->level_states[w->BW->current_level - 1][j] = first_elem;
-                    w->BW->level_states[w->BW->current_level - 1][0] = elem;
+                    bfs_element<vertex_t> *first_elem = bwork->level_states[bwork->current_level - 1][0];
+                    bwork->level_states[bwork->current_level - 1][j] = first_elem;
+                    bwork->level_states[bwork->current_level - 1][0] = elem;
                     break;
                 }
             }
 
             int i;
             // could parallelize this easily?
-            for (int j = 0; j < w->BW->level_sizes[w->BW->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = w->BW->level_states[w->BW->current_level - 1][j];
+            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
                 int added = 0;
                 if (elem->weight > 0) {
                     int c = elem->target_color;
                     int c_size = elem->c->ptn[c] + 1;
                     int * orbits_sz;
                     int * orbits;
-                    if(w->BW->current_level > 1) {
+                    if(bwork->current_level > 1) {
                         orbits_sz = nullptr;
                         orbits = _getorbits(elem->base, elem->base_sz, w->sequential_gp, &w->sequential_gens,
                                             w->G->domain_size, w->G->b, &orbits_sz);
@@ -1733,7 +1737,7 @@ private:
                     }
                     for (i = c; i < c + c_size; ++i) {
                         if (orbits[elem->c->lab[i]] == elem->c->lab[i]) {
-                            w->BW->bfs_level_todo[w->BW->current_level].enqueue(
+                            bwork->bfs_level_todo[bwork->current_level].enqueue(
                                     std::tuple<bfs_element<vertex_t> *, int, int>(
                                             elem, elem->c->lab[i], orbits_sz[elem->c->lab[i]]));
                             expected += 1;
@@ -1742,18 +1746,18 @@ private:
                     }
                     if (elem->is_identity) {
                         PRINT("[BFS] Abort map expecting: " << added);
-                        w->BW->level_abort_map_done[w->BW->current_level] = added;
+                        bwork->level_abort_map_done[bwork->current_level] = added;
                     }
                 }
             }
         }
 
-        w->BW->level_expecting_finished[w->BW->current_level] = expected;
+        bwork->level_expecting_finished[bwork->current_level] = expected;
     }
 
-    void bfs_assure_init(dejavu_workspace<vertex_t, degree_t, edge_t> *w) {
+    void bfs_assure_init(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t>* bwork) {
         if(!w->init_bfs) {
-            int chunk_sz = w->BW->chunk_size;
+            int chunk_sz = bwork->chunk_size;
             w->todo_dequeue = new std::tuple<bfs_element<vertex_t>*, int, int>[chunk_sz];
             w->todo_deque_sz = chunk_sz;
             w->todo_elements = new std::pair<bfs_element<vertex_t> *, int>[chunk_sz * 8];

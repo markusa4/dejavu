@@ -106,6 +106,7 @@ private:
         if (master) {
             PRINT("[iso] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
             switches->current_mode = modes_iso ::MODE_ISO_BIDIRECTIONAL_DEVIATION;
+            W.id        = -1; // id of the master thread
 
             // first color refinement
             canon_strategy = new strategy<vertex_t>;
@@ -121,6 +122,9 @@ private:
                 delete canon_strategy;
                 return comp;
             }
+            // set some workspace variables
+            _start_c1 = &W.start_c1;
+            _start_c2 = &W.start_c2;
             PRINT("[iso] First refinement done.");
 
             int init_c = W.S.select_color(g1, &W.start_c1, selector_seed);
@@ -163,7 +167,7 @@ private:
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(master_sched, &cpuset);
-                int rc = pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+                pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
                 #endif
             }
             // launch worker threads
@@ -176,16 +180,10 @@ private:
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
                 CPU_SET(i + (i >= master_sched), &cpuset);
-                int rc = pthread_setaffinity_np(work_threads[i].native_handle(),
-                                                sizeof(cpu_set_t), &cpuset);
+                pthread_setaffinity_np(work_threads[i].native_handle(), sizeof(cpu_set_t), &cpuset);
                 #endif
             }
             PRINT("[iso] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
-
-            // set some workspace variables
-            _start_c1 = &W.start_c1;
-            _start_c2 = &W.start_c2;
-            W.id        = -1;
         }
 
         int base_sz = 0;
