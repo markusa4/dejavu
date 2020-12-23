@@ -19,7 +19,7 @@ if (DEFINED COMPILE_PYTHON2API)
     message(STATUS "PYTHON_INCLUDE_DIRS = ${Python2_INCLUDE_DIRS}")
 
     # might need to replace "python" with "python2" or "python27"
-    find_package(Boost COMPONENTS python REQUIRED)
+    find_package(Boost COMPONENTS python2 REQUIRED)
     set(CMAKE_SHARED_MODULE_PREFIX "")
     add_library(dejavupy2 MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
     set_target_properties(dejavupy2 PROPERTIES SUFFIX ".pyd")
@@ -35,7 +35,7 @@ if (DEFINED COMPILE_PYTHON3API)
     message(STATUS "PYTHON_INCLUDE_DIRS = ${Python3_INCLUDE_DIRS}")
 
     # might need to replace "python" with "python3" or "python36"
-    find_package(Boost COMPONENTS python REQUIRED)
+    find_package(Boost COMPONENTS python3 REQUIRED)
     set(CMAKE_SHARED_MODULE_PREFIX "")
     add_library(dejavupy3 MODULE dejavu_api_python.cpp utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
     set_target_properties(dejavupy3 PROPERTIES SUFFIX ".pyd")
