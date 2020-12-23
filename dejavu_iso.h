@@ -41,18 +41,10 @@ struct alignas(64) dejavu_workspace {
     // indicates which thread this is
     int id;
 
-    // bfs_workspace workspace
-    bfs_workspace<vertex_t>* BW1;
-    bfs_workspace<vertex_t>* BW2;
-    bfs_element<vertex_t>* prev_bfs_element = nullptr;
-    bool init_bfs = false;
-
     dejavu_workspace() {
     }
 
     ~dejavu_workspace() {
-        delete BW1;
-        delete BW2;
     };
 };
 
@@ -74,8 +66,10 @@ public:
         }
 
         shared_workspace_iso<vertex_t> switches;
+        bfs_workspace<vertex_t> BW1;
+        bfs_workspace<vertex_t> BW2;
         return worker_thread(g1, g2, true, &switches, nullptr, nullptr, nullptr,
-                -1,nullptr, nullptr);
+                -1,&BW1, &BW2);
     }
 
 private:
@@ -173,11 +167,11 @@ private:
             }
 
             // create some objects that are initialized after tournament
-            W.BW1 = new bfs_workspace<vertex_t>();
-            bwork1 = W.BW1;
+            //W.BW1 = new bfs_workspace<vertex_t>();
+            //bwork1 = W.BW1;
 
-            W.BW2 = new bfs_workspace<vertex_t>();
-            bwork2 = W.BW2;
+            //W.BW2 = new bfs_workspace<vertex_t>();
+            //bwork2 = W.BW2;
 
             #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
@@ -197,7 +191,7 @@ private:
                 work_threads.emplace_back(
                         std::thread(&dejavu_iso_t<vertex_t, degree_t, edge_t>::worker_thread,
                                     dejavu_iso_t<vertex_t, degree_t, edge_t>(), g1, g2, false, switches, &W.start_c1, &W.start_c2,
-                                    canon_strategy, i, W.BW1, W.BW2));
+                                    canon_strategy, i, bwork1, bwork2));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
@@ -216,8 +210,8 @@ private:
 
         int base_sz = 0;
         W.skip_c.copy_force(_start_c1);
-        W.BW1 = bwork1;
-        W.BW2 = bwork2;
+        // W.BW1 = bwork1;
+        // W.BW2 = bwork2;
         W.skiplevels = 0;
 
         if (!master) {
@@ -260,8 +254,8 @@ private:
             PRINT("[strat] Combinatorial base size:" << W.my_base_points_sz);
             W.S.empty_cache();
             int init_c = W.S.select_color_dynamic(g1, &W.start_c1, my_strategy);
-            W.BW1->initialize(bfs_element<vertex_t>::root_element(&W.start_c1, &start_I), init_c, g1->v_size, 2);
-            W.BW2->initialize(bfs_element<vertex_t>::root_element(&W.start_c2, &start_I), init_c, g2->v_size, 2);
+            bwork1->initialize(bfs_element<vertex_t>::root_element(&W.start_c1, &start_I), init_c, g1->v_size, 2);
+            bwork2->initialize(bfs_element<vertex_t>::root_element(&W.start_c2, &start_I), init_c, g2->v_size, 2);
             W.base_size = base_sz;
             // suppress extended deviation on last level, if there is only one level...
             if(W.base_size == 0) {
@@ -288,7 +282,7 @@ private:
                 case MODE_ISO_BIDIRECTIONAL:
                 {
                     g_id = (g_id + 1) % 2;
-                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
+                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?bwork1:bwork2;
 
                     // pick initial path from BFS level that is allocated to me
                     --switches->experimental_budget;
@@ -324,7 +318,7 @@ private:
                 case MODE_ISO_BIDIRECTIONAL_DEVIATION:
                 {
                     g_id = (g_id + 1) % 2;
-                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?W.BW1:W.BW2;
+                    bfs_workspace<vertex_t>* bwork = (g_id == 0)?bwork1:bwork2;
 
                     // pick initial path from BFS level that is allocated to me
                     --switches->experimental_budget;
