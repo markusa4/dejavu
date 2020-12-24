@@ -930,7 +930,7 @@ private:
             const int v = c->lab[rpos];
 
             // individualize and refine
-            proceed_state(w, g, c, I, v, nullptr, -1);
+            proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
             assert(c->vertex_to_col[v] > 0);
 
             // base point
@@ -982,7 +982,7 @@ private:
             m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
             if(*done) return abort_code(0);
             proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m,
-                          (*start_I->compareI->vec_cells)[w->first_skiplevel - 1]);
+                          (*start_I->compareI->vec_cells)[w->first_skiplevel - 1], -1, nullptr);
             w->first_skiplevel += 1;
             if(!w->is_foreign_base)
                 w->skip_schreier_level = w->skip_schreier_level->next;
@@ -1026,7 +1026,8 @@ private:
 
                 if(w->first_skiplevel <= w->skiplevels) {
                     m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
-                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m, -1);
+                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m, -1,
+                                  -1, nullptr);
                     w->first_skiplevel += 1;
                     if(!w->is_foreign_base) {
                         w->skip_schreier_level = w->skip_schreier_level->next;
@@ -1109,7 +1110,7 @@ private:
             }
 
             const int cell_early = (*I->compareI->vec_cells)[level - 1];
-            bool comp = proceed_state(w, g, c, I, v, m, cell_early);
+            bool comp = proceed_state(w, g, c, I, v, m, cell_early, -1, nullptr);
             level += 1;
 
             if(!comp) {
@@ -1255,7 +1256,7 @@ private:
 
             group_level = group_level->next;
             level += 1;
-            const bool comp = proceed_state(w, g, c, I, v, nullptr, -1);
+            const bool comp = proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
 
             if(!comp) {
                 backtrack = true;
@@ -1268,21 +1269,23 @@ private:
     int extract_selector(invariant* I, int base_point) {
         if((I->compareI->vec_selections)->size() <= base_point)
             return - 1;
-        return (*I->compareI->vec_selections)[base_point];
+        return (*I->compareI->vec_selections)[base_point].first;
     }
 
     // Performs one individualization followed by one refinement on the given coloring with the given settings.
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
                        sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
-                       invariant* I, int v, strategy_metrics* m, int cell_early) {
+                       invariant* I, int v, strategy_metrics* m, int cell_early, int individualize_early,
+                       std::vector<int>* early_individualized) {
         if(!config.CONFIG_IR_IDLE_SKIP)
             cell_early = -1;
 
         // protocol of selector choice
-        I->selection_write(c->vertex_to_col[v]);
-        const int init_color_class = w->R.individualize_vertex(c, v);
+        I->selection_write(c->vertex_to_col[v], c->ptn[c->vertex_to_col[v]]);
+        const int init_color_class = w->R.individualize_vertex(c, v); // TODO: should allow vector of vertices to be individualized
         bool comp = true;
-        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early);
+        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early,
+                                            early_individualized);
         return comp;
     }
 
@@ -1440,7 +1443,8 @@ private:
                 // compute next coloring
                 w->work_I->reset_deviation();
                 const int cells_early = (*w->work_I->compareI->vec_cells)[elem->base_sz];
-                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, cells_early); // &w->changes
+                comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, cells_early, -1,
+                                             nullptr);
 
                 // manage abort map counter
                 if (comp && elem->is_identity && level > 1) {
@@ -1798,14 +1802,16 @@ private:
     // Computes a leaf of the tree by following the path given in base.
     void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                           sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
-                          int base_sz, bijection<vertex_t> *leaf) {
+                          int base_sz, bijection<vertex_t> *leaf, invariant* compare_I) {
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
+        // I->set_compare_invariant(compare_I);
         c->copy_force(start_c);
         I->never_fail = true;
+        //PRINT("Reconstruction base_sz " << base_sz);
         for(int pos = 0; pos < base_sz; ++pos) {
             const int v = base[pos];
-            proceed_state(w, g, c, I, v, nullptr, -1);
+            proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
         };
         leaf->read_from_coloring(c);
     }
@@ -1817,11 +1823,13 @@ private:
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
         thread_local work_list_t<vertex_t> collect_base;
+        thread_local std::vector<int>      collect_early_individualized;
         thread_local int collect_base_sz;
 
         if(!collect_base.init)
             collect_base.initialize(g->v_size);
         collect_base.reset();
+        collect_early_individualized.clear();
         collect_base_sz = 0;
 
         coloring<vertex_t>* c = &w->c;
@@ -1840,15 +1848,18 @@ private:
             collect_base.push_back(v);
             collect_base_sz += 1;
             int cell_early = -1;
+            int individualize_early = -1;
             if (look_close) {
                 I->never_fail = true;
+                individualize_early = elem->base_sz + 1;
             } else {
                 I->never_fail = false;
                 cell_early = (*I->compareI->vec_cells)[elem->base_sz];
             }
             I->reset_deviation();
-            if(v != elem->deviation_vertex) {
-                comp = proceed_state(w, g, c, I, v, nullptr, cell_early);
+            if(v != elem->deviation_vertex || look_close) { // added || look_close
+                comp = proceed_state(w, g, c, I, v, nullptr, cell_early, individualize_early,
+                                     &collect_early_individualized);
                 if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
                     ++switches->experimental_deviation;
                     if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
@@ -1864,6 +1875,13 @@ private:
             }
         }
 
+        //if(collect_early_individualized.size() != 0)
+        //    PRINT(collect_early_individualized.size());
+        for(int i = 0; i < collect_early_individualized.size(); ++i) {
+            collect_base.push_back(collect_early_individualized[i]);
+            collect_base_sz += 1;
+        }
+
         ++switches->experimental_paths;
         w->S.empty_cache();
 
@@ -1876,7 +1894,7 @@ private:
             const int v    = c->lab[rpos];
             collect_base.push_back(v);
             collect_base_sz += 1;
-            comp = proceed_state(w, g, c, I, v, nullptr, -1);
+            comp = proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
         } while(comp);
 
         if(comp && (strat->I->acc == I->acc)) { // automorphism computed
@@ -1907,12 +1925,25 @@ private:
                 if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                     switches->leaf_store_explicit++;
                     switches->leaf_store.insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g->v_size, true)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g->v_size, true, look_close)));
                 } else {
                     vertex_t* base = new vertex_t[collect_base_sz];
                     memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
                     switches->leaf_store.insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, elem)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, look_close, elem)));
+
+                    // DEBUG
+                    /*bijection<vertex_t> fake_leaf;
+                    reconstruct_leaf(w, g, elem->c, base, collect_base_sz, &fake_leaf, strat->I);
+                    fake_leaf.deletable();
+                    automorphism->copy(&leaf);
+                    automorphism->inverse();
+                    automorphism->compose(&fake_leaf);
+                    if(!w->R.certify_automorphism(g, automorphism)) {
+                        PRINT("IMMEDIATE RECONSTRUCTION FAIL.");
+                        PRINT(collect_base_sz << ", " << collect_early_individualized.size());
+                    }*/
+                    //
                     leaf.deletable();
                 }
             }
@@ -1921,6 +1952,12 @@ private:
             comp = false;
 
             for(size_t i = 0; i < pointers.size(); ++i) {
+                // use reconstruction method on actual leaf to make it isomorphism-invariant
+                if(collect_early_individualized.size() > 0) {
+                    reconstruct_leaf(w, g, elem->c, collect_base.arr, collect_base_sz, &leaf, strat->I);
+                }
+
+                // compute automorphism
                 automorphism->copy(&leaf);
                 automorphism->inverse();
                 bijection<vertex_t> fake_leaf;
@@ -1929,8 +1966,10 @@ private:
                     fake_leaf.map = pointers[i].map;
                     fake_leaf.not_deletable();
                 } else {
+                    // if other leaf was not stored explicitly, reconstruct!
                     if(switches->done) return false;
-                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf);
+                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf,
+                                     strat->I);
                     fake_leaf.deletable();
                 }
 
@@ -1942,6 +1981,7 @@ private:
                     automorphism->non_uniform = false;
                     comp = true;
                 } else {
+                    PRINT("Reconstruction failed.")
                     comp = false;
                 }
             }

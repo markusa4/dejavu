@@ -14,7 +14,7 @@ class invariant {
 public:
     invariant* created                     = nullptr;
     std::vector<int>*        vec_cells     = nullptr;
-    std::vector<int>*        vec_selections= nullptr;
+    std::vector<std::pair<int, int>>* vec_selections= nullptr;
     std::vector<cell_state>* vec_protocol  = nullptr;
     std::vector<int>*        vec_invariant = nullptr;
 
@@ -67,14 +67,14 @@ public:
         }
     }
 
-    inline void selection_write(int cell) {
+    inline void selection_write(int cell, int cell_size) {
         if(!no_write) {
-            vec_selections->push_back(cell);
+            vec_selections->push_back(std::pair<int, int>(cell, cell_size));
         }
     }
 
     inline int selection_read(int base_point) {
-        return (*vec_selections)[base_point];
+        return (*vec_selections)[base_point].first;
     }
 
     inline void protocol_write(bool active_cell, int c) {
@@ -131,7 +131,7 @@ public:
         vec_cells     = new std::vector<int>();
         vec_protocol  = new std::vector<cell_state>();
         vec_invariant = new std::vector<int>();
-        vec_selections= new std::vector<int>(); // should also include size, for future blueprint uses
+        vec_selections= new std::vector<std::pair<int,int>>(); // should also include size, for future blueprint uses
         vec_cells->reserve(prealloc + 16);
         vec_protocol->reserve(prealloc + 16);
         vec_invariant->reserve(prealloc * 20);

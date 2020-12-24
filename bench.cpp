@@ -19,6 +19,8 @@ class time_point;
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
+thread_local int numnodes;
+thread_local int colorcost;
 
 bool finished = false;
 

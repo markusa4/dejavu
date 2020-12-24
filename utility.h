@@ -32,8 +32,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-//#define PRINT(str) std::cout << str << std::endl;
-#define PRINT(str) (void)0;
+#define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) (void)0;
 
 /*class NFAllocBuf {
 public:
@@ -98,11 +98,12 @@ struct bfs_element;
 
 template<class vertex_t>
 struct stored_leaf {
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf) :
-                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf) {};
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bfs_element<vertex_t>* start_elem) :
-                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), start_elem(start_elem) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bool look_close) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), look_close(look_close) {};
+    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bool look_close, bfs_element<vertex_t>* start_elem) :
+                map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), look_close(look_close), start_elem(start_elem) {};
     bool      explicit_leaf;
+    bool      look_close;
     int       map_sz;
     vertex_t* map;
     bfs_element<vertex_t>* start_elem;

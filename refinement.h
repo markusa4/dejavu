@@ -340,8 +340,10 @@ template<class vertex_t, class degree_t, class edge_t>
 class refinement {
 public:
     bool refine_coloring(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, invariant *I,
-                         int init_color_class, strategy_metrics *m, int cell_early) {
+                         int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
+                         std::vector<int>* early_individualized) {
         bool comp = true;
+        int individualize_pos = individualize_early;
         assure_initialized(g);
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
         if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
@@ -422,7 +424,7 @@ public:
                 bool is_largest = color_class_splits.last()->second;
 
                 c->cells += (old_class != new_class);
-                const int class_size = c->ptn[new_class];
+                int class_size = c->ptn[new_class];
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
 
@@ -461,6 +463,24 @@ public:
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     return comp;
+                }
+
+                // random blueprint individualization during color refinement
+                if(true) {
+                    if (individualize_early >= 0 && individualize_pos < I->vec_selections->size() &&
+                        (*I->vec_selections)[individualize_pos].first == new_class &&
+                        (*I->vec_selections)[individualize_pos].second == class_size) {
+                        //PRINT("FOUND CLASS" << individualize_pos);
+                        const int col = new_class;
+                        const int rpos = col + (intRand(0, INT32_MAX, 0) % (c->ptn[col] + 1));
+                        const int v = c->lab[rpos];
+                        early_individualized->push_back(v);
+                        const int resulting_color = individualize_vertex(c, v);
+                        new_class = resulting_color;
+                        class_size = c->ptn[new_class];
+                        is_largest = false;
+                        individualize_pos += 1;
+                    }
                 }
 
                 if(latest_old_class != old_class) {

@@ -7,4 +7,5 @@ void invariant::set_compare_invariant(invariant* I) {
     has_compare = true;
     compareI    = I;
     compare_vec = I->vec_invariant;
+    vec_selections = I->vec_selections;
 }
