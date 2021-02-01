@@ -32,7 +32,7 @@ Command Line Argument | Effect
 `--file2` | specifies the second graph input file in DIMACS format
 
 # API
-By including "dejavu_auto.h" you can use the automorphism from your code. Given an `sgraph` g (which follows the graph format used by `nauty` and `Traces`), you can compute its automorphism group with a call to `dejavu_automorphisms`:
+By including "dejavu_auto.h" you can use the automorphism solver. Given an `sgraph` g (which follows the graph format used by `nauty` and `Traces`), you can compute its automorphism group with a call to `dejavu_automorphisms`:
 ```cpp
 shared_permnode* gens;
 dejavu_automorphisms(&g, nullptr, &gens);
