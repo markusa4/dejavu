@@ -5,12 +5,6 @@ cmake .
 make 
 ```
 
-The benchmark utility has binary dependencies to nauty. The easiest way to compile it is to place a configured and compiled distribution of nauty / Traces (available at http://pallini.di.uniroma1.it/) in "nauty/". After placing nauty and Traces into the respective folder, the project can be compiled with cmake:
-```
-cmake -DBENCH=1 --build "."
-make 
-```
-
 # Usage
 Compilation produces two binaries (`dejavu-auto` and `dejavu-iso`), which are similar in usage. `dejavu-auto` is the binary of the automorphism solver, `dejavu-iso` of the isomorphism solver.
 
