@@ -217,7 +217,7 @@ void bench_nauty(sgraph* g1, sgraph* g2, double* nauty_solve_time) {
 }
 
 
-void bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
+void bench_dejavu_iso(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
     vujade_iso(g1, g2);

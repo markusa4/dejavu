@@ -131,7 +131,7 @@ private:
 
             int init_c = W.S.select_color(g1, &W.start_c1, selector_seed);
             if(init_c == -1) {
-                std::cout << "[iso] First coloring discrete, checking isomorphism." << std::endl;
+                PRINT("[iso] First coloring discrete, checking isomorphism." << std::endl);
                 bijection<vertex_t> automorphism;
                 automorphism.read_from_coloring(&W.start_c1);
                 bijection<vertex_t> leaf2;

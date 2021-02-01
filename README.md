@@ -12,7 +12,7 @@ make
 ```
 
 # Usage
-Compilation produces (up to) three binaries (`dejavu-auto`, `dejavu-iso` and `bench`), which are however similar in usage. dejavu is the binary of the automorphism solver, dejavu-iso of the isomorphism solver. bench is a frontend which can call nauty, Traces and dejavu, while recording and tracking time measurements, as well as manage timeouts. 
+Compilation produces two binaries (`dejavu-auto` and `dejavu-iso`), which are similar in usage. `dejavu-auto` is the binary of the automorphism solver, `dejavu-iso` of the isomorphism solver.
 
 ## dejavu-auto
 The automorphism solver `dejavu-auto` only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. The solver accepts the following command line arguments:
@@ -37,23 +37,22 @@ Command Line Argument | Effect
 `--file1` | specifies the first graph input file in DIMACS format
 `--file2` | specifies the second graph input file in DIMACS format
 
-## bench
-The benchmark utility `bench` again understands the same command line arguments as `dejavu`, with the addition of the following: 
-
-Command Line Argument | Effect
---- | ---
-`--no-nauty` | does not run nauty
-`--no-traces` | does not run Traces
-`--no-dejavu` | does not run dejavu
-`--stat-file` | specifies a file to which measurements are written
-
 # API
-By including "dejavu_auto.h" you can call the automorphism computation directly. The API currently only consists of one function, which can be used as follows. If you have an `sgraph` g, you can compute its automorphism group with a call to `dejavu_automorphisms`:
+By including "dejavu_auto.h" you can use the automorphism from your code. Given an `sgraph` g (which follows the graph format used by `nauty` and `Traces`), you can compute its automorphism group with a call to `dejavu_automorphisms`:
 ```cpp
 shared_permnode* gens;
 dejavu_automorphisms(&g, nullptr, &gens);
 ```
-Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (analogous to the commandline arguments). The second argument defines the initial colors of vertices. If the graph is uncolored, a null pointer can be passed. Otherwise, an integer array mapping vertices to colors is expected.
+The second argument may also be an integer array mapping vertices to colors.
+
+Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (analogous to the commandline arguments). The second argument defines the initial colors of vertices. If the graph is uncolored, a null pointer can be passed. Otherwise, an integer array mapping vertices to colors is expected. 
+
+The isomorphism computation can be accessed through "dejavu_iso.h" in a similar fashion: 
+```cpp
+bool are_isomorphic = dejavu_isomorphic(&g1, &g2);
+```
+
+Note that calling the solver from multiple threads simultaneously is not yet supported.
 
 # License
 The source code contains modified source code of the [nauty / Traces](http://pallini.di.uniroma1.it) distribution, as well as the lock-free queue implementation described [here](http://moodycamel.com/blog/2014/a-fast-general-purpose-lock-free-queue-for-c++). 

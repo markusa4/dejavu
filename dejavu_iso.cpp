@@ -25,7 +25,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-bool bench_vujade(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
+bool bench_dejavu_iso(sgraph *g1, sgraph *g2, double* dejavu_solve_time) {
     Clock::time_point timer = Clock::now();
     bool res = dejavu_isomorphic(g1, g2);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
@@ -205,7 +205,7 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bool res = bench_vujade(_g1, _g2, &dejavu_solve_time);
+    bool res = bench_dejavu_iso(_g1, _g2, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
 
