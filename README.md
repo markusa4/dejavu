@@ -37,8 +37,6 @@ By including "dejavu_auto.h" you can use the automorphism solver. Given an `sgra
 shared_permnode* gens;
 dejavu_automorphisms(&g, nullptr, &gens);
 ```
-The second argument may also be an integer array mapping vertices to colors.
-
 Configurations can be made using the global struct `config`, in which things such as the thread count can be defined (analogous to the commandline arguments). The second argument defines the initial colors of vertices. If the graph is uncolored, a null pointer can be passed. Otherwise, an integer array mapping vertices to colors is expected. 
 
 The isomorphism computation can be accessed through "dejavu_iso.h" in a similar fashion: 
