@@ -8,14 +8,16 @@
 #include "concurrentqueue.h"
 #include "selector.h"
 #include "bfs.h"
+#include "dejavu_auto.h"
 
+enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
+
+/*
 struct abort_code {
     abort_code()=default;
     abort_code(int reason):reason(reason){};
     int reason = 0;
 };
-
-enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
 
 template <class vertex_t, class degree_t, class edge_t>
 struct alignas(64) dejavu_workspace {
@@ -36,7 +38,7 @@ struct alignas(64) dejavu_workspace {
 
     // indicates which thread this is
     int id;
-};
+};*/
 
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_iso_t {
@@ -113,9 +115,9 @@ private:
             my_canon_I->create_vector(g1->v_size);
             strategy_metrics m;
             bool comp;
-            W.R.refine_coloring(g1, &W.start_c1, my_canon_I, -1, &m, -1);
+            W.R.refine_coloring(g1, &W.start_c1, my_canon_I, -1, &m, -1, -1, nullptr);
             W.start_I.set_compare_invariant(my_canon_I);
-            comp = W.R.refine_coloring(g2, &W.start_c2, &W.start_I, -1, &m, W.start_c2.cells);
+            comp = W.R.refine_coloring(g2, &W.start_c2, &W.start_I, -1, &m, W.start_c2.cells, -1, nullptr);
             delete my_canon_I;
             my_canon_I = new invariant;
             if(!comp) {
@@ -214,7 +216,7 @@ private:
         switches->leaf_store_mutex[gid_first].lock();
         my_canon_leaf->not_deletable();
         switches->leaf_store[gid_first].insert(std::pair<long, stored_leaf<vertex_t>>(my_canon_I->acc,
-                stored_leaf<vertex_t>(my_canon_leaf->map, g1->v_size, true)));
+                stored_leaf<vertex_t>(my_canon_leaf->map, g1->v_size, true, false)));
         switches->leaf_store_mutex[gid_first].unlock();
 
         // we need to perform some unnecessary initializations which are mostly not utilized in the isomorphism solver
@@ -410,10 +412,10 @@ private:
             cell_early = -1;
 
         // protocol of selector choice
-        I->selection_write(c->vertex_to_col[v]);
+        I->selection_write(c->vertex_to_col[v], c->ptn[c->vertex_to_col[v]]);
         const int init_color_class = w->R.individualize_vertex(c, v);
         bool comp = true;
-        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early);
+        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early, -1, nullptr);
         return comp;
     }
 
@@ -525,12 +527,12 @@ private:
                     if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                         switches->leaf_store_explicit++;
                         switches->leaf_store[gi].insert(std::pair<long,
-                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true)));
+                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
                     } else {
                         vertex_t* base = new vertex_t[collect_base_sz];
                         memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
                         switches->leaf_store[gi].insert(std::pair<long,
-                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false)));
+                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, false)));
                         leaf.deletable();
                     }
                 }
@@ -576,12 +578,12 @@ private:
                 if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                     switches->leaf_store_explicit++;
                     switches->leaf_store[gi].insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
                 } else {
                     vertex_t* base = new vertex_t[collect_base_sz];
                     memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
                     switches->leaf_store[gi].insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, false)));
                     leaf.deletable();
                 }
             }
@@ -645,7 +647,7 @@ private:
                         if(switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                             switches->leaf_store_explicit++;
                             switches->leaf_store[gi].insert(std::pair<long,
-                                    stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true)));
+                                    stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
                         } else {
 
                         }
@@ -687,7 +689,7 @@ private:
                 if (!pointers.empty() && gi == g_id && !found_auto) {
                     switches->leaf_store_mutex[gi].lock();
                     switches->leaf_store[gi].insert(std::pair<long, stored_leaf<vertex_t>>(I->acc,
-                            stored_leaf<vertex_t>(leaf.map, g1->v_size, true)));
+                            stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
                     switches->leaf_store_mutex[gi].unlock();
                 }
             }
@@ -727,31 +729,31 @@ typedef dejavu_iso_t<int, int, int> dejavu_iso;
     switch(sgraph->type) {
         case sgraph_type::DSG_INT_INT_INT: {
             PRINT("[Dispatch] <int32, int32, int32>");
-            dejavu_t<int, int, int> d;
+            dejavu_auto_t<int, int, int> d;
             d.automorphisms(sgraph->sgraph_0, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_INT: {
             PRINT("[Dispatch] <int16, int16, int>");
-            dejavu_t<int16_t, int16_t, int> d;
+            dejavu_auto_t<int16_t, int16_t, int> d;
             d.automorphisms(sgraph->sgraph_1, gens);
         }
             break;
         case sgraph_type::DSG_SHORT_SHORT_SHORT: {
             PRINT("[Dispatch] <int16, int16, int16>");
-            dejavu_t<int16_t, int16_t, int16_t> d;
+            dejavu_auto_t<int16_t, int16_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_2, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_SHORT:{
             PRINT("[Dispatch] <int8, int8, int16>");
-            dejavu_t<int8_t, int8_t, int16_t> d;
+            dejavu_auto_t<int8_t, int8_t, int16_t> d;
             d.automorphisms(sgraph->sgraph_3, gens);
         }
             break;
         case sgraph_type::DSG_CHAR_CHAR_CHAR: {
             PRINT("[Dispatch] <int8, int8, int8>");
-            dejavu_t<int8_t, int8_t, int8_t> d;
+            dejavu_auto_t<int8_t, int8_t, int8_t> d;
             d.automorphisms(sgraph->sgraph_4, gens);
         }
             break;

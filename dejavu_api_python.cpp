@@ -160,8 +160,38 @@ public:
     }
 };
 
+boost::python::list isomorphism(pygraph g1, pycoloring c1, pygraph g2, pycoloring c2) {
+    sgraph sg1;
+    g1->to_sgraph(sg1);
+    sgraph sg2;
+    g2->to_sgraph(sg2);
+    int* vertex_to_col1 = new int[sg1.v_size];
+    for(int i = 0; i < sg1.v_size; ++i)
+        vertex_to_col1[i] = c1.get_color(i);
+    int* vertex_to_col2 = new int[sg2.v_size];
+    for(int i = 0; i < sg2.v_size; ++i)
+        vertex_to_col2[i] = c2.get_color(i);
 
-boost::python::list _random_paths(pygraph g, pycoloring c, int max_length, int num, bool fill_paths) {
+    auto isomorphism = are_isomorphic(sg1, vertex_to_col1, sg2, vertex_to_col2);
+
+    // ToDo: isomorphism
+}
+
+boost::python::list automorphisms(pygraph g, pycoloring c) {
+    sgraph sg;
+    g->to_sgraph(sg);
+    int* vertex_to_col = new int[sg.v_size];
+    for(int i = 0; i < sg.v_size; ++i)
+        vertex_to_col[i] = c.get_color(i);
+
+    auto generating_set = automorphisms(sg, vertex_to_col);
+
+    // ToDo: transform generating_set
+
+    delete[] vertex_to_col;
+}
+
+boost::python::list get_random_paths(pygraph g, pycoloring c, int max_length, int num, bool fill_paths) {
     sgraph sg;
     g.to_sgraph(&sg);
     sg.print();
@@ -209,7 +239,7 @@ boost::python::list _random_paths(pygraph g, pycoloring c, int max_length, int n
     return std_vector_to_py_list(_nodes);
 }
 
-boost::python::list _random_paths_edge_colored(pygraph g, pycoloring c, pycoloring ce, int max_length, int num, bool fill_paths) {
+boost::python::list get_random_paths_edge_colored(pygraph g, pycoloring c, pycoloring ce, int max_length, int num, bool fill_paths) {
     pygraph ge;
     pycoloring c_ce;
 
@@ -238,10 +268,10 @@ boost::python::list _random_paths_edge_colored(pygraph g, pycoloring c, pycolori
     return l;
 }
 
-BOOST_PYTHON_MODULE(libdejavu_python) {
+BOOST_PYTHON_MODULE(dejavupy) {
         using namespace boost::python;
-        def("_random_paths", _random_paths);
-        def("_random_paths_edge_colored", _random_paths_edge_colored);
+        def("get_random_paths", get_random_paths);
+        def("get_random_paths_edge_colored", get_random_paths_edge_colored);
         class_<nodes>("nodes")
             .def("get_size", &nodes::get_size)
             .def("get_node", &nodes::get_node)

@@ -13,7 +13,6 @@
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
 
-
 #if (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__))
     #define OS_WINDOWS
 #endif
@@ -32,8 +31,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
 
 /*class NFAllocBuf {
 public:
@@ -77,8 +76,6 @@ static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
     }
     all_buffers->clear();
 }*/
-
-
 
 // modes_auto of the solver
 enum modes_auto {MODE_AUTO_TOURNAMENT, MODE_AUTO_NON_UNIFORM_PROBE, MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE,

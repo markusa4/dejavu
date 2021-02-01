@@ -168,7 +168,7 @@ public:
     }
 
     void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection<vertex_t>* p) {
-        initialize(v_size, e_size);
+        ng->initialize(v_size, e_size);
         ng->v_size = v_size;
         ng->d_size = d_size;
         ng->e_size = e_size;

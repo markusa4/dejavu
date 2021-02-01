@@ -339,9 +339,11 @@ private:
 template<class vertex_t, class degree_t, class edge_t>
 class refinement {
 public:
+    // color refinement
+    // includes several options for using invariants, blueprints and k-deviation
     bool refine_coloring(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
-                         std::vector<int>* early_individualized) {
+                         std::vector<vertex_t>* early_individualized) {
         bool comp = true;
         int individualize_pos = individualize_early;
         assure_initialized(g);
@@ -440,6 +442,7 @@ public:
             }
 #endif
 
+                // detection if coloring is discrete
                 if(c->cells == g->v_size) {
                     const int new_cells = c->cells - pre_cells;
 
@@ -455,7 +458,7 @@ public:
                     return comp;
                 }
 
-                // partition is similar to that of target invariant, skip to the end of the entire refinement
+                // partition is as large as the one of target invariant, can skip to the end of the entire refinement
                 if(c->cells == cell_early && comp) {
                     I->fast_forward(INV_MARK_ENDREF);
                     if(I->no_write)
@@ -466,7 +469,7 @@ public:
                 }
 
                 // random blueprint individualization during color refinement
-                if(true) {
+                if(config.CONFIG_IR_INDIVIDUALIZE_EARLY) {
                     if (individualize_early >= 0 && individualize_pos < I->vec_selections->size() &&
                         (*I->vec_selections)[individualize_pos].first == new_class &&
                         (*I->vec_selections)[individualize_pos].second == class_size) {
@@ -488,9 +491,9 @@ public:
                     skipped_largest = false;
                 }
 
+                // management code for skipping largest class resulting from old_class
                 color_class_splits.pop_back();
                 int new_class_sz = c->ptn[new_class] + 1;
-
 
                 if(skipped_largest || !is_largest) {
                     cell_todo.add_cell(&queue_pointer, new_class);
@@ -507,7 +510,7 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
-            // mark end of cell and denote whether this cell split
+            // mark end of cell and denote whether this cell was splitting or non-splitting
             I->protocol_write(new_cells > 0, next_color_class);
             comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
             if(!comp && deviation_expander <= 0) break;
@@ -524,6 +527,7 @@ public:
         return comp;
     }
 
+    // individualize a vertex in a coloring
     int  individualize_vertex(coloring<vertex_t>* c, int v) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
@@ -547,6 +551,8 @@ public:
         return color + color_class_size;
     }
 
+    // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
+    // techniques -- meant to be used as the first refinement in automorphism computation
     bool refine_coloring_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                int init_color_class) {
         assure_initialized(g);
@@ -655,6 +661,7 @@ public:
         return true;
     }
 
+    // certify an automorphism on a graph
     bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
@@ -691,6 +698,7 @@ public:
         return true;
     }
 
+    // certify an automorphism on a graph
     bool certify_automorphism_iso(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
@@ -725,6 +733,7 @@ public:
         return true;
     }
 
+    // certify a graph isomorphism
     bool certify_isomorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
                              bijection<vertex_t> *p) {
         if(g1 == g2) {
@@ -1668,7 +1677,6 @@ private:
             while(pos > 0) {
                 const int v = scratch[--pos];
                 const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
-                // i could immediately determine size of v_new_color here and write invariant before rearrange?
                 assert(v_new_color >= col);
                 assert(v_new_color < col + col_sz);
 

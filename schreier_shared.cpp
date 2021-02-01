@@ -347,7 +347,6 @@ void mapplyperm(int *wp, int *p, int k, int n) {
         /* We will construct p^k in workpermB one cycle at a time. */
 
         for (i = 0; i < n; ++i) {
-            //if (ISELEMENT(mworkset2, i)) continue;
             if (mworkset_marks.get(i)) continue;
             if (p[i] == i)
                 mworkpermB[i] = i;
@@ -356,7 +355,6 @@ void mapplyperm(int *wp, int *p, int k, int n) {
                 mworkpermA[0] = i;
                 for (j = p[i]; j != i; j = p[j]) {
                     mworkpermA[cyclen++] = j;
-                            //ADDELEMENT(mworkset2, j);
                             mworkset_marks.set(j);
                 }
                 kk = k % cyclen;
@@ -774,7 +772,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
 
     if(endlevel == maxlevel) {
         if (!ident && !ingroup) {
-            std::cout << "should not happen" << std::endl;
+            std::cout << "[error] base seems incomplete, should not happen" << std::endl;
             assert(false);
             changed = true;
             report_changed = changed;

@@ -2,9 +2,9 @@
 #define DEJAVU_DEJAVU_API_H
 
 #include "dejavu_iso.h"
+#include "dejavu_auto.h"
 
 class dejavu_api {
-public:
 public:
     bool random_paths(sgraph_t<int, int, int> *g, int* vertex_to_col, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
@@ -46,9 +46,9 @@ private:
             config.CONFIG_IR_FORCE_EXPAND_DEVIATION = true;
             config.CONFIG_IR_DENSE = !(g->e_size < g->v_size ||
                                        g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
-            //start_c = new coloring<int>;
+            //start_c1 = new coloring<int>;
             g->initialize_coloring(&W.start_c1, vertex_to_col);
-            //g->initialize_coloring_raw(start_c);
+            //g->initialize_coloring_raw(start_c1);
             if (config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
@@ -80,7 +80,7 @@ private:
             // first color refinement
             canon_strategy = new strategy<int>;
             my_canon_I->create_vector(g->v_size);
-            //W.start_c1 = start_c;
+            //W.start_c1 = start_c1;
             //W.start_c2 = new coloring<int>;
             strategy_metrics m;
             bool comp;
@@ -134,7 +134,7 @@ private:
 
             // set some workspace variables
             //W.start_c1 = new coloring<int>;
-            //W.start_c1->copy_force(start_c);
+            //W.start_c1->copy_force(start_c1);
             _start_c = &W.start_c1;
             W.id = -1;
         }
@@ -273,6 +273,21 @@ private:
 void random_paths(sgraph* g, int* vertex_to_col, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
     dejavu_api v;
     v.random_paths(g, vertex_to_col, max_length, num, paths);
+}
+
+bijection<int> are_isomorphic(sgraph_t<int, int, int> *g1, int* vertex_to_col1,
+                              sgraph_t<int, int, int> *g2, int* vertex_to_col2) {
+    dejavu_iso solver;
+    solver.iso(g1, g2);
+
+    // ToDo: return results
+}
+
+std::vector<bijection<int>> automorphisms(sgraph_t<int, int, int> *g, int* vertex_to_col) {
+    dejavu_auto solver;
+    solver.automorphisms(g, vertex_to_col);
+
+    // ToDo: return results
 }
 
 #endif //DEJAVU_DEJAVU_API_H

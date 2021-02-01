@@ -91,6 +91,13 @@ public:
             delete[] p->map;
         }
 
+
+        int support = 0;
+        for(int i = 0; i < p->map_sz; ++i) {
+            support += (p->map[i] != i);
+        }
+        PRINT("[auto] support: " << support << " / " << p->map_sz);
+
         filterstate state;
         state.ingroup = false;
         state.counts_towards_abort = !p->non_uniform;
@@ -101,7 +108,7 @@ public:
             result = mfilterschreier_shared(gp, map, &gens, (state.ingroup ? true : false), domain_size + 1,
                                             domain_size, state.level + 1, domain_size + 1,
                                             &state, domain_size + 1);
-            sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result));
+            sift_results.enqueue(std::pair<sift_type, bool>(state.stype, result)); // ToDo: replace sifting queue with counter!
         } else {
             // finish sift, but return change according to sqrt(base) first levels
             // such that we can switch to more efficient base

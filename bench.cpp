@@ -358,9 +358,10 @@ int commandline_mode(int argc, char **argv) {
     p.parse_dimacs_file(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
-        std::cout << "Permuting graph..." << std::endl;
         bijection<int> pr;
+        std::cout << "Generating random bijection (seed " << seed << ")..." << std::endl;
         bijection<int>::random_bijection(&pr, g->v_size, seed);
+        std::cout << "Permuting graph..." << std::endl;
         g->permute_graph(_g, &pr); // permute graph
         if(colmap != nullptr)
             permute_colmap(&colmap, g->v_size, pr.map);
