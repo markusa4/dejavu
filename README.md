@@ -1,5 +1,5 @@
 # Compilation
-If only the dejavu automorphism and isomorphism solvers are to be compiled the project should compile without any further dependencies:
+Using `cmake`, the project should compile without any further dependencies:
 ```
 cmake .
 make 
