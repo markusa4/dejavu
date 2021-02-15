@@ -87,7 +87,7 @@ private:
             if(config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
-            assert(start_c1->check());
+            // assert(start_c1->check());
         }
 
         std::vector<std::thread> work_threads;
@@ -476,7 +476,7 @@ private:
                 I->never_fail = true;
             } else {
                 I->never_fail = false;
-                cell_early = (*I->compareI->vec_cells)[elem->base_sz];
+                cell_early = (I->compareI->vec_cells)[elem->base_sz];
             }
             I->reset_deviation();
             if(v != elem->deviation_vertex) {
@@ -626,7 +626,7 @@ private:
             ++level;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
-            const int cell_early = (*I->compareI->vec_cells)[elem->base_sz];
+            const int cell_early = (I->compareI->vec_cells)[elem->base_sz];
             comp = proceed_state(w, g, c, I, v, nullptr, cell_early);
         } while(comp);
 

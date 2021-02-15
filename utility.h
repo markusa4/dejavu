@@ -31,51 +31,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-//#define PRINT(str) std::cout << str << std::endl;
-#define PRINT(str) (void)0;
-
-/*class NFAllocBuf {
-public:
-    NFAllocBuf() {
-        all_buffers.reserve(1024);
-    }
-    unsigned char* buffer = nullptr;
-    std::vector<unsigned char*> all_buffers = std::vector<unsigned char*>();
-};
-
-extern thread_local NFAllocBuf n_buffer;
-
-static void *NFAlloc(size_t size) {
-    //return malloc(size);
-    thread_local size_t buffer_sz  = 0;
-    thread_local size_t buffer_pos = 0;
-    thread_local size_t next_buffer_sz = 4096;
-    if(buffer_sz <= (buffer_pos + size)) {
-        n_buffer.buffer = new unsigned char[next_buffer_sz];
-        n_buffer.all_buffers.push_back(n_buffer.buffer);
-        buffer_sz  = next_buffer_sz;
-        next_buffer_sz *= 2;
-        buffer_pos = 0;
-    }
-
-    void* alloc_p = (void*) (n_buffer.buffer + buffer_pos);
-    buffer_pos += size;
-    return alloc_p;
-}
-
-static void FreeAll() {
-    for(int i = 0; i < n_buffer.all_buffers.size(); ++i) {
-        delete[] n_buffer.all_buffers[i];
-    }
-    n_buffer.all_buffers.clear();
-}
-
-static void FreeBuf(std::vector<unsigned char*>* all_buffers) {
-    for(int i = 0; i < all_buffers->size(); ++i) {
-        delete[] (*all_buffers)[i];
-    }
-    all_buffers->clear();
-}*/
+#define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) (void)0;
 
 // modes_auto of the solver
 enum modes_auto {MODE_AUTO_TOURNAMENT, MODE_AUTO_NON_UNIFORM_PROBE, MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE,
@@ -126,6 +83,13 @@ public:
         }*/
     };
 
+    ~shared_workspace_auto() {
+        // clean up leaf store
+        for (auto it = leaf_store.begin(); it != leaf_store.end(); ++it) {
+            delete[] it->second.map;
+        }
+    }
+
     bool done = false;
     bool done_fast = false;
     std::atomic_bool done_shared_group;
@@ -164,11 +128,9 @@ public:
         tolerance = std::max(size / (config.CONFIG_IR_SIZE_FACTOR * domain_size), 1);
     }
 
-    bool check_strategy_tournament(int id, strategy_metrics* m, bool early_check) {
-        thread_local bool ichecked = false;
-
+    bool check_strategy_tournament(int id, strategy_metrics* m, bool early_check, bool* this_checked) {
         if(!early_check) {
-            if (!ichecked) {
+            if (!*this_checked) {
                 tournament_mutex.lock();
                 //std::cout << "late check" << m->color_refinement_cost << std::endl;
                 if(m->restarts > 0)
@@ -187,9 +149,9 @@ public:
                 checked++;
                 tournament_mutex.unlock();
             }
-            ichecked = true;
+            *this_checked = true;
         } else {
-            if (!ichecked) {
+            if (!*this_checked) {
                 if (win_id != -2 && (m->restarts > win_metrics.restarts || win_metrics.restarts == 0)) {
                     // we can already concede to currently best strategy
                     tournament_mutex.lock();
@@ -197,21 +159,10 @@ public:
                         all_no_restart = false;
                     checked++;
                     tournament_mutex.unlock();
-                    ichecked = true;
+                    *this_checked = true;
                 }
             }
         }
-        return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
-    }
-
-    bool ack_done() {
-        thread_local bool ichecked = false;
-
-        if(!ichecked) {
-            _ack_done++;
-        }
-
-        ichecked = true;
         return (checked == config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
     }
 };
@@ -254,8 +205,6 @@ public:
     std::atomic_int    exit_counter;
     std::atomic_int    noniso_counter;
     std::atomic_bool   found_iso;
-
-    std::vector<unsigned char*>* buffer_buffer;
 
     // tournament variables
     std::mutex         tournament_mutex;

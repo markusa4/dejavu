@@ -38,8 +38,7 @@ struct alignas(64) dejavu_workspace {
     shared_schreier*   skip_schreier_level;
     bool               skiplevel_is_uniform = false;
 
-    int*         my_base_points;
-    int          my_base_points_sz;
+    bijection<int> my_base_points; // this should be bijection
     bool         is_foreign_base;
 
     group_shared<vertex_t>* G;
@@ -71,17 +70,24 @@ struct alignas(64) dejavu_workspace {
     shared_permnode** generator_fix_base;
     int         generator_fix_base_size;
 
-    // bfs_workspace workspace
-    // bfs_workspace<vertex_t>* BW;
+    bool checked_tournament = false;
+    bool seen_done_shared   = false;
+
+    // bfs workspace
     std::tuple<bfs_element<vertex_t>*, int, int>* todo_dequeue;
-    int todo_deque_sz        = -1;
     std::pair<bfs_element<vertex_t> *, int>* finished_elements;
-    int finished_elements_sz = -1;
     std::pair<bfs_element<vertex_t> *, int>* todo_elements;
-    int todo_elements_sz     = -1;
     bfs_element<vertex_t>* prev_bfs_element = nullptr;
     bool init_bfs = false;
 
+    work_list_t<vertex_t> _collect_base;
+    std::vector<vertex_t> _collect_early_individualized;
+    int _collect_base_sz;
+
+    dejavu_workspace() {
+        work_c = new coloring<vertex_t>;
+        work_I = new invariant;
+    }
     ~dejavu_workspace() {
         if(init_bfs) {
             delete[] todo_dequeue;
@@ -91,10 +97,11 @@ struct alignas(64) dejavu_workspace {
         }
         if(sequential_init) {
             _freeschreier(&sequential_gp, &sequential_gens);
+            _schreier_freedyn();
         }
 
-        //delete work_c;
-        //delete work_I;
+        delete work_c;
+        delete work_I;
         //delete start_c1;
     };
 };
@@ -156,6 +163,8 @@ private:
 
         sgraph_t<vertex_t, degree_t, edge_t> *g = g_;
         dejavu_workspace<vertex_t, degree_t, edge_t> W;
+        strategy<vertex_t> _canon_strategy;
+
 
         numnodes  = 0;
         colorcost = 0;
@@ -164,7 +173,6 @@ private:
         if(master) {
             config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
             coloring<vertex_t>* init_c  = start_c;
-            //start_c = new coloring<vertex_t>;
             start_c = &W.start_c1;
             g->initialize_coloring(&W.start_c1, init_c->vertex_to_col);
             if(config.CONFIG_PREPROCESS) {
@@ -200,8 +208,7 @@ private:
             switches->current_mode = modes_auto::MODE_AUTO_TOURNAMENT;
 
             // first color refinement
-            canon_strategy = new strategy<vertex_t>;
-            //W.start_c1 = start_c;
+            canon_strategy = &_canon_strategy;
             W.R.refine_coloring_first(g, start_c, -1);
             PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 
@@ -211,9 +218,6 @@ private:
                 std::cout << "First coloring discrete." << std::endl;
                 std::cout << "Base size: 0" << std::endl;
                 std::cout << "Group size: 1" << std::endl;
-                W.work_c = new coloring<vertex_t>;
-                W.work_I = new invariant;
-                delete canon_strategy;
                 return;
             }
 
@@ -243,8 +247,6 @@ private:
 
             // create some objects that are initialized after tournament
             G    = new group_shared<vertex_t>(g->v_size);
-            // W.BW = new bfs_workspace<vertex_t>();
-            // bwork = W.BW;
 
             W.S.empty_cache();
 
@@ -266,8 +268,6 @@ private:
             PRINT("[Dej] Refinement workers created (" << config.CONFIG_THREADS_REFINEMENT_WORKERS << " threads)");
 
             // set some workspace variables
-            //W.start_c1 = coloring<vertex_t>;
-            //W.start_c1->copy_force(start_c);
             W.id        = -1;
             W.shared_orbit           = shrd_orbit_;
             W.shared_orbit_weights   = shrd_orbit_weights_;
@@ -284,17 +284,14 @@ private:
         bool switched2 = false;
 
         W.skip_c.copy_force(start_c);
-        W.work_c = new coloring<vertex_t>;
-        W.work_I = new invariant;
         W.G = G;
-        // W.BW = bwork;
+
         W.skiplevels = 0;
         W.skip_schreier_level = G->gp;
 
         if (!master) {
             W.shared_orbit = shared_orbit;
             W.shared_orbit_weights = shared_orbit_weights;
-            //W.start_c1 = new coloring<vertex_t>;
             W.start_c1.copy_force(start_c);
             W.id = communicator_id;
             W.shared_generators = gens;
@@ -302,30 +299,25 @@ private:
         }
 
         strategy<vertex_t>* my_strategy;
+        bijection<vertex_t> _my_canon_leaf;
 
-        my_canon_I = new invariant;
+        invariant _my_canon_I;
+        my_canon_I = &_my_canon_I;
         my_canon_I->has_compare = false;
         my_canon_I->compare_vec = nullptr;
         my_canon_I->compareI    = nullptr;
-        my_canon_leaf = new bijection<vertex_t>;
+        my_canon_leaf = &_my_canon_leaf;
         auto rst = (selector_type) ((communicator_id + 2) % 3);
         if(config.CONFIG_IR_FORCE_SELECTOR)
             rst = (selector_type) config.CONFIG_IR_CELL_SELECTOR;
 
-        my_strategy = new strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
+        strategy<vertex_t> _my_strategy(my_canon_leaf, my_canon_I, rst, -1);
+        my_strategy = &_my_strategy;
 
         W.S.empty_cache();
         find_first_leaf(&W, g, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches, selector_seed);
-        if(std::is_same<vertex_t, int>::value) {
-            W.my_base_points = (int*) base_points.map;
-        } else {
-            W.my_base_points = new int[base_points.map_sz];
-            for(int i = 0; i < base_points.map_sz; ++i) {
-                W.my_base_points[i] = static_cast<int>(base_points.map[i]);
-            }
-            base_points.deletable();
-        }
-        W.my_base_points_sz = base_points.map_sz;
+        W.my_base_points.swap(&base_points);
+
         W.is_foreign_base   = true;
 
         int n_found    = 0;
@@ -353,7 +345,7 @@ private:
                     // wait for ack of done_fast
                     PRINT("[N] Waiting for ACK");
                     switches->current_mode = modes_auto::MODE_AUTO_WAIT;
-                    G->ack_done_shared();
+                    G->ack_done_shared(&W.seen_done_shared);
                     reset_non_uniform_switch = true;
                     G->wait_for_ack_done_shared(config.CONFIG_THREADS_REFINEMENT_WORKERS + 1, &switches->done);
 
@@ -379,9 +371,9 @@ private:
 
                     if(bwork->current_level > 1) { // > 1
                         if(*W.shared_generators_size > 0) {
-                            PRINT("[BFS] Reducing tree (" << n_found << ")");
+                            //PRINT("[BFS] Reducing tree (" << n_found << ")");
                             assert(master && communicator_id == -1);
-                            bfs_reduce_tree(&W, bwork);
+                            //bfs_reduce_tree(&W, bwork); // removed feature
                         }
                         // check if expected size is still too large...
                         if(bwork->level_expecting_finished[bwork->current_level] >=
@@ -448,7 +440,7 @@ private:
             }
 
             if(switches->done_fast) {
-                G->ack_done_shared();
+                G->ack_done_shared(&W.seen_done_shared);
                 reset_non_uniform_switch = true;
             }
 
@@ -475,14 +467,15 @@ private:
                     // check if this thread won
                     if(n_found == 0) {
                         // wait until everyone checked
-                        while(!switches->check_strategy_tournament(communicator_id, &m, false)
+                        while(!switches->check_strategy_tournament(communicator_id, &m, false,
+                                                                   &W.checked_tournament)
                               && !switches->done_created_group) continue;
+                        PRINT("[Dej] Cycle done");
                         // if this thread won, it will now create the group
                         if(switches->win_id == communicator_id) {
                             canon_strategy->replace(my_strategy);
                             is_canon_strategy = true;
-                            actual_base = base_points;
-                            base_points.not_deletable();
+                            actual_base.copy(&W.my_base_points);
                             G->initialize(g->v_size, &actual_base);
                             PRINT("[Strat] Chosen strategy: " << canon_strategy->cell_selector_type);
                             W.S.empty_cache();
@@ -560,30 +553,29 @@ private:
                         if (reset_non_uniform_switch) {
                             reset_skiplevels(&W);
                             if(!master) { // guess a new leaf
+                                // ToDo: just renew _my_strategy here
                                 if(!is_canon_strategy) {
-                                    delete my_canon_I;
-                                    delete my_canon_leaf;
-                                    delete my_strategy;
+                                    //delete my_canon_I;
+                                    //delete my_canon_leaf;
+                                    //delete my_strategy;
                                 }
-
                                 is_canon_strategy = false;
-                                my_canon_I    = new invariant; // delete old if non canon
+                                my_canon_I    = new invariant;
                                 my_canon_leaf = new bijection<vertex_t>;
                                 base_points   = bijection<vertex_t>();
                                 auto rst      = (selector_type) intRand(0, 2, selector_seed);
                                 my_strategy   = new strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
                                 find_first_leaf(&W, g, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches,
                                                 selector_seed);
-                                if(std::is_same<vertex_t, int>::value) {
-                                    W.my_base_points = (int*) base_points.map;
-                                } else {
+                                //if(std::is_same<vertex_t, int>::value) {
+                                W.my_base_points.swap(&base_points);
+                                /*} else {
                                     W.my_base_points = new int[base_points.map_sz];
                                     for(int i = 0; i < base_points.map_sz; ++i) {
                                         W.my_base_points[i] = static_cast<int>(base_points.map[i]);
                                     }
-                                    base_points.deletable();
                                 }
-                                W.my_base_points_sz    = base_points.map_sz;
+                                W.my_base_points_sz    = base_points.map_sz;*/
                                 W.skiplevel_is_uniform = false;
                                 W.is_foreign_base      = true;
                                 foreign_base_done      = false;
@@ -654,7 +646,6 @@ private:
                                 switches->iterate_tolerance();
                             }
                         }
-
                         switches->experimental_budget = -1;
                         switches->current_mode = modes_auto::MODE_AUTO_WAIT;
                         switches->done_fast = true;
@@ -839,7 +830,6 @@ private:
             bool test = true;
             if(switches->done_created_group && automorphism.mark && automorphism.certified) {
                 test = G->add_permutation(&automorphism, &idle_ms, done);
-                automorphism.not_deletable();
                 if(test && foreign_base_done) { //
                     G->sift_random();
                 }
@@ -870,23 +860,16 @@ private:
             G->generators_persistent = (gens == nullptr);
             delete G;
 
-            delete canon_strategy->I;
-            delete canon_strategy->leaf;
-            delete canon_strategy;
+            //delete canon_strategy->I;
+            //delete canon_strategy->leaf;
+            // delete canon_strategy;
         }
 
         if(!is_canon_strategy) {
-            delete my_canon_I;
-            delete my_canon_leaf;
-            delete my_strategy;
+            //delete my_canon_I;
+            //delete my_canon_leaf;
+            //delete my_strategy;
         }
-
-        /*switches->buffer_buffer[communicator_id + 1].swap(n_buffer.all_buffers);
-        if(master) {
-            for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
-                FreeBuf(&switches->buffer_buffer[i]);
-            }
-        }*/
 
         return;
     }
@@ -911,8 +894,12 @@ private:
         S->empty_cache();
 
         start_I->create_vector(g->v_size * 2);
-        automorphism->map    = new vertex_t[g->v_size];
-        automorphism->map_sz = 0;
+        //if(automorphism->init)
+        //    delete[] automorphism->map;
+        automorphism->initialize_empty(g->v_size);
+        //automorphism->map    = new vertex_t[g->v_size];
+        //automorphism->map_sz = 0;
+        //automorphism->deletable();
 
         *I = *start_I;
         c->copy(start_c);
@@ -935,8 +922,9 @@ private:
             assert(c->vertex_to_col[v] > 0);
 
             // base point
-            automorphism->map[automorphism->map_sz] = v;
-            automorphism->map_sz += 1;
+            automorphism->append(v);
+            //automorphism->map[automorphism->map_sz] = v;
+            //automorphism->map_sz += 1;
         }
     }
 
@@ -972,18 +960,18 @@ private:
         *I = *start_I;
         c->copy_force(start_c);
 
-        if(w->skiplevels > w->my_base_points_sz)
-            w->skiplevels = w->my_base_points_sz;
+        if(w->skiplevels > w->my_base_points.map_sz)
+            w->skiplevels = w->my_base_points.map_sz;
 
         m->expected_bfs_size = 1;
         m->expected_level = -1;
         S->empty_cache();
 
         while(w->first_skiplevel <= w->skiplevels) {
-            m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
+            m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points.map_vertex(w->first_skiplevel - 1)]] + 1;
             if(*done) return abort_code(0);
-            proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m,
-                          (*start_I->compareI->vec_cells)[w->first_skiplevel - 1], -1, nullptr);
+            proceed_state(w, g, start_c, start_I, w->my_base_points.map_vertex(w->first_skiplevel - 1), m,
+                          (start_I->compareI->vec_cells)[w->first_skiplevel - 1], -1, nullptr);
             w->first_skiplevel += 1;
             if(!w->is_foreign_base)
                 w->skip_schreier_level = w->skip_schreier_level->next;
@@ -1008,7 +996,7 @@ private:
             ++it;
             if(it % 3 == 0) {
                 if(switches->current_mode == modes_auto::MODE_AUTO_TOURNAMENT)
-                    switches->check_strategy_tournament(w->id, m, true);
+                    switches->check_strategy_tournament(w->id, m, true, &w->checked_tournament);
                 if(w->id == -1) // but need to be able to reach proper state afterwads
                     w->G->manage_results(switches);
             }
@@ -1016,18 +1004,18 @@ private:
             if (backtrack) {
                 if(*done) return abort_code(0);
                 if((m->restarts % (5 * switches->tolerance) == ((5 * switches->tolerance) - 1))
-                   && (w->skiplevels < w->my_base_points_sz)) {
+                   && (w->skiplevels < w->my_base_points.map_sz)) {
                     w->skiplevel_is_uniform = false;
                     w->skiplevels += 1;
                 }
 
                 S->empty_cache();
-                if(w->skiplevels > w->my_base_points_sz)
-                    w->skiplevels = w->my_base_points_sz;
+                if(w->skiplevels > w->my_base_points.map_sz)
+                    w->skiplevels = w->my_base_points.map_sz;
 
                 if(w->first_skiplevel <= w->skiplevels) {
-                    m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points[w->first_skiplevel - 1]]] + 1;
-                    proceed_state(w, g, start_c, start_I, w->my_base_points[w->first_skiplevel - 1], m, -1,
+                    m->expected_bfs_size *= start_c->ptn[start_c->vertex_to_col[w->my_base_points.map_vertex(w->first_skiplevel - 1)]] + 1;
+                    proceed_state(w, g, start_c, start_I, w->my_base_points.map_vertex(w->first_skiplevel - 1), m, -1,
                                   -1, nullptr);
                     w->first_skiplevel += 1;
                     if(!w->is_foreign_base) {
@@ -1056,10 +1044,7 @@ private:
             // int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 // we can derive an automorphism!
-                bijection<vertex_t> leaf;
-                leaf.read_from_coloring(c);
-                leaf.not_deletable();
-                *automorphism = leaf;
+                automorphism->read_from_coloring(c);
                 automorphism->inverse();
                 automorphism->compose(canon_leaf);
                 automorphism->non_uniform = (skipped_level && !w->skiplevel_is_uniform);
@@ -1076,7 +1061,7 @@ private:
                 }
 
                 automorphism->certified = true;
-                assert(g->certify_automorphism(*automorphism));
+                //assert(g->certify_automorphism(automorphism)); // warning this assert is broken! (copy semantics!)
                 return abort_code(0);
             }
 
@@ -1085,7 +1070,7 @@ private:
 
             if(level <= w->skiplevels) {
                 skipped_level = true;
-                v = w->my_base_points[level - 1];
+                v = w->my_base_points.map_vertex(level - 1);
                 assert(c->vertex_to_col[v] == s);
                 base_aligned  = true;
             } else {
@@ -1097,7 +1082,7 @@ private:
             if(!w->is_foreign_base) {
                 if (group_level->vec[v] && base_aligned) {
                     v = group_level->fixed;// choose base point
-                    if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz)) {
+                    if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points.map_sz)) {
                         bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
                         if(total_orbit) {
                             w->skiplevels += 1;
@@ -1110,7 +1095,7 @@ private:
                 }
             }
 
-            const int cell_early = (*I->compareI->vec_cells)[level - 1];
+            const int cell_early = (I->compareI->vec_cells)[level - 1];
             bool comp = proceed_state(w, g, c, I, v, m, cell_early, -1, nullptr);
             level += 1;
 
@@ -1131,8 +1116,9 @@ private:
         w->skip_schreier_level = w->G->gp;
         w->first_skiplevel = 1;
         w->skiplevel_is_uniform = true;
-        w->my_base_points    = w->G->b;
-        w->my_base_points_sz = w->G->base_size;
+        //w->my_base_points    = w->G->b;
+        //w->my_base_points_sz = w->G->base_size;
+        w->my_base_points.read_from_array(w->G->b, w->G->base_size);
         w->is_foreign_base   = false;
     }
 
@@ -1155,9 +1141,6 @@ private:
 
         *restarts = 0;
         int level;
-
-        automorphism->map    = new vertex_t[g->v_size];
-        automorphism->map_sz = 0;
 
         automorphism->certified = false;
 
@@ -1226,10 +1209,7 @@ private:
             //const int s = S->select_color_dynamic(g, c, canon_strategy);
             if (s == -1) {
                 // we can derive an automorphism!
-                bijection<vertex_t> leaf;
-                leaf.read_from_coloring(c);
-                leaf.not_deletable();
-                *automorphism = leaf;
+                automorphism->read_from_coloring(c);
                 automorphism->inverse();
                 automorphism->compose(canon_leaf);//enqueue_fail_point_sz
                 if(!config.CONFIG_IR_FULL_INVARIANT && !R->certify_automorphism(g, automorphism)) {
@@ -1246,7 +1226,7 @@ private:
 
             if (group_level->vec[v] && base_aligned) {
                 v = group_level->fixed;// choose base point
-                if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points_sz - 1)) {
+                if(level == w->skiplevels + 1 &&  (w->skiplevels < w->my_base_points.map_sz - 1)) {
                     const bool total_orbit = (c->ptn[s] + 1 == group_level->fixed_orbit_sz);
                     if(total_orbit)
                         w->skiplevels += 1;
@@ -1268,9 +1248,9 @@ private:
 
     //  Extracts which color was chosen in the path of the given invariant at a given base point.
     int extract_selector(invariant* I, int base_point) {
-        if((I->compareI->vec_selections)->size() <= base_point)
+        if((I->compareI->vec_selections).size() <= base_point)
             return - 1;
-        return (*I->compareI->vec_selections)[base_point].first;
+        return (I->compareI->vec_selections)[base_point].first;
     }
 
     // Performs one individualization followed by one refinement on the given coloring with the given settings.
@@ -1397,7 +1377,7 @@ private:
             bfs_element<vertex_t> *elem = std::get<0>(w->todo_dequeue[i]);
             int v      = std::get<1>(w->todo_dequeue[i]);
             int weight = std::get<2>(w->todo_dequeue[i]);
-            bool is_identity  = elem->is_identity && (v == w->my_base_points[elem->base_sz]);
+            bool is_identity  = elem->is_identity && (v == w->my_base_points.map_vertex(elem->base_sz));
 
             // check orbit
             bool comp = elem->weight != 0;
@@ -1422,7 +1402,7 @@ private:
             }
 
             if (weight == -1 && comp) {
-                comp = comp && get_orbit(w, elem->base, elem->base_sz, v, w->my_base_points[elem->base_sz], &w->orbit,
+                comp = comp && get_orbit(w, elem->base, elem->base_sz, v, w->my_base_points.map_vertex(elem->base_sz), &w->orbit,
                                          w->prev_bfs_element == elem);
                 assert(!comp ? (!is_identity) : true);
             }
@@ -1443,7 +1423,7 @@ private:
                 numnodes++;
                 // compute next coloring
                 w->work_I->reset_deviation();
-                const int cells_early = (*w->work_I->compareI->vec_cells)[elem->base_sz];
+                const int cells_early = (w->work_I->compareI->vec_cells)[elem->base_sz];
                 comp = comp && proceed_state(w, g, w->work_c, w->work_I, v, nullptr, cells_early, -1,
                                              nullptr);
 
@@ -1477,7 +1457,7 @@ private:
                 continue;
             }
 
-            // still looks equal to canonical base, so create a node
+            // still looks equal to canonical base, so create a node in bfs tree
             bfs_element<vertex_t> *next_elem = new bfs_element<vertex_t>;
             next_elem->c = w->work_c;
             next_elem->I = w->work_I;
@@ -1527,236 +1507,29 @@ private:
         return true;
     }
 
-    void bfs_reduce_tree(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t> *bwork) {
-        thread_local bool first_call = true;
-
-        _schreier_fails(2);
-        bfs_assure_init(w, bwork);
-
-        int domain_size = w->G->domain_size;
-        bool new_gens = sequential_init_copy(w);
-
-        if(!new_gens && !first_call) {
-            PRINT("[BFS] Skipping reduce tree (no new generators)");
-            return;
-        }
-        first_call = false;
-
-        if(w->generator_fix_base_alloc < *w->shared_generators_size) {
-            delete[] w->generator_fix_base;
-            w->generator_fix_base = new shared_permnode*[*w->shared_generators_size];
-            w->generator_fix_base_alloc = *w->shared_generators_size;
-            w->prev_bfs_element = nullptr;
-        }
-
-        // step1: check on level i if orbits can be reduced
-        int i, j, v;
-        int active = 0;
-        bool found_canon = false;
-        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-            active += (elem->weight > 0);
-            found_canon = found_canon || (elem->base[elem->base_sz - 1] == w->G->b[elem->base_sz - 1]);
-        }
-        assert(found_canon);
-        PRINT("[BFS] Top level active (before): " << active);
-
-
-        for(i = 1; i < bwork->current_level; ++i) {
-            bfs_element<vertex_t>** arr = bwork->level_states[i];
-            int arr_sz        = bwork->level_sizes[i];
-            std::sort(arr, arr + arr_sz, &bfs_element_parent_sorter<vertex_t>);
-
-            if(i == 1) {
-                for(j = 0; j < bwork->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t>* elem = bwork->level_states[i][j];
-                    if(elem->weight > 0) {
-                        v = elem->base[elem->base_sz - 1];
-                        assert(v >= 0 && v < w->G->domain_size);
-                        if ((*w->shared_orbit)[v] != v) {
-                            elem->weight = 0;
-                            assert(v != w->G->b[elem->base_sz - 1]);
-                        } else {
-                            if (elem->weight != (*w->shared_orbit_weights)[v]) {
-                                elem->weight = (*w->shared_orbit_weights)[v];
-                            }
-                        }
-                    }
-                }
-            } else {
-                // update weights...
-                for(j = 0; j < bwork->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t> *elem = bwork->level_states[i][j];
-                    assert(elem->parent != NULL);
-                    if(elem->parent->weight == 0) {
-                        elem->weight = 0;
-                        continue;
-                    }
-                    if(elem->parent_weight != elem->parent->weight) {
-                        elem->weight        = elem->parent->weight * (elem->weight / elem->parent_weight);
-                        elem->parent_weight = elem->parent->weight;
-                    }
-                }
-
-                // reduce using orbits
-                for(j = 0; j < bwork->level_sizes[i]; ++j) {
-                    bfs_element<vertex_t> *elem = bwork->level_states[i][j];
-                    if(elem == nullptr)
-                        continue;
-                    assert(elem->parent != NULL);
-                    if(elem->weight != 0) {
-                        int* orbits_sz = nullptr;
-                        // depends on earlier sorting
-                        int* orbits = _getorbits(elem->base, elem->base_sz - 1, w->sequential_gp, &w->sequential_gens,
-                                                 domain_size, w->G->b, &orbits_sz);
-#ifndef NDEBUG
-                        int calc_sz = 0;
-                        for(int ii = 0; ii < domain_size; ++ii) {
-                            assert(orbits[ii] >= 0 && orbits[ii] < domain_size);
-                            if(ii == orbits[ii]) {
-                                calc_sz += (orbits_sz)[ii];
-                            }
-                        }
-                        assert(calc_sz == domain_size);
-#endif
-                        assert(elem->base_sz == elem->level);
-                        assert(elem->level == i);
-                        assert(i > 1);
-                        v = elem->base[elem->base_sz - 1];
-                        assert((v >= 0) && (v < w->G->domain_size));
-                        assert(elem->base_sz - 1 > 0);
-                        if(orbits[v] != v) {
-                            assert(v != w->G->b[elem->base_sz - 1]);
-                            elem->weight = 0;
-                        } else {
-                            elem->weight = elem->parent_weight * orbits_sz[v];
-                        }
-                        w->orbit.reset();
-                        w->orbit_vertex_worklist.reset();
-                        w->orbit_considered.reset();
-                    }
-                }
-            }
-        }
-
-        active = 0;
-        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-            active += (elem->weight > 0);
-        }
-
-        PRINT("[BFS] Top level active (after): " << active);
-        PRINT("[BFS] Emptying queue...");
-        moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
-        bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
-
-
-        // do not fill this if there is no hope...
-        int expecting_finished = 0;
-        for (j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-            if (elem->weight > 0) {
-                int c      = elem->target_color;
-                int c_size = elem->c->ptn[c] + 1;
-                expecting_finished += c_size;
-            }
-        }
-        bwork->level_expecting_finished[bwork->current_level] = expecting_finished;
-        w->prev_bfs_element = nullptr;
-        w->orbit.reset();
-        w->orbit_vertex_worklist.reset();
-        w->orbit_considered.reset();
-    }
-
     void bfs_fill_queue(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t>* bwork) {
         if(bwork->current_level == bwork->target_level)
             return;
-        moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
-        bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
+        //moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
+        //bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
 
         int expected = 0;
-
-        if(*w->shared_generators_size > 0)
-            sequential_init_copy(w);
-
-        // swap identity to first position...
         for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
             bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-            if(elem->is_identity) {
-                bfs_element<vertex_t> *first_elem = bwork->level_states[bwork->current_level - 1][0];
-                bwork->level_states[bwork->current_level - 1][j] = first_elem;
-                bwork->level_states[bwork->current_level - 1][0] = elem;
-                break;
-            }
-        }
-
-        if(!w->sequential_init) {
-            // then rest...
-            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-                if (elem->weight > 0) {
-                    int c = elem->target_color;
-                    int c_size = elem->c->ptn[c] + 1;
-                    for (int i = c; i < c + c_size; ++i) {
-                        expected += 1;
-                        bwork->bfs_level_todo[bwork->current_level].enqueue(
-                                std::tuple<bfs_element<vertex_t> *, int, int>(elem, elem->c->lab[i], -1));
-                    }
-                    if (elem->is_identity) {
-                        PRINT("[BFS] Abort map expecting: " << c_size);
-                        bwork->level_abort_map_done[bwork->current_level] = c_size;
-                    }
+            if (elem->weight > 0) {
+                int c = elem->target_color;
+                int c_size = elem->c->ptn[c] + 1;
+                for (int i = c; i < c + c_size; ++i) {
+                    expected += 1;
+                    bwork->bfs_level_todo[bwork->current_level].enqueue(
+                            std::tuple<bfs_element<vertex_t> *, int, int>(elem, elem->c->lab[i], -1));
                 }
-            }
-        } else {
-            PRINT("[BFS] Filling with orbits...");
-
-            // swap identity to first position...
-            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-                if(elem->is_identity) {
-                    bfs_element<vertex_t> *first_elem = bwork->level_states[bwork->current_level - 1][0];
-                    bwork->level_states[bwork->current_level - 1][j] = first_elem;
-                    bwork->level_states[bwork->current_level - 1][0] = elem;
-                    break;
-                }
-            }
-
-            int i;
-            // could parallelize this easily?
-            for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
-                bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
-                int added = 0;
-                if (elem->weight > 0) {
-                    int c = elem->target_color;
-                    int c_size = elem->c->ptn[c] + 1;
-                    int * orbits_sz;
-                    int * orbits;
-                    if(bwork->current_level > 1) {
-                        orbits_sz = nullptr;
-                        orbits = _getorbits(elem->base, elem->base_sz, w->sequential_gp, &w->sequential_gens,
-                                            w->G->domain_size, w->G->b, &orbits_sz);
-                    } else {
-                        orbits_sz = *w->shared_orbit_weights;
-                        orbits    = *w->shared_orbit;
-                    }
-                    for (i = c; i < c + c_size; ++i) {
-                        if (orbits[elem->c->lab[i]] == elem->c->lab[i]) {
-                            bwork->bfs_level_todo[bwork->current_level].enqueue(
-                                    std::tuple<bfs_element<vertex_t> *, int, int>(
-                                            elem, elem->c->lab[i], orbits_sz[elem->c->lab[i]]));
-                            expected += 1;
-                            added += 1;
-                        }
-                    }
-                    if (elem->is_identity) {
-                        PRINT("[BFS] Abort map expecting: " << added);
-                        bwork->level_abort_map_done[bwork->current_level] = added;
-                    }
+                if (elem->is_identity) {
+                    PRINT("[BFS] Abort map expecting: " << c_size);
+                    bwork->level_abort_map_done[bwork->current_level] = c_size;
                 }
             }
         }
-
         bwork->level_expecting_finished[bwork->current_level] = expected;
     }
 
@@ -1764,11 +1537,8 @@ private:
         if(!w->init_bfs) {
             int chunk_sz = bwork->chunk_size;
             w->todo_dequeue = new std::tuple<bfs_element<vertex_t>*, int, int>[chunk_sz];
-            w->todo_deque_sz = chunk_sz;
             w->todo_elements = new std::pair<bfs_element<vertex_t> *, int>[chunk_sz * 8];
-            w->todo_elements_sz = chunk_sz * 8;
             w->finished_elements = new std::pair<bfs_element<vertex_t> *, int>[chunk_sz + 1];
-            w->finished_elements_sz = chunk_sz;
             w->init_bfs = true;
             w->orbit.initialize(w->G->domain_size);
             w->orbit_considered.initialize(w->G->domain_size);
@@ -1803,10 +1573,9 @@ private:
     // Computes a leaf of the tree by following the path given in base.
     void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
                           sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
-                          int base_sz, bijection<vertex_t> *leaf, invariant* compare_I) {
+                          int base_sz, bijection<vertex_t> *leaf) {
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
-        // I->set_compare_invariant(compare_I);
         c->copy_force(start_c);
         I->never_fail = true;
         //PRINT("Reconstruction base_sz " << base_sz);
@@ -1823,15 +1592,11 @@ private:
                                               shared_workspace_auto<vertex_t>* switches, bfs_element<vertex_t> *elem,
                                               int selector_seed, strategy<vertex_t> *strat,
                                               bijection<vertex_t> *automorphism, bool look_close) {
-        thread_local work_list_t<vertex_t> collect_base;
-        thread_local std::vector<vertex_t>      collect_early_individualized;
-        thread_local int collect_base_sz;
-
-        if(!collect_base.init)
-            collect_base.initialize(g->v_size);
-        collect_base.reset();
-        collect_early_individualized.clear();
-        collect_base_sz = 0;
+        if(!w->_collect_base.init)
+            w->_collect_base.initialize(g->v_size);
+        w->_collect_base.reset();
+        w->_collect_early_individualized.clear();
+        w->_collect_base_sz = 0;
 
         coloring<vertex_t>* c = &w->c;
         invariant* I = &w->I;
@@ -1846,8 +1611,8 @@ private:
             const int col = elem->target_color;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
-            collect_base.push_back(v);
-            collect_base_sz += 1;
+            w->_collect_base.push_back(v);
+            w->_collect_base_sz += 1;
             int cell_early = -1;
             int individualize_early = -1;
             if (look_close) {
@@ -1856,12 +1621,12 @@ private:
                 individualize_early = elem->base_sz + 1;
             } else {
                 I->never_fail = false;
-                cell_early = (*I->compareI->vec_cells)[elem->base_sz];
+                cell_early = (I->compareI->vec_cells)[elem->base_sz];
             }
             I->reset_deviation();
             if(v != elem->deviation_vertex || look_close) { // added || look_close
                 comp = proceed_state(w, g, c, I, v, nullptr, cell_early, individualize_early,
-                                     &collect_early_individualized);
+                                     &w->_collect_early_individualized);
                 if (!comp) { // fail on first level, set deviation acc, pos and vertex in elem
                     ++switches->experimental_deviation;
                     if (elem->deviation_write.try_lock() && elem->deviation_pos == -1) {
@@ -1877,9 +1642,9 @@ private:
             }
         }
 
-        for(int i = 0; i < collect_early_individualized.size(); ++i) {
-            collect_base.push_back(collect_early_individualized[i]);
-            collect_base_sz += 1;
+        for(int i = 0; i < w->_collect_early_individualized.size(); ++i) {
+            w->_collect_base.push_back(w->_collect_early_individualized[i]);
+            w->_collect_base_sz += 1;
         }
 
         ++switches->experimental_paths;
@@ -1893,16 +1658,13 @@ private:
             if(col == -1) break;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v    = c->lab[rpos];
-            collect_base.push_back(v);
-            collect_base_sz += 1;
+            w->_collect_base.push_back(v);
+            w->_collect_base_sz += 1;
             comp = proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
         } while(comp);
 
         if(comp && (strat->I->acc == I->acc)) { // automorphism computed
-            bijection<vertex_t> leaf;
-            leaf.read_from_coloring(c);
-            leaf.not_deletable();
-            *automorphism = leaf;
+            automorphism->read_from_coloring(c);
             automorphism->inverse();
             automorphism->compose(strat->leaf);
             automorphism->non_uniform = false;
@@ -1914,7 +1676,6 @@ private:
         } else {
             bijection<vertex_t> leaf;
             leaf.read_from_coloring(c);
-            leaf.not_deletable();
             // consider leaf store...
             std::vector<stored_leaf<vertex_t>> pointers;
 
@@ -1926,13 +1687,12 @@ private:
                 if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                     switches->leaf_store_explicit++;
                     switches->leaf_store.insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g->v_size, true, look_close)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.extract_map(), g->v_size, true, look_close)));
                 } else {
-                    vertex_t* base = new vertex_t[collect_base_sz];
-                    memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
+                    vertex_t* base = new vertex_t[w->_collect_base_sz];
+                    memcpy(base, w->_collect_base.arr, sizeof(vertex_t) * w->_collect_base_sz); // ToDo: better solution to this, use bijection?
                     switches->leaf_store.insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, look_close, elem)));
-                    leaf.deletable();
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, w->_collect_base_sz, false, look_close, elem)));
                 }
             }
             switches->leaf_store_mutex.unlock();
@@ -1941,27 +1701,23 @@ private:
 
             for(size_t i = 0; i < pointers.size(); ++i) {
                 // use reconstruction method on actual leaf to make it isomorphism-invariant
-                if(collect_early_individualized.size() > 0) {
-                    reconstruct_leaf(w, g, elem->c, collect_base.arr, collect_base_sz, &leaf, strat->I);
+                if(w->_collect_early_individualized.size() > 0) {
+                    reconstruct_leaf(w, g, elem->c, w->_collect_base.arr, w->_collect_base_sz, &leaf);
                 }
 
                 // compute automorphism
-                automorphism->copy(&leaf);
+                automorphism->swap(&leaf);
                 automorphism->inverse();
                 bijection<vertex_t> fake_leaf;
 
                 if(pointers[i].explicit_leaf) {
-                    fake_leaf.map = pointers[i].map;
-                    fake_leaf.not_deletable();
+                    fake_leaf.read_from_array(pointers[i].map, g->v_size);
                 } else {
                     // if other leaf was not stored explicitly, reconstruct!
                     if(switches->done) return false;
-                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf,
-                                     strat->I);
-                    fake_leaf.deletable();
+                    reconstruct_leaf(w, g, pointers[i].start_elem->c, pointers[i].map,pointers[i].map_sz, &fake_leaf);
                 }
 
-                fake_leaf.map_sz = g->v_size;
                 automorphism->compose(&fake_leaf);
 
                 if(w->R.certify_automorphism(g, automorphism)) {
@@ -1981,79 +1737,9 @@ private:
 
 typedef dejavu_auto_t<int, int, int> dejavu_auto;
 
-void dejavu_automorphisms_dispatch(dynamic_sgraph *sgraph, int* colmap, shared_permnode **gens) {
-    switch(sgraph->type) {
-        case sgraph_type::DSG_INT_INT_INT: {
-            PRINT("[Dispatch] <int32, int32, int32>");
-            dejavu_auto_t<int, int, int> d;
-
-            d.automorphisms(sgraph->sgraph_0, colmap, gens);
-        }
-            break;
-        case sgraph_type::DSG_SHORT_SHORT_INT: {
-            PRINT("[Dispatch] <int16, int16, int>");
-            dejavu_auto_t<int16_t, int16_t, int> d;
-            const int v_size = sgraph->sgraph_1->v_size;
-            int16_t* colmap_16 = nullptr;
-            if(colmap != nullptr) {
-                colmap_16 = new int16_t[v_size];
-                for (int i = 0; i < v_size; ++i)
-                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
-            }
-            d.automorphisms(sgraph->sgraph_1, colmap_16, gens);
-        }
-            break;
-        case sgraph_type::DSG_SHORT_SHORT_SHORT: {
-            PRINT("[Dispatch] <int16, int16, int16>");
-            dejavu_auto_t<int16_t, int16_t, int16_t> d;
-            const int v_size = sgraph->sgraph_2->v_size;
-            int16_t* colmap_16 = nullptr;
-            if(colmap != nullptr) {
-                colmap_16 = new int16_t[v_size];
-                for (int i = 0; i < v_size; ++i)
-                    colmap_16[i] = static_cast<int16_t>(colmap[i]);
-            }
-            d.automorphisms(sgraph->sgraph_2, colmap_16, gens);
-        }
-            break;
-        case sgraph_type::DSG_CHAR_CHAR_SHORT:{
-            PRINT("[Dispatch] <int8, int8, int16>");
-            dejavu_auto_t<int8_t, int8_t, int16_t> d;
-            const int v_size = sgraph->sgraph_3->v_size;
-            int8_t* colmap_8 = nullptr;
-            if(colmap != nullptr) {
-                colmap_8 = new int8_t[v_size];
-                for (int i = 0; i < v_size; ++i)
-                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
-            }
-            d.automorphisms(sgraph->sgraph_3, colmap_8, gens);
-        }
-            break;
-        case sgraph_type::DSG_CHAR_CHAR_CHAR: {
-            PRINT("[Dispatch] <int8, int8, int8>");
-            dejavu_auto_t<int8_t, int8_t, int8_t> d;
-            const int v_size = sgraph->sgraph_4->v_size;
-            int8_t* colmap_8 = nullptr;
-            if(colmap != nullptr) {
-                colmap_8 = new int8_t[v_size];
-                for (int i = 0; i < v_size; ++i)
-                    colmap_8[i] = static_cast<int8_t>(colmap[i]);
-            }
-            d.automorphisms(sgraph->sgraph_4, colmap_8, gens);
-        }
-            break;
-    }
-}
-
 void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
-    if(config.CONFIG_PREPROCESS_COMPRESS) {
-        dynamic_sgraph sg;
-        dynamic_sgraph::read(g, &sg);
-        dejavu_automorphisms_dispatch(&sg, colmap, gens);
-    } else {
-        dejavu_auto d;
-        d.automorphisms(g, colmap, gens);
-    }
+    dejavu_auto d;
+    d.automorphisms(g, colmap, gens);
 }
 
 #endif //DEJAVU_DEJAVU_AUTO_H

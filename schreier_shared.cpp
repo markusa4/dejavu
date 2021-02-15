@@ -53,6 +53,8 @@ static void mclearfreelists(void) {
         free(sh->vec);
         free(sh->pwr);
         free(sh->orbits);
+        free(sh->fixed_orbit);
+        free(sh->level_lock);
         free(sh);
     }
     mschreier_freelist = nullptr;
@@ -97,6 +99,8 @@ static shared_schreier *mnewschreier(int n) {
             free(sh->vec);
             free(sh->pwr);
             free(sh->orbits);
+            free(sh->level_lock);
+            free(sh->fixed_orbit);
             free(sh);
         }
     }
@@ -638,7 +642,10 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
 
     // identity should not allocate memory, hence early out here!
     for (i = 0; i < n; ++i) if (p[i] != i) {break;}
-    if(i == n) return false;
+    if(i == n) {
+        DYNFREE(p, n);
+        return false;
+    }
 
     shared_permnode** r = ring;
 
@@ -782,7 +789,6 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
         DYNFREE(mworkperm, mworkperm_sz);
         return report_changed;
     } else {
-        //assert(false);
         DYNFREE(mworkperm, mworkperm_sz);
         state->sh   = sh;
         state->orbits = orbits;

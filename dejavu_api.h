@@ -1,7 +1,7 @@
 #ifndef DEJAVU_DEJAVU_API_H
 #define DEJAVU_DEJAVU_API_H
 
-#include "dejavu_iso.h"
+//#include "dejavu_iso.h"
 #include "dejavu_auto.h"
 
 class dejavu_api {
@@ -22,10 +22,13 @@ public:
 
         bulk_domain_reset = true;
 
+        bfs_workspace<int> BW1;
+        bfs_workspace<int> BW2;
+
         shared_workspace_iso<int> switches;
         switches.node_store = paths;
         return worker_thread(g, vertex_to_col, true, &switches, nullptr, nullptr,
-                             -1,nullptr, nullptr, max_length, num);
+                             -1,&BW1, &BW2, max_length, num);
     }
 
 private:
@@ -52,7 +55,7 @@ private:
             if (config.CONFIG_PREPROCESS) {
                 //  add preprocessing here
             }
-            assert(start_c->check());
+            // assert(start_c->check());
         }
 
         double cref;
@@ -84,7 +87,7 @@ private:
             //W.start_c2 = new coloring<int>;
             strategy_metrics m;
             bool comp;
-            W.R.refine_coloring(g, &W.start_c1, my_canon_I, -1, &m, -1);
+            W.R.refine_coloring(g, &W.start_c1, my_canon_I, -1, &m, -1, -1, nullptr);
             my_canon_I->purge();
             delete my_canon_I;
             my_canon_I = new invariant;
@@ -95,13 +98,6 @@ private:
                 //std::cout << "First coloring discrete, special case." << std::endl;
                 //return 0;
             }
-
-            // create some objects that are initialized after tournament
-            W.BW1 = new bfs_workspace<int>();
-            bwork1 = W.BW1;
-
-            W.BW2 = new bfs_workspace<int>();
-            bwork2 = W.BW2;
 
             #ifndef OS_WINDOWS
             const int master_sched = sched_getcpu();
@@ -121,7 +117,7 @@ private:
                 work_threads.emplace_back(
                         std::thread(&dejavu_api::worker_thread,
                                     dejavu_api(), g, nullptr, false, switches, &W.start_c1,
-                                    canon_strategy, i, W.BW1, W.BW2, max_length, num));
+                                    canon_strategy, i, bwork1, bwork2, max_length, num));
                 #ifndef OS_WINDOWS
                 cpu_set_t cpuset;
                 CPU_ZERO(&cpuset);
@@ -142,8 +138,6 @@ private:
         //PRINT("[api] Initial management...");
         int base_sz = 0;
         W.skip_c.copy_force(_start_c);
-        W.BW1 = bwork1;
-        W.BW2 = bwork2;
         W.skiplevels = 0;
 
         if (!master) {
@@ -171,9 +165,10 @@ private:
                 ++switches->experimental_paths;
                 switches->leaf_store_mutex->lock();
                 int* save_c = new int[g->v_size];
-                int* save_b = new int[base_points.map_sz];
+                //int* save_b = new int[base_points.map_sz];
+                int* save_b = base_points.extract_map();
                 memcpy(save_c, W.c.vertex_to_col, g->v_size * sizeof(int));
-                memcpy(save_b, base_points.map, base_points.map_sz * sizeof(int));
+                //memcpy(save_b, base_points.map, base_points.map_sz * sizeof(int));
 
                 switches->node_store->insert(std::tuple<int*, int, int*, long>(save_b, base_points.map_sz, save_c, W.I.acc));
                 switches->leaf_store_mutex->unlock();
@@ -181,7 +176,7 @@ private:
             if(switches->experimental_paths >= num) {
                 switches->done = true;
             }
-            delete[] base_points.map;
+            //delete[] base_points.map;
         }
         // TODO: check cleanup
         if (master && !dejavu_kill_request) {
@@ -217,8 +212,8 @@ private:
         S->empty_cache();
         start_I->reset_compare_invariant();
         start_I->create_vector(1);
-        automorphism->map    = new int[g->v_size];
-        automorphism->map_sz = 0;
+
+        automorphism->initialize_empty(g->v_size);
 
         int length = 0;
 
@@ -249,8 +244,7 @@ private:
             assert(c->vertex_to_col[v] > 0);
 
             // check if max_length reached
-            automorphism->map[length] = v;
-            automorphism->map_sz = length + 1;
+            automorphism->append(v);
             length += 1;
         }
     }
@@ -262,10 +256,10 @@ private:
             cell_early = -1;
         //PRINT("[api] Individualizing " << v << " and refining...");
         // protocol of selector choice
-        I->selection_write(c->vertex_to_col[v]);
+        I->selection_write(c->vertex_to_col[v], c->ptn[c->vertex_to_col[v]]);
         const int init_color_class = w->R.individualize_vertex(c, v);
         bool comp = true;
-        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early);
+        comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early, -1, nullptr);
         return comp;
     }
 };
@@ -277,15 +271,15 @@ void random_paths(sgraph* g, int* vertex_to_col, int max_length, int num, std::s
 
 bijection<int> are_isomorphic(sgraph_t<int, int, int> *g1, int* vertex_to_col1,
                               sgraph_t<int, int, int> *g2, int* vertex_to_col2) {
-    dejavu_iso solver;
-    solver.iso(g1, g2);
+    //dejavu_iso solver;
+    //solver.iso(g1, g2);
 
     // ToDo: return results
 }
 
 std::vector<bijection<int>> automorphisms(sgraph_t<int, int, int> *g, int* vertex_to_col) {
     dejavu_auto solver;
-    solver.automorphisms(g, vertex_to_col);
+    solver.automorphisms(g, vertex_to_col, nullptr);
 
     // ToDo: return results
 }

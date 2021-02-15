@@ -470,9 +470,9 @@ public:
 
                 // random blueprint individualization during color refinement
                 if(config.CONFIG_IR_INDIVIDUALIZE_EARLY) {
-                    if (individualize_early >= 0 && individualize_pos < I->vec_selections->size() &&
-                        (*I->vec_selections)[individualize_pos].first == new_class &&
-                        (*I->vec_selections)[individualize_pos].second == class_size) {
+                    if (individualize_early >= 0 && individualize_pos < I->vec_selections.size() &&
+                        (I->vec_selections)[individualize_pos].first == new_class &&
+                        (I->vec_selections)[individualize_pos].second == class_size) {
                         //PRINT("FOUND CLASS" << individualize_pos);
                         const int col = new_class;
                         const int rpos = col + (intRand(0, INT32_MAX, 0) % (c->ptn[col] + 1));

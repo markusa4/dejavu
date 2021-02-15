@@ -7,7 +7,7 @@
 #include <iostream>
 #include "utility.h"
 
-extern thread_local bool bulk_domain_reset;
+extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
 
 template<class vertex_t>
 class coloring_allocator {
@@ -22,6 +22,7 @@ public:
                 buffer_const = 20;
             bulk_domain_reset = false;
             bulk_domain = new vertex_t[buffer_const * domain_size + 1];
+            std::cout << "createB " << bulk_domain << std::endl;
             bulk_domain[0] = 0;
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;
@@ -29,17 +30,16 @@ public:
         }
 
         bulk_domain_cnt += domain_size;
-        if (bulk_domain_cnt == bulk_domain_sz)
+        bulk_domain[0] += 1;
+        if (bulk_domain_cnt >= bulk_domain_sz)
             bulk_domain_sz = -1;
-        else
-            bulk_domain[0] += 1;
-
 
         return std::pair<vertex_t *, vertex_t *>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
     }
 
     static void coloring_bulk_deallocator(vertex_t *bulk_domain) {
         if (--bulk_domain[0] == 0) {
+            std::cout << "removeB " << bulk_domain << std::endl;
             bulk_domain_reset = true;
             delete[] bulk_domain;
         }
@@ -71,6 +71,35 @@ public:
         }
     }
 
+    void alloc(int sz) {
+        /*if(!init) {
+            std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(sz * 4);
+            bulk_alloc = alloc.first;
+            bulk_pt    = alloc.second;
+
+            lab           = bulk_pt;
+            ptn           = lab + sz;
+            vertex_to_col = lab + sz * 2;
+            vertex_to_lab = lab + sz * 3;
+            efficient_alloc = true;
+            init = true;
+
+            lab_sz = sz;
+            ptn_sz = sz;
+        }*/
+        if(!init) {
+            lab           = new vertex_t[sz];
+            ptn           = new vertex_t[sz];
+            vertex_to_col = new vertex_t[sz];
+            vertex_to_lab = new vertex_t[sz];
+            efficient_alloc = false;
+            init = true;
+
+            lab_sz = sz;
+            ptn_sz = sz;
+        }
+    }
+
     void dealloc() {
         if(!efficient_alloc) {
             delete[] ptn;
@@ -84,40 +113,32 @@ public:
 
     void copy(coloring<vertex_t> *c) {
         if(init) {
-        if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
-            dealloc();
-            init = false;
-        } else {
-            cells = c->cells;
-            if(!efficient_alloc || !c->efficient_alloc) {
-                for(int i = 0; i < c->ptn_sz;) {
-                    const vertex_t rd = c->ptn[i];
-                    ptn[i] = rd;
-                    i += rd +1;
-                }
-                memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
+            if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
+                dealloc();
+                init = false;
             } else {
-                for(int i = 0; i < c->ptn_sz;) {
-                    const vertex_t rd = c->ptn[i];
-                    ptn[i] = rd;
-                    i += rd +1;
+                cells = c->cells;
+                if(!efficient_alloc || !c->efficient_alloc) {
+                    for(int i = 0; i < c->ptn_sz;) {
+                        const vertex_t rd = c->ptn[i];
+                        ptn[i] = rd;
+                        i += rd +1;
+                    }
+                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
+                } else {
+                    for(int i = 0; i < c->ptn_sz;) {
+                        const vertex_t rd = c->ptn[i];
+                        ptn[i] = rd;
+                        i += rd +1;
+                    }
+                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
                 }
-                memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
+                return;
             }
-            return;
-        }
         }
 
         if(!init) {
-            std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(c->lab_sz * 4);
-            bulk_alloc = alloc.first;
-            bulk_pt    = alloc.second;
-
-            lab           = bulk_pt;
-            ptn           = lab + c->lab_sz;
-            vertex_to_col = lab + c->lab_sz * 2;
-            vertex_to_lab = lab + c->lab_sz * 3;
-            efficient_alloc = true;
+            alloc(c->lab_sz);
         }
 
         if(c->cells > c->ptn_sz / 4) {
@@ -150,16 +171,7 @@ public:
         }
 
         if(!init) {
-            std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(c->lab_sz * 4);
-
-            bulk_alloc = alloc.first;
-            bulk_pt    = alloc.second;
-
-            lab           = bulk_pt;
-            ptn           = lab + c->lab_sz;
-            vertex_to_col = lab + c->lab_sz * 2;
-            vertex_to_lab = lab + c->lab_sz * 3;
-            efficient_alloc = true;
+            alloc(c->lab_sz);
         }
 
         if(c->cells > c->ptn_sz / 4) {
@@ -184,19 +196,7 @@ public:
     }
 
     void initialize(int domain_size) {
-        std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(domain_size * 4);
-        bulk_alloc = alloc.first;
-        bulk_pt    = alloc.second;
-
-        lab           = bulk_pt;
-        ptn           = lab + domain_size;
-        vertex_to_col = lab + domain_size * 2;
-        vertex_to_lab = lab + domain_size * 3;
-        efficient_alloc = true;
-        init = true;
-
-        lab_sz = domain_size;
-        ptn_sz = domain_size;
+        alloc(domain_size);
     }
 
     bool check() {
@@ -208,12 +208,6 @@ public:
         }
         return comp;
     }
-
-    /*static void* operator new(size_t size) {
-        return NFAlloc(size);
-    }
-    static void operator delete(void *p) {
-    }*/
 };
 
 #endif //DEJAVU_COLORING_H

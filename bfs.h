@@ -29,13 +29,16 @@ public:
         root_elem->base_sz = 0;
         root_elem->is_identity = true;
         *root_elem->I = *start_I;
+        root_elem->init_I = true;
+        root_elem->init_c = true;
+        root_elem->init_base = true;
         return root_elem;
     }
 
     bfs_element() {};
     // coloring and invariant for the specified path / base
     bfs_element<vertex_t>* parent = nullptr;
-    coloring<vertex_t>*    c = nullptr;
+    coloring<vertex_t>*    c      = nullptr;
     invariant* I = nullptr;
     int* base    = nullptr;
     int  base_sz = -1;
@@ -61,12 +64,13 @@ public:
     bool init_c = false;
     bool init_I = false;
     bool init_base = false;
+
     ~bfs_element() {
-        if(init_c)
+        if(init_c && c != nullptr)
             delete c;
-        if(init_I)
+        if(init_I && I != nullptr)
             delete I;
-        if(init_base)
+        if(init_base && base != nullptr)
             delete base;
     }
 
@@ -127,20 +131,28 @@ public:
             for (int i = 0; i < base_size + 2; ++i)
                 delete level_abort_map_mutex[i];
 
-            for (int i = 0; i < current_level; ++i) {
-                //for(int j = 0; j < level_sizes[i]; ++j)
-                //delete level_states[i][j];
-                delete[] level_states[i];
+            for (int i = 0; i < base_size + 2; ++i) {
+                if(level_states[i] != nullptr) {
+                    for (int j = 0; j < level_sizes[i]; ++j) {
+                        delete level_states[i][j];
+                    }
+                    delete[] level_states[i];
+                }
             }
 
             delete[] level_states;
             delete[] level_sizes;
-            //delete[] level_reserved_sizes;
+            // delete[] level_reserved_sizes;
             delete[] level_maxweight;
             // delete[] level_minweight;
             // delete[] level_abort_map_done;
             delete[] level_abort_map_mutex;
             delete[] level_abort_map;
+
+            delete[] bfs_level_todo;
+            delete[] bfs_level_finished_elements;
+
+            delete[] finished_elems;
             // delete[] level_expecting_finished;
         }
     }
@@ -179,6 +191,7 @@ public:
             level_abort_map[i] = std::unordered_set<std::pair<int, long>, pair_hash>();
             level_abort_map_done[i] = -1;
             level_abort_map_mutex[i] = new std::mutex();
+            level_states[i] = nullptr;
         }
 
         level_states[0]    = new bfs_element<vertex_t>*[1];

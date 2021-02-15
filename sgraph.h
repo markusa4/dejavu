@@ -51,13 +51,7 @@ public:
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
     void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
-        c->lab = new vertex_t[this->v_size];
-        c->ptn = new vertex_t[this->v_size];
-        c->vertex_to_col = new vertex_t[this->v_size];
-        c->vertex_to_lab = new vertex_t[this->v_size];
-        c->lab_sz = this->v_size;
-        c->ptn_sz = this->v_size;
-        c->init = true;
+        c->alloc(this->v_size);
 
         for(int i = 0; i < v_size; i++) {
             c->lab[i] = i;
@@ -116,13 +110,7 @@ public:
     }
 
     void initialize_coloring_raw(coloring<vertex_t> *c) {
-        c->lab = new vertex_t[this->v_size];
-        c->ptn = new vertex_t[this->v_size];
-        c->vertex_to_col = new vertex_t[this->v_size];
-        c->vertex_to_lab = new vertex_t[this->v_size];
-        c->lab_sz = this->v_size;
-        c->ptn_sz = this->v_size;
-        c->init = true;
+        c->alloc(this->v_size);
 
         for(int i = 0; i < v_size; i++) {
             c->lab[i] = i;

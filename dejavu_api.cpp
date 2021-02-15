@@ -28,8 +28,9 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 bool bench_dejavu_api(sgraph *g1, int max_length, int num, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    std::set<std::pair<int*, long>> paths;
-    random_paths(g1, max_length, num, &paths);
+    std::set<std::tuple<int*, int, int*, long>> paths;
+    //random_paths(g1, nullptr, max_length, num, &paths);
+    dejavu_automorphisms(g1, nullptr, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
     return true;
@@ -192,7 +193,7 @@ int commandline_mode(int argc, char **argv) {
     _g1 = g1;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu-api" << std::endl;
+    std::cout << "dejavu-api benchmark" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
@@ -200,12 +201,16 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     if(timeout > 0)
         killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bool res = bench_dejavu_api(_g1, max_length, num, &dejavu_solve_time);
+    for(int i = 0; i < num; ++i ) {
+        std::cout << "Run " << i << ":" << std::endl;
+        bool res = bench_dejavu_api(_g1, max_length, num, &dejavu_solve_time);
+    }
     if(timeout > 0)
         killer.join();
 
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
+    getchar();
     return 0;
 }
 

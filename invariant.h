@@ -12,11 +12,11 @@ enum cell_state {CELL_ACTIVE, CELL_IDLE, CELL_END};
 
 class invariant {
 public:
-    invariant* created                     = nullptr;
-    std::vector<int>*        vec_cells     = nullptr;
-    std::vector<std::pair<int, int>>* vec_selections= nullptr;
-    std::vector<cell_state>* vec_protocol  = nullptr;
-    std::vector<int>*        vec_invariant = nullptr;
+    invariant* created    = nullptr;
+    std::vector<int>        vec_cells;
+    std::vector<std::pair<int, int>> vec_selections;
+    std::vector<cell_state> vec_protocol;
+    std::vector<int>        vec_invariant;
 
     invariant*        compareI;
     std::vector<int>* compare_vec;
@@ -49,12 +49,12 @@ public:
             }
             return (comp || never_fail);
         } else {
-            vec_invariant->push_back(i);
+            vec_invariant.push_back(i);
             cur_pos += 1;
             if (has_compare) {
-                if ((compareI->vec_invariant)->size() < vec_invariant->size())
+                if ((compareI->vec_invariant).size() < vec_invariant.size())
                     return false;
-                return (*vec_invariant)[cur_pos] == (*compareI->vec_invariant)[cur_pos];
+                return (vec_invariant)[cur_pos] == (compareI->vec_invariant)[cur_pos];
             } else {
                 return true;
             }
@@ -63,41 +63,41 @@ public:
 
     inline void write_cells(int cells) {
         if(!no_write) {
-            vec_cells->push_back(cells);
+            vec_cells.push_back(cells);
         }
     }
 
     inline void selection_write(int cell, int cell_size) {
         if(!no_write) {
-            vec_selections->push_back(std::pair<int, int>(cell, cell_size));
+            vec_selections.push_back(std::pair<int, int>(cell, cell_size));
         }
     }
 
     inline int selection_read(int base_point) {
-        return (*vec_selections)[base_point].first;
+        return (vec_selections)[base_point].first;
     }
 
     inline void protocol_write(bool active_cell, int c) {
         if(!no_write) {
             ++protocol_pos;
-            vec_protocol->push_back(active_cell?cell_state::CELL_ACTIVE:cell_state::CELL_IDLE);
+            vec_protocol.push_back(active_cell?cell_state::CELL_ACTIVE:cell_state::CELL_IDLE);
         }
     }
 
     inline void protocol_mark() {
         if(!no_write) {
             ++protocol_pos;
-            vec_protocol->push_back(CELL_END);
+            vec_protocol.push_back(CELL_END);
         }
     }
 
     inline bool protocol_read(int c) {
         ++protocol_pos;
-        return (*compareI->vec_protocol)[protocol_pos] == cell_state::CELL_ACTIVE;
+        return (compareI->vec_protocol)[protocol_pos] == cell_state::CELL_ACTIVE;
     }
 
     inline void protocol_skip_to_mark() {
-        while((*compareI->vec_protocol)[protocol_pos] != cell_state::CELL_END) {
+        while((compareI->vec_protocol)[protocol_pos] != cell_state::CELL_END) {
             ++protocol_pos;
         }
     }
@@ -128,22 +128,22 @@ public:
 
     void create_vector(int prealloc) {
         created       = this;
-        vec_cells     = new std::vector<int>();
-        vec_protocol  = new std::vector<cell_state>();
-        vec_invariant = new std::vector<int>();
-        vec_selections= new std::vector<std::pair<int,int>>(); // should also include size, for future blueprint uses
-        vec_cells->reserve(prealloc + 16);
-        vec_protocol->reserve(prealloc + 16);
-        vec_invariant->reserve(prealloc * 20);
-        vec_selections->reserve(prealloc + 16);
+        //vec_cells     = new std::vector<int>();
+        //vec_protocol  = new std::vector<cell_state>();
+        //vec_invariant = new std::vector<int>();
+        //vec_selections= new std::vector<std::pair<int,int>>(); // should also include size, for future blueprint uses
+        vec_cells.reserve(prealloc + 16);
+        vec_protocol.reserve(prealloc + 16);
+        vec_invariant.reserve(prealloc * 20);
+        vec_selections.reserve(prealloc + 16);
     }
 
     void purge() {
         if(created != nullptr) {
-            delete vec_cells;
-            delete vec_protocol;
-            delete vec_invariant;
-            delete vec_selections;
+            //delete vec_cells;
+            //delete vec_protocol;
+            //delete vec_invariant;
+            //delete vec_selections;
             created = nullptr;
         }
     }

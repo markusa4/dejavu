@@ -6,6 +6,6 @@ void invariant::set_compare_invariant(invariant* I) {
     no_write = true;
     has_compare = true;
     compareI    = I;
-    compare_vec = I->vec_invariant;
+    compare_vec = &I->vec_invariant;
     vec_selections = I->vec_selections;
 }

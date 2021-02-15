@@ -52,17 +52,8 @@ public:
         dequeue_space    = new std::pair<int,int>[128];
         dequeue_space_sz = 128;
 
-        if(std::is_same<vertex_t, int>::value) {
-            b = (int*) base_points->map;
-        } else {
-            b = new int[base_points->map_sz];
-            for(int i = 0; i < base_points->map_sz; ++i) {
-                b[i] = static_cast<int>(base_points->map[i]);
-            }
-            //delete[] base_points->map;
-            base_points->deletable();
-        }
-
+        b = new int[base_points->map_sz];
+        base_points->copy_map(b);
         base_size = base_points->map_sz;
 
         shared_newgroup(&gp, &gens, domain_size);
@@ -74,30 +65,15 @@ public:
         delete[] dequeue_space;
         if(generators_persistent) {
             shared_freeschreier(&gp, nullptr);
+            shared_schreier_freedyn();
         } else {
             shared_freeschreier(&gp, &gens);
+            shared_schreier_freedyn();
         }
     }
 
     bool add_permutation(bijection<vertex_t>* p, int* idle_ms, bool* done) {
-        int* map;
-        if(std::is_same<vertex_t, int>::value) {
-            map = (int*) p->map;
-        } else {
-            map = new int[p->map_sz];
-            for(int i = 0; i < p->map_sz; ++i) {
-                map[i] = p->map[i];
-            }
-            delete[] p->map;
-        }
-
-
-        int support = 0;
-        for(int i = 0; i < p->map_sz; ++i) {
-            support += (p->map[i] != i);
-        }
-        PRINT("[auto] support: " << support << " / " << p->map_sz);
-
+        int* map = p->extract_map();
         filterstate state;
         state.ingroup = false;
         state.counts_towards_abort = !p->non_uniform;
@@ -139,7 +115,7 @@ public:
                         gens_added += 1;
                         if(abort_counter > 0) {
                             config.CONFIG_RAND_ABORT += 1;
-                            std::cout << "d: " << config.CONFIG_RAND_ABORT << std::endl;
+                            PRINT("[Dej] d: " << config.CONFIG_RAND_ABORT << std::endl);
                         }
                         abort_counter = 0;
                     }
@@ -196,11 +172,10 @@ public:
         return;
     }
 
-    void ack_done_shared() {
-        thread_local bool seen = false;
-        if(!seen) {
+    void ack_done_shared(bool* seen) {
+        if(!*seen) {
             ++_ack_done_shared_group;
-            seen = true;
+            *seen = true;
         }
     }
 

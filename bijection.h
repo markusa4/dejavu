@@ -6,14 +6,16 @@
 #include <chrono>
 #include <random>
 #include <iostream>
+#include <assert.h>
 
 
 template<class vertex_t>
 class bijection {
-public:
     bool init = false;
+    vertex_t* map = nullptr;
+public:
     bool mark = false;
-    vertex_t* map;
+    int res_sz;
     int map_sz;
     bool non_uniform  = false;
     bool foreign_base = false;
@@ -23,9 +25,31 @@ public:
         return map[v];
     }
 
+    void initialize_empty(int reserve) {
+        if(init) {
+            delete[] map;
+        }
+        map    = new vertex_t[reserve];
+        res_sz = reserve;
+        map_sz = 0;
+        init = true;
+    }
+
+    void append(int v) {
+        assert(init);
+        assert(map_sz < res_sz);
+        map[map_sz] = v;
+        ++map_sz;
+    }
+
     void copy(bijection* p) {
-        if(!init)
-            map = new vertex_t[p->map_sz];
+        assert(p->init);
+        //if(!init)
+        if(init) {
+            delete[] map;
+        }
+        map = new vertex_t[p->map_sz];
+        res_sz = p->map_sz;
         init = p->init;
         mark = p->mark;
         map_sz = p->map_sz;
@@ -35,32 +59,78 @@ public:
         memcpy(map, p->map, p->map_sz * sizeof(vertex_t));
     }
 
+    void swap(bijection* p) {
+        bool s_init = p->init;
+        vertex_t* s_map = p->map;
+        int s_map_sz = p->map_sz;
+
+        p->init = init;
+        p->map = map;
+        p->map_sz = map_sz;
+
+        init = s_init;
+        map = s_map;
+        map_sz = s_map_sz;
+    }
+
+    int* extract_map() {
+        int* r_map = map;
+        map = nullptr;
+        init = false;
+        return r_map;
+    }
+
+    void copy_map(int* b) {
+        assert(init);
+        assert(map != nullptr);
+        assert(b != nullptr);
+        memcpy(b, map, map_sz * sizeof(vertex_t));
+    }
+
     void print() {
         for(int i = 0; i < map_sz; ++i)
             std::cout << map[i] << " ";
         std::cout << std::endl;
     }
 
-    void read_from_coloring(coloring<vertex_t> *c) {
-        if(!init) {
-            //    delete[] map;
-            //}
-            map = new vertex_t[c->lab_sz];
+    void read_from_array(vertex_t* _map, int _map_sz) {
+        if(init) {
+            delete[] map;
         }
+        map = new vertex_t[_map_sz];
+        res_sz = _map_sz;
+        init = true;
+        map_sz = _map_sz;
+        for(int i = 0; i < _map_sz; ++i) {
+            map[i] = _map[i];
+        }
+    }
+
+    void read_from_coloring(coloring<vertex_t> *c) {
+        if(init) {
+            delete[] map;
+        }
+        map = new vertex_t[c->lab_sz];
         init = true;
         map_sz = c->lab_sz;
+        res_sz = c->lab_sz;
         for(int i = 0; i < c->lab_sz; ++i) {
             map[i] = c->lab[i];
         }
     }
 
     void inverse() {
-        thread_local vertex_t* switch_map;
-        thread_local bool         switch_map_init;
+        assert(init);
+        // ToDo: problematic!
+        //thread_local
+        vertex_t* switch_map;
+        //thread_local
+        bool      switch_map_init = false;
 
         if(!switch_map_init) {
             switch_map_init = true;
             switch_map      = new vertex_t[map_sz];
+
         }
 
         vertex_t* swap = map;
@@ -70,21 +140,19 @@ public:
         for(int i = 0; i < map_sz; ++i) {
             map[switch_map[i]] = i;
         }
-    }
 
-    void compose(bijection<vertex_t>* p) {
-        for(int i = 0; i < map_sz; ++i) {
-            map[i] = p->map[map[i]];
+        if(switch_map_init) {
+            switch_map_init = false;
+            delete[] switch_map;
         }
     }
 
-    void not_deletable() {
-        init = false;
-    }
-
-
-    void deletable() {
-        init = true;
+    void compose(bijection<vertex_t>* p) {
+        assert(p->init);
+        assert(init);
+        for(int i = 0; i < map_sz; ++i) {
+            map[i] = p->map[map[i]];
+        }
     }
 
     bijection() {
@@ -92,11 +160,16 @@ public:
     }
 
     ~bijection() {
-        if(init)
+        if(init) {
             delete[] map;
+            init = false;
+        }
     }
 
     static void random_bijection(bijection<vertex_t>* p, int n, unsigned seed) {
+        if(p->init)
+            delete[] p->map;
+
         p->map = new vertex_t[n];
         p->init = true;
         p->map_sz = n;
