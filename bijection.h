@@ -13,6 +13,19 @@ template<class vertex_t>
 class bijection {
     bool init = false;
     vertex_t* map = nullptr;
+
+    void alloc(int n) {
+        dealloc();
+        map  = new vertex_t[n];
+        init = true;
+    }
+
+    void dealloc() {
+        if(init) {
+            delete[] map;
+            init = false;
+        }
+    };
 public:
     bool mark = false;
     int res_sz;
@@ -26,10 +39,7 @@ public:
     }
 
     void initialize_empty(int reserve) {
-        if(init) {
-            delete[] map;
-        }
-        map    = new vertex_t[reserve];
+        alloc(reserve);
         res_sz = reserve;
         map_sz = 0;
         init = true;
@@ -44,11 +54,7 @@ public:
 
     void copy(bijection* p) {
         assert(p->init);
-        //if(!init)
-        if(init) {
-            delete[] map;
-        }
-        map = new vertex_t[p->map_sz];
+        alloc(p->map_sz);
         res_sz = p->map_sz;
         init = p->init;
         mark = p->mark;
@@ -94,10 +100,7 @@ public:
     }
 
     void read_from_array(vertex_t* _map, int _map_sz) {
-        if(init) {
-            delete[] map;
-        }
-        map = new vertex_t[_map_sz];
+        alloc(_map_sz);
         res_sz = _map_sz;
         init = true;
         map_sz = _map_sz;
@@ -107,10 +110,7 @@ public:
     }
 
     void read_from_coloring(coloring<vertex_t> *c) {
-        if(init) {
-            delete[] map;
-        }
-        map = new vertex_t[c->lab_sz];
+        alloc(c->lab_sz);
         init = true;
         map_sz = c->lab_sz;
         res_sz = c->lab_sz;
@@ -121,10 +121,9 @@ public:
 
     void inverse() {
         assert(init);
-        // ToDo: problematic!
-        //thread_local
+        // ToDo: buffer this map
+        // thread local with unique_ptr?
         vertex_t* switch_map;
-        //thread_local
         bool      switch_map_init = false;
 
         if(!switch_map_init) {
@@ -160,10 +159,7 @@ public:
     }
 
     ~bijection() {
-        if(init) {
-            delete[] map;
-            init = false;
-        }
+        dealloc();
     }
 
     static void random_bijection(bijection<vertex_t>* p, int n, unsigned seed) {

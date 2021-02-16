@@ -10,6 +10,30 @@
 extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
 
 template<class vertex_t>
+class trash_manager {
+    static std::vector<vertex_t*> junk;
+    static std::unique_ptr<std::mutex> lock;
+public:
+    static void free_trash() {
+        lock->lock();
+        PRINT("[Dej] Deleting colorings (" << junk.size() << ")" << std::endl)
+        while(!junk.empty()) {
+            delete[] junk.back();
+            junk.pop_back();
+        }
+        lock->unlock();
+    }
+    static void add_trash(vertex_t* arr) {
+        lock->lock();
+        junk.push_back(arr);
+        lock->unlock();
+    }
+};
+
+template<class vertex_t> std::unique_ptr<std::mutex> trash_manager<vertex_t>::lock = std::make_unique<std::mutex>();
+template<class vertex_t> std::vector<vertex_t*> trash_manager<vertex_t>::junk = std::vector<vertex_t*>();
+
+template<class vertex_t>
 class coloring_allocator {
 public:
     static std::pair<vertex_t *, vertex_t *> coloring_bulk_allocator(int domain_size) {
@@ -22,7 +46,7 @@ public:
                 buffer_const = 20;
             bulk_domain_reset = false;
             bulk_domain = new vertex_t[buffer_const * domain_size + 1];
-            std::cout << "createB " << bulk_domain << std::endl;
+            trash_manager<vertex_t>::add_trash(bulk_domain);
             bulk_domain[0] = 0;
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;
@@ -38,11 +62,12 @@ public:
     }
 
     static void coloring_bulk_deallocator(vertex_t *bulk_domain) {
-        if (--bulk_domain[0] == 0) {
+        bulk_domain_reset = true;
+        /*if (--bulk_domain[0] == 0) {
             std::cout << "removeB " << bulk_domain << std::endl;
             bulk_domain_reset = true;
             delete[] bulk_domain;
-        }
+        }*/
     }
 };
 
@@ -72,7 +97,7 @@ public:
     }
 
     void alloc(int sz) {
-        /*if(!init) {
+        if(!init) {
             std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(sz * 4);
             bulk_alloc = alloc.first;
             bulk_pt    = alloc.second;
@@ -86,8 +111,8 @@ public:
 
             lab_sz = sz;
             ptn_sz = sz;
-        }*/
-        if(!init) {
+        }
+        /*if(!init) {
             lab           = new vertex_t[sz];
             ptn           = new vertex_t[sz];
             vertex_to_col = new vertex_t[sz];
@@ -97,7 +122,7 @@ public:
 
             lab_sz = sz;
             ptn_sz = sz;
-        }
+        }*/
     }
 
     void dealloc() {

@@ -18,7 +18,7 @@ struct abort_code {
 };
 
 template <class vertex_t, class degree_t, class edge_t>
-struct alignas(64) dejavu_workspace {
+struct dejavu_workspace {
     // workspace for normal search
     refinement<vertex_t, degree_t, edge_t> R;
     selector<vertex_t, degree_t, edge_t>   S;
@@ -470,7 +470,6 @@ private:
                         while(!switches->check_strategy_tournament(communicator_id, &m, false,
                                                                    &W.checked_tournament)
                               && !switches->done_created_group) continue;
-                        PRINT("[Dej] Cycle done");
                         // if this thread won, it will now create the group
                         if(switches->win_id == communicator_id) {
                             canon_strategy->replace(my_strategy);
@@ -553,29 +552,15 @@ private:
                         if (reset_non_uniform_switch) {
                             reset_skiplevels(&W);
                             if(!master) { // guess a new leaf
-                                // ToDo: just renew _my_strategy here
-                                if(!is_canon_strategy) {
-                                    //delete my_canon_I;
-                                    //delete my_canon_leaf;
-                                    //delete my_strategy;
-                                }
-                                is_canon_strategy = false;
-                                my_canon_I    = new invariant;
-                                my_canon_leaf = new bijection<vertex_t>;
-                                base_points   = bijection<vertex_t>();
+                                _my_canon_I    = invariant();
+                                _my_canon_leaf = bijection<vertex_t>();
                                 auto rst      = (selector_type) intRand(0, 2, selector_seed);
-                                my_strategy   = new strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
+                                _my_strategy   = strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
+                                is_canon_strategy = false;
+                                base_points   = bijection<vertex_t>();
                                 find_first_leaf(&W, g, my_canon_I, my_canon_leaf, my_strategy, &base_points, switches,
                                                 selector_seed);
-                                //if(std::is_same<vertex_t, int>::value) {
                                 W.my_base_points.swap(&base_points);
-                                /*} else {
-                                    W.my_base_points = new int[base_points.map_sz];
-                                    for(int i = 0; i < base_points.map_sz; ++i) {
-                                        W.my_base_points[i] = static_cast<int>(base_points.map[i]);
-                                    }
-                                }
-                                W.my_base_points_sz    = base_points.map_sz;*/
                                 W.skiplevel_is_uniform = false;
                                 W.is_foreign_base      = true;
                                 foreign_base_done      = false;
@@ -844,11 +829,6 @@ private:
             sampled_paths += 1;
         }
 
-        //if(switch_map_init) {
-         //   switch_map_init = false;
-         //   delete[] switch_map;
-        //}
-
         if(master && !dejavu_kill_request) {
             PRINT("[Dej] Cleanup...")
             delete[] shrd_orbit;
@@ -857,18 +837,10 @@ private:
             delete shrd_orbit_;
             delete shrd_orbit_weights_;
 
-            G->generators_persistent = (gens == nullptr);
+            G->generators_persistent = (gens != nullptr);
             delete G;
 
-            //delete canon_strategy->I;
-            //delete canon_strategy->leaf;
-            // delete canon_strategy;
-        }
-
-        if(!is_canon_strategy) {
-            //delete my_canon_I;
-            //delete my_canon_leaf;
-            //delete my_strategy;
+            trash_manager<vertex_t>::free_trash();
         }
 
         return;
@@ -1402,8 +1374,9 @@ private:
             }
 
             if (weight == -1 && comp) {
-                comp = comp && get_orbit(w, elem->base, elem->base_sz, v, w->my_base_points.map_vertex(elem->base_sz), &w->orbit,
-                                         w->prev_bfs_element == elem);
+                //comp = comp && get_orbit(w, elem->base, elem->base_sz, v, w->my_base_points.map_vertex(elem->base_sz), &w->orbit,
+                //                         w->prev_bfs_element == elem);
+                weight = 1;
                 assert(!comp ? (!is_identity) : true);
             }
 
@@ -1466,6 +1439,7 @@ private:
             next_elem->is_identity = is_identity;
             next_elem->level = level + 1;
             next_elem->base_sz = elem->base_sz + 1;
+            assert(next_elem->base == nullptr);
             next_elem->base = new int[next_elem->base_sz];
             next_elem->init_base = true;
 
@@ -1510,8 +1484,10 @@ private:
     void bfs_fill_queue(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t>* bwork) {
         if(bwork->current_level == bwork->target_level)
             return;
+        bwork->reserve_current_level();
         //moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
         //bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
+        bwork->bfs_level_todo[bwork->current_level].clear();
 
         int expected = 0;
         for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
@@ -1546,28 +1522,6 @@ private:
             w->generator_fix_base = new shared_permnode*[*w->shared_generators_size];
             w->generator_fix_base_alloc = *w->shared_generators_size;
         }
-    }
-
-    bool sequential_init_copy(dejavu_workspace<vertex_t, degree_t, edge_t> *w) {
-        // update sequential group in workspace
-        bool new_gen = false;
-        if(!w->sequential_init) {
-            _newgroup(&w->sequential_gp, &w->sequential_gens, w->G->domain_size);
-            w->sequential_init = true;
-        }
-
-        // copy generators that have not been copied yet
-        shared_permnode *it = w->G->gens;
-        do {
-            if(it->copied == 0) {
-                new_gen = true;
-                _addpermutation(&w->sequential_gens, it->p, w->G->domain_size);
-                it->copied = 1;
-            }
-            it = it->next;
-        } while (it != w->G->gens);
-
-        return new_gen;
     }
 
     // Computes a leaf of the tree by following the path given in base.

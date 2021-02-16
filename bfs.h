@@ -66,12 +66,12 @@ public:
     bool init_base = false;
 
     ~bfs_element() {
-        if(init_c && c != nullptr)
+        if(c != nullptr)
             delete c;
-        if(init_I && I != nullptr)
+        if(I != nullptr)
             delete I;
-        if(init_base && base != nullptr)
-            delete base;
+        if(base != nullptr)
+            delete[] base;
     }
 
     bool rm_point = false;
@@ -87,15 +87,19 @@ class bfs_workspace {
 public:
     // level array that keeps a queue with tasks
     // bfs_element* is a pointer to the state where int has to be individualized
-    moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>* bfs_level_todo;
+    //moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>* bfs_level_todo;
+    std::vector<concurrent_queue<std::tuple<bfs_element<vertex_t>*, int, int>>> bfs_level_todo;
 
     // commit finished elements (or nullptr if element was deleted)
     // integer determines how many todos were added for this element
-    moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>* bfs_level_finished_elements;
+    //moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>* bfs_level_finished_elements;
+    std::vector<concurrent_queue<std::pair<bfs_element<vertex_t>*, int>>> bfs_level_finished_elements;
+
 
     // elements of all levels
     // delete elements of level once work of level + 1 is fully commited, then it is safe
-    bfs_element<vertex_t>***         level_states;
+    //bfs_element<vertex_t>***         level_states;
+    std::vector<std::vector<bfs_element<vertex_t>*>> level_states;
     int*                             level_sizes;
     int*                             level_reserved_sizes;
     int*                             level_expecting_finished;
@@ -120,7 +124,6 @@ public:
     int chunk_size = 32; // ToDo: dynamically adapt this
     bool reached_initial_target = true;
     bool initialized = false;
-    int initial_target_level;
 
     std::pair<bfs_element<vertex_t>*, int>* finished_elems;
     int finished_elems_sz = -1;
@@ -131,71 +134,88 @@ public:
             for (int i = 0; i < base_size + 2; ++i)
                 delete level_abort_map_mutex[i];
 
-            for (int i = 0; i < base_size + 2; ++i) {
-                if(level_states[i] != nullptr) {
+            int cleanelem = 0;
+            for (int i = 0; i <= current_level; ++i) {
+                std::cout << "queue size " << i << ": " << bfs_level_todo[i].size() << std::endl;
+                //if(level_states[i] != nullptr) {
                     for (int j = 0; j < level_sizes[i]; ++j) {
                         delete level_states[i][j];
+                        ++cleanelem;
                     }
-                    delete[] level_states[i];
-                }
+                    //std::cout << "removing pt " << level_states[i] << std::endl;
+                    //delete[] level_states[i];
+                //}
             }
 
-            delete[] level_states;
+            std::cout << "Cleaned " << cleanelem << " elements." << std::endl;
+
+            //delete[] level_states;
             delete[] level_sizes;
-            // delete[] level_reserved_sizes;
+            delete[] level_reserved_sizes;
             delete[] level_maxweight;
-            // delete[] level_minweight;
-            // delete[] level_abort_map_done;
+            delete[] level_minweight;
+            delete[] level_abort_map_done;
             delete[] level_abort_map_mutex;
             delete[] level_abort_map;
 
-            delete[] bfs_level_todo;
-            delete[] bfs_level_finished_elements;
+            //delete[] bfs_level_todo;
+            //delete[] bfs_level_finished_elements;
 
             delete[] finished_elems;
-            // delete[] level_expecting_finished;
+            delete[] level_expecting_finished;
+
+            initialized = false;
         }
     }
 
     void initialize(bfs_element<vertex_t>* root_elem, int init_c, int domain_size, int base_size) {
         initialized = true;
-        bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>[base_size + 2];
-        bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>[base_size + 2];
+        //bfs_level_todo              = new moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>[base_size + 2];
+        //bfs_level_todo              = new concurrent_queue<std::tuple<bfs_element<vertex_t>*, int, int>>[base_size + 2];
+        bfs_level_todo.reserve(base_size + 2);
+        //bfs_level_finished_elements = new moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>[base_size + 2];
+        bfs_level_finished_elements.reserve(base_size + 2);
 
         this->domain_size = domain_size;
         this->base_size   = base_size;
         current_level = 1;
         target_level  = -1;
-        level_states  = new bfs_element<vertex_t>**[base_size + 2];
-        level_sizes   = new int[(base_size + 2) * 4];
-        level_reserved_sizes = level_sizes + base_size + 2;
-        level_maxweight = new double[(base_size + 2) * 2];
-        level_minweight = level_maxweight + base_size + 2;
-        level_abort_map_done  = level_sizes + (base_size + 2) * 2;
+        //level_states  = new bfs_element<vertex_t>**[base_size + 2];
+        level_states.reserve(base_size + 2);
+        level_sizes   = new int[base_size + 2];
+        level_reserved_sizes = new int[base_size + 2];
+        level_maxweight = new double[base_size + 2];
+        level_minweight = new double[base_size + 2];
+        level_abort_map_done  = new int[base_size + 2];
         level_abort_map_mutex = new std::mutex*[base_size + 2];
         level_abort_map = new std::unordered_set<std::pair<int, long>, pair_hash>[base_size + 2];
 
         abort_map_prune.store(0);
 
-        level_expecting_finished = level_sizes + (base_size + 2) * 3;
+        level_expecting_finished = new int[(base_size + 2)];
         for(int i = 0; i < base_size + 2; ++i) {
-            bfs_level_todo[i] =
-                    moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>(chunk_size, 0,
-                            config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
-            bfs_level_finished_elements[i] =
-                    moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>(chunk_size, 0,
-                            config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+            //bfs_level_todo[i] =
+            //        moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t>*, int, int>>(chunk_size, 0,
+            //                config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+            //bfs_level_todo[i] = concurrent_queue<std::tuple<bfs_element<vertex_t>*, int, int>>();
+            bfs_level_todo.emplace_back(concurrent_queue<std::tuple<bfs_element<vertex_t>*, int, int>>());
+            //bfs_level_finished_elements[i] =
+                    //moodycamel::ConcurrentQueue<std::pair<bfs_element<vertex_t>*, int>>(chunk_size, 0,
+                    //        config.CONFIG_THREADS_REFINEMENT_WORKERS + 1);
+            bfs_level_finished_elements.emplace_back(concurrent_queue<std::pair<bfs_element<vertex_t>*, int>>());
             level_expecting_finished[i] = 0;
             level_maxweight[i] = 1;
             level_minweight[i] = INT32_MAX;
             level_abort_map[i] = std::unordered_set<std::pair<int, long>, pair_hash>();
             level_abort_map_done[i] = -1;
             level_abort_map_mutex[i] = new std::mutex();
-            level_states[i] = nullptr;
+            //level_states[i] = nullptr;
+            level_states.emplace_back(std::vector<bfs_element<vertex_t>*>());
         }
 
-        level_states[0]    = new bfs_element<vertex_t>*[1];
-        level_states[0][0] = root_elem;
+        //level_states[0]    = new bfs_element<vertex_t>*[1];
+        //level_states[0][0] = root_elem;
+        level_states[0].emplace_back(root_elem);
         root_elem->weight = 1;
         root_elem->target_color = init_c;
 
@@ -215,11 +235,12 @@ public:
         level_reserved_sizes[0] = 1;
 
         level_expecting_finished[1] = sz;
-        level_states[1] = new bfs_element<vertex_t>*[sz];
+        //level_states[1] = new bfs_element<vertex_t>*[sz];
+        level_states[1].resize(sz);
         level_reserved_sizes[1] = sz;
         level_sizes[1] = 0;
 
-        finished_elems = new std::pair<bfs_element<vertex_t>*, int>[chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS];
+        finished_elems = new std::pair<bfs_element<vertex_t>*, int>[chunk_size * (config.CONFIG_THREADS_REFINEMENT_WORKERS + 1)];
         finished_elems_sz = chunk_size * config.CONFIG_THREADS_REFINEMENT_WORKERS;
         PRINT("[BFS] BFS structure initialized, expecting " << sz << " on first level");
     }
@@ -293,21 +314,24 @@ public:
             }
 
             if(expected_size < config.CONFIG_IR_SIZE_FACTOR * domain_size * tolerance || config.CONFIG_IR_FULL_BFS) {
-                level_reserved_sizes[current_level + 1] = expected_size;
-                level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
-                level_sizes[current_level + 1] = 0;
-
                 assert(expected_size > 0);
-
                 need_queue_fill = true;
+                level_sizes[current_level + 1] = 0;
                 current_level += 1;
+                //reserve_current_level();
             } else {
                 PRINT("[BFS] Refusing to advance level (expected_size too large), setting target level to " << current_level + 1);
 
-                level_reserved_sizes[current_level + 1] = expected_size;
-                level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
+                //level_reserved_sizes[current_level + 1] = expected_size;
+                //if(level_states[current_level + 1] != nullptr) {
+                //    delete[] level_states[current_level + 1];
+                //}
+                //level_states[current_level + 1] = new bfs_element<vertex_t> * [expected_size];
+                //level_states[current_level + 1].resize(expected_size);
+                //if(expected_size > 1000000)
+                //    std::cout << "allocated " << expected_size << std::endl;
+                //level_sizes[current_level + 1] = 0;
                 level_sizes[current_level + 1] = 0;
-
                 target_level   = current_level + 1;
                 reached_initial_target = false;
                 current_level += 1;
@@ -315,6 +339,16 @@ public:
         }
 
         return need_queue_fill;
+    }
+
+    void reserve_current_level() {
+        if(level_expecting_finished[current_level] != level_reserved_sizes[current_level]) {
+            if(level_expecting_finished[current_level] > 1000000)
+                std::cout << "allocated " << level_expecting_finished[current_level] << std::endl;
+            level_states[current_level ].resize(level_expecting_finished[current_level]);
+            level_reserved_sizes[current_level] = level_expecting_finished[current_level];
+            level_sizes[current_level] = 0;
+        }
     }
 
     void reset_initial_target() {

@@ -9,6 +9,8 @@
 #include <fstream>
 #include <set>
 #include <cstring>
+#include <queue>
+#include <memory>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -70,6 +72,7 @@ public:
         done_shared_group.store(false);
         done_created_group.store(false);
         experimental_look_close.store(false);
+        delete_canon_strategy.store(false);
         _ack_done.store(0);
         win_id.store(-2);
         checked.store(0);
@@ -107,6 +110,7 @@ public:
     strategy_metrics   win_metrics;
     std::atomic_int    win_id;
     std::atomic_int    _ack_done;
+    std::atomic_bool   delete_canon_strategy;
     bool               all_no_restart = true;
 
     // used for leaf storage decisions and the leaf storage
@@ -276,6 +280,80 @@ public:
     ~mark_set() {
         if(init)
             delete[] s;
+    }
+};
+
+template<class T>
+class concurrent_queue {
+    std::unique_ptr<std::mutex> lock;
+    std::deque<T> content;
+public:
+    concurrent_queue() {
+        lock =  std::make_unique<std::mutex>();
+    }
+
+    //~concurrent_queue() {
+    //    std::cout << "remove q " <<  this << std::endl;
+   // }
+
+    void enqueue(T item) {
+        lock->lock();
+        content.emplace_back(item);
+        lock->unlock();
+    }
+
+    void enqueue_bulk(T* items, int size) {
+        lock->lock();
+        for(int i = 0; i < size; ++i) {
+            content.emplace_back(items[i]);
+        }
+        lock->unlock();
+    }
+
+    T dequeue() {
+        lock->lock();
+        T item = content.front();
+        content.pop_front();
+        lock->unlock();
+        return item;
+    }
+
+    bool try_dequeue(T& item)  {
+        int i = 0;
+        lock->lock();
+        if(content.size() > 0) {
+            item = content.front();
+            content.pop_front();
+            ++i;
+        }
+        lock->unlock();
+        return (i > 0);
+    }
+
+    int try_dequeue_bulk(T* arr, int chunk_size)  {
+        int i = 0;
+        lock->lock();
+        while(chunk_size - i > 0 && content.size() > 0) {
+            arr[i] = content.front();
+            content.pop_front();
+            ++i;
+        }
+        lock->unlock();
+        return i;
+    }
+
+    void clear() {
+        lock->lock();
+        content.clear();
+        lock->unlock();
+    }
+
+    int size() {
+        int sz = 0;
+        lock->lock();
+        sz = content.size();
+        lock->unlock();
+        return sz;
     }
 };
 

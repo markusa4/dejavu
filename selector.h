@@ -16,8 +16,15 @@ struct strategy {
     invariant* I    = nullptr;
     selector_type cell_selector_type = SELECTOR_FIRST;
     int           cell_selector_seed = 0;
+    bool init = false;
 
     strategy() = default;
+    ~strategy() {
+        if(init) {
+            delete leaf;
+            delete I;
+        }
+    }
     strategy(bijection<vertex_t>* leaf, invariant* I, selector_type cell_selector_type, int seed) {
         this->leaf = leaf;
         this->I    = I;
@@ -26,8 +33,16 @@ struct strategy {
     }
 
     void replace(strategy<vertex_t>* s) {
-        leaf = s->leaf;
-        I    = s->I;
+        if(init) {
+            delete leaf;
+            delete I;
+        }
+        leaf = new bijection<vertex_t>();
+        I    = new invariant();
+        init = true;
+
+        leaf->copy(s->leaf);
+        *I    = *s->I;
         I->created    = I;
         s->I->created = nullptr;
         cell_selector_type = s->cell_selector_type;

@@ -53,8 +53,8 @@ static void mclearfreelists(void) {
         free(sh->vec);
         free(sh->pwr);
         free(sh->orbits);
-        free(sh->fixed_orbit);
-        free(sh->level_lock);
+        delete[] sh->fixed_orbit;
+        delete sh->level_lock;
         free(sh);
     }
     mschreier_freelist = nullptr;
@@ -643,7 +643,7 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
     // identity should not allocate memory, hence early out here!
     for (i = 0; i < n; ++i) if (p[i] != i) {break;}
     if(i == n) {
-        DYNFREE(p, n);
+        delete[] p;
         return false;
     }
 
@@ -786,10 +786,10 @@ bool mfilterschreier_shared(shared_schreier *gp, int *p, shared_permnode **ring,
             shared_addpermutation(ring, p, n);
         }
 
-        DYNFREE(mworkperm, mworkperm_sz);
+        delete[] mworkperm;
         return report_changed;
     } else {
-        DYNFREE(mworkperm, mworkperm_sz);
+        delete[] mworkperm;
         state->sh   = sh;
         state->orbits = orbits;
         state->pwr  = pwr;
@@ -856,9 +856,11 @@ bool generate_random_element(shared_schreier *gp, shared_permnode **ring, int n,
         return false;
     }
 
-    DYNALL(int, mworkperm2, mworkperm2_sz);
-    mworkperm2 = nullptr;
-    DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
+    //DYNALL(int, mworkperm2, mworkperm2_sz);
+    int* mworkperm2 = new int[n];
+    int  mworkperm2_sz = n;
+    //DYNALLOC1(int, mworkperm2, mworkperm2_sz, n, "expandschreier");
+
 
     element->perm    = mworkperm2;
     element->perm_sz = mworkperm2_sz;

@@ -189,7 +189,7 @@ int commandline_mode(int argc, char **argv) {
     sgraph *g1 = new sgraph;
     std::cout << "Parsing " << filename1 << "..." << std::endl;
     p.parse_dimacs_file(filename1, g1, &colmap1);
-    sgraph *_g1 = new sgraph;
+    sgraph *_g1;
     _g1 = g1;
 
     std::cout << "------------------------------------------------------------------" << std::endl;
@@ -211,6 +211,9 @@ int commandline_mode(int argc, char **argv) {
     std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     getchar();
+    delete g1;
+    if(colmap1)
+        delete[] colmap1;
     return 0;
 }
 
