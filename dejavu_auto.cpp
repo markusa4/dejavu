@@ -161,9 +161,11 @@ int commandline_mode(int argc, char **argv) {
         bijection<int> pr;
         bijection<int>::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
+        int* rmap = pr.extract_map();
         if(colmap != nullptr)
-            permute_colmap(&colmap, g->v_size, pr.map);
+            permute_colmap(&colmap, g->v_size, rmap);
         delete g;
+        delete[] rmap;
     } else {
         _g = g;
     }

@@ -163,10 +163,8 @@ public:
         ng->max_degree = max_degree;
 
         bijection<vertex_t> p_inv;
-        p_inv.map = new vertex_t[p->map_sz];
-        p_inv.map_sz = p->map_sz;
-        p_inv.deletable();
-        memcpy(p_inv.map, p->map, p->map_sz*sizeof(vertex_t));
+        p_inv.initialize_empty(p->map_sz);
+        p_inv.copy(p);
         p_inv.inverse();
 
         std::set<int> vertices_hit;

@@ -11,7 +11,7 @@ struct configstruct {
     bool CONFIG_IR_IDLE_SKIP      = true;
     bool CONFIG_IR_FAST_TOLERANCE_INC = true;
     bool CONFIG_IR_INDIVIDUALIZE_EARLY = false;
-    int  CONFIG_IR_EXPAND_DEVIATION = 7;  // default 5
+    int  CONFIG_IR_EXPAND_DEVIATION = 5;  // default 5
     bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;
     int  CONFIG_IR_LEAF_STORE_LIMIT = 64; // default 64
     int  CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;

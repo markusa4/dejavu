@@ -1484,11 +1484,24 @@ private:
     void bfs_fill_queue(dejavu_workspace<vertex_t, degree_t, edge_t> *w, bfs_workspace<vertex_t>* bwork) {
         if(bwork->current_level == bwork->target_level)
             return;
+        // throw away old content of queue
         bwork->reserve_current_level();
         //moodycamel::ConcurrentQueue<std::tuple<bfs_element<vertex_t> *, int, int>> throwaway_queue;
         //bwork->bfs_level_todo[bwork->current_level].swap(throwaway_queue);
         bwork->bfs_level_todo[bwork->current_level].clear();
 
+        // swap identity to first position...
+        for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
+            bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];
+            if(elem->is_identity) {
+                bfs_element<vertex_t> *first_elem = bwork->level_states[bwork->current_level - 1][0];
+                bwork->level_states[bwork->current_level - 1][j] = first_elem;
+                bwork->level_states[bwork->current_level - 1][0] = elem;
+                break;
+            }
+        }
+
+        // fill queue
         int expected = 0;
         for (int j = 0; j < bwork->level_sizes[bwork->current_level - 1]; ++j) {
             bfs_element<vertex_t> *elem = bwork->level_states[bwork->current_level - 1][j];

@@ -136,15 +136,12 @@ public:
 
             int cleanelem = 0;
             for (int i = 0; i <= current_level; ++i) {
-                std::cout << "queue size " << i << ": " << bfs_level_todo[i].size() << std::endl;
                 //if(level_states[i] != nullptr) {
                     for (int j = 0; j < level_sizes[i]; ++j) {
                         delete level_states[i][j];
                         ++cleanelem;
                     }
                     //std::cout << "removing pt " << level_states[i] << std::endl;
-                    //delete[] level_states[i];
-                //}
             }
 
             std::cout << "Cleaned " << cleanelem << " elements." << std::endl;
