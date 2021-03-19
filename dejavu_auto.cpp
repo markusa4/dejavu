@@ -105,6 +105,8 @@ int commandline_mode(int argc, char **argv) {
             }
         } else if (arg == "__NO_IDLESKIP") {
             config.CONFIG_IR_IDLE_SKIP = false;
+        }  else if (arg == "__EARLY_IR") {
+            config.CONFIG_IR_INDIVIDUALIZE_EARLY = true;
         } else if (arg == "__COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;

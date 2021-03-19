@@ -1,7 +1,7 @@
 #ifndef DEJAVU_DEJAVU_API_H
 #define DEJAVU_DEJAVU_API_H
 
-//#include "dejavu_iso.h"
+#include "dejavu_iso.h"
 #include "dejavu_auto.h"
 
 class dejavu_api {

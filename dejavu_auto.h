@@ -840,7 +840,7 @@ private:
             G->generators_persistent = (gens != nullptr);
             delete G;
 
-            trash_manager<vertex_t>::free_trash();
+            garbage_collector<vertex_t>::free_trash();
         }
 
         return;

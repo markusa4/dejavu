@@ -74,7 +74,7 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--timeout option requires one argument." << std::endl;
                 return 1;
             }
-        } else if (arg == "__WRITE_AUTO") {
+        } else if (arg == "__WRITE_ISO") {
             config.CONFIG_WRITE_AUTOMORPHISMS = true;
         } else if (arg == "__THREADS") {
             if (i + 1 < argc) {
@@ -180,17 +180,21 @@ int commandline_mode(int argc, char **argv) {
         std::cout << "Permuting graphs..." << std::endl;
         bijection<int> pr1;
         bijection<int>::random_bijection(&pr1, g1->v_size, seed);
+        int* rmap1 = pr1.extract_map();
         g1->permute_graph(_g1, &pr1); // permute graph
         if(colmap1 != nullptr)
-            permute_colmap(&colmap1, g1->v_size, pr1.map);
+            permute_colmap(&colmap1, g1->v_size, rmap1);
         delete g1;
+        delete[] rmap1;
 
         bijection<int> pr2;
         bijection<int>::random_bijection(&pr2, g2->v_size, seed * 123);
+        int* rmap2 = pr2.extract_map();
         g2->permute_graph(_g2, &pr2); // permute graph
         if(colmap2 != nullptr)
-            permute_colmap(&colmap2, g2->v_size, pr2.map);
+            permute_colmap(&colmap2, g2->v_size, rmap2);
         delete g2;
+        delete[] rmap2;
     } else {
         _g1 = g1;
         _g2 = g2;

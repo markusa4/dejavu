@@ -10,13 +10,12 @@
 extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
 
 template<class vertex_t>
-class trash_manager {
+class garbage_collector {
     static std::vector<vertex_t*> junk;
     static std::unique_ptr<std::mutex> lock;
 public:
     static void free_trash() {
         lock->lock();
-        PRINT("[Dej] Deleting colorings (" << junk.size() << ")" << std::endl)
         while(!junk.empty()) {
             delete[] junk.back();
             junk.pop_back();
@@ -30,8 +29,8 @@ public:
     }
 };
 
-template<class vertex_t> std::unique_ptr<std::mutex> trash_manager<vertex_t>::lock = std::make_unique<std::mutex>();
-template<class vertex_t> std::vector<vertex_t*> trash_manager<vertex_t>::junk = std::vector<vertex_t*>();
+template<class vertex_t> std::unique_ptr<std::mutex> garbage_collector<vertex_t>::lock = std::make_unique<std::mutex>();
+template<class vertex_t> std::vector<vertex_t*> garbage_collector<vertex_t>::junk = std::vector<vertex_t*>();
 
 template<class vertex_t>
 class coloring_allocator {
@@ -46,7 +45,7 @@ public:
                 buffer_const = 20;
             bulk_domain_reset = false;
             bulk_domain = new vertex_t[buffer_const * domain_size + 1];
-            trash_manager<vertex_t>::add_trash(bulk_domain);
+            garbage_collector<vertex_t>::add_trash(bulk_domain);
             bulk_domain[0] = 0;
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;

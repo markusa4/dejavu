@@ -80,10 +80,6 @@ public:
         experimental_paths.store(0);
         experimental_deviation.store(0);
         leaf_store_explicit.store(0);
-        /*buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
-        for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
-            buffer_buffer[i] = std::vector<unsigned char*>();
-        }*/
     };
 
     ~shared_workspace_auto() {
@@ -136,7 +132,6 @@ public:
         if(!early_check) {
             if (!*this_checked) {
                 tournament_mutex.lock();
-                //std::cout << "late check" << m->color_refinement_cost << std::endl;
                 if(m->restarts > 0)
                     all_no_restart = false;
 
@@ -175,7 +170,6 @@ template<class vertex_t>
 class shared_workspace_iso {
 public:
     ~shared_workspace_iso() {
-        //delete[] buffer_buffer;
     }
 
     shared_workspace_iso() {
@@ -194,10 +188,6 @@ public:
         leaf_store_explicit.store(0);
         deviation_store[0] = std::unordered_set<long>();
         deviation_store[1] = std::unordered_set<long>();
-        //buffer_buffer = new std::vector<unsigned char*>[config.CONFIG_THREADS_REFINEMENT_WORKERS + 1];
-        //for(int i = 0; i < config.CONFIG_THREADS_REFINEMENT_WORKERS + 1; ++i) {
-        //    buffer_buffer[i] = std::vector<unsigned char*>();
-        //}
     };
 
     bool done = false;
@@ -291,10 +281,6 @@ public:
     concurrent_queue() {
         lock =  std::make_unique<std::mutex>();
     }
-
-    //~concurrent_queue() {
-    //    std::cout << "remove q " <<  this << std::endl;
-   // }
 
     void enqueue(T item) {
         lock->lock();

@@ -12,34 +12,6 @@
 
 enum uniform_outcome {OUT_NONE, OUT_AUTO, OUT_ISO, OUT_AUTO_DEV, OUT_ISO_DEV};
 
-/*
-struct abort_code {
-    abort_code()=default;
-    abort_code(int reason):reason(reason){};
-    int reason = 0;
-};
-
-template <class vertex_t, class degree_t, class edge_t>
-struct alignas(64) dejavu_workspace {
-    // refinement and selector
-    refinement<vertex_t, degree_t, edge_t> R;
-    selector<vertex_t, degree_t, edge_t>   S;
-
-    // workspace
-    coloring<vertex_t> c;
-    invariant  I;
-
-    int base_size = 0;
-
-    // initial colorings and invariant
-    coloring<vertex_t> start_c1;
-    coloring<vertex_t> start_c2;
-    invariant start_I;
-
-    // indicates which thread this is
-    int id;
-};*/
-
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_iso_t {
 public:
@@ -62,7 +34,9 @@ public:
         bfs_workspace<vertex_t> BW1;
         bfs_workspace<vertex_t> BW2;
 
-        return worker_thread(g1, g2, true, &switches, nullptr, nullptr, nullptr,
+        strategy<vertex_t> canon_strategy;
+
+        return worker_thread(g1, g2, true, &switches, nullptr, nullptr, &canon_strategy,
                 -1,&BW1, &BW2);
     }
 
@@ -111,7 +85,6 @@ private:
             W.id        = -1; // id of the master thread
 
             // first color refinement
-            canon_strategy = new strategy<vertex_t>;
             my_canon_I->create_vector(g1->v_size);
             strategy_metrics m;
             bool comp;
@@ -121,26 +94,30 @@ private:
             delete my_canon_I;
             my_canon_I = new invariant;
             if(!comp) {
-                delete canon_strategy;
                 return comp;
             }
             // set some workspace variables
             _start_c1 = &W.start_c1;
             _start_c2 = &W.start_c2;
-            PRINT("[iso] First refinement done.");
+            // PRINT("[iso] First refinement done.");
 
             int init_c = W.S.select_color(g1, &W.start_c1, selector_seed);
             if(init_c == -1) {
-                PRINT("[iso] First coloring discrete, checking isomorphism." << std::endl);
+                PRINT("[iso] Initial coloring discrete");
                 bijection<vertex_t> automorphism;
                 automorphism.read_from_coloring(&W.start_c1);
                 bijection<vertex_t> leaf2;
                 leaf2.read_from_coloring(&W.start_c2);
                 automorphism.inverse();
                 automorphism.compose(&leaf2);
-                delete canon_strategy;
-
-                return (W.R.certify_isomorphism(g1, g2, &automorphism));
+                if(W.R.certify_isomorphism(g1, g2, &automorphism)) {
+                    if(config.CONFIG_WRITE_AUTOMORPHISMS) {
+                        automorphism.print();
+                    }
+                    return true;
+                } else {
+                    return false;
+                }
             }
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
@@ -213,10 +190,11 @@ private:
         }
 
         // add first leaf to leaf store
+        bijection<vertex_t> _canon_leaf_copy;
+        _canon_leaf_copy.copy(my_canon_leaf);
         switches->leaf_store_mutex[gid_first].lock();
-        my_canon_leaf->not_deletable();
         switches->leaf_store[gid_first].insert(std::pair<long, stored_leaf<vertex_t>>(my_canon_I->acc,
-                stored_leaf<vertex_t>(my_canon_leaf->map, g1->v_size, true, false)));
+                stored_leaf<vertex_t>(_canon_leaf_copy.extract_map(), g1->v_size, true, false)));
         switches->leaf_store_mutex[gid_first].unlock();
 
         // we need to perform some unnecessary initializations which are mostly not utilized in the isomorphism solver
@@ -276,6 +254,9 @@ private:
                             }
                             break;
                         case OUT_ISO:
+                            if(config.CONFIG_WRITE_AUTOMORPHISMS) {
+                                automorphism.print();
+                            }
                             switches->done = true;
                             switches->found_iso.store(true);
                             switches->noniso_counter.store(-10);
@@ -311,6 +292,9 @@ private:
                             }
                             break;
                         case OUT_ISO:
+                            if(config.CONFIG_WRITE_AUTOMORPHISMS) {
+                                automorphism.print();
+                            }
                             switches->done = true;
                             switches->found_iso.store(true);
                             switches->noniso_counter.store(-10);
@@ -353,6 +337,8 @@ private:
             PRINT("[iso] Store: leafs(" << switches->leaf_store[0].size() << ":" << switches->leaf_store[1].size()
             << "), " << "devs(" << switches->deviation_store[0].size() << ":" << switches->deviation_store[1].size() << ")");
             PRINT("[iso] Cleanup...");
+
+            garbage_collector<vertex_t>::free_trash();
         }
         return switches->found_iso;
     }
@@ -513,10 +499,17 @@ private:
 
         bijection<vertex_t> leaf;
         leaf.read_from_coloring(c);
-        leaf.not_deletable();
 
         // consider leaf store...
-        for (int gi = 0; gi <= 1; ++gi) {
+        for (int _gi = 0; _gi <= 1; ++_gi) {
+            int gi;
+            // first check for isomorphisms, then for automorphisms
+            // (careful: otherwise leaf can become uninitialized when checking for isomorphisms)
+            if(g_id == 0) {
+                gi = 1 - _gi;
+            } else {
+                gi = _gi;
+            }
             std::vector<stored_leaf<vertex_t>> pointers;
             switches->leaf_store_mutex[gi].lock();
             auto range = switches->leaf_store[gi].equal_range(I->acc);
@@ -527,13 +520,12 @@ private:
                     if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                         switches->leaf_store_explicit++;
                         switches->leaf_store[gi].insert(std::pair<long,
-                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
+                                stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.extract_map(), g1->v_size, true, false)));
                     } else {
                         vertex_t* base = new vertex_t[collect_base_sz];
                         memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
                         switches->leaf_store[gi].insert(std::pair<long,
                                 stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, false)));
-                        leaf.deletable();
                     }
                 }
             }
@@ -544,24 +536,17 @@ private:
                 automorphism->inverse();
                 bijection<vertex_t> fake_leaf;
                 if(pointers[i].explicit_leaf) {
-                    fake_leaf.map = pointers[i].map;
-                    fake_leaf.not_deletable();
+                    fake_leaf.read_from_array(pointers[i].map, g->v_size);
                 } else {
                     reconstruct_leaf(w, (gi==0)?g1:g2, (gi==0)?(&w->start_c1):(&w->start_c2),
                             pointers[i].map,pointers[i].map_sz, &fake_leaf);
-                    fake_leaf.deletable();
                 }
                 fake_leaf.map_sz = g->v_size;
                 automorphism->compose(&fake_leaf);
 
                 if(gi == g_id) {
                     if (w->R.certify_automorphism_iso(g, automorphism)) {
-
-                        int j;
-                        for(j = 0; j < automorphism->map_sz; ++j)
-                            if(automorphism->map[j] != j) break;
-
-                        PRINT("[bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz) << ")");
+                        PRINT("[bid] Found uniform automorphism. (" << g_id << ")");
                         automorphism->certified = true;
                         automorphism->non_uniform = false;
                         found_auto = true;
@@ -578,13 +563,12 @@ private:
                 if (switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                     switches->leaf_store_explicit++;
                     switches->leaf_store[gi].insert(std::pair<long,
-                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
+                            stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.extract_map(), g1->v_size, true, false)));
                 } else {
                     vertex_t* base = new vertex_t[collect_base_sz];
                     memcpy(base, collect_base.arr, sizeof(vertex_t) * collect_base_sz);
                     switches->leaf_store[gi].insert(std::pair<long,
                             stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, collect_base_sz, false, false)));
-                    leaf.deletable();
                 }
             }
         }
@@ -633,10 +617,17 @@ private:
         if(comp) {
             bijection<vertex_t> leaf;
             leaf.read_from_coloring(c);
-            leaf.not_deletable();
 
             // consider leaf store...
-            for (int gi = 0; gi <= 1; ++gi) {
+            for (int _gi = 0; _gi <= 1; ++_gi) {
+                int gi;
+                // first check for isomorphisms, then for automorphisms
+                // (careful: otherwise leaf can become uninitialized when checking for isomorphisms)
+                if(g_id == 0) {
+                    gi = 1 - _gi;
+                } else {
+                    gi = _gi;
+                }
                 std::vector<stored_leaf<vertex_t>> pointers;
                 switches->leaf_store_mutex[gi].lock();
                 auto range = switches->leaf_store[gi].equal_range(I->acc);
@@ -647,7 +638,7 @@ private:
                         if(switches->leaf_store_explicit <= config.CONFIG_IR_LEAF_STORE_LIMIT) {
                             switches->leaf_store_explicit++;
                             switches->leaf_store[gi].insert(std::pair<long,
-                                    stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
+                                    stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.extract_map(), g1->v_size, true, false)));
                         } else {
 
                         }
@@ -659,21 +650,17 @@ private:
                     automorphism->copy(&leaf);
                     automorphism->inverse();
                     bijection<vertex_t> fake_leaf;
-                    if(pointers[i].explicit_leaf)
-                        fake_leaf.map = pointers[i].map;
-                    fake_leaf.map_sz = g->v_size;
-                    fake_leaf.not_deletable();
+                    if(pointers[i].explicit_leaf) {
+                        fake_leaf.read_from_array(pointers[i].map, g->v_size);
+                    } else {
+                        reconstruct_leaf(w, (gi==0)?g1:g2, (gi==0)?(&w->start_c1):(&w->start_c2),
+                                         pointers[i].map,pointers[i].map_sz, &fake_leaf);
+                    }
                     automorphism->compose(&fake_leaf);
 
                     if (gi == g_id) {
                         if (w->R.certify_automorphism_iso(g, automorphism)) {
-
-                            int j;
-                            for (j = 0; j < automorphism->map_sz; ++j)
-                                if (automorphism->map[j] != j) break;
-
-                            PRINT("[bid] Found uniform automorphism. (" << g_id << "), (" << (j == automorphism->map_sz)
-                                                                        << ")");
+                            PRINT("[bid] Found uniform automorphism. (" << g_id << ")");
                             automorphism->certified = true;
                             automorphism->non_uniform = false;
                             found_auto = true;
@@ -689,7 +676,7 @@ private:
                 if (!pointers.empty() && gi == g_id && !found_auto) {
                     switches->leaf_store_mutex[gi].lock();
                     switches->leaf_store[gi].insert(std::pair<long, stored_leaf<vertex_t>>(I->acc,
-                            stored_leaf<vertex_t>(leaf.map, g1->v_size, true, false)));
+                            stored_leaf<vertex_t>(leaf.extract_map(), g1->v_size, true, false)));
                     switches->leaf_store_mutex[gi].unlock();
                 }
             }

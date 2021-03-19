@@ -144,9 +144,6 @@ public:
                     //std::cout << "removing pt " << level_states[i] << std::endl;
             }
 
-            std::cout << "Cleaned " << cleanelem << " elements." << std::endl;
-
-            //delete[] level_states;
             delete[] level_sizes;
             delete[] level_reserved_sizes;
             delete[] level_maxweight;
@@ -154,9 +151,6 @@ public:
             delete[] level_abort_map_done;
             delete[] level_abort_map_mutex;
             delete[] level_abort_map;
-
-            //delete[] bfs_level_todo;
-            //delete[] bfs_level_finished_elements;
 
             delete[] finished_elems;
             delete[] level_expecting_finished;
