@@ -6,10 +6,10 @@ make
 ```
 
 # Usage
-Compilation produces two binaries (`dejavu-auto` and `dejavu-iso`), which are similar in usage. `dejavu-auto` is the binary of the automorphism solver, `dejavu-iso` of the isomorphism solver.
+Compilation produces two binaries (`dejavu-auto` and `dejavu-iso`), which are similar in usage. `dejavu-auto` is the binary of the automorphism solver, `dejavu-iso` of the isomorphism solver. For interesting benchmark graphs you may check out the [nauty / Traces benchmark library](https://pallini.di.uniroma1.it/Graphs.html).
 
 ## dejavu-auto
-The automorphism solver `dejavu-auto` only accepts files in the DIMACS graph format. Only undirected graphs can be handled at this point -- but the graphs may be colored. An example call using 8 threads might be:
+The automorphism solver `dejavu-auto` only accepts files in the [DIMACS graph format](http://www.tcs.hut.fi/Software/bliss/fileformat.shtml). Only undirected graphs can be handled at this point -- but the graphs may be colored. An example call using 8 threads might be:
 ```
 dejavu_auto pp-25-100 --threads 7
 ```
