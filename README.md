@@ -15,6 +15,7 @@ dejavu_auto pp-25-100 --threads 7
 ```
 
 The solver accepts the following command line arguments:
+
 Command Line Argument | Effect
 --- | ---
 `--file` | specifies the graph input file in DIMACS format
@@ -34,6 +35,7 @@ dejavu_iso pp-25-100 pp-25-101 --threads 7
 ```
 
 The solver accepts the following command line arguments:
+
 Command Line Argument | Effect
 --- | ---
 `--file` | specifies the graph input file in DIMACS format
