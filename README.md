@@ -18,7 +18,6 @@ The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
-`--file` | specifies the graph input file in DIMACS format
 `--threads` | specifies the amount of additional threads used (total is threads + 1, default is 0)
 `--write-auto` | outputs a generating set of the found automorphism group
 `--timeout` | specifies a timeout (in seconds)
@@ -38,7 +37,6 @@ The solver accepts the following command line arguments:
 
 Command Line Argument | Effect
 --- | ---
-`--file` | specifies the graph input file in DIMACS format
 `--threads` | specifies the amount of additional threads used (total is threads + 1, default is 0)
 `--write-auto` | outputs a generating set of the found automorphism group
 `--timeout` | specifies a timeout (in seconds)
