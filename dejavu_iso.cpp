@@ -133,6 +133,15 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--force_selector option requires one argument." << std::endl;
                 return 1;
             }
+        }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
+            if (i + 1 < argc) {
+                i++;
+                config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
+                config.CONFIG_IR_FORCE_SELECTOR = true;
+            } else {
+                std::cerr << "--force_selector option requires one argument." << std::endl;
+                return 1;
+            }
         } else if (argv[i][0] != '-'){
             if(!entered_file1) {
                 filename1 = argv[i];

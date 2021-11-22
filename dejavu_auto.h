@@ -209,6 +209,21 @@ private:
 
             // first color refinement
             canon_strategy = &_canon_strategy;
+
+            if(config.ONLY_COLOR_REF_INVARIANT) {
+                strategy_metrics m;
+                invariant my_canon_I;
+                my_canon_I.has_compare = false;
+                my_canon_I.compare_vec = nullptr;
+                my_canon_I.compareI    = nullptr;
+                my_canon_I.create_vector(g->v_size);
+                W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr);
+                int init_c = W.S.select_color(g, start_c, selector_seed);
+                std::cout << init_c << std::endl;
+                std::cout << my_canon_I.acc << std::endl;
+                return;
+            }
+
             W.R.refine_coloring_first(g, start_c, -1);
             PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 

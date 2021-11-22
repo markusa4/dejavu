@@ -119,7 +119,9 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--permute_seed option requires one argument." << std::endl;
                 return 1;
             }
-        } else if (arg == "__FORCE_SELECTOR") {
+        }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
+                config.ONLY_COLOR_REF_INVARIANT = true;
+        }  else if (arg == "__FORCE_SELECTOR") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);

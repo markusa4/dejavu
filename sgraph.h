@@ -52,7 +52,6 @@ public:
     // initialize a coloring of this sgraph, partitioning degrees of vertices
     void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
         c->alloc(this->v_size);
-
         for(int i = 0; i < v_size; i++) {
             c->lab[i] = i;
         }
@@ -106,7 +105,7 @@ public:
         }
 
         c->cells = cells;
-
+        //std::cout << "Cells after initialize: " << cells << std::endl;
     }
 
     void initialize_coloring_raw(coloring<vertex_t> *c) {

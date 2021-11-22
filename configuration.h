@@ -24,6 +24,8 @@ struct configstruct {
     bool CONFIG_PREPROCESS               = false;
     bool CONFIG_SOLVE_ISO                = false;
 
+    bool ONLY_COLOR_REF_INVARIANT       = false;
+
     int CONFIG_RAND_ABORT = 8;             // determines error probability (higher value means lower error probability)
                                            // error is at most (1 / 2)^(i-1), where i is the given value
                                            // 6 equals an error of roughly 3.2%
