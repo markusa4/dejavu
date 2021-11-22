@@ -182,7 +182,6 @@ int commandline_mode(int argc, char **argv) {
         bijection<int>::random_bijection(&pr1, g1->v_size, seed);
         g1->permute_graph(_g1, &pr1); // permute graph
         int* rmap1 = pr1.extract_map();
-        std::cout << "Colmap" << std::endl;
         if(colmap1 != nullptr)
             permute_colmap(&colmap1, g1->v_size, rmap1);
         delete g1;
