@@ -168,11 +168,11 @@ private:
 
         numnodes  = 0;
         colorcost = 0;
-
+	coloring<vertex_t>* init_c;
         // preprocessing
         if(master) {
             config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
-            coloring<vertex_t>* init_c  = start_c;
+            init_c  = start_c;
             start_c = &W.start_c1;
             g->initialize_coloring(&W.start_c1, init_c->vertex_to_col);
             if(config.CONFIG_PREPROCESS) {
@@ -217,6 +217,25 @@ private:
                 my_canon_I.compare_vec = nullptr;
                 my_canon_I.compareI    = nullptr;
                 my_canon_I.create_vector(g->v_size);
+                int __acc = 0;
+                std::vector<int> color_sequence;
+                for(int i = 0; i < g->v_size; ++i) {
+                	__acc += init_c->vertex_to_col[i];
+                	color_sequence.push_back(init_c->vertex_to_col[i]);
+                }
+        	my_canon_I.write_top_and_compare(__acc, false);
+        	std::sort(std::begin(color_sequence), std::end(color_sequence));
+        	for(std::vector<int>::iterator it = color_sequence.begin(); it != color_sequence.end(); ++it) {
+        		my_canon_I.write_top_and_compare(*it, false);
+        	}
+        	for(int i = 0; i < start_c->ptn_sz;) {
+		        const vertex_t rd = start_c->ptn[i];
+		        my_canon_I.write_top_and_compare(i, false);
+		        my_canon_I.write_top_and_compare(rd, false);
+		        //const vertex_t some_vertex = start_c->lab[i];
+		        //my_canon_I.write_top_and_compare(init_c->vertex_to_col[some_vertex], false);
+		        i += rd +1;
+		}
                 W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr);
                 int init_c = W.S.select_color(g, start_c, selector_seed);
                 std::cout << init_c << std::endl;
