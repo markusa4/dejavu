@@ -4,13 +4,13 @@ project(dejavu)
 set(CMAKE_CXX_STANDARD 14)
 add_compile_options("-O3")
 add_definitions(-DNDEBUG)
-# add_definitions(-g)
+#add_definitions(-g)
 set(CMAKE_CXX_STANDARD_LIBRARIES -lpthread)
 
 add_executable(dejavu-auto schreier_sequential.cpp utility.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu_auto.cpp dejavu_auto.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h)
 add_executable(dejavu-iso  utility.cpp dejavu_iso.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h dejavu_iso.cpp schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
 # add_executable(dejavu-api-test utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h dejavu_api.cpp schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
-# add_library(dejavu-api utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h)
+add_library(dejavu-api SHARED dejavu_api.h dejavu_api_impl.cpp utility.cpp dejavu_iso.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
 
 if (DEFINED COMPILE_PYTHON2API)
     # might need to replace 2.7 with appropriate version
