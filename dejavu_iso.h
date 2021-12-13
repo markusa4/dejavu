@@ -36,8 +36,9 @@ public:
 
         strategy<vertex_t> canon_strategy;
 
-        return worker_thread(g1, g2, true, &switches, nullptr, nullptr, &canon_strategy,
+        volatile bool is_iso = worker_thread(g1, g2, true, &switches, nullptr, nullptr, &canon_strategy,
                 -1,&BW1, &BW2);
+        return is_iso;
     }
 
 private:

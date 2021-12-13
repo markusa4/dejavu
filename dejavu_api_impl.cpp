@@ -294,11 +294,16 @@ int path_get_vertex_color(int path_handle, int path_id, int v) {
     return paths[path_handle]->paths[path_id].vertex_to_col[v];
 }
 
-bijection<int> are_isomorphic(int graph_handle1, int graph_handle2) {
-    //dejavu_iso solver;
-    //solver.iso(g1, g2);
+volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err) {
+    sgraph g1;
+    sgraph g2;
+    make_sgraph_from_handle(&g1, graph_handle1, false);
+    make_sgraph_from_handle(&g2, graph_handle2, false);
 
-    // ToDo: return results
+    config.CONFIG_RAND_ABORT = err;
+    dejavu_iso solver;
+    bool is_iso = solver.iso(&g1, &g2);
+    return is_iso;
 }
 
 extern std::vector<bijection<int>> automorphisms(int graph_handle) {

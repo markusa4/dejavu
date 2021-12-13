@@ -292,7 +292,7 @@ extern "C"  {
 
     extern int random_paths(int graph_handle, int max_length, int num, bool fill_paths);
 
-    extern bijection<int> are_isomorphic(int graph_handle1, int graph_handle2);
+    extern volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err);
 
     extern std::vector<bijection<int>> automorphisms(int graph_handle);
 }

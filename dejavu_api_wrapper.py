@@ -22,9 +22,8 @@ def extract_coloring(n, path_handle, path_id):
 		vertex_to_col += [dejavuc.path_get_vertex_color(path_handle, path_id, v)]
 	return vertex_to_col
 
-def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, vertex_labels=[], edge_labels=[], return_coloring=False):
+def graph_to_handle(n, edges, vertex_labels, edge_labels):
 	graph_handle = dejavuc.graph_create(n)
-	print(graph_handle)
 	if edge_labels == []:
 		for [v1, v2] in edges:
 			dejavuc.graph_add_edge(graph_handle, v1, v2)
@@ -40,7 +39,10 @@ def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, 
 		assert(n == len(vertex_labels))
 	for v in range(0, n):
 		dejavuc.graph_label(graph_handle, v, vertex_labels[v])
-		
+	return graph_handle;
+
+def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, vertex_labels=[], edge_labels=[], return_coloring=False):
+	graph_handle = graph_to_handle(n, edges, vertex_labels, edge_labels)
 	path_handle = dejavuc.random_paths(graph_handle, path_length, number_of_paths, fill_paths)
 	paths = extract_paths(path_handle, n, return_coloring)
 	dejavuc.clean()
@@ -51,9 +53,16 @@ def color_refinement(n, edges, vertex_labels=[], edge_labels=[]):
 	dejavuc.clean()
 	return path[0]['coloring']
 	
+def are_isomorphic(n1, edges1, n2, edges2, err=8):
+	graph_handle1 = graph_to_handle(n1, edges1, [], [])
+	graph_handle2 = graph_to_handle(n2, edges2, [], [])
+	return dejavuc.are_isomorphic(graph_handle1, graph_handle2, err)
 	
 	
-		
+cycle1 = [[0,1], [1,2], [2,3], [4,3], [4,0]]
+cycle2 = [[1,0], [2,3], [3,4], [1,2], [4,0]]
+
+print(are_isomorphic(5, cycle1, 5, cycle2))	
 		
 #print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0]))
 
