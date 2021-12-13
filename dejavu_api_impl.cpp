@@ -126,20 +126,6 @@ void make_sgraph_from_graph_constr(sgraph* g, graph_constr* graph, bool directed
     return;
 }
 
-void make_sgraph_from_handle(sgraph* g, int graph_handle, bool directed_dimacs) {
-    graph_constr* graph = graphs[graph_handle];
-    const int nv = graph->labels.size();
-
-    if(graph->has_edge_labels) {
-        // make new graph and call again
-        graph_constr subdivision_graph;
-
-        // TODO
-        make_sgraph_from_graph_constr(g, &subdivision_graph, directed_dimacs);
-    }
-    make_sgraph_from_graph_constr(g, graph, directed_dimacs);
-}
-
 void make_coloring_from_handle(int* vertex_to_col, int graph_handle) {
     graph_constr* graph = graphs[graph_handle];
     for(int i = 0; i < graph->labels.size(); ++i) {
@@ -164,10 +150,14 @@ void graph_delete(int graph_handle) {
     }
 }
 
+void _graph_add_edge(graph_constr* graph, int v1, int v2) {
+    graph->edges.emplace_back(std::pair<int, int>(v1, v2));
+}
+
+
 void graph_add_edge(int graph_handle, int v1, int v2) {
     graph_constr* graph = graphs[graph_handle];
-    assert(!graph->has_edge_labels);
-    graph->edges.emplace_back(std::pair<int, int>(v1, v2));
+    _graph_add_edge(graph, v1, v2);
 }
 
 void graph_add_edge_labelled(int graph_handle, int v1, int v2, int l) {
@@ -178,14 +168,62 @@ void graph_add_edge_labelled(int graph_handle, int v1, int v2, int l) {
     assert(graph->edges.size() == graph->edge_labels.size());
 }
 
+void _graph_label(graph_constr* graph, int v, int l) {
+    graph->labels[v] = l;
+}
 void graph_label(int graph_handle, int v, int l) {
     graph_constr* graph = graphs[graph_handle];
-    graph->labels  [v] = l;
+    _graph_label(graph, v, l);
+}
+
+void make_sgraph_from_handle(sgraph* g, int graph_handle, bool directed_dimacs) {
+    graph_constr* graph = graphs[graph_handle];
+    const int nv = graph->labels.size();
+
+    if(graph->has_edge_labels) {
+        // make new graph and call again
+        graph_constr subdivision_graph;
+
+        subdivision_graph = *graph;
+        subdivision_graph.has_edge_labels = false;
+        subdivision_graph.edges.clear();
+
+        int highest_label = *std::max_element(subdivision_graph.labels.begin(), subdivision_graph.labels.end());
+        subdivision_graph.labels.resize(graph->labels.size() + graph->edges.size());
+        subdivision_graph.edges.reserve(graph->edges.size() * 2);
+
+        int edge_vertex_id = graph->labels.size();
+        for(int i = 0; i < graph->edges.size(); ++i) {
+            if(directed_dimacs) {
+                if(graph->edges[i].first > graph->edges[i].second) {
+                    continue;
+                }
+            }
+            _graph_add_edge(&subdivision_graph, graph->edges[i].first, edge_vertex_id);
+            _graph_add_edge(&subdivision_graph, edge_vertex_id, graph->edges[i].second);
+            _graph_label(&subdivision_graph, edge_vertex_id, 1 + highest_label + graph->edge_labels[i]);
+            ++edge_vertex_id;
+        }
+        /*for(int i = 0; i < subdivision_graph.labels.size(); ++i) {
+            std::cout << "v" << i << " l: " << subdivision_graph.labels[i] << std::endl;
+        }
+        for(int i = 0; i < subdivision_graph.edges.size(); ++i) {
+            std::cout << "v" << subdivision_graph.edges[i].first << "--" << "v" << subdivision_graph.edges[i].second << std::endl;
+        }*/
+        make_sgraph_from_graph_constr(g, &subdivision_graph, directed_dimacs);
+    } else {
+        make_sgraph_from_graph_constr(g, graph, directed_dimacs);
+    }
 }
 
 int random_paths(int graph_handle, int max_length, int num, bool fill_paths) {
     sgraph g;
     make_sgraph_from_handle(&g, graph_handle, false);
+    if(graphs[graph_handle]->has_edge_labels) {
+        config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = graphs[graph_handle]->labels.size();
+    } else {
+        config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
+    }
     int* vertex_to_col = new int[g.v_size];
     make_coloring_from_handle(vertex_to_col, graph_handle);
     dejavu_api v;
@@ -231,6 +269,7 @@ int random_paths(int graph_handle, int max_length, int num, bool fill_paths) {
         delete[] std::get<2>(f);
     }
     paths.push_back(new_paths);
+    config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
     return paths.size() - 1;
 }
 

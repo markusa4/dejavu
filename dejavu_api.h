@@ -92,7 +92,7 @@ private:
             //my_canon_I->purge();
            // delete my_canon_I;
             //my_canon_I = new invariant;
-            PRINT("[api] First refinement: " << cref / 1000000.0 << "ms");
+            //PRINT("[api] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g, &W.start_c1, selector_seed);
             if (init_c == -1) {
@@ -267,6 +267,8 @@ private:
 
 extern "C"  {
     extern void initialize();
+
+    extern void clean();
 
     extern int graph_create(int size);
 
