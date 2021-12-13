@@ -88,9 +88,10 @@ private:
             strategy_metrics m;
             bool comp;
             W.R.refine_coloring(g, &W.start_c1, my_canon_I, -1, &m, -1, -1, nullptr);
-            my_canon_I->purge();
-            delete my_canon_I;
-            my_canon_I = new invariant;
+            //PRINT("[api] First refinement inv: " << my_canon_I->acc << "ms");
+            //my_canon_I->purge();
+           // delete my_canon_I;
+            //my_canon_I = new invariant;
             PRINT("[api] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g, &W.start_c1, selector_seed);
@@ -265,15 +266,33 @@ private:
 };
 
 extern "C"  {
-    extern int test_xyz(int a);
+    extern void initialize();
 
-    extern void random_paths(sgraph *g, int *vertex_to_col, int max_length, int num,
-                      std::set<std::tuple<int *, int, int *, long>> *paths);
+    extern int graph_create(int size);
 
-    extern bijection<int> are_isomorphic(sgraph_t<int, int, int> *g1, int *vertex_to_col1,
-                                  sgraph_t<int, int, int> *g2, int *vertex_to_col2);
+    extern void graph_delete(int graph_handle);
 
-    extern std::vector<bijection<int>> automorphisms(sgraph_t<int, int, int> *g, int *vertex_to_col);
+    extern void graph_add_edge(int graph_handle, int v1, int v2);
+
+    extern void graph_add_edge_labelled(int graph_handle, int v1, int v2, int l);
+
+    extern void graph_label(int graph_handle, int v, int l);
+
+    extern int path_get_num(int path_handle);
+
+    extern int path_get_size(int path_handle, int path_id);
+
+    extern int path_get_inv(int path_handle, int path_id);
+
+    extern int path_get_point(int path_handle, int path_id, int path_pos);
+
+    extern int path_get_vertex_color(int path_handle, int path_id, int v);
+
+    extern int random_paths(int graph_handle, int max_length, int num, bool fill_paths);
+
+    extern bijection<int> are_isomorphic(int graph_handle1, int graph_handle2);
+
+    extern std::vector<bijection<int>> automorphisms(int graph_handle);
 }
 
 #endif //DEJAVU_DEJAVU_API_H
