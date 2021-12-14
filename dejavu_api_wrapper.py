@@ -10,7 +10,7 @@ import os
 #else:
 #	dejavuc = ctypes.CDLL(dejavuc_path)
 
-dejavuc = CDLL("./libdejavu-api.so")   
+dejavuc = ctypes.CDLL("./libdejavu-api.so")   
 
 def extract_paths(path_handle, n, return_coloring=False):
 	paths = []
@@ -57,13 +57,13 @@ def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, 
 	graph_handle = graph_to_handle(n, edges, vertex_labels, edge_labels)
 	path_handle = dejavuc.random_paths(graph_handle, path_length, number_of_paths, fill_paths)
 	paths = extract_paths(path_handle, n, return_coloring)
-	dejavuc.clean()
+	#dejavuc.clean()
 	return paths
 	
 def color_refinement(n, edges, vertex_labels=[], edge_labels=[]):
 	path = random_ir_paths(n, edges, 0, number_of_paths=1, vertex_labels=vertex_labels, 
 	                       edge_labels=edge_labels, return_coloring = True)
-	dejavuc.clean()
+	#dejavuc.clean()
 	return path[0]['coloring']
 	
 def are_isomorphic(n1, edges1, n2, edges2, err=8):
@@ -76,8 +76,13 @@ cycle1 = [[0,1], [1,2], [2,3], [4,3], [4,0]]
 cycle2 = [[1,0], [2,3], [3,4], [1,2], [4,0]]
 
 #print(are_isomorphic(5, cycle1, 5, cycle2))
-		
-print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0], number_of_paths=3,return_coloring=True))
+
+for i in range(0, 100):		
+	print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0], number_of_paths=3,return_coloring=True))
+	print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0], [3,0]], 10, number_of_paths=3,return_coloring=True))
+	print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,1], number_of_paths=3,return_coloring=True))
+	print(random_ir_paths(10, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0], number_of_paths=3,return_coloring=True))
+	print(color_refinement(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], edge_labels=[0,0,0,0,1]))
 
 #print(color_refinement(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], edge_labels=[0,0,0,0,0]))
 

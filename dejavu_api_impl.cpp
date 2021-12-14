@@ -9,7 +9,14 @@ struct graph_constr {
     std::vector<int> labels;
     std::vector<std::pair<int, int>> edges;
     std::vector<int> edge_labels;
-    bool has_edge_labels = false;
+    bool has_edge_labels;
+
+    graph_constr() {
+        labels = std::vector<int>();
+        edges = std::vector<std::pair<int, int>>();
+        edge_labels = std::vector<int>();
+        has_edge_labels = false;
+    }
 };
 
 class path_node {
@@ -73,7 +80,14 @@ void clean() {
     colorings.clear();
 }
 
-void make_sgraph_from_graph_constr(sgraph* g, graph_constr* graph, bool directed_dimacs) {
+void make_coloring_from_graph_constr(int* vertex_to_col, graph_constr* graph) {
+    for(int i = 0; i < graph->labels.size(); ++i) {
+        vertex_to_col[i] = graph->labels[i];
+    }
+    return;
+}
+
+void make_sgraph_from_graph_constr(sgraph* g, int** vertex_to_col, graph_constr* graph, bool directed_dimacs) {
     std::vector<std::vector<int>> incidence_list;
     const int nv = graph->labels.size();
     int ne;
@@ -123,19 +137,16 @@ void make_sgraph_from_graph_constr(sgraph* g, graph_constr* graph, bool directed
     g->e_size = 2 * ne;
 
     g->max_degree = maxd;
-    return;
-}
 
-void make_coloring_from_handle(int* vertex_to_col, int graph_handle) {
-    graph_constr* graph = graphs[graph_handle];
-    for(int i = 0; i < graph->labels.size(); ++i) {
-        vertex_to_col[i] = graph->labels[i];
+    if(vertex_to_col != nullptr) {
+        *vertex_to_col = new int[g->v_size];
+        make_coloring_from_graph_constr(*vertex_to_col, graph);
     }
     return;
 }
 
 int graph_create(int size) {
-    auto new_graph = new graph_constr;
+    auto new_graph = new graph_constr();
     new_graph->edges.reserve(size);
     new_graph->labels.resize(size);
     graphs.push_back(new_graph);
@@ -176,7 +187,7 @@ void graph_label(int graph_handle, int v, int l) {
     _graph_label(graph, v, l);
 }
 
-void make_sgraph_from_handle(sgraph* g, int graph_handle, bool directed_dimacs) {
+void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle, bool directed_dimacs) {
     graph_constr* graph = graphs[graph_handle];
     const int nv = graph->labels.size();
 
@@ -210,28 +221,32 @@ void make_sgraph_from_handle(sgraph* g, int graph_handle, bool directed_dimacs) 
         for(int i = 0; i < subdivision_graph.edges.size(); ++i) {
             std::cout << "v" << subdivision_graph.edges[i].first << "--" << "v" << subdivision_graph.edges[i].second << std::endl;
         }*/
-        make_sgraph_from_graph_constr(g, &subdivision_graph, directed_dimacs);
+        make_sgraph_from_graph_constr(g, vertex_to_col, &subdivision_graph, directed_dimacs);
     } else {
-        make_sgraph_from_graph_constr(g, graph, directed_dimacs);
+        make_sgraph_from_graph_constr(g, vertex_to_col, graph, directed_dimacs);
     }
+}
+
+int _graph_size_from_handle(int graph_handle) {
+    return graphs[graph_handle]->labels.size();
 }
 
 int random_paths(int graph_handle, int max_length, int num, bool fill_paths) {
     sgraph g;
-    make_sgraph_from_handle(&g, graph_handle, false);
+    int** vertex_to_col = new int*;
+    make_sgraph_from_handle(&g, vertex_to_col, graph_handle, false);
     if(graphs[graph_handle]->has_edge_labels) {
         config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = graphs[graph_handle]->labels.size();
     } else {
         config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
     }
-    int* vertex_to_col = new int[g.v_size];
-    make_coloring_from_handle(vertex_to_col, graph_handle);
     dejavu_api v;
 
     std::set<std::tuple<int*, int, int*, long>> paths_result;
 
-    v.random_paths(&g, vertex_to_col, max_length, num, &paths_result);
-    delete[] vertex_to_col;
+    v.random_paths(&g, *vertex_to_col, max_length, num, &paths_result);
+    delete[] *vertex_to_col;
+    delete vertex_to_col;
 
     path_constr* new_paths = new path_constr;
     std::set<std::tuple<int*, int, int*, long>>::iterator it;
@@ -297,8 +312,9 @@ int path_get_vertex_color(int path_handle, int path_id, int v) {
 volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err) {
     sgraph g1;
     sgraph g2;
-    make_sgraph_from_handle(&g1, graph_handle1, false);
-    make_sgraph_from_handle(&g2, graph_handle2, false);
+
+    make_sgraph_from_handle(&g1, nullptr, graph_handle1, false);
+    make_sgraph_from_handle(&g2, nullptr, graph_handle2, false);
 
     config.CONFIG_RAND_ABORT = err;
     dejavu_iso solver;
