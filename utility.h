@@ -33,8 +33,8 @@ double doubleRand(const double & min, const double & max, int seed);
 #define MASH4(i) ((i + 1) * (23524361 - i * 3))
 #define MASH5(i) ((i + 1) * (23524361 - i * 3))
 
-#define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
+//#define PRINT(str) std::cout << str << std::endl;
+#define PRINT(str) (void)0;
 
 // modes_auto of the solver
 enum modes_auto {MODE_AUTO_TOURNAMENT, MODE_AUTO_NON_UNIFORM_PROBE, MODE_AUTO_UNIFORM_WITH_LEAF_STORAGE,
@@ -170,6 +170,12 @@ template<class vertex_t>
 class shared_workspace_iso {
 public:
     ~shared_workspace_iso() {
+        for (auto it = leaf_store[0].begin(); it != leaf_store[0].end(); ++it) {
+            delete[] it->second.map;
+        }
+        for (auto it = leaf_store[1].begin(); it != leaf_store[1].end(); ++it) {
+            delete[] it->second.map;
+        }
     }
 
     shared_workspace_iso() {

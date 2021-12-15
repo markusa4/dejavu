@@ -1,4 +1,34 @@
 #include "dejavu_api.h"
+#include <Python.h>
+
+static char module_docstring[] =
+    "This module provides an interface for dejavu.";
+
+static PyMethodDef module_methods[] = {
+    {"libdejavu-api"},
+    {NULL}
+};
+
+PyMODINIT_FUNC PyInit_libdejavu_api(void)
+{
+
+    PyObject *module;
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "libdejavu-api",
+        module_docstring,
+        -1,
+        module_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+    };
+    module = PyModule_Create(&moduledef);
+    if (!module) return NULL;
+
+    return module;
+}
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
@@ -10,12 +40,14 @@ struct graph_constr {
     std::vector<std::pair<int, int>> edges;
     std::vector<int> edge_labels;
     bool has_edge_labels;
+    bool directed_dimacs;
 
     graph_constr() {
         labels = std::vector<int>();
         edges = std::vector<std::pair<int, int>>();
         edge_labels = std::vector<int>();
         has_edge_labels = false;
+        directed_dimacs = false;
     }
 };
 
@@ -39,6 +71,9 @@ public:
 };
 
 struct path_constr {
+    double grpsz1;
+    int    grpsz2;
+    std::vector<int> base;
     std::vector<path_node> paths;
 };
 
@@ -145,6 +180,11 @@ void make_sgraph_from_graph_constr(sgraph* g, int** vertex_to_col, graph_constr*
     return;
 }
 
+void graph_set_directed_dimacs(int graph_handle, bool directed_dimacs) {
+    graph_constr* graph = graphs[graph_handle];
+    graph->directed_dimacs = directed_dimacs;
+}
+
 int graph_create(int size) {
     auto new_graph = new graph_constr();
     new_graph->edges.reserve(size);
@@ -187,7 +227,7 @@ void graph_label(int graph_handle, int v, int l) {
     _graph_label(graph, v, l);
 }
 
-void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle, bool directed_dimacs) {
+void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle) {
     graph_constr* graph = graphs[graph_handle];
     const int nv = graph->labels.size();
 
@@ -205,7 +245,7 @@ void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle, b
 
         int edge_vertex_id = graph->labels.size();
         for(int i = 0; i < graph->edges.size(); ++i) {
-            if(directed_dimacs) {
+            if(graph->directed_dimacs) {
                 if(graph->edges[i].first > graph->edges[i].second) {
                     continue;
                 }
@@ -221,9 +261,9 @@ void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle, b
         for(int i = 0; i < subdivision_graph.edges.size(); ++i) {
             std::cout << "v" << subdivision_graph.edges[i].first << "--" << "v" << subdivision_graph.edges[i].second << std::endl;
         }*/
-        make_sgraph_from_graph_constr(g, vertex_to_col, &subdivision_graph, directed_dimacs);
+        make_sgraph_from_graph_constr(g, vertex_to_col, &subdivision_graph, false);
     } else {
-        make_sgraph_from_graph_constr(g, vertex_to_col, graph, directed_dimacs);
+        make_sgraph_from_graph_constr(g, vertex_to_col, graph, graph->directed_dimacs);
     }
 }
 
@@ -234,7 +274,7 @@ int _graph_size_from_handle(int graph_handle) {
 int random_paths(int graph_handle, int max_length, int num, bool fill_paths) {
     sgraph g;
     int** vertex_to_col = new int*;
-    make_sgraph_from_handle(&g, vertex_to_col, graph_handle, false);
+    make_sgraph_from_handle(&g, vertex_to_col, graph_handle);
     if(graphs[graph_handle]->has_edge_labels) {
         config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = graphs[graph_handle]->labels.size();
     } else {
@@ -309,22 +349,63 @@ int path_get_vertex_color(int path_handle, int path_id, int v) {
     return paths[path_handle]->paths[path_id].vertex_to_col[v];
 }
 
+int path_get_base_size(int path_handle) {
+    return paths[path_handle]->base.size();
+}
+
+int path_get_base_point(int path_handle, int i) {
+    return paths[path_handle]->base[i];
+}
+
+double path_get_grpsz1(int path_handle) {
+    return paths[path_handle]->grpsz1;
+}
+
+int path_get_grpsz2(int path_handle) {
+    return paths[path_handle]->grpsz2;
+}
+
 volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err) {
     sgraph g1;
     sgraph g2;
 
-    make_sgraph_from_handle(&g1, nullptr, graph_handle1, false);
-    make_sgraph_from_handle(&g2, nullptr, graph_handle2, false);
+    make_sgraph_from_handle(&g1, nullptr, graph_handle1);
+    make_sgraph_from_handle(&g2, nullptr, graph_handle2);
 
     config.CONFIG_RAND_ABORT = err;
-    dejavu_iso solver;
-    bool is_iso = solver.iso(&g1, &g2);
+    bool is_iso = dejavu_isomorphic(&g1, &g2);
     return is_iso;
 }
 
-extern std::vector<bijection<int>> automorphisms(int graph_handle) {
-    //dejavu_auto solver;
-    //solver.automorphisms(g, vertex_to_col, nullptr);
+extern int get_automorphisms(int graph_handle, int err) {
+    config.CONFIG_RAND_ABORT = err;
+    dejavu_auto solver;
+    shared_permnode* permnode;
 
-    // ToDo: return results
+    sgraph g;
+    int** vertex_to_col = new int*;
+    make_sgraph_from_handle(&g, vertex_to_col, graph_handle);
+
+    automorphism_info a = solver.automorphisms(&g, *vertex_to_col, &permnode);
+    shared_permnode* itpermnode = permnode;
+    path_constr* new_paths = new path_constr;
+
+    new_paths->grpsz1 = a.grp_sz_man;
+    new_paths->grpsz2 = a.grp_sz_exp;
+    new_paths->base.swap(a.base);
+
+    do {
+        new_paths->paths.emplace_back(path_node());
+        new_paths->paths[new_paths->paths.size()-1].set_vertex_to_col(itpermnode->p, g.v_size);
+        itpermnode = itpermnode->next;
+    } while(itpermnode != permnode);
+
+    shared_freeschreier(nullptr, &permnode);
+    shared_schreier_freedyn();
+
+    delete[] *vertex_to_col;
+    delete vertex_to_col;
+
+    paths.push_back(new_paths);
+    return paths.size() - 1;
 }

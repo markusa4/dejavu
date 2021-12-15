@@ -4,7 +4,7 @@
 #define DEJAVU_NAUDEFS_H
 
 #include <sys/types.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include <stddef.h>
 #include <stddef.h>
 #include <stdlib.h>

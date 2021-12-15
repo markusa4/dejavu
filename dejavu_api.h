@@ -4,6 +4,12 @@
 #include "dejavu_iso.h"
 #include "dejavu_auto.h"
 
+#ifdef _WIN32
+#define LIBRARY_API extern "C" __declspec(dllexport)
+#else
+#define LIBRARY_API extern "C"
+#endif
+
 class dejavu_api {
 public:
     bool random_paths(sgraph_t<int, int, int> *g, int* vertex_to_col, int max_length, int num, std::set<std::tuple<int*, int, int*, long>>* paths) {
@@ -66,14 +72,17 @@ private:
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id * 5) * 5135235);
         int selector_seed = seed;
 
+        strategy<int> _canon_strategy;
         invariant start_I;
         invariant *my_canon_I;
+        bijection<int> _my_canon_leaf;
         bijection<int> *my_canon_leaf;
-        my_canon_I = new invariant;
+        invariant _my_canon_I;
+        my_canon_I = &_my_canon_I;
         my_canon_I->has_compare = false;
         my_canon_I->compare_vec = nullptr;
         my_canon_I->compareI = nullptr;
-        my_canon_leaf = new bijection<int>;
+        my_canon_leaf = &_my_canon_leaf;
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
@@ -81,7 +90,7 @@ private:
             switches->current_mode = modes_iso::MODE_ISO_BIDIRECTIONAL_DEVIATION;
 
             // first color refinement
-            canon_strategy = new strategy<int>;
+            canon_strategy = &_canon_strategy;
             my_canon_I->create_vector(g->v_size);
             //W.start_c1 = start_c1;
             //W.start_c2 = new coloring<int>;
@@ -148,20 +157,20 @@ private:
             W.id = communicator_id;
         }
 
-        strategy<int> *my_strategy;
+        strategy<int> my_strategy;
 
         auto rst = SELECTOR_LARGEST;
         //auto rst = SELECTOR_SMALLEST;
         if (config.CONFIG_IR_FORCE_SELECTOR)
             rst = (selector_type) config.CONFIG_IR_CELL_SELECTOR;
 
-        my_strategy = new strategy<int>(my_canon_leaf, my_canon_I, rst, -1);
+        my_strategy = strategy<int>(my_canon_leaf, my_canon_I, rst, -1);
 
         //PRINT("[api] Entering main loop...");
         W.S.empty_cache();
         while(!switches->done) {
             //PRINT("[api] Computing path...");
-            bool res = random_path_bounded(&W, g, my_strategy, &base_points, switches, selector_seed, max_length);
+            bool res = random_path_bounded(&W, g, &my_strategy, &base_points, switches, selector_seed, max_length);
             if(res) {
                 ++switches->experimental_paths;
                 switches->leaf_store_mutex->lock();
@@ -189,10 +198,10 @@ private:
             PRINT("[api] Found " << switches->experimental_paths << " paths of maximum length " << max_length);
             //PRINT("[api] Cleanup...");
 
-            delete my_strategy;
-            delete canon_strategy;
-            delete my_canon_leaf;
-            delete my_canon_I;
+            //delete canon_strategy;
+            //delete my_canon_leaf;
+            //delete my_canon_I;
+            garbage_collector<int>::free_trash();
         }
         return false;
     }
@@ -265,36 +274,46 @@ private:
     }
 };
 
-extern "C"  {
-    extern void initialize();
 
-    extern void clean();
+    LIBRARY_API  void initialize();
 
-    extern int graph_create(int size);
+    LIBRARY_API  void clean();
 
-    extern void graph_delete(int graph_handle);
+    LIBRARY_API  int graph_create(int size);
 
-    extern void graph_add_edge(int graph_handle, int v1, int v2);
+    LIBRARY_API  void graph_set_directed_dimacs(int graph_handle, bool directed_dimacs);
 
-    extern void graph_add_edge_labelled(int graph_handle, int v1, int v2, int l);
+    LIBRARY_API  void graph_delete(int graph_handle);
 
-    extern void graph_label(int graph_handle, int v, int l);
+    LIBRARY_API  void graph_add_edge(int graph_handle, int v1, int v2);
 
-    extern int path_get_num(int path_handle);
+    LIBRARY_API  void graph_add_edge_labelled(int graph_handle, int v1, int v2, int l);
 
-    extern int path_get_size(int path_handle, int path_id);
+    LIBRARY_API  void graph_label(int graph_handle, int v, int l);
 
-    extern int path_get_inv(int path_handle, int path_id);
+    LIBRARY_API  int path_get_num(int path_handle);
 
-    extern int path_get_point(int path_handle, int path_id, int path_pos);
+    LIBRARY_API  int path_get_size(int path_handle, int path_id);
 
-    extern int path_get_vertex_color(int path_handle, int path_id, int v);
+    LIBRARY_API  int path_get_inv(int path_handle, int path_id);
 
-    extern int random_paths(int graph_handle, int max_length, int num, bool fill_paths);
+    LIBRARY_API  int path_get_point(int path_handle, int path_id, int path_pos);
 
-    extern volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err);
+    LIBRARY_API  int path_get_vertex_color(int path_handle, int path_id, int v);
 
-    extern std::vector<bijection<int>> automorphisms(int graph_handle);
-}
+    LIBRARY_API  int path_get_base_size(int path_handle);
+
+    LIBRARY_API  int path_get_base_point(int path_handle, int i);
+
+    LIBRARY_API  double path_get_grpsz1(int path_handle);
+
+    LIBRARY_API  int path_get_grpsz2(int path_handle);
+
+    LIBRARY_API  int random_paths(int graph_handle, int max_length, int num, bool fill_paths);
+
+    LIBRARY_API  volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err);
+
+    LIBRARY_API  int get_automorphisms(int graph_handle, int err);
+
 
 #endif //DEJAVU_DEJAVU_API_H

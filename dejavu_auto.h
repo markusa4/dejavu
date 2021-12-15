@@ -17,6 +17,13 @@ struct abort_code {
     int reason = 0;
 };
 
+struct automorphism_info {
+    shared_permnode** gens;
+    double grp_sz_man;
+    int    grp_sz_exp;
+    std::vector<int> base;
+};
+
 template <class vertex_t, class degree_t, class edge_t>
 struct dejavu_workspace {
     // workspace for normal search
@@ -119,7 +126,7 @@ bool bfs_element_parent_sorter(bfs_element<vertex_t>* const& lhs, bfs_element<ve
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_auto_t {
 public:
-    void automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
+    automorphism_info automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 100) {
@@ -139,16 +146,19 @@ public:
         shared_workspace_auto<vertex_t> switches;
         bfs_workspace<vertex_t> BW;
 
-        worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
+        return worker_thread(g, true, &switches, nullptr, &start_c, nullptr, -1,
                       nullptr, nullptr, &BW, gens, nullptr);
     }
 
 private:
-    void worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
-                       shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
-                       coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
-                       int communicator_id, int **shared_orbit, int** shared_orbit_weights,
-                       bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
+    automorphism_info worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
+                                    shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
+                                    coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
+                                    int communicator_id, int **shared_orbit, int** shared_orbit_weights,
+                                    bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
+
+        automorphism_info a = automorphism_info();
+
         // first order of business: try to glue this thread to currently assigned core
         #ifndef OS_WINDOWS
         int master_sched;
@@ -240,7 +250,7 @@ private:
                 int init_c = W.S.select_color(g, start_c, selector_seed);
                 std::cout << init_c << std::endl;
                 std::cout << my_canon_I.acc << std::endl;
-                return;
+                return automorphism_info();
             }
 
             W.R.refine_coloring_first(g, start_c, -1);
@@ -252,7 +262,10 @@ private:
                 std::cout << "First coloring discrete." << std::endl;
                 std::cout << "Base size: 0" << std::endl;
                 std::cout << "Group size: 1" << std::endl;
-                return;
+                a.gens = nullptr;
+                a.grp_sz_exp = 0;
+                a.grp_sz_man = 1;
+                return a;
             }
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
@@ -438,12 +451,12 @@ private:
                         PRINT("Numnodes (master): " << numnodes);
                         PRINT("Colorcost (master): " << colorcost);
 
-                        std::cout << "Base size:  " << G->base_size << std::endl;
+                        PRINT("Base size:  " << G->base_size);
                         while (!work_threads.empty()) {
                             work_threads[work_threads.size() - 1].join();
                             work_threads.pop_back();
                         }
-                        std::cout << "Group size: ";
+                        PRINT("Group size: ");
                         G->print_group_size();
 
                         if(config.CONFIG_WRITE_AUTOMORPHISMS) {
@@ -458,9 +471,13 @@ private:
                                     it = it->next;
                                 } while (it != G->gens);
                             }
-                            if(gens != nullptr) {
-                                *gens = G->gens;
-                            }
+                        }
+
+                        a.gens = gens;
+                        a.base = std::vector<int>(G->b, G->b+G->base_size);
+                        G->compute_group_size(&a.grp_sz_man, &a.grp_sz_exp);
+                        if(gens != nullptr) {
+                            *gens = G->gens;
                         }
                     } else {
                         while (!work_threads.empty()) {
@@ -877,7 +894,7 @@ private:
             garbage_collector<vertex_t>::free_trash();
         }
 
-        return;
+        return a;
     }
 
     // Probes a random leaf of the tree and writes down an invariant. The invariant will be utilized for blueprints and
@@ -1738,7 +1755,7 @@ private:
 
 typedef dejavu_auto_t<int, int, int> dejavu_auto;
 
-void dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
+automorphism_info dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
     dejavu_auto d;
     d.automorphisms(g, colmap, gens);
 }

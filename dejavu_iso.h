@@ -70,14 +70,20 @@ private:
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((communicator_id * 5) * 5135235);
         int selector_seed = seed;
 
+
+
         invariant start_I;
+
+        invariant _my_canon_I;
+        bijection<vertex_t> _my_canon_leaf;
+
         invariant *my_canon_I;
         bijection<vertex_t> *my_canon_leaf;
-        my_canon_I = new invariant;
+        my_canon_I = &_my_canon_I;
         my_canon_I->has_compare = false;
         my_canon_I->compare_vec = nullptr;
         my_canon_I->compareI    = nullptr;
-        my_canon_leaf = new bijection<vertex_t>;
+        my_canon_leaf = &_my_canon_leaf;
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
@@ -92,8 +98,9 @@ private:
             W.R.refine_coloring(g1, &W.start_c1, my_canon_I, -1, &m, -1, -1, nullptr);
             W.start_I.set_compare_invariant(my_canon_I);
             comp = W.R.refine_coloring(g2, &W.start_c2, &W.start_I, -1, &m, W.start_c2.cells, -1, nullptr);
-            delete my_canon_I;
-            my_canon_I = new invariant;
+            //delete my_canon_I;
+            //my_canon_I = new invariant;
+            _my_canon_I = invariant();
             if(!comp) {
                 return comp;
             }
@@ -174,13 +181,16 @@ private:
             W.id = communicator_id;
         }
 
+        strategy<vertex_t> _my_strategy;
         strategy<vertex_t>* my_strategy;
 
         auto rst = (selector_type) ((communicator_id + 2) % 3);
         if(config.CONFIG_IR_FORCE_SELECTOR)
             rst = (selector_type) config.CONFIG_IR_CELL_SELECTOR;
 
-        my_strategy = new strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
+
+        _my_strategy = strategy<vertex_t>(my_canon_leaf, my_canon_I, rst, -1);
+        my_strategy = &_my_strategy;
 
         W.S.empty_cache();
         const int gid_first = communicator_id % 2 == 0;

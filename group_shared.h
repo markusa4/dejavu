@@ -99,9 +99,13 @@ public:
         double grpsize1;
         int grpsize2;
         shared_grouporder(b, base_size, gp, &gens, &grpsize1, &grpsize2, domain_size);
-        std::cout << grpsize1 << " * 10^" << (grpsize2) << std::endl;
+        PRINT(grpsize1 << " * 10^" << (grpsize2));
         //deleteunmarked(&gens);
-        std::cout << "Generators: " << shared_schreier_gens(gens) << std::endl;
+        PRINT("Generators: " << shared_schreier_gens(gens));
+    }
+
+    void compute_group_size(double* grpsize1, int* grpsize2) {
+        shared_grouporder(b, base_size, gp, &gens, grpsize1, grpsize2, domain_size);
     }
 
     void manage_results(shared_workspace_auto<vertex_t>* switches) {
