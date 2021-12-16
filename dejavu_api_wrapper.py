@@ -81,6 +81,11 @@ def __graph_to_handle(n, edges, vertex_labels, edge_labels, directed_dimacs=Fals
 		dejavuc.graph_label(ctypes.c_int(graph_handle), ctypes.c_int(v), ctypes.c_int(vertex_labels[v]))
 	return graph_handle;
 
+"""
+    Compute random paths starting from the root of the IR tree. The graph with 'n' vertices is given as an edgelist in 'edges'. Paths are limited to length 'path_length'. Can also return multiple paths at once using 'number_of_paths'. A vertex labelling can be given using 'vertex_labels', which means that vertex 'i' is labelled with 'vertex_labels[i]'. Similarly, an edge labelling can be given using 'edge_labels'. However, note that edge labels are internally resolved using edge subdivision and vertex labels, reducing performance. 
+    
+    The method returns a dictionary containing the base points of the computed paths and an invariant. If the coloring of the node where a path ends is required, set 'return_coloring'.    
+"""
 def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, vertex_labels=[], 
                     edge_labels=[], return_coloring=False, directed_dimacs=False):
 	graph_handle = __graph_to_handle(n, edges, vertex_labels, edge_labels, directed_dimacs=directed_dimacs)
@@ -89,13 +94,19 @@ def random_ir_paths(n, edges, path_length, number_of_paths=1, fill_paths=False, 
 	paths = __extract_paths(path_handle, n, return_coloring)
 	dejavuc.clean()
 	return paths
-	
+
+"""
+    Computes color refinement on a given graph. The graph with 'n' vertices is given as an edgelist in 'edges'. A vertex labelling can be given using 'vertex_labels', which means that vertex 'i' is labelled with 'vertex_labels[i]'. Similarly, a edge labelling can be given using 'edge_labels'. However, note that edge labels are internally resolved using edge subdivision and vertex labels, reducing performance. 
+"""
 def color_refinement(n, edges, vertex_labels=[], edge_labels=[], directed_dimacs=False):
 	path = random_ir_paths(n, edges, 0, number_of_paths=1, vertex_labels=vertex_labels, 
 	                       edge_labels=edge_labels, return_coloring = True, directed_dimacs=directed_dimacs)
 	dejavuc.clean()
 	return path[0]['coloring']
-	
+
+"""
+    Probabilistic isomorphism test for two given graphs. The first graph on 'n1' vertices is given as an edgelist in 'edges1'. The second graph is given using 'n2' and 'edges2'. The optional parameter 'err' determines the error probability. If the two graphs are non-isomorphic, the method is guaranteed to determine this. If they are isomorphic, the method returns non-isomorphic with probability at most 1 / 2^err.
+"""
 def are_isomorphic(n1, edges1, n2, edges2, err=8):
 	graph_handle1 = __graph_to_handle(n1, edges1, [], [])
 	graph_handle2 = __graph_to_handle(n2, edges2, [], [])
@@ -103,6 +114,9 @@ def are_isomorphic(n1, edges1, n2, edges2, err=8):
 	dejavuc.clean()
 	return is_iso
 
+"""
+    Computes a generating set for the automorphism group of the given graph probabilistically. The graph on 'n' vertices is given as an edgelist in 'edges'. A vertex labelling can be given using 'vertex_labels'. The optional parameter 'err' determines the error probability. The method will never return generators that are not symmetries of the graph (one-sided error). The method is guaranteed to return all generators with probability at least 1 / 2^err.
+"""
 def get_automorphisms(n, edges, err=8, vertex_labels=[], directed_dimacs=False):
 	graph_handle = __graph_to_handle(n, edges, vertex_labels, [], directed_dimacs=directed_dimacs)
 	auto_handle = dejavuc.get_automorphisms(ctypes.c_int(graph_handle), ctypes.c_int(err))
@@ -110,50 +124,3 @@ def get_automorphisms(n, edges, err=8, vertex_labels=[], directed_dimacs=False):
 	dejavuc.clean()
 	return grp_info
 
-#cycle1 = [[0,1], [1,2], [2,3], [4,3], [4,0]]
-#cycle2 = [[1,0], [2,3], [3,4], [1,2], [4,0]]
-
-
-
-#print(are_isomorphic(5, cycle1, 5, cycle2))
-
-def _fix_digraph(edges):
-	n_edges = []
-	for e in edges:
-		v1, v2 = e
-		if not [v2, v1] in n_edges:
-			n_edges += [e]
-	return n_edges
-
-#edges = [[0, 23], [0, 27], [0, 28], [1, 2], [1, 3], [1, 4], [1, 30], [2, 1], [2, 3], [2, 4], [2, 5], [3, 1], [3, 2], [3, 4], [3, 5], [3, 32], [4, 1], [4, 2], [4, 3], [4, 5], [5, 2], [5, 3], [5, 4], [5, 8], [5, 32], [6, 7], [6, 8], [6, 31], [6, 32], [7, 6], [7, 8], [7, 31], [8, 5], [8, 6], [8, 7], [8, 26], [9, 10], [9, 24], [9, 25], [9, 26], [10, 9], [10, 11], [10, 24], [11, 10], [11, 12], [11, 33], [12, 11], [12, 33], [12, 36], [13, 14], [13, 33], [13, 36], [14, 13], [14, 15], [14, 36], [15, 14], [15, 16], [15, 38], [16, 15], [16, 17], [16, 38], [17, 16], [17, 38], [17, 39], [18, 19], [18, 35], [18, 39], [19, 18], [19, 20], [19, 35], [20, 19], [20, 21], [20, 35], [21, 20], [21, 22], [21, 34], [21, 37], [22, 21], [22, 34], [22, 37], [23, 0], [23, 27], [23, 28], [24, 9], [24, 10], [24, 25], [24, 26], [25, 9], [25, 24], [25, 26], [26, 8], [26, 9], [26, 24], [26, 25], [27, 0], [27, 23], [27, 28], [27, 29], [27, 30], [28, 0], [28, 23], [28, 27], [28, 29], [28, 30], [29, 27], [29, 28], [29, 30], [30, 1], [30, 27], [30, 28], [30, 29], [31, 6], [31, 7], [31, 32], [32,3], [32, 5], [32, 6], [32, 31], [33, 11], [33, 12], [33, 13], [33, 36], [34, 21], [34, 22], [34, 37], [35, 18], [35, 19], [35, 20], [35, 39], [36, 12], [36, 13], [36, 14], [36, 33], [37, 21], [37, 22], [37, 34], [38, 15], [38, 16], [38, 17], [38, 39], [39, 17], [39, 18], [39, 35], [39, 38]]
-
-#vlabels = [1628273134, -2132368460, 652329178, -387690958, -1435709788, 652329178, -387690958, 652329178, 1628273134, 652329178, 26827912, 1254396766, 652329178, 1628273134, -387690958, 136319548, 1097698410, -1327612506, 1628273134, -1809771368, -1179349854, -639656304, 652329178, 2146176196, 2146176196, -1639394214, -1065704762, -250097854, -250097854, -1065704762, -1639394214, 2146176196, 2146176196, 2146176196, 2146176196, -1065704762, -1065704762, -1639394214, -1065704762, -1065704762]
-
-#vlabels_fix = list(map(lambda i: abs(i % 1073741823), vlabels))
-
-#vlabels_fix2x = vlabels_fix + vlabels_fix
-
-#elabels = [35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232,35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232, 35235232]
-
-#print(get_automorphisms(5, cycle1))
-
-#elabels_fix = [35235232]*len(fix_digraph(edges))
-
-#for i in range(0, 2000000):
-#	print(get_automorphisms(5, cycle1))
-#	are_isomorphic(5, cycle1, 5, cycle2)
-#	graph_to_handle(40, fix_digraph(edges), vlabels, elabels_fix)
-#	graph_to_handle(40, fix_digraph(edges), vlabels, [])
-#	dejavuc.clean()
-#	print(random_ir_paths(40, edges, 5, vertex_labels=vlabels_fix, number_of_paths=3, edge_labels=elabels, fill_paths=True, directed_dimacs=True))
-#	print(random_ir_paths(80, edges, 5, vertex_labels=vlabels_fix2x, number_of_paths=3, edge_labels=elabels, directed_dimacs=True))
-	#print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0], number_of_paths=3,return_coloring=True))
-	#print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0], [3,0]], 10, number_of_paths=3,return_coloring=True))
-	#print(random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,1], number_of_paths=3,return_coloring=True))
-	#print(random_ir_paths(10, [[0,1], [1,2], [2,3], [3,4], [4,0]], 10, edge_labels=[0,0,0,0,0], number_of_paths=3,return_coloring=True))
-	#print(color_refinement(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], edge_labels=[0,0,0,0,1]))
-
-#print(color_refinement(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], edge_labels=[0,0,0,0,0]))
-
-
-#random_ir_paths(5, [[0,1], [1,2], [2,3], [3,4], [4,0]], 4)
