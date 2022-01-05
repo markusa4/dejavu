@@ -291,6 +291,8 @@ private:
 
     LIBRARY_API  void graph_label(int graph_handle, int v, int l);
 
+    LIBRARY_API void graph_write_dimacs_to_file(int graph_handle, std::string fname);
+
     LIBRARY_API  int path_get_num(int path_handle);
 
     LIBRARY_API  int path_get_size(int path_handle, int path_id);
@@ -314,6 +316,8 @@ private:
     LIBRARY_API  volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err);
 
     LIBRARY_API  int get_automorphisms(int graph_handle, int err);
+
+    LIBRARY_API void set_threads(int threads);
 
 
 #endif //DEJAVU_DEJAVU_API_H

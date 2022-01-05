@@ -86,8 +86,10 @@ public:
 
         while(!largest_cache.empty()) {
             std::pair<int, int>* elem = largest_cache.front();
-            if(c->ptn[elem->first] == elem->second)
+            if(c->ptn[elem->first] == elem->second) {
+                assert(c->ptn[elem->first] > 0);
                 return elem->first;
+            }
             largest_cache.pop();
         }
 
@@ -97,6 +99,7 @@ public:
 
         assert(skipstart < c->ptn_sz);
         for(int i = skipstart; i < c->ptn_sz;) {
+            assert(c->vertex_to_col[c->lab[i]] == i);
             assert(i < c->ptn_sz);
             if (c->ptn[i] != 0 && only_trivial) {
                 skipstart = i;
@@ -113,6 +116,7 @@ public:
 
             i += c->ptn[i] + 1;
         }
+        assert(c->ptn[largest_cell] > 0);
         return largest_cell;
     }
 

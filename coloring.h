@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <iostream>
+#include <cassert>
 #include "utility.h"
 
 extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
@@ -229,6 +230,24 @@ public:
         for(int i = 0; i < lab_sz;++i) {
             comp = comp && (lab[i] >= 0 && lab[i] < lab_sz);
             comp = comp && (lab[vertex_to_lab[i]] == i);
+        }
+
+        int last_col = -1;
+        int counter  = 1;
+        for (int i = 0; i < ptn_sz; ++i) {
+            --counter;
+            if(counter == 0) {
+                counter = ptn[i] + 1;
+                last_col = i;
+                assert(ptn[i] >= 0 && ptn[i] < lab_sz);
+            } else {
+                assert(vertex_to_col[lab[i]] == last_col);
+            }
+        }
+
+        for(int i = 0; i < ptn_sz;) {
+            assert(vertex_to_col[lab[i]] == i);
+            i += ptn[i] + 1;
         }
         return comp;
     }

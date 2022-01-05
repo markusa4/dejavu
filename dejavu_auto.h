@@ -456,8 +456,10 @@ private:
                             work_threads[work_threads.size() - 1].join();
                             work_threads.pop_back();
                         }
-                        PRINT("Group size: ");
-                        G->print_group_size();
+                        if(config.CONFIG_IR_WRITE_GROUPORDER) {
+                            std::cout << "Group size: ";
+                            G->print_group_size_stdout();
+                        }
 
                         if(config.CONFIG_WRITE_AUTOMORPHISMS) {
                             std::cout << "Generators: " << std::endl;
@@ -941,6 +943,9 @@ private:
             const int v = c->lab[rpos];
 
             // individualize and refine
+            assert(c->vertex_to_col[c->lab[s]] == s);
+            assert(c->ptn[s] > 0 && c->ptn[s] < c->ptn_sz);
+            assert(c->vertex_to_col[v] == s);
             proceed_state(w, g, c, I, v, nullptr, -1, -1, nullptr);
             assert(c->vertex_to_col[v] > 0);
 
@@ -1758,6 +1763,8 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 automorphism_info dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
     dejavu_auto d;
     d.automorphisms(g, colmap, gens);
+
+    return automorphism_info();
 }
 
 #endif //DEJAVU_DEJAVU_AUTO_H

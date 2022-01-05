@@ -359,6 +359,7 @@ public:
                 i += c->ptn[i] + 1;
             }
         } else {
+            assert(c->vertex_to_col[c->lab[init_color_class]] == init_color_class);
             cell_todo.add_cell(&queue_pointer, init_color_class);
         }
         int its = 0;
@@ -627,7 +628,6 @@ public:
                 if(c->cells == g->v_size) {
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
-                    assert(c->check());
                     // assert(assert_is_equitable(g, c));
                     return true;
                 }
@@ -656,7 +656,6 @@ public:
             }
         }
 
-        assert(c->check());
         // assert(assert_is_equitable(g, c));
         return true;
     }
@@ -1353,11 +1352,16 @@ private:
             const int deg0_col_sz = (c->ptn[deg0_col] + 1) - deg1_col_sz;
             const int deg1_col    = deg0_col + deg0_col_sz;
 
+            assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+
             // no split? done...
             if(deg0_col == deg1_col) {
                 neighbours.set(deg1_col, -1);
+                assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
                 continue;
             }
+
+            assert(deg0_col_sz + deg1_col_sz - 1 == c->ptn[deg0_col]);
 
             // set ptn
             c->ptn[deg0_col]     = deg0_col_sz - 1;
@@ -1367,7 +1371,11 @@ private:
             deg1_write_pos = deg1_col;
             deg1_read_pos  = neighbours.get(deg0_col) - 1;
 
+            //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
+
             // rearrange vertices of deg1 to the back of deg0 color
+            assert(deg1_read_pos >= deg0_col);
+
             while(deg1_read_pos >= deg0_col) {
                 const int v             = scratch[deg1_read_pos];
                 const int vertex_at_pos = c->lab[deg1_write_pos];
@@ -1376,12 +1384,16 @@ private:
                 c->lab[deg1_write_pos]          = v;
                 c->vertex_to_lab[v]             = deg1_write_pos;
                 c->vertex_to_col[v]             = deg1_col;
+
                 c->lab[lab_pos]                 = vertex_at_pos;
                 c->vertex_to_lab[vertex_at_pos] = lab_pos;
 
                 deg1_write_pos++;
                 deg1_read_pos--;
             }
+
+            assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+            assert(c->vertex_to_col[c->lab[deg1_col]] == deg1_col);
 
             // add new classes to color_class_split_worklist
             const bool leq = deg1_col_sz > deg0_col_sz;

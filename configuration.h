@@ -18,6 +18,7 @@ struct configstruct {
     bool CONFIG_IR_SELECTOR_FILL_GRAPH = false;
     bool CONFIG_IR_ALWAYS_STORE = false;
 
+    bool CONFIG_IR_WRITE_GROUPORDER      = false;
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;
     bool CONFIG_PREPROCESS_EDGELIST_SORT = false;

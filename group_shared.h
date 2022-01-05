@@ -104,6 +104,15 @@ public:
         PRINT("Generators: " << shared_schreier_gens(gens));
     }
 
+    void print_group_size_stdout() {
+        double grpsize1;
+        int grpsize2;
+        shared_grouporder(b, base_size, gp, &gens, &grpsize1, &grpsize2, domain_size);
+        std::cout << grpsize1 << " * 10^" << (grpsize2) << std::endl;
+        //deleteunmarked(&gens);
+        PRINT("Generators: " << shared_schreier_gens(gens));
+    }
+
     void compute_group_size(double* grpsize1, int* grpsize2) {
         shared_grouporder(b, base_size, gp, &gens, grpsize1, grpsize2, domain_size);
     }
