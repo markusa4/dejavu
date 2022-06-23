@@ -99,7 +99,7 @@ public:
         std::cout << std::endl;
     }
 
-    void read_from_array(vertex_t* _map, int _map_sz) {
+    void read_from_array(const vertex_t* _map, int _map_sz) {
         alloc(_map_sz);
         res_sz = _map_sz;
         init = true;

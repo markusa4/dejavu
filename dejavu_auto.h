@@ -2,26 +2,23 @@
 #define DEJAVU_DEJAVU_AUTO_H
 
 #include <random>
+#include <chrono>
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
+#include "prep.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_shared.h"
 #include "group_shared.h"
 #include "schreier_sequential.h"
 
+typedef std::chrono::high_resolution_clock Clock;
+
 struct abort_code {
     abort_code()=default;
     abort_code(int reason):reason(reason){};
     int reason = 0;
-};
-
-struct automorphism_info {
-    shared_permnode** gens;
-    double grp_sz_man;
-    int    grp_sz_exp;
-    std::vector<int> base;
 };
 
 template <class vertex_t, class degree_t, class edge_t>
@@ -126,7 +123,7 @@ bool bfs_element_parent_sorter(bfs_element<vertex_t>* const& lhs, bfs_element<ve
 template<class vertex_t, class degree_t, class edge_t>
 class dejavu_auto_t {
 public:
-    automorphism_info automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
+    dejavu_stats automorphisms(sgraph_t<vertex_t, degree_t, edge_t> *g, vertex_t* colmap, shared_permnode **gens) {
         if(config.CONFIG_THREADS_REFINEMENT_WORKERS == -1) {
             const int max_threads = std::thread::hardware_concurrency();
             if (g->v_size <= 100) {
@@ -151,13 +148,13 @@ public:
     }
 
 private:
-    automorphism_info worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
-                                    shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
-                                    coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
-                                    int communicator_id, int **shared_orbit, int** shared_orbit_weights,
-                                    bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
+    dejavu_stats worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
+                               shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
+                               coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
+                               int communicator_id, int **shared_orbit, int** shared_orbit_weights,
+                               bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
 
-        automorphism_info a = automorphism_info();
+        dejavu_stats a = dejavu_stats();
 
         // first order of business: try to glue this thread to currently assigned core
         #ifndef OS_WINDOWS
@@ -181,13 +178,9 @@ private:
 	coloring<vertex_t>* init_c;
         // preprocessing
         if(master) {
-            config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
             init_c  = start_c;
             start_c = &W.start_c1;
             g->initialize_coloring(&W.start_c1, init_c->vertex_to_col);
-            if(config.CONFIG_PREPROCESS) {
-                //  add preprocessing here
-            }
             assert(start_c->check());
         }
 
@@ -233,27 +226,28 @@ private:
                 	__acc += init_c->vertex_to_col[i];
                 	color_sequence.push_back(init_c->vertex_to_col[i]);
                 }
-        	my_canon_I.write_top_and_compare(__acc, false);
-        	std::sort(std::begin(color_sequence), std::end(color_sequence));
-        	for(std::vector<int>::iterator it = color_sequence.begin(); it != color_sequence.end(); ++it) {
-        		my_canon_I.write_top_and_compare(*it, false);
-        	}
-        	for(int i = 0; i < start_c->ptn_sz;) {
-		        const vertex_t rd = start_c->ptn[i];
-		        my_canon_I.write_top_and_compare(i, false);
-		        my_canon_I.write_top_and_compare(rd, false);
-		        //const vertex_t some_vertex = start_c->lab[i];
-		        //my_canon_I.write_top_and_compare(init_c->vertex_to_col[some_vertex], false);
-		        i += rd +1;
-		}
-                W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr);
-                int init_c = W.S.select_color(g, start_c, selector_seed);
-                std::cout << init_c << std::endl;
-                std::cout << my_canon_I.acc << std::endl;
-                return automorphism_info();
+                my_canon_I.write_top_and_compare(__acc, false);
+                std::sort(std::begin(color_sequence), std::end(color_sequence));
+                for(std::vector<int>::iterator it = color_sequence.begin(); it != color_sequence.end(); ++it) {
+                    my_canon_I.write_top_and_compare(*it, false);
+                }
+                for(int i = 0; i < start_c->ptn_sz;) {
+                    const vertex_t rd = start_c->ptn[i];
+                    my_canon_I.write_top_and_compare(i, false);
+                    my_canon_I.write_top_and_compare(rd, false);
+                    //const vertex_t some_vertex = start_c->lab[i];
+                    //my_canon_I.write_top_and_compare(init_c->vertex_to_col[some_vertex], false);
+                    i += rd +1;
+                }
+                    W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr);
+                    int init_c = W.S.select_color(g, start_c, selector_seed);
+                    std::cout << init_c << std::endl;
+                    std::cout << my_canon_I.acc << std::endl;
+                    return dejavu_stats();
             }
 
-            W.R.refine_coloring_first(g, start_c, -1);
+            if(!config.config_IR_SKIP_FIRST_REFINEMENT)
+                W.R.refine_coloring_first(g, start_c, -1);
             PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 
             int init_c = W.S.select_color(g, start_c, selector_seed);
@@ -1760,11 +1754,57 @@ private:
 
 typedef dejavu_auto_t<int, int, int> dejavu_auto;
 
-automorphism_info dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, shared_permnode **gens) {
-    dejavu_auto d;
-    d.automorphisms(g, colmap, gens);
+// TODO: add automorphism consumer
 
-    return automorphism_info();
+dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_consumer consume) {
+    config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
+    Clock::time_point timer1 = Clock::now();
+    preprocessor p;
+    if(colmap == nullptr) {
+        colmap = new int[g->v_size]; // TODO: memory leak
+        for(int i = 0; i < g->v_size; ++i)
+            colmap[i] = 0;
+    }
+    p.reduce(g, colmap, consume);
+    config.config_IR_SKIP_FIRST_REFINEMENT = true;
+    double prep_red_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer1).count());
+    Clock::time_point timer2 = Clock::now();
+    dejavu_stats a;
+    if(g->v_size > 1) {
+        dejavu_auto d;
+        shared_permnode *gens = nullptr;
+        a = d.automorphisms(g, colmap, &gens);
+
+        // call consumer for retrieved automorphisms
+        work_list_t<int> automorphism_supp;
+        automorphism_supp.initialize(g->v_size);
+        if (gens != nullptr) {
+            shared_permnode *gen_next = gens;
+            do {
+                automorphism_supp.reset();
+                for (int i = 0; i < g->v_size; ++i) {
+                    if (gen_next->p[i] != i)
+                        automorphism_supp.push_back(i);
+                }
+                //std::cout << automorphism_supp.cur_pos << std::endl;
+                p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.arr, consume);
+                gen_next = gen_next->next;
+            } while (gen_next != gens);
+        }
+    }
+
+    double solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer2).count());
+    Clock::time_point timer3 = Clock::now();
+    double prep_res_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer3).count());
+    std::cout << "(prep-red)  " << prep_red_time / 1000000.0 << "ms" << std::endl;
+    std::cout << "(solve) " << solve_time / 1000000.0 << "ms" << std::endl;
+    std::cout << "(prep-res)  " << prep_res_time / 1000000.0 << "ms" << std::endl;
+
+    // calculate automorphism group size
+    p.rec.exp += a.grp_sz_exp;
+    p.multiply_to_group_size(a.grp_sz_man);
+    std::cout << "(prep-res) group sz: " << p.rec.base << "*10^" << p.rec.exp << std::endl;
+    return a;
 }
 
 #endif //DEJAVU_DEJAVU_AUTO_H

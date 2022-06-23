@@ -169,7 +169,14 @@ void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_
     finished = true;
 }
 
-static int saucyConsume(int n, const int *ct_perm, int nsupp, int *, void *) {
+int test_cycle = 0;
+
+static int saucyConsume(int n, const int *perm, int nsupp, int * support, void *) {
+    int i, k;
+    for (i = 0; i < nsupp; ++i) {
+        k = support[i];
+        test_cycle += perm[k];
+    }
     return true;
 }
 
@@ -198,6 +205,13 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
     sg.adj[g->v_size] = epos;
     assert(epos == g->e_size);
 
+    if(colmap == nullptr) {
+        colmap = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i) {
+            colmap[i] = 0;
+        }
+    }
+
     make_small_colmap(sg.colors, colmap, g->v_size);
 
     Clock::time_point timer = Clock::now();
@@ -210,6 +224,10 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
     std::cout << "Group size: ";
     std::cout << stats.grpsize_base << "*10^" << stats.grpsize_exp << std::endl;
     finished = true;
+}
+
+void test_auto(int i, int* x1, int x2) {
+    return;
 }
 
 void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_time) {
@@ -235,6 +253,7 @@ void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_
     // options.writeautoms = true;
     //schreier_fails(10);
     options.defaultptn = false;
+    options.userautomproc = test_auto;
 
     DYNALLOC1(int, lab, lab_sz, sg.nv, "malloc");
     DYNALLOC1(int, ptn, ptn_sz, sg.nv, "malloc");
@@ -269,6 +288,7 @@ void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_
     Traces(&sg, lab, ptn, orbits, &options, &stats, NULL);
     std::cout << "Group size: ";
     writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
+    std::cout << "Gens: " << stats.numgenerators << std::endl;
     std::cout << std::endl;
     std::cout << "Num nodes: " << stats.numnodes << std::endl;
     *traces_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());

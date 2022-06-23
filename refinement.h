@@ -120,6 +120,20 @@ public:
         sort_t<T>(arr, cur_pos);
     }
 
+    void sort_after_map(T* map) {
+        struct comparator_map {
+            T* map;
+            comparator_map(T* map) {
+                this->map = map;
+            }
+            bool operator()(const T & a, const T & b) {
+                return map[a] < map[b];
+            }
+        };
+        comparator_map c = comparator_map(map);
+        std::sort(arr, arr + cur_pos, c);
+    }
+
     int  cur_pos = 0;
     T*   arr  = nullptr;
     bool init = false;
@@ -664,6 +678,8 @@ public:
     bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
+
+        assure_initialized(g);
 
         for(i = 0; i < g->v_size; ++i) {
             const int image_i = p->map_vertex(i);

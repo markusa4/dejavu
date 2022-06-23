@@ -27,6 +27,7 @@ struct configstruct {
     int  CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
     bool CONFIG_IR_SELECTOR_FILL_GRAPH = false;
     bool CONFIG_IR_ALWAYS_STORE = false;
+    bool config_IR_SKIP_FIRST_REFINEMENT = false; // use if initial coloring has already been refined using >=1-WL
 
     bool CONFIG_IR_WRITE_GROUPORDER      = false;
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;

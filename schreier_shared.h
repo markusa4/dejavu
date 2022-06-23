@@ -7,6 +7,7 @@
 
 #include <mutex>
 #include <atomic>
+#include <vector>
 
 #define DYNALL(type,name,name_sz) \
 	type *name = NULL; size_t name_sz=0;
@@ -35,6 +36,13 @@ typedef struct shared_schreierlevel {
     shared_permnode *marker;
 } shared_schreier;
 
+struct dejavu_stats {
+    shared_permnode** gens;
+    double grp_sz_man = 1;
+    int    grp_sz_exp = 0;
+    std::vector<int> base;
+    int* orbit = nullptr;
+};
 
 typedef struct filterstatestruct {
     int level;

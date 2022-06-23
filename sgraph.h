@@ -27,7 +27,8 @@ class alignas(16) sgraph_t {
         const vertex_t* vertex_to_col;
 
         bool operator()(const vertex_t & v1, const vertex_t & v2) {
-            return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));
+            //return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));
+            return (vertex_to_col[v1] < vertex_to_col[v2]);
         }
     };
 public:
@@ -92,9 +93,10 @@ public:
                     c->ptn[i] = 0;
                     break;
                 }
-                assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
-                if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]  || (this->d[c->lab[i]] == this->d[c->lab[i + 1]]
-                && (vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]))) {
+                //assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
+                //if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]  || (this->d[c->lab[i]] == this->d[c->lab[i + 1]]
+                //&& (vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]))) {
+                if(vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]) {
                     c->ptn[i] = 0;
                     cells += 1;
                     c->ptn[last_new_cell] = i - last_new_cell;
@@ -192,6 +194,51 @@ public:
         assert(epos == ng->e_size);
 
         return;
+    }
+
+    void sanity_check() {
+#ifndef NDEBUG
+        for(int i = 0; i < v_size; ++i) {
+            assert(d[i]>0?v[i] < e_size:true);
+            assert(d[i]>0?v[i] >= 0:true);
+            assert(d[i] >= 0);
+            assert(d[i] < v_size);
+        }
+        for(int i = 0; i < e_size; ++i) {
+            assert(e[i] < v_size);
+            assert(e[i] >= 0);
+        }
+
+        // multiedge test
+        mark_set multiedge_test;
+        multiedge_test.initialize(v_size);
+        for(int i = 0; i < v_size; ++i) {
+            multiedge_test.reset();
+            for(int j = 0; j < d[i]; ++j) {
+                const int neigh = e[v[i] + j];
+                assert(!multiedge_test.get(neigh));
+                multiedge_test.set(neigh);
+            }
+        }
+
+        // fwd - bwd test
+        multiedge_test.initialize(v_size);
+        for(int i = 0; i < v_size; ++i) {
+            multiedge_test.reset();
+            for(int j = 0; j < d[i]; ++j) {
+                const int neigh = e[v[i] + j];
+                bool found = false;
+                for(int k = 0; k < d[neigh]; ++k) {
+                    const int neigh_neigh = e[v[neigh] + k];
+                    if(neigh_neigh == i) {
+                        found = true;
+                        break;
+                    }
+                }
+                assert(found);
+            }
+        }
+#endif
     }
 
     void copy_graph(sgraph_t<vertex_t, degree_t, edge_t>* g) {
@@ -361,5 +408,7 @@ void permute_colmap(int** colmap, int colmap_sz, vertex_t* p) {
     *colmap = new_colmap;
     delete[] old_colmap;
 }
+
+static sgraph test_graph;
 
 #endif //DEJAVU_GRAPH_H

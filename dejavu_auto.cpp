@@ -27,10 +27,23 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
+refinement<int, int, int> test_R;
+
+void empty_consumer(int n, const int * p, int support, const int *) {
+    /*bijection<int> test_p;
+    test_p.read_from_array(p, n);
+    const bool test_auto = test_R.certify_automorphism(&test_graph, &test_p); // TODO: sparse automorphism certification?
+    assert(test_auto);*/
+    //std::cout << "automorphism support " << support << std::endl;
+    return;
+}
+
 void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
+    test_graph.copy_graph(g);
+
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    dejavu_automorphisms(g, colmap, nullptr);
+    dejavu_automorphisms(g, colmap, empty_consumer);
     //dejavu d;
     //d.automorphisms(g, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
@@ -45,6 +58,7 @@ int commandline_mode(int argc, char **argv) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
+    config.CONFIG_IR_WRITE_GROUPORDER = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
@@ -175,7 +189,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu" << std::endl;
+    std::cout << "dejavu-auto 頭文字D" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
@@ -195,7 +209,7 @@ int commandline_mode(int argc, char **argv) {
 
 int main(int argc, char *argv[]) {
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu" << std::endl;
+    std::cout << "parser" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     return commandline_mode(argc, argv);
 }
