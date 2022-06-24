@@ -239,7 +239,7 @@ private:
                     //my_canon_I.write_top_and_compare(init_c->vertex_to_col[some_vertex], false);
                     i += rd +1;
                 }
-                    W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr);
+                    W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr, nullptr, nullptr);
                     int init_c = W.S.select_color(g, start_c, selector_seed);
                     std::cout << init_c << std::endl;
                     std::cout << my_canon_I.acc << std::endl;
@@ -1288,7 +1288,7 @@ private:
         const int init_color_class = w->R.individualize_vertex(c, v); // TODO: should allow vector of vertices to be individualized
         bool comp = true;
         comp = comp && w->R.refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early,
-                                            early_individualized);
+                                            early_individualized, nullptr, nullptr);
         return comp;
     }
 

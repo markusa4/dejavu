@@ -357,7 +357,8 @@ public:
     // includes several options for using invariants, blueprints and k-deviation
     bool refine_coloring(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
-                         std::vector<vertex_t>* early_individualized) {
+                         std::vector<vertex_t>* early_individualized, mark_set* touched_color,
+                         work_list* touched_color_list) {
         bool comp = true;
         int individualize_pos = individualize_early;
         assure_initialized(g);
@@ -439,6 +440,15 @@ public:
                 int  old_class  = color_class_splits.last()->first.first;
                 int  new_class  = color_class_splits.last()->first.second;
                 bool is_largest = color_class_splits.last()->second;
+
+
+                // record colors that were changed
+                if(touched_color) {
+                    if(!touched_color->get(new_class)) {
+                        touched_color->set(new_class);
+                        touched_color_list->push_back(new_class);
+                    }
+                }
 
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
@@ -702,6 +712,90 @@ public:
                 if(!scratch_set.get(vertex_j)) {
                     return false;
                 }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // certify an automorphism on a graph
+    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* p) {
+        int i, found;
+
+        assure_initialized(g);
+
+        for(i = 0; i < g->v_size; ++i) {
+            const int image_i = p[i];
+            if(image_i == i)
+                continue;
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p[vertex_j];
+                scratch_set.set(image_j);
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // certify an automorphism on a graph
+    // TODO need to check colors too?
+    bool certify_automorphism_sparse(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* colmap, int* p, int supp, int* supp_arr) {
+        int i, found;
+
+        assure_initialized(g);
+
+        //for(i = 0; i < g->v_size; ++i) {
+        for(int f = 0; f < supp; ++f) {
+            i = supp_arr[f];
+            const int image_i = p[i];
+            if(image_i == i)
+                continue;
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+            if(colmap[i] != colmap[image_i]) // colors must be equal
+                return false;
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p[vertex_j];
+                scratch_set.set(image_j);
+                scratch[image_j] = vertex_j;
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                if(colmap[scratch[vertex_j]] != colmap[vertex_j])
+                    return false;
                 scratch_set.unset(vertex_j);
                 found -= 1;
             }

@@ -83,7 +83,7 @@ public:
                 }
             }
         } else {
-            std::sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));
+            std::stable_sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));
             for(int i = 0; i < c->lab_sz; i++) {
                 c->vertex_to_col[c->lab[i]] = last_new_cell;
                 c->vertex_to_lab[c->lab[i]] = i;
@@ -191,6 +191,7 @@ public:
         assert(ng->v_size == v_size);
         assert(ng->e_size == e_size);
         assert(ng->d_size == d_size);
+        std::cout << epos << ", " << ng->e_size << std::endl;
         assert(epos == ng->e_size);
 
         return;

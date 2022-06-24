@@ -38,7 +38,7 @@ class coloring_allocator {
 public:
     static std::pair<vertex_t *, vertex_t *> coloring_bulk_allocator(int domain_size) {
         thread_local vertex_t *bulk_domain = nullptr;
-        thread_local int buffer_const = 20;
+        thread_local int buffer_const = 5; // was 20, for very large graphs this fails hard
         thread_local int bulk_domain_sz = -1, bulk_domain_cnt = -1;
 
         if (bulk_domain_sz < 0 || bulk_domain_reset) {

@@ -63,6 +63,15 @@ private:
             add_edge_buff.push_back(std::vector<int>()); // TODO: do this smarter... i know how many edges will end up here... should not allocate anything...
         add_edge_buff_act.initialize(rec->domain_size);
 
+        std::vector<int> test_v_to_min_endpoint;
+        test_v_to_min_endpoint.reserve(g->v_size);
+        for(int i = 0; i < g->v_size; ++i)
+            test_v_to_min_endpoint.push_back(-1);
+        std::vector<int> test_v_to_max_endpoint;
+        test_v_to_max_endpoint.reserve(g->v_size);
+        for(int i = 0; i < g->v_size; ++i)
+            test_v_to_max_endpoint.push_back(-1);
+
         work_list_t<int> smallest_endpoint_cnt;
         smallest_endpoint_cnt.initialize(g->v_size);
         for(int i = 0; i < g->v_size; ++i) {
@@ -86,6 +95,8 @@ private:
             }
         }
 
+        // TODO: special, fast algorithm for length=1 paths? maybe some reduction that involves parallel-1 paths?
+        // TODO: first pass to detect parallel paths and collpase them to single path?
         // detecting paths 1: check how many paths are connected to a node
         int num_paths1 = 0;
         double total_path_length = 0;
@@ -155,6 +166,9 @@ private:
                     assert(v_child_next_next != v_child);
                     v_child_next = v_child_next_next;
                 }
+                //std::cout << endpoint1 << "<-->" << endpoint2 << std::endl;
+            } else {
+                std::cout << "cycle" << std::endl;
             }
 
             if(!cycle) {
@@ -249,6 +263,16 @@ private:
                 }
             }
 
+            ///////////////////////////////////////////////////
+            // TESTCODE
+            const int min_endpoint = std::min(endpoint1, endpoint2);
+            const int max_endpoint = std::max(endpoint1, endpoint2);
+            for(int i = 0; i < path.cur_pos; ++i) {
+                test_v_to_min_endpoint[path.arr[i]] = min_endpoint;
+                test_v_to_max_endpoint[path.arr[i]] = max_endpoint;
+            }
+            //////////////////////////////////////////////////
+
             total_path_length += path_length;
 
             if(cycle) {
@@ -265,7 +289,7 @@ private:
                     // TODO: make sure endpoint1 is not neighbour of another vertex of color of endpoint2
 
                     if(check_if_neighbour(g, endpoint1, endpoint2)) {
-                        std::cout << "neighbours!" << std::endl;
+                        //std::cout << "neighbours!" << std::endl;
                         continue;
                     }
 
@@ -346,6 +370,12 @@ private:
                     }
                     //std::cout << std::endl;
                 }
+            }
+        }
+
+        for(int i = 0; i < g->v_size; ++i) {
+            if(g->d[i] == 2 && !rec->del.get(i)) {
+                //std::cout << test_v_to_min_endpoint[i] << ":" << test_v_to_max_endpoint[i] << ":" << colmap[i] << std::endl;
             }
         }
 
@@ -480,9 +510,9 @@ private:
                         parent = g->e[e_pos_child + search_parent];
                     }
 
-                    if(c->vertex_to_col[parent] == c->vertex_to_col[child]) { // TODO: dual-color pairs? not an issue...
+                    if(c->vertex_to_col[parent] == c->vertex_to_col[child]) { // dual-color pairs? not an issue...
                         is_pairs = true;
-                        std::cout << "pair" << std::endl;
+                        //std::cout << "pair" << std::endl;
                         //rec->del1.set(child);
                         //rec->del1.set(parent);
                         //std::cout << "yeah that probably doesn't work" << std::endl;
@@ -565,7 +595,7 @@ private:
                     automorphism_supp.push_back(to_1);
                     write_canonical_recovery_string_to_automorphism(to_1, from_1);
                     ++pos;
-                    // TODO child_to and child_from could have canonical strings when translated back
+                    // child_to and child_from could have canonical strings when translated back
                     assert(childcount.arr[child_to] == childcount.arr[child_from]);
                     stack1.push_back(std::pair<int, int>(g->v[child_to], g->v[child_to] + childcount.arr[child_to]));
                     while(!stack1.empty()) {
@@ -617,7 +647,7 @@ private:
                     stack1.reset();
                     stack1.push_back(std::pair<int, int>(g->v[_i], g->v[_i] + childcount.arr[_i]));
                     const int orig_i = translate_back(_i);
-                    rec->canonical_recovery_string[orig_i].reserve(childcount.arr[orig_i]);
+                    rec->canonical_recovery_string[orig_i].reserve(childcount.arr[_i]); // TODO: segmentation fault! throw_length_error --- did i fix by switching orig_i to _i?
                     while (!stack1.empty()) {
                         std::pair<int, int> from_to = stack1.pop_back();
                         int from = from_to.first;
@@ -1361,6 +1391,182 @@ public:
         }
     }
 
+    void cell2_ir(sgraph*g, int* colmap, dejavu_consumer consume) {
+        coloring<int> c1;
+        g->initialize_coloring(&c1, colmap); // could re-order to reduce overhead when not applicable
+        coloring<int> c2;
+        c2.copy(&c1);
+
+        work_list_t<int> _automorphism;
+        work_list_t<int> _automorphism_supp;
+
+        _automorphism.initialize(g->v_size);
+        _automorphism_supp.initialize(g->v_size);
+        for(int i = 0; i < g->v_size; ++i)
+            _automorphism.arr[i] = i;
+
+        mark_set touched_color;
+        work_list_t<int> touched_color_list;
+        touched_color.initialize(g->v_size);
+        touched_color_list.initialize(g->v_size);
+
+        invariant I1, I2;
+        I1.only_acc = true;
+        I2.only_acc = true;
+
+        refinement<int, int, int> R1;
+        bool certify = true;
+        int start_search_here = 0;
+        while(certify) {
+            // select a color class of size 2
+            bool only_discrete_prev = true;
+            int cell = -1;
+            for (int i = start_search_here; i < c1.ptn_sz;) {
+                if (c1.ptn[i] > 0 && only_discrete_prev) {
+                    start_search_here = i;
+                    only_discrete_prev = false;
+                }
+                if (c1.ptn[i] == 1) {
+                    cell = i;
+                    break;
+                }
+                i += c1.ptn[i] + 1;
+            }
+            if (cell == -1)
+                return;
+
+            touched_color.reset();
+            touched_color_list.reset();
+
+            const int ind_v1 = c1.lab[cell];
+            const int ind_v2 = c1.lab[cell + 1];
+            const int init_c1 = R1.individualize_vertex(&c1, ind_v1);
+
+            touched_color.set(cell);
+            touched_color.set(cell + 1);
+            touched_color_list.push_back(cell);
+            touched_color_list.push_back(cell + 1);
+
+            R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color, &touched_color_list);
+
+            const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
+            R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color, &touched_color_list);
+
+            if(I1.acc != I2.acc) {
+                for (int i = 0; i < g->v_size; ++i) {
+                    colmap[i] = c1.vertex_to_col[i];
+                }
+                I2.acc = I1.acc;
+                c2.copy(&c1);
+                continue;
+            }
+
+
+            _automorphism_supp.reset();
+            if(c1.cells != g->v_size) { // touched_colors doesn't work properly when early-out is used
+                // read automorphism
+                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                    const int i = touched_color_list.arr[j];
+                    if (c1.lab[i] != c2.lab[i]) {
+                        //if(c1.ptn[i] == 1) {
+                       //     std::cout << "(" << c1.lab[i] << ", " << c1.lab[i + 1] << ")" << "(" << c2.lab[i] << ", " << c2.lab[i + 1] << ")" << std::endl;
+                       // }
+                        if (colmap[c1.lab[i]] != colmap[c2.lab[i]])
+                            std::cout << "color mismatch" << std::endl;
+                        _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                        _automorphism_supp.push_back(c1.lab[i]);
+                    }
+                }
+                // reset c2 to c1
+                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                    const int i = touched_color_list.arr[j];
+                    if (c1.lab[i] != c2.lab[i]) {
+                        c2.lab[i] = c1.lab[i];
+                        c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
+                        c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+                    }
+                }
+            } else {
+                for (int i = 0; i < g->v_size; ++i) {
+                    if (c1.lab[i] != c2.lab[i]) {
+                        if (colmap[c1.lab[i]] != colmap[c2.lab[i]])
+                            std::cout << "color mismatch" << std::endl;
+                        _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                        _automorphism_supp.push_back(c1.lab[i]);
+
+                        c2.lab[i] = c1.lab[i];
+                        c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
+                        c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+                    }
+                }
+            }
+
+            certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+            assert(certify?R1.certify_automorphism(g, _automorphism.arr):true);
+            std::cout << "(pre-red) cell2-ir certify: " << certify << std::endl;
+            if(certify) {
+                pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr,
+                                     consume);
+                multiply_to_group_size(2);
+            }
+            reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+            automorphism_supp.reset();
+
+            if(certify) {
+                if(c1.cells == g->v_size) {
+                    for (int i = 0; i < g->v_size; ++i) {
+                        colmap[i] = c1.vertex_to_col[i];
+                    }
+                    break;
+                } else {
+                    for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                        const int c = touched_color_list.arr[j];
+                        int f = 0;
+                        while (f < c1.ptn[c] + 1) {
+                            colmap[c1.lab[c + f]] = c1.vertex_to_col[c1.lab[c + f]];
+                            ++f;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void pre_consumer_inplace(int _n, int* _automorphism, int _supp, int* _automorphism_supp, dejavu_consumer consume) {
+        automorphism_supp.reset();
+
+        for(int i = 0; i < _supp; ++i) {
+            const int v_from      = _automorphism_supp[i];
+            const int orig_v_from = translate_back(v_from);
+            const int v_to        = _automorphism[v_from];
+            assert(v_from != v_to);
+            const int orig_v_to   = translate_back(v_to);
+            assert(v_from >= 0);
+            assert(v_to >= 0);
+            assert(orig_v_from < rec.domain_size);
+            assert(orig_v_from >= 0);
+            assert(orig_v_to < rec.domain_size);
+            assert(orig_v_to >= 0);
+            assert(automorphism.arr[orig_v_from] == orig_v_from);
+            automorphism.arr[orig_v_from] = orig_v_to;
+            automorphism_supp.push_back(orig_v_from);
+
+            assert(rec.canonical_recovery_string[orig_v_to].size() == rec.canonical_recovery_string[orig_v_from].size());
+
+            for(int j = 0; j < rec.canonical_recovery_string[orig_v_to].size(); ++j) {
+                const int v_from_t = rec.canonical_recovery_string[orig_v_from][j];
+                const int v_to_t   = rec.canonical_recovery_string[orig_v_to][j];
+                assert(automorphism.arr[v_from_t] == v_from_t);
+                automorphism.arr[v_from_t] = v_to_t;
+                automorphism_supp.push_back(v_from_t);
+            }
+        }
+
+        consume(rec.domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+        reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+        automorphism_supp.reset();
+    }
+
     void pre_consumer(int _n, int* _automorphism, int _supp, int* _automorphism_supp, dejavu_consumer consume) {
         meld_translation_layers();
         automorphism_supp.reset();
@@ -1397,7 +1603,6 @@ public:
         consume(rec.domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         automorphism_supp.reset();
-
     }
 
     void reduce(sgraph* g, int* colmap, dejavu_consumer consume) {
@@ -1476,8 +1681,6 @@ public:
         perform_del2(g, colmap, &rec);
 
         // TODO: maybe degree 2, edge-colors
-        red_quotient_components(g, colmap, &rec, consume);
-        perform_del_edge(g, colmap, &rec);
 
         /*red_quotient_matchings_(g, colmap, &rec, consume);*/
 
@@ -1485,6 +1688,12 @@ public:
 
 
         // invariants: paths of length 2 for large regular components
+
+        cell2_ir(g, colmap, consume);
+        perform_del_discrete(g, colmap, &rec);
+
+        //red_quotient_components(g, colmap, &rec, consume); // TODO: bug on highschool1-aigio.dimacs
+        //perform_del_edge(g, colmap, &rec);
 
         if(g->v_size > 1) {
             int deg0 = 0;
@@ -1508,9 +1717,9 @@ public:
             std::cout << "(pre-red) after reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2 << std::endl;
             std::cout << "(pre-red) after reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
 
-            if (deg0 > 0 || deg1 > 0) {
+            while(deg0 > 0 || deg1 > 0) {
                 // refinement
-
+                std::cout << "(prep-red) loop" << std::endl;
                 coloring<int> c2;
                 refinement<int, int, int> R2;
                 g->initialize_coloring(&c2, colmap);
@@ -1520,12 +1729,47 @@ public:
                 red_deg10_assume_cref(g, &c2, &rec, consume);
                 copy_coloring_to_colmap(&c2, colmap);
                 perform_del(g, colmap, &rec);
+                perform_del_discrete(g, colmap, &rec);
+                //red_deg2_assume_cref(g, colmap, &rec, consume);
+                //perform_del2(g, colmap, &rec);
+
+                cell2_ir(g, colmap, consume);
+                perform_del_discrete(g, colmap, &rec);
+
+                {
+                    deg0 = 0;
+                    deg1 = 0;
+                    deg2 = 0;
+                    for (int i = 0; i < g->v_size; ++i) {
+                        switch (g->d[i]) {
+                            case 0:
+                                ++deg0;
+                                break;
+                            case 1:
+                                ++deg1;
+                                break;
+                            case 2:
+                                ++deg2;
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    std::cout << "(pre-red)[2] after reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2
+                              << std::endl;
+                    std::cout << "(pre-red)[2] after reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
+                }
+                break;
             }
         }
 
          //std::cout << "(pre-red) group size: " << rec.base << "*10^" << rec.exp << std::endl;
 
         g->sanity_check();
+
+
+        // TODO "degree one random probing": make some random individualizations, search for deg1 after deleting discrete
+        // TODO if color class of deg1 vertices = color class in original coloring, can remove those from graph?
 
         // TODO: multiple calls for now obviously independent components -- could use "buffer consumer" to translate domains
         // TODO: just use consumer for all the back-translation (just dont "restore"!): compactify translation layers here for this

@@ -151,6 +151,14 @@ void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_ti
     finished = true;
 }
 
+void empty_consumer(int n, const int * p, int support, const int *) {
+    /*bijection<int> test_p;
+    test_p.read_from_array(p, n);
+    const bool test_auto = test_R.certify_automorphism(&test_graph, &test_p); // TODO: sparse automorphism certification?
+    assert(test_auto);*/
+    //std::cout << "automorphism support " << support << std::endl;
+    return;
+}
 
 void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
@@ -162,9 +170,16 @@ void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_
         acc += g->e[i];
     }
 
+    /*if(colmap == nullptr) {
+        colmap = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i) {
+            colmap[i] = 0;
+        }
+    }*/
+
     Clock::time_point timer = Clock::now();
     config.CONFIG_IR_WRITE_GROUPORDER = true;
-    dejavu_automorphisms(g, colmap, nullptr);
+    dejavu_automorphisms(g, colmap, empty_consumer);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }
@@ -449,7 +464,8 @@ int commandline_mode(int argc, char **argv) {
    // p.parse_dimacs_file_digraph(filename, g);
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    p.parse_dimacs_file(filename, g, &colmap);
+    //p.parse_dimacs_file(filename, g, &colmap);
+    p.parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
         /*bijection<int> pr;
@@ -465,25 +481,6 @@ int commandline_mode(int argc, char **argv) {
         _g = g;
     }
 
-    if(comp_dejavu) {
-        std::cout << "------------------------------------------------------------------" << std::endl;
-        std::cout << "dejavu" << std::endl;
-        std::cout << "------------------------------------------------------------------" << std::endl;
-    }
-
-    double dejavu_solve_time;
-    if(comp_dejavu) {
-        finished = false;
-        std::thread killer;
-        if(timeout > 0)
-            killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-        bench_dejavu(_g, colmap, &dejavu_solve_time);
-        if(timeout > 0)
-            killer.join();
-    }
-    if(comp_dejavu) {
-        std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
-    }
     if(comp_nauty) {
         std::cout << "------------------------------------------------------------------" << std::endl;
         std::cout << "nauty" << std::endl;
@@ -542,6 +539,27 @@ int commandline_mode(int argc, char **argv) {
     if(comp_saucy) {
         std::cout << "Solve time: " << saucy_solve_time / 1000000.0 << "ms" << std::endl;
     }
+
+    if(comp_dejavu) {
+        std::cout << "------------------------------------------------------------------" << std::endl;
+        std::cout << "dejavu" << std::endl;
+        std::cout << "------------------------------------------------------------------" << std::endl;
+    }
+
+    double dejavu_solve_time;
+    if(comp_dejavu) {
+        finished = false;
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
+        bench_dejavu(_g, colmap, &dejavu_solve_time);
+        if(timeout > 0)
+            killer.join();
+    }
+    if(comp_dejavu) {
+        std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
+    }
+
     // std::cout << "Compare (nauty): " << nauty_solve_time / dejavu_solve_time << std::endl;
     // std::cout << "Compare (Traces): " << traces_solve_time / dejavu_solve_time << std::endl;
 
