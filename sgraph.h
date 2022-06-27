@@ -53,16 +53,18 @@ public:
     // initialize a coloring of this sgraph, partitioning degrees of vertices
     void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
         c->alloc(this->v_size);
-        for(int i = 0; i < v_size; i++) {
-            c->lab[i] = i;
-        }
-
         std::memset(c->ptn, 1, sizeof(int) * v_size);
+
+        if(v_size == 0)
+            return;
 
         int cells = 0;
         int last_new_cell   = 0;
 
         if(vertex_to_col == nullptr) {
+            for(int i = 0; i < v_size; i++) {
+                c->lab[i] = i;
+            }
             std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
             for(int i = 0; i < c->lab_sz; i++) {
                 c->vertex_to_col[c->lab[i]] = last_new_cell;
@@ -74,7 +76,7 @@ public:
                     break;
                 }
                 assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
-                if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]) {
+                if(this->d[c->lab[i]] != this->d[c->lab[i + 1]]) {
                     c->ptn[i] = 0;
                     cells += 1;
                     c->ptn[last_new_cell] = i - last_new_cell;
@@ -83,7 +85,78 @@ public:
                 }
             }
         } else {
-            std::stable_sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));
+            int col = 0;
+
+            int min_col = INT32_MAX;
+            int max_col = INT32_MIN;
+            for(int i = 0; i < v_size; i++) {
+                if(vertex_to_col[i] < min_col)
+                    min_col = vertex_to_col[i];
+                if(vertex_to_col[i] > max_col)
+                    max_col = vertex_to_col[i];
+            }
+
+            std::vector<int> colsize;
+            colsize.reserve(std::min(this->v_size, (max_col - min_col)  + 1));
+
+            if(min_col < 0 || max_col > this->v_size) {
+                std::unordered_map<int, int> colors; // TODO: should not use unordered_map!
+                colors.reserve(this->v_size);
+                for (int i = 0; i < v_size; i++) {
+                    auto it = colors.find(vertex_to_col[i]);
+                    if (it == colors.end()) {
+                        colors.insert(std::pair<int, int>(vertex_to_col[i], col));
+                        colsize.push_back(1);
+                        assert(col < this->v_size);
+                        vertex_to_col[i] = col;
+                        ++col;
+                    } else {
+                        const int found_col = it->second;
+                        assert(found_col < this->v_size);
+                        vertex_to_col[i] = found_col;
+                        ++colsize[found_col];
+                    }
+                }
+            } else {
+                std::vector<int> colors;
+                colors.reserve(max_col + 1);
+                for(int i = 0; i < max_col + 1; ++i)
+                    colors.push_back(-1);
+                for (int i = 0; i < v_size; i++) {
+                    if (colors[vertex_to_col[i]] == -1) {
+                        colors[vertex_to_col[i]] = col;
+                        colsize.push_back(1);
+                        assert(col < this->v_size);
+                        vertex_to_col[i] = col;
+                        ++col;
+                    } else {
+                        const int found_col = colors[vertex_to_col[i]];
+                        assert(found_col < this->v_size);
+                        vertex_to_col[i] = found_col;
+                        ++colsize[found_col];
+                    }
+                }
+            }
+
+            int increment = 0;
+            for(int i = 0; i < colsize.size(); i++) {
+                const int col_sz = colsize[i];
+                colsize[i] += increment;
+                increment += col_sz;
+            }
+            assert(increment == v_size);
+
+            for(int i = 0; i < v_size; i++) {
+                const int v_col     = vertex_to_col[i];
+                --colsize[v_col];
+                const int v_lab_pos = colsize[v_col];
+                c->lab[v_lab_pos] = i;
+            }
+
+            /*for(int i = 0; i < v_size; i++) {
+                c->lab[i] = i;
+            }
+            std::sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));*/
             for(int i = 0; i < c->lab_sz; i++) {
                 c->vertex_to_col[c->lab[i]] = last_new_cell;
                 c->vertex_to_lab[c->lab[i]] = i;
@@ -96,7 +169,7 @@ public:
                 //assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
                 //if(this->d[c->lab[i]] < this->d[c->lab[i + 1]]  || (this->d[c->lab[i]] == this->d[c->lab[i + 1]]
                 //&& (vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]))) {
-                if(vertex_to_col[c->lab[i]] < vertex_to_col[c->lab[i + 1]]) {
+                if(vertex_to_col[c->lab[i]] != vertex_to_col[c->lab[i + 1]]) {
                     c->ptn[i] = 0;
                     cells += 1;
                     c->ptn[last_new_cell] = i - last_new_cell;
@@ -107,7 +180,6 @@ public:
         }
 
         c->cells = cells;
-        //std::cout << "Cells after initialize: " << cells << std::endl;
     }
 
     void initialize_coloring_raw(coloring<vertex_t> *c) {
