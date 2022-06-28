@@ -153,6 +153,8 @@ private:
                     if (g->d[v_child_next] != 2) {
                         // v_child_next is endpoint2
                         endpoint2 = v_child_next;
+                        if(endpoint1 == endpoint2)
+                            cycle = true;
                         break;
                     }
                     assert(!path_done.get(v_child_next));
@@ -173,7 +175,7 @@ private:
                 }
                 //std::cout << endpoint1 << "<-->" << endpoint2 << std::endl;
             } else {
-                std::cout << "cycle" << std::endl;
+                //std::cout << "cycle" << std::endl;
             }
 
             if(!cycle) {
@@ -396,7 +398,7 @@ private:
     void write_canonical_recovery_string_to_automorphism(const int from, const int to) {
         assert(rec.canonical_recovery_string[from].size() == rec.canonical_recovery_string[to].size());
         for(int i = 0; i < rec.canonical_recovery_string[to].size(); ++i) {
-            std::cout << i << std::endl;
+            //std::cout << i << std::endl;
             const int str_from = rec.canonical_recovery_string[from][i];
             const int str_to = rec.canonical_recovery_string[to][i];
             automorphism.arr[str_to]   = str_from;
@@ -405,6 +407,27 @@ private:
             automorphism_supp.push_back(str_to);
         }
         return;
+    }
+
+    void write_deg1_parent_to_map(sgraph* g, work_list_t<std::pair<int, int>>* stack1, work_list_t<int>* map, work_list_t<int>* childlist, work_list_t<int>* childcount, const int parent, const int child_from) {
+        stack1->reset();
+        map->reset();
+        map->push_back(child_from);
+        stack1->push_back(std::pair<int, int>(g->v[child_from], g->v[child_from] + childcount->arr[child_from]));
+        while(!stack1->empty()) {
+            std::pair<int, int> from_to = stack1->pop_back();
+            int from       = from_to.first;
+            const int to   = from_to.second;
+            for(int f = from; f < to; ++f) {
+                const int next = childlist->arr[f];
+                const int from_next = g->v[next];
+                const int to_next = g->v[next] + childcount->arr[next];
+                map->push_back(next);
+                assert(next != parent);
+                if (from_next != to_next)
+                    stack1->push_back(std::pair<int, int>(from_next, to_next));
+            }
+        }
     }
 
     void red_deg10_assume_cref(sgraph* g, const coloring<int>* c, recovery_map* rec, dejavu_consumer consume) {
@@ -423,13 +446,13 @@ private:
             g_old_d2.push_back(g->d[i]);
         }
 
+        work_list_t<int> pair_match;
+        pair_match.initialize(g->v_size);
+
         work_list_t<int> parentlist;
         parentlist.initialize(g->v_size);
         work_list_t<int> childlist;
         childlist.initialize(g->e_size);
-        //for(int i = 0; i < g->e_size; ++i) {
-        //    childlist.arr[i] = g->e[i];
-        //}
 
         work_list_t<int> childcount;
         childcount.initialize(g->v_size);
@@ -468,6 +491,8 @@ private:
 
             const int v_child_col = c->vertex_to_col[v_child];
             const int child_col_sz = c->ptn[v_child_col] + 1;
+            bool is_pairs = false;
+            bool permute_parents_instead = false;
             //std::cout << "col " << v_child_col << "(" << child_col_sz << ")" << " from vertex " << v_child << std::endl;
             if(child_col_sz == 1) { // TODO this can never be mapped, this is bloat... should handle before?
                 rec->del.set(v_child);
@@ -475,18 +500,15 @@ private:
             } else {
                 parentlist.reset();
                 is_parent.reset();
-                bool is_pairs = false;
                 for (int i = v_child_col; i < v_child_col + child_col_sz; ++i) {
                     int child = c->lab[i];
-                    //assert(workspace_d[child] == 1);
-                    // TODO: need special code for pairs in same color class
 
                     // search for parent
                     const int e_pos_child = g->v[child];
                     int parent = g->e[e_pos_child];
 
-                    //if(is_pairs && rec->del1.get(parent))
-                    //    continue;
+                    if(is_pairs && rec->del.get(child))
+                        continue;
 
                     int search_parent = 0;
                     while (rec->del.get(parent)) {
@@ -494,12 +516,18 @@ private:
                         parent = g->e[e_pos_child + search_parent];
                     }
 
-                    if(c->vertex_to_col[parent] == c->vertex_to_col[child]) { // dual-color pairs? not an issue...
+                    assert(is_pairs?c->vertex_to_col[parent] == c->vertex_to_col[child]:true);
+                    if(c->vertex_to_col[parent] == c->vertex_to_col[child]) {
                         is_pairs = true;
-                        //std::cout << "pair" << std::endl;
-                        //rec->del1.set(child);
-                        //rec->del1.set(parent);
-                        //std::cout << "yeah that probably doesn't work" << std::endl;
+                        rec->del.set(child);
+                        rec->del.set(parent);
+                        pair_match.arr[child] = parent;
+                        pair_match.arr[parent] = child;
+                        if(parent < child) {
+                            parentlist.push_back(parent);
+                        } else {
+                            parentlist.push_back(child);
+                        }
                         continue;
                     }
 
@@ -527,15 +555,138 @@ private:
                 }
             }
 
+            if(is_pairs) {
+                for(int j = 0; j < parentlist.cur_pos; ++j) {
+                    const int first_pair_parent = parentlist.arr[j];
+                    const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                    const int pair_to = pair_match.arr[pair_from];
+
+                    stack1.reset();
+                    map.reset();
+                    map.push_back(pair_from);
+                    stack1.push_back(std::pair<int, int>(g->v[pair_from], g->v[pair_from] + childcount.arr[pair_from]));
+                    while (!stack1.empty()) {
+                        std::pair<int, int> from_to = stack1.pop_back();
+                        int from = from_to.first;
+                        const int to = from_to.second;
+                        for (int f = from; f < to; ++f) {
+                            const int next = childlist.arr[f];
+                            const int from_next = g->v[next];
+                            const int to_next = g->v[next] + childcount.arr[next];
+                            map.push_back(next);
+                            assert(next != pair_to);
+                            if (from_next != to_next)
+                                stack1.push_back(std::pair<int, int>(from_next, to_next));
+                        }
+                    }
+
+                    ////////////////////
+                    multiply_to_group_size(2);
+
+                    assert(c->vertex_to_col[pair_from] == c->vertex_to_col[pair_to]);
+                    assert(pair_from != pair_to);
+                    int pos = 0;
+
+                    automorphism_supp.reset();
+                    // descending tree of child_to while writing automorphism
+                    stack1.reset();
+                    assert(map.arr[pos] != pair_to);
+                    const int to_1 = translate_back(pair_to);
+                    const int from_1 = translate_back(map.arr[pos]);
+                    assert(automorphism.arr[to_1] == to_1);
+                    assert(automorphism.arr[from_1] == from_1);
+                    automorphism.arr[from_1] = to_1;
+                    automorphism.arr[to_1] = from_1;
+                    automorphism_supp.push_back(from_1);
+                    automorphism_supp.push_back(to_1);
+                    write_canonical_recovery_string_to_automorphism(to_1, from_1);
+                    ++pos;
+                    // child_to and child_from could have canonical strings when translated back
+                    assert(childcount.arr[pair_to] == childcount.arr[pair_from]);
+                    stack1.push_back(std::pair<int, int>(g->v[pair_to], g->v[pair_to] + childcount.arr[pair_to]));
+                    while (!stack1.empty()) {
+                        std::pair<int, int> from_to = stack1.pop_back();
+                        int from = from_to.first;
+                        const int to = from_to.second;
+                        for (int f = from; f < to; ++f) {
+                            const int next = childlist.arr[f];
+                            const int from_next = g->v[next];
+                            const int to_next = g->v[next] + childcount.arr[next];
+                            ++from;
+                            assert(next >= 0);
+                            assert(next < g->v_size);
+                            assert(map.arr[pos] != next);
+
+                            const int to_2 = translate_back(next);
+                            const int from_2 = translate_back(map.arr[pos]);
+                            assert(automorphism.arr[to_2] == to_2);
+                            assert(automorphism.arr[from_2] == from_2);
+                            automorphism.arr[from_2] = to_2;
+                            automorphism.arr[to_2] = from_2;
+                            automorphism_supp.push_back(from_2);
+                            automorphism_supp.push_back(to_2);
+                            write_canonical_recovery_string_to_automorphism(to_2, from_2);
+                            ++pos;
+                            if (from_next != to_next) // there was a semicolon here, should have been bug
+                                stack1.push_back(std::pair<int, int>(from_next, to_next));
+                        }
+                    }
+
+                    assert(pos == map.cur_pos);
+
+                    assert(g_old_d2[pair_to] == 1);
+                    assert(g_old_d2[pair_from] == 1);
+                    assert(rec->del.get(pair_to));
+                    assert(rec->del.get(pair_from));
+                    consume(g->v_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+                    reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+                    automorphism_supp.reset();
+                    /////////////////////
+                }
+
+                for(int j = 0; j < parentlist.cur_pos; ++j) {
+                    const int first_pair_parent = parentlist.arr[j];
+                    const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                    const int pair_to = pair_match.arr[pair_from];
+
+                    const int original_parent = translate_back(first_pair_parent);
+                    rec->canonical_recovery_string[original_parent].push_back(translate_back(pair_to));
+                }
+
+                permute_parents_instead = true;
+
+                //while(parentlist.empty());
+                //parentlist.reset();
+                //continue;
+            }
+
+            //int __cnt = 0;
             while(!parentlist.empty()) {
-                const int parent = parentlist.pop_back();
-                const int childcount_from = childcount_prev.arr[parent];
-                const int childcount_to   = childcount.arr[parent];
+                //std::cout << __cnt << ", " << permute_parents_instead << std::endl;
+                //++__cnt;
+
+                int parent, childcount_from, childcount_to, child_from;
+                if(!permute_parents_instead) {
+                    parent = parentlist.pop_back();
+                    childcount_from = childcount_prev.arr[parent];
+                    childcount_to = childcount.arr[parent];
+                } else {
+                    parent = -1;
+                    childcount_from = 0;
+                    childcount_to = parentlist.cur_pos;
+                }
                 // automorphism 1: long cycle (c1 ... cn)
                 assert(childcount_to - childcount_from > 0);
-                if(childcount_to - childcount_from == 1)
+                if(childcount_to - childcount_from == 1) {
+                    if(permute_parents_instead)
+                        break;
                     continue;
-                int child_from = childlist.arr[g->v[parent] + childcount_from];
+                }
+                if(!permute_parents_instead) {
+                    child_from = childlist.arr[g->v[parent] + childcount_from];
+                } else {
+                    child_from = parentlist.arr[0];
+                }
 
                 // descending tree of child_from while writing map
                 stack1.reset();
@@ -560,7 +711,12 @@ private:
                 for(int i = childcount_from + 1; i < childcount_to; ++i) {
                     multiply_to_group_size(j);
                     ++j;
-                    const int child_to = childlist.arr[g->v[parent] + i];
+                    int child_to;
+                    if(!permute_parents_instead) {
+                        child_to = childlist.arr[g->v[parent] + i];
+                    } else {
+                        child_to = parentlist.arr[i];
+                    }
                     assert(c->vertex_to_col[child_from] == c->vertex_to_col[child_to]);
                     assert(child_from != child_to);
                     int pos = 0;
@@ -619,6 +775,9 @@ private:
                     consume(g->v_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     automorphism_supp.reset();
+                }
+                if(permute_parents_instead) {
+                    break;      // :-)
                 }
             }
             parentlist.reset();
@@ -989,7 +1148,7 @@ private:
 
         // make graph smaller using the translation array
         int epos  = 0;
-        for (int i = 0; i < g->v_size; ++i) {
+        for (int i = 0; i < g->v_size; ++i) { // TODO: maybe iterate over new_vsize and use backward array?
             const int old_v = i;
             //const int new_v = rec->translation_layers[fwd_ind][i];
             const int new_v = translate_layer_fwd[i];
@@ -1433,13 +1592,16 @@ public:
         }
     }
 
-    void sparse_ir(sgraph*g, int* colmap, dejavu_consumer consume) {
+    void sparse_ir_col_sz_2(sgraph*g, int* colmap, dejavu_consumer consume) {
         // TODO: ORBITS!
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
         int selector_seed = seed;
 
         coloring<int> c1;
         g->initialize_coloring(&c1, colmap); // could re-order to reduce overhead when not applicable
+        for(int i = 0; i < g->v_size; ++i)
+            colmap[i] = c1.vertex_to_col[i];
+
         coloring<int> c2;
         c2.copy(&c1);
 
@@ -1514,6 +1676,7 @@ public:
                 for (int j = 0; j < touched_color_list.cur_pos; ++j) {
                     const int i = touched_color_list.arr[j];
                     if (c1.lab[i] != c2.lab[i]) {
+                        // TODO: what if color is larger than 1?
                         //if(c1.ptn[i] == 1) {
                        //     std::cout << "(" << c1.lab[i] << ", " << c1.lab[i + 1] << ")" << "(" << c2.lab[i] << ", " << c2.lab[i + 1] << ")" << std::endl;
                        // }
@@ -1545,21 +1708,20 @@ public:
                 // reset c2 to c1
                 if(c1.cells != g->v_size) {
                     for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                        const int i = touched_color_list.arr[j];
-                        if (c1.lab[i] != c2.lab[i]) {
-                            c2.lab[i] = c1.lab[i];
-                            c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
-                            c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+                        const int _c = touched_color_list.arr[j];
+                        int f = 0;
+                        while (f < c1.ptn[_c] + 1) {
+                            const int i = _c + f;
+                            ++f;
+                            if (c1.lab[i] != c2.lab[i]) {
+                                c2.lab[i] = c1.lab[i];
+                                c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
+                                c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+                            }
                         }
                     }
                 } else {
-                    for (int i = 0; i < g->v_size; ++i) {
-                        if (c1.lab[i] != c2.lab[i]) {
-                            c2.lab[i] = c1.lab[i];
-                            c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
-                            c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
-                        }
-                    }
+                    //std::cout << "this here" << std::endl;
                 }
             } else {
                 touched_color.reset();
@@ -1617,8 +1779,10 @@ public:
                 reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                 _automorphism_supp.reset();
 
-                for(int i = 0; i < g->v_size; ++i) {
-                    colmap[i] = save_colmap[i];
+                if(certify) {
+                    for (int i = 0; i < g->v_size; ++i) {
+                        colmap[i] = save_colmap[i];
+                    }
                 }
 
                 return;
@@ -1632,13 +1796,13 @@ public:
                     for (int i = 0; i < g->v_size; ++i) {
                         colmap[i] = c1.vertex_to_col[i];
                     }
-                    break;
                 } else {
                     for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                        const int c = touched_color_list.arr[j];
+                        const int _c = touched_color_list.arr[j];
                         int f = 0;
-                        while (f < c1.ptn[c] + 1) {
-                            colmap[c1.lab[c + f]] = c1.vertex_to_col[c1.lab[c + f]];
+                        while (f < c1.ptn[_c] + 1) {
+                            assert(c1.vertex_to_col[c1.lab[_c + f]] == _c);
+                            colmap[c1.lab[_c + f]] = c1.vertex_to_col[c1.lab[_c + f]];
                             ++f;
                         }
                     }
@@ -1647,7 +1811,7 @@ public:
         }
     }
 
-    void sparse_ir_but_better(sgraph*g, int* colmap, dejavu_consumer consume) {
+    void sparse_ir(sgraph*g, int* colmap, dejavu_consumer consume) {
         // TODO: orbits?
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
         int selector_seed = seed;
@@ -1948,6 +2112,8 @@ public:
         mark_discrete_for_deletion(g, colmap, &rec);
         perform_del(g, colmap, &rec);
 
+        // TODO: reduce the number of del's performed and rather sparsify routines
+
         // eliminate discrete colors
         //perform_del_discrete(g, colmap, &rec);
 
@@ -1960,10 +2126,10 @@ public:
 
         // invariants: paths of length 2 for large regular components
 
-        sparse_ir(g, colmap, consume);
+        sparse_ir_col_sz_2(g, colmap, consume);
         perform_del_discrete(g, colmap, &rec);
 
-        sparse_ir(g, colmap, consume);
+        sparse_ir_col_sz_2(g, colmap, consume);
         perform_del_discrete(g, colmap, &rec);
 
         // eliminate degree 2, no edge-colors
@@ -1971,11 +2137,11 @@ public:
         perform_del2(g, colmap, &rec);
         rec.del.reset();
 
-        red_deg2_assume_cref(g, colmap, &rec, consume);
-        perform_del2(g, colmap, &rec);
+        //red_deg2_assume_cref(g, colmap, &rec, consume);
+        //perform_del2(g, colmap, &rec);
 
-        red_deg2_assume_cref(g, colmap, &rec, consume);
-        perform_del2(g, colmap, &rec);
+        //red_deg2_assume_cref(g, colmap, &rec, consume);
+        //perform_del2(g, colmap, &rec);
 
         //red_quotient_components(g, colmap, &rec, consume); // TODO: bug on highschool1-aigio.dimacs
         //perform_del_edge(g, colmap, &rec);
@@ -2019,7 +2185,7 @@ public:
                 //red_deg2_assume_cref(g, colmap, &rec, consume);
                 //perform_del2(g, colmap, &rec);
 
-                sparse_ir(g, colmap, consume);
+                //sparse_ir_col_sz_2(g, colmap, consume);
                 perform_del_discrete(g, colmap, &rec);
 
                 {

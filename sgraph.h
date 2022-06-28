@@ -99,7 +99,7 @@ public:
             std::vector<int> colsize;
             colsize.reserve(std::min(this->v_size, (max_col - min_col)  + 1));
 
-            if(min_col < 0 || max_col > this->v_size) {
+            if(min_col < 0 || max_col > 4*this->v_size) {
                 std::unordered_map<int, int> colors; // TODO: should not use unordered_map!
                 colors.reserve(this->v_size);
                 for (int i = 0; i < v_size; i++) {
