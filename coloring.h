@@ -136,6 +136,12 @@ public:
         }
     };
 
+    void copy_ptn(coloring<vertex_t> *c) {
+        assert(init);
+        assert(c->init);
+        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(vertex_t));
+    }
+
     void copy(coloring<vertex_t> *c) {
         if(init) {
             if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
