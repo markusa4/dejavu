@@ -319,6 +319,42 @@ public:
         return sm_col;
     }
 
+    int next_cell(work_set_int* queue_pointer, coloring<vertex_t>* c, work_list_t<int>* singleton_hint) {
+        // use singleton_hint
+        int sm_j = -1;
+        while(!singleton_hint->empty()) {
+            const int next_hint = singleton_hint->pop_back();
+            sm_j = queue_pointer->get(next_hint);
+            if(sm_j == -1)
+                continue;
+            else
+                break;
+        }
+
+        // look at first 12 positions and pick the (first) smallest cell within these entries
+        if(sm_j == -1) {
+            sm_j = cur_pos - 1;
+            for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
+                //bool smaller_d = g->d[arr[j]] > g->d[arr[sm_j]];
+                const int size_sm_j = c->ptn[arr[sm_j]];
+                if (c->ptn[size_sm_j] == 0)
+                    break;
+                const bool smaller = (c->ptn[arr[j]] < size_sm_j);
+                //bool eq        = (c->ptn[arr[j]] == c->ptn[arr[sm_j]]);
+                sm_j = smaller ? j : sm_j;
+            }
+        }
+
+        // swap sm_j and j
+        const int sm_col = arr[sm_j];
+        arr[sm_j] = arr[cur_pos - 1];
+        queue_pointer->set(arr[sm_j], sm_j);
+
+        cur_pos--;
+        queue_pointer->set(sm_col, -1);
+        return sm_col;
+    }
+
     void replace_cell(work_set_int* queue_pointer, int col_old, int col) {
         const int pos = queue_pointer->get(col_old);
         arr[pos] = col;
@@ -581,25 +617,34 @@ public:
     bool refine_coloring_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
                                int init_color_class) {
         assure_initialized(g);
+        singleton_hint.reset();
 
         cell_todo.reset(&queue_pointer);
 
         if(init_color_class < 0) {
             for (int i = 0; i < c->ptn_sz;) {
                 cell_todo.add_cell(&queue_pointer, i);
-                i += c->ptn[i] + 1;
+                const int col_sz = c->ptn[i];
+                if(col_sz == 0) {
+                    singleton_hint.push_back(i);
+                }
+                i += col_sz + 1;
             }
         } else {
             cell_todo.add_cell(&queue_pointer, init_color_class);
         }
-        int its = 0;
 
         while(!cell_todo.empty()) {
-            its += 1;
             color_class_splits.reset();
-            const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
+            const int next_color_class = cell_todo.next_cell(&queue_pointer, c, &singleton_hint);
             const int next_color_class_sz = c->ptn[next_color_class] + 1;
-            const bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+            bool dense_dense = false;
+            //if(g->d[c->lab[next_color_class]] == 0) {
+             //   continue;
+            //}
+            if(g->d[c->lab[next_color_class]] > 5) {
+                dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+            }
 
             if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
                 // singleton
@@ -619,8 +664,6 @@ public:
             }
 
             // add all new classes except for the first, largest one
-            int skip = 0;
-
             int  latest_old_class = -1;
             bool skipped_largest = false;
 
@@ -652,7 +695,6 @@ public:
                 if(c->cells == g->v_size) {
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
-                    // assert(assert_is_equitable(g, c));
                     return true;
                 }
 
@@ -667,14 +709,17 @@ public:
 
                 if(skipped_largest || !is_largest) {
                     cell_todo.add_cell(&queue_pointer, new_class);
+                    if(new_class_sz == 1)
+                        singleton_hint.push_back(new_class);
                 } else {
                     skipped_largest = true;
-                    skip += 1;
 
                     // since old color class will always appear last, the queue pointer of old color class is still valid!
                     int i = queue_pointer.get(old_class);
                     if(i >= 0) {
                         cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                        if(new_class_sz == 1)
+                            singleton_hint.push_back(new_class);
                     }
                 }
             }
@@ -895,7 +940,8 @@ private:
     work_set_t<vertex_t>   color_vertices_considered;
     work_set_t<vertex_t>   neighbours; // degree type instead?
     work_set_t<vertex_t>   neighbour_sizes;
-    work_list_t<vertex_t>  singletons;
+    //work_list_t<vertex_t>  singletons;
+    work_list_t<vertex_t>  singleton_hint;
     work_list_t<vertex_t>  old_color_classes;
     work_list_pair_bool    color_class_splits;
 
@@ -909,8 +955,9 @@ private:
             // reducing contention on heap allocator through bulk allocation...
             workspace_int = new int[n * 2];
 
-            vertex_worklist.initialize(n * 2);
-            singletons.initialize(n);
+            vertex_worklist.initialize(n*2);
+            //singletons.initialize(n);
+            singleton_hint.initialize(n);
             old_color_classes.initialize(n);
             neighbours.initialize(n);
             neighbour_sizes.initialize(n);
@@ -921,7 +968,7 @@ private:
             scratch_set.initialize_from_array(workspace_int + n, n);
 
             color_class_splits.initialize(n);
-            cell_todo.initialize(n * 2);
+            cell_todo.initialize(n*2);
 
             memset(scratch, 0, n * sizeof(vertex_t));
             initialized = true;
@@ -942,7 +989,7 @@ private:
         cc = color_class; // iterate over color class
         comp = true;
 
-        singletons.reset();
+        //singletons.reset();
         scratch_set.reset();
         old_color_classes.reset();
         neighbours.reset();
@@ -1834,7 +1881,7 @@ private:
                                          int color_class, int class_size,
                                          work_list_pair_bool* color_class_split_worklist) {
         bool comp;
-        int i, cc, v_new_color, largest_color_class_size, acc;
+        int v_new_color, cc, largest_color_class_size, acc;
 
         cc = color_class; // iterate over color class
         comp = true;
@@ -1849,7 +1896,7 @@ private:
             const int vc = c->lab[cc];
             const int pe = g->v[vc];
             const int end_i = pe + g->d[vc];
-            for (i = pe; i < end_i; i++) {
+            for (int i = pe; i < end_i; i++) {
                 const int v   = g->e[i];
                 const int col = c->vertex_to_col[v];
 
@@ -1879,7 +1926,7 @@ private:
             vertex_worklist.reset();
 
             int total = 0;
-            for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
+            for(int i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
                 const int v = scratch[_col + i];
                 int index = neighbours.get(v) + 1;
                 total += 1;
@@ -1901,7 +1948,7 @@ private:
             // determine colors
             vertex_worklist.reset();
 
-            for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
+            for(int i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
                 const int v = scratch[_col + i];
                 if (neighbours.get(v) == -1) {
                     v_new_color = _col; assert(false);
@@ -1922,26 +1969,27 @@ private:
             // rearrange vertices
             while (!vertex_worklist.empty()) {
                 const int v           = vertex_worklist.pop_back();
-                const int v_new_color = vertex_worklist.pop_back();
+                const int v_new_color2 = vertex_worklist.pop_back();
 
                 const int vertex_old_pos = c->vertex_to_lab[v];
-                const int vertex_at_pos  = c->lab[v_new_color + c->ptn[v_new_color] + 1];
+                const int vertex_at_pos  = c->lab[v_new_color2 + c->ptn[v_new_color2] + 1];
                 c->lab[vertex_old_pos]          = vertex_at_pos;
                 c->vertex_to_lab[vertex_at_pos] = vertex_old_pos;
 
-                c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
-                c->vertex_to_col[v] = v_new_color;
-                c->vertex_to_lab[v] = v_new_color + c->ptn[v_new_color] + 1;
-                c->ptn[v_new_color] += 1;
+                c->lab[v_new_color2 + c->ptn[v_new_color2] + 1] = v;
+                c->vertex_to_col[v] = v_new_color2;
+                c->vertex_to_lab[v] = v_new_color2 + c->ptn[v_new_color2] + 1;
+                c->ptn[v_new_color2] += 1;
 
-                if (_col != v_new_color) {
-                    assert(v_new_color > _col);
+                if (_col != v_new_color2) {
+                    assert(v_new_color2 > _col);
                     c->ptn[_col] -= 1;
                 } else assert(false);
             }
 
             // add new colors to worklist
             largest_color_class_size = -1;
+            int i;
             for(i = _col; i < _col + _col_sz;) {
                 assert(i >= 0 && i < c->ptn_sz);
                 assert(c->ptn[i] + 1 > 0);

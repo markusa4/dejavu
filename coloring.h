@@ -97,32 +97,35 @@ public:
     }
 
     void alloc(int sz) {
-        if(!init) {
-            std::pair<vertex_t*, vertex_t*> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(sz * 4);
-            bulk_alloc = alloc.first;
-            bulk_pt    = alloc.second;
+        if(config.CONFIG_BULK_ALLOCATOR) {
+            if (!init) {
+                std::pair<vertex_t *, vertex_t *> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(sz * 4);
+                bulk_alloc = alloc.first;
+                bulk_pt = alloc.second;
 
-            lab           = bulk_pt;
-            ptn           = lab + sz;
-            vertex_to_col = lab + sz * 2;
-            vertex_to_lab = lab + sz * 3;
-            efficient_alloc = true;
-            init = true;
+                lab = bulk_pt;
+                ptn = lab + sz;
+                vertex_to_col = lab + sz * 2;
+                vertex_to_lab = lab + sz * 3;
+                efficient_alloc = true;
+                init = true;
 
-            lab_sz = sz;
-            ptn_sz = sz;
+                lab_sz = sz;
+                ptn_sz = sz;
+            }
+        } else {
+            if (!init) {
+                lab = new vertex_t[sz];
+                ptn = new vertex_t[sz];
+                vertex_to_col = new vertex_t[sz];
+                vertex_to_lab = new vertex_t[sz];
+                efficient_alloc = false;
+                init = true;
+
+                lab_sz = sz;
+                ptn_sz = sz;
+            }
         }
-        /*if(!init) {
-            lab           = new vertex_t[sz];
-            ptn           = new vertex_t[sz];
-            vertex_to_col = new vertex_t[sz];
-            vertex_to_lab = new vertex_t[sz];
-            efficient_alloc = false;
-            init = true;
-
-            lab_sz = sz;
-            ptn_sz = sz;
-        }*/
     }
 
     void dealloc() {

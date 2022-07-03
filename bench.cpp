@@ -160,7 +160,7 @@ void empty_consumer(int n, const int * p, int support, const int *) {
     return;
 }
 
-void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
+int bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     int acc = 0;
     for(int i = 0; i < g->v_size; ++i) {
@@ -170,18 +170,19 @@ void bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_
         acc += g->e[i];
     }
 
-    /*if(colmap == nullptr) {
-        colmap = new int[g->v_size];
+    if(colmap != nullptr) {
         for(int i = 0; i < g->v_size; ++i) {
-            colmap[i] = 0;
+            acc += colmap[i];
         }
-    }*/
+    }
 
     Clock::time_point timer = Clock::now();
     config.CONFIG_IR_WRITE_GROUPORDER = true;
     dejavu_automorphisms(g, colmap, empty_consumer);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
+
+    return acc;
 }
 
 int test_cycle = 0;

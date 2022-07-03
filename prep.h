@@ -38,8 +38,6 @@ class preprocessor {
     std::vector<int> translate_layer_fwd;
     std::vector<int> translate_layer_bwd;
 
-    work_list_t<int> v_to_component;
-
     std::vector<int> quotient_component_worklist_col;
     std::vector<int> quotient_component_worklist_col_sz;
     std::vector<int> quotient_component_worklist_v;
@@ -70,6 +68,9 @@ private:
     }
 
     void red_deg2_path_size_1(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+        if(g->v_size <= 1)
+            return;
+
         rec->del.reset();
 
         int found_match = 0;
@@ -623,7 +624,6 @@ private:
     }
 
     void red_deg10_assume_cref(sgraph* g, const coloring<int>* c, recovery_map* rec, dejavu_consumer consume) {
-        //std::cout << "(prep-red) deg1" << std::endl;
         rec->del.reset();
 
         worklist_deg0.reset();
@@ -1070,6 +1070,9 @@ private:
     }
 
     void red_quotient_components(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+        if(g->v_size <= 1)
+            return;
+
         //std::cout << "(prep-red) deg1" << std::endl;
         rec->del_e.reset();
 
@@ -1383,6 +1386,9 @@ private:
     }
 
     void perform_del_edge(sgraph*g, int* colmap, recovery_map* rec) {
+        if(g->v_size <= 1)
+            return;
+
         int pre_esize = g->e_size;
         // copy some stuff
         g_old_v.clear();
@@ -1799,7 +1805,7 @@ public:
     }
 
     int select_color_component(sgraph*g, coloring<int>* c1, int component_start_pos) {
-        const int my_component = v_to_component.arr[c1->lab[quotient_component_worklist_col[component_start_pos]]];
+        //const int my_component = v_to_component.arr[c1->lab[quotient_component_worklist_col[component_start_pos]]];
         int cell = -1;
         bool only_discrete_prev = true;
         for (int _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
@@ -2732,16 +2738,19 @@ public:
         if(!init_quotient_arrays) {
             seen_vertex.initialize(g->v_size);
             seen_color.initialize(g->v_size);
-            v_to_component.initialize(g->v_size);
+
+            worklist.reserve(g->v_size);
+
+            quotient_component_worklist_v.reserve(g->v_size + 32);
+            quotient_component_worklist_col.reserve(g->v_size + 32);
+            quotient_component_worklist_col_sz.reserve(g->v_size + 32);
+            init_quotient_arrays = true;
         }
 
+        seen_vertex.reset();
+        seen_color.reset();
+
         int touched_vertices = 0;
-
-        worklist.reserve(g->v_size);
-
-        quotient_component_worklist_v.reserve(g->v_size + 32);
-        quotient_component_worklist_col.reserve(g->v_size + 32);
-        quotient_component_worklist_col_sz.reserve(g->v_size + 32);
 
         quotient_component_workspace.clear();
         quotient_component_worklist_col.clear();
@@ -2771,16 +2780,15 @@ public:
                     worklist.pop_back();
                     if (seen_vertex.get(next_v))
                         continue;
-                    if (c1->ptn[c1->vertex_to_col[next_v]] == 0) {// ignore discrete vertices
+                    /*if (c1->ptn[c1->vertex_to_col[next_v]] == 0) {// ignore discrete vertices
                         seen_vertex.set(next_v);
                         continue;
-                    }
+                    }*/
 
                     ++touched_vertices;
                     current_component_sz += 1;
                     seen_vertex.set(next_v);
                     quotient_component_worklist_v.push_back(next_v);
-                    v_to_component.arr[next_v] = component;
                     for (int i = 0; i < g->d[next_v]; ++i) {
                         if (!seen_vertex.get(g->e[g->v[next_v] + i]))
                             worklist.push_back(g->e[g->v[next_v] + i]); // neighbours
@@ -2840,20 +2848,16 @@ public:
 
                     int v_write_pos = component_vstart;
                     quotient_component_workspace.clear();
-
-                    for (int vi = component_vstart; vi < component_vend; ++vi) {
-                        const int vs = quotient_component_worklist_v[vi]; // need to copy this away first so that I can write into it?
-                        quotient_component_workspace.push_back(vs);
-                    }
-
                     int discrete_vertices = 0;
-                    for (int vi = 0; vi < quotient_component_workspace.size(); ++vi) {
-                        const int vs = quotient_component_workspace[vi];
-                        if (c1->ptn[c1->vertex_to_col[vs]] == 0) {
+                    for (int vi = component_vstart; vi < component_vend; ++vi) {
+                        const int vs = quotient_component_worklist_v[vi]; // need to copy this away
+                        if (c1->ptn[c1->vertex_to_col[vs]] == 0) { // set up fake discrete vertex component, not gonna use it
+                            assert(c1->vertex_to_col[vs] == c1->vertex_to_lab[vs]);
                             seen_vertex.set(vs);
-                            quotient_component_worklist_v[v_write_pos] = vs;
                             ++v_write_pos;
                             ++discrete_vertices;
+                        } else {
+                            quotient_component_workspace.push_back(vs);
                         }
                     }
 
@@ -2877,6 +2881,7 @@ public:
                             if (seen_vertex.get(next_v))
                                 continue;
                             if (c1->ptn[c1->vertex_to_col[next_v]] == 0) {// ignore discrete vertices
+                                assert(c1->vertex_to_col[next_v] == c1->vertex_to_lab[next_v]);
                                 seen_vertex.set(next_v);
                                 continue;
                             }
@@ -2886,7 +2891,6 @@ public:
                             seen_vertex.set(next_v);
                             quotient_component_worklist_v[v_write_pos] = next_v;
                             ++v_write_pos;
-                            v_to_component.arr[next_v] = new_component;
                             for (int i = 0; i < g->d[next_v]; ++i) {
                                 if (!seen_vertex.get(g->e[g->v[next_v] + i]))
                                     worklist.push_back(g->e[g->v[next_v] + i]); // neighbours
@@ -2933,27 +2937,29 @@ public:
     }
 
     int sparse_ir_col_sz_2_quotient_components(sgraph* g, int* colmap, dejavu_consumer consume, int num_paths) {
+        if(g->v_size <= 1)
+            return 0;
+
+        quotient_component_touched.clear();
+        quotient_component_touched_swap.clear();
+
         coloring<int> c1;
         g->initialize_coloring(&c1, colmap);
 
-        compute_quotient_graph_components_update(g, &c1, consume);
+        for (int i = 0; i < g->v_size; ++i)
+            colmap[i] = c1.vertex_to_col[i];
 
-        //quotient_component_touched.clear();
+        int global_automorphisms_found = 0;
 
-        int automorphisms_found = 0;
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
         int selector_seed = seed;
 
-        //work_list_t<int> _automorphism;
-        //work_list_t<int> _automorphism_supp;
+        std::vector<int> save_colmap_v_to_col;
+        std::vector<int> save_colmap_v_to_lab;
+        std::vector<int> save_colmap_ptn;
+        int save_cell_number = -1;
 
-        save_colmap.reserve(g->v_size);
-        save_colmap.clear();
-
-        quotient_component_touched_swap.clear();
-        quotient_component_touched_swap.swap(quotient_component_touched);
-
-        if(!ir_quotient_component_init) {
+        if (!ir_quotient_component_init) {
             _automorphism.initialize(g->v_size);
             _automorphism_supp.initialize(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
@@ -2963,274 +2969,381 @@ public:
             ir_quotient_component_init = true;
         }
 
-        //mark_set touched_color;
-        //work_list_t<int> touched_color_list;
-        touched_color.reset();
-        touched_color_list.reset();
+        for(int x = 0; x < num_paths; ++x) {
+            compute_quotient_graph_components_update(g, &c1, consume);
 
-        invariant I1, I2;
-        I1.only_acc = true;
-        I2.only_acc = true;
+            int automorphisms_found = 0;
 
-        for(int i = 0; i < g->v_size; ++i)
-            colmap[i] = c1.vertex_to_col[i];
+            save_colmap.reserve(g->v_size);
+            save_colmap.clear();
 
-        coloring<int> c2;
-        c2.copy(&c1);
+            quotient_component_touched_swap.clear();
+            quotient_component_touched_swap.swap(quotient_component_touched);
 
-        //refinement<int, int, int> R1;
-        bool certify = true;
-        int quotient_component_start_pos   = 0;
-        int quotient_component_start_pos_v = 0;
+            touched_color.reset();
+            touched_color_list.reset();
 
-        int component = 0;
-        int next_touched_component_i = 0;
-        int next_touched_component   = -1;
+            invariant I1, I2;
+            I1.only_acc = true;
+            I2.only_acc = true;
 
-        int quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-        int quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
+            coloring<int> c2;
+            c2.copy(&c1);
 
-        while(quotient_component_start_pos < quotient_component_worklist_col.size()) { // TODO: get rid of the color array?
-            assert(quotient_component_start_pos_v < quotient_component_worklist_v.size());
-            // additional loop here for components?
-            //std::cout << "component " << quotient_component_start_pos << "-" << quotient_component_end_pos << ", " << quotient_component_start_pos_v << "-" << quotient_component_end_pos_v << std::endl;
-            int start_search_here = quotient_component_start_pos;
+            bool certify = true;
+            int quotient_component_start_pos = 0;
+            int quotient_component_start_pos_v = 0;
 
-            //if(quotient_component_start_pos == quotient_component_end_pos)
-            //    std::cout << "skipped" << std::endl;
+            int component = 0;
+            int next_touched_component_i = 0;
+            int next_touched_component = -1;
 
-            assert(quotient_component_worklist_col[quotient_component_start_pos] >= 0);
-            assert(quotient_component_worklist_v[quotient_component_start_pos_v] >= 0);
-            certify = true;
-            bool touched_current_component = false;
+            int quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
+            int quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
 
-            if(next_touched_component_i < quotient_component_touched_swap.size())
-                next_touched_component = quotient_component_touched_swap[next_touched_component_i];
+            while (quotient_component_start_pos < quotient_component_worklist_col.size()) { // TODO: get rid of the color array?
+                assert(quotient_component_start_pos_v < quotient_component_worklist_v.size());
+                // additional loop here for components?
+                int start_search_here = quotient_component_start_pos;
 
-            while(certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
-                ++next_touched_component_i;
-                // select a color class of size 2
-                bool only_discrete_prev = true;
-                int cell = -1;
-                for (int _i = start_search_here; _i < quotient_component_end_pos; ++_i) { // TODO this can miss out on cells that appear after refining (copy other selector here)
-                    const int v = quotient_component_worklist_col[_i];
-                    if (v == -1) {// reached end of component
+                //if(quotient_component_start_pos == quotient_component_end_pos)
+                //    std::cout << "skipped" << std::endl;
+
+                assert(quotient_component_worklist_col[quotient_component_start_pos] >= 0);
+                assert(quotient_component_worklist_v[quotient_component_start_pos_v] >= 0);
+                certify = true;
+                bool touched_current_component = false;
+
+                if (next_touched_component_i < quotient_component_touched_swap.size())
+                    next_touched_component = quotient_component_touched_swap[next_touched_component_i];
+
+                while (certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
+                    ++next_touched_component_i;
+                    // select a color class of size 2
+                    bool only_discrete_prev = true;
+                    int cell = -1;
+                    for (int _i = start_search_here; _i < quotient_component_end_pos; ++_i) {
+                        const int col = quotient_component_worklist_col[_i];
+                        const int col_sz = quotient_component_worklist_col_sz[_i];
+
+                        if (only_discrete_prev)
+                            start_search_here = _i;
+
+                        if (col == -1) {// reached end of component
+                            break;
+                        }
+                        for (int i = col; i < col + col_sz + 1; ++i) {
+                            if (c1.vertex_to_col[c1.lab[i]] != i)
+                                continue; // not a color
+                            if (c1.ptn[i] > 0 && only_discrete_prev) {
+                                //start_search_here = i;
+                                only_discrete_prev = false;
+                            }
+                            if (c1.ptn[i] == 1) {
+                                cell = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (cell == -1)
                         break;
+
+                    touched_color.reset();
+                    touched_color_list.reset();
+
+                    I1.acc = 0;
+                    I2.acc = 0;
+
+                    const int ind_v1 = c1.lab[cell];
+                    const int ind_v2 = c1.lab[cell + 1];
+                    const int init_c1 = R1.individualize_vertex(&c1, ind_v1);
+
+                    touched_color.set(cell);
+                    touched_color.set(cell + 1);
+                    touched_color_list.push_back(cell);
+                    touched_color_list.push_back(cell + 1);
+
+                    R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color,
+                                       &touched_color_list);
+
+                    const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
+                    R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color,
+                                       &touched_color_list);
+
+                    if (I1.acc != I2.acc) {
+                        std::cout << "probably broken code 0" << std::endl;
+                        for (int i = 0; i < g->v_size; ++i) { // TODO only use component
+                            colmap[i] = c1.vertex_to_col[i];
+                        }
+                        I2.acc = I1.acc;
+                        c2.copy(&c1);
+                        continue;
                     }
-                    const int i = v;
-                    if (c1.ptn[i] > 0 && only_discrete_prev) {
-                        start_search_here = i;
-                        only_discrete_prev = false;
-                    }
-                    if (c1.ptn[i] == 1) {
-                        cell = i;
-                        break;
-                    }
-                }
 
-                if (cell == -1)
-                    break;
-
-                touched_color.reset();
-                touched_color_list.reset();
-
-                const int ind_v1 = c1.lab[cell];
-                const int ind_v2 = c1.lab[cell + 1];
-                const int init_c1 = R1.individualize_vertex(&c1, ind_v1);
-
-                touched_color.set(cell);
-                touched_color.set(cell + 1);
-                touched_color_list.push_back(cell);
-                touched_color_list.push_back(cell + 1);
-
-                R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color, &touched_color_list);
-
-                const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
-                R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color, &touched_color_list);
-
-                if (I1.acc != I2.acc) {
-                    for (int i = 0; i < g->v_size; ++i) {
-                        colmap[i] = c1.vertex_to_col[i];
-                    }
-                    I2.acc = I1.acc;
-                    c2.copy(&c1);
-                    continue;
-                }
-
-
-                _automorphism_supp.reset();
-                if (c1.cells != g->v_size) { // touched_colors doesn't work properly when early-out is used
-                    // read automorphism
-                    for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                        const int _c = touched_color_list.arr[j];
-                        int f = 0;
-                        while (f < c1.ptn[_c] + 1) {
-                            const int i = _c + f;
-                            ++f;
+                    _automorphism_supp.reset();
+                    if (c1.cells != g->v_size) { // touched_colors doesn't work properly when early-out is used
+                        // read automorphism
+                        for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                            const int _c = touched_color_list.arr[j];
+                            int f = 0;
+                            while (f < c1.ptn[_c] + 1) {
+                                const int i = _c + f;
+                                ++f;
+                                if (c1.lab[i] != c2.lab[i]) {
+                                    _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                                    _automorphism_supp.push_back(c1.lab[i]);
+                                }
+                            }
+                        }
+                    } else {
+                        std::cout << "probably broken code 1" << std::endl;
+                        for (int i = 0; i < g->v_size; ++i) { // TODO only use component
                             if (c1.lab[i] != c2.lab[i]) {
                                 _automorphism.arr[c1.lab[i]] = c2.lab[i];
                                 _automorphism_supp.push_back(c1.lab[i]);
                             }
                         }
                     }
-                } else {
-                    for (int i = 0; i < g->v_size; ++i) {
-                        if (c1.lab[i] != c2.lab[i]) {
-                            _automorphism.arr[c1.lab[i]] = c2.lab[i];
-                            _automorphism_supp.push_back(c1.lab[i]);
-                        }
-                    }
-                }
 
-                touched_current_component = true;
-                certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr, _automorphism_supp.cur_pos,
-                                                         _automorphism_supp.arr);
-                assert(certify ? R1.certify_automorphism(g, _automorphism.arr) : true);
-                //std::cout << "(pre-red) sparse-ir certify: " << certify << std::endl;
-                if (certify) {
-                    ++automorphisms_found;
-                    pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr,
-                                         consume);
-                    multiply_to_group_size(2);
-
-                    // reset c2 to c1
-                    if (c1.cells != g->v_size) {
-                        for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                            const int _c = touched_color_list.arr[j];
-                            int f = 0;
-                            c2.cells = c1.cells;
-                            while (f < c1.ptn[_c] + 1) {
-                                const int i = _c + f;
-                                ++f;
-                                c2.ptn[i] = c1.ptn[i];
-                                c2.lab[i] = c1.lab[i];
-                                c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
-                                c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
-                            }
-                        }
-                    } else {
-                        std::cout << "this here" << std::endl;
-                    }
-                } else {
-                    touched_color.reset();
-                    touched_color_list.reset();
-
-                    save_colmap.clear();
-                    for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                        const int i = quotient_component_worklist_v[_i];
-                        save_colmap.push_back(c1.vertex_to_col[i]);
-                    }
-
-                    //selector<int, int, int> S;
-                    //strategy<int> strat;
-                    //strat.cell_selector_type = SELECTOR_FIRST;
-                    //S.empty_cache();
-                    int col = -1;
-                    //std::cout << "first path" << std::endl;
-
-                    while (true) {
-                        // stay within component!
-                        col = select_color_component(g, &c1, quotient_component_start_pos, quotient_component_end_pos);
-                        if (col == -1) break;
-                        const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c1.ptn[col] + 1));
-                        const int v = c1.lab[rpos];
-                        const int init_color_class = R1.individualize_vertex(&c1, v);
-                        R1.refine_coloring(g, &c1, &I1, init_color_class, nullptr, -1, -1,
-                                           nullptr, nullptr, nullptr);
-                    }
-
-                    while (true) {
-                        col = select_color_component(g, &c2, quotient_component_start_pos, quotient_component_end_pos);
-                        if (col == -1) break;
-                        const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
-                        const int v = c2.lab[rpos];
-                        const int init_color_class = R1.individualize_vertex(&c2, v);
-                        R1.refine_coloring(g, &c2, &I2, init_color_class, nullptr, -1, -1,
-                                           nullptr, nullptr, nullptr);
-                    }
-
-                    //std::cout << "(prep-red) sparse-ir random paths: " << I1.acc << ", " << I2.acc << std::endl;
-                    reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
-                    _automorphism_supp.reset();
-
-
-                    for(int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // TODO: only consider component! can use touched as long as not final component
-                        const int i = quotient_component_worklist_v[_i];
-                        const int lab_p = c1.vertex_to_lab[i];
-                        assert(i >= 0);
-                        assert(i < g->v_size);
-                        if (c1.lab[lab_p] != c2.lab[lab_p]) {
-                            _automorphism.arr[c1.lab[lab_p]] = c2.lab[lab_p];
-                            _automorphism_supp.push_back(c1.lab[lab_p]);
-                        }
-                    }
-
+                    touched_current_component = true;
                     certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr, _automorphism_supp.cur_pos,
                                                              _automorphism_supp.arr);
-                    //std::cout << "(prep-red) sparse-ir random path certify: " << certify << std::endl;
+                    assert(certify ? R1.certify_automorphism(g, _automorphism.arr) : true);
+                    //std::cout << "(pre-red) sparse-ir certify: " << certify << std::endl;
                     if (certify) {
-                        touched_current_component = true;
+                        //std::cout << "certified sparse" << std::endl;
                         ++automorphisms_found;
                         pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
                                              _automorphism_supp.arr,
                                              consume);
                         multiply_to_group_size(2);
+
+                        // reset c2 to c1
+                        if (c1.cells != g->v_size) {
+                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                                const int _c = touched_color_list.arr[j];
+                                int f = 0;
+                                c2.cells = c1.cells;
+                                while (f < c1.ptn[_c] + 1) {
+                                    const int i = _c + f;
+                                    ++f;
+                                    c2.ptn[i] = c1.ptn[i];
+                                    c2.lab[i] = c1.lab[i];
+                                    c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
+                                    c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+                                }
+                            }
+                        } else {
+                            std::cout << "this here" << std::endl;
+                        }
+                    } else { // save entire coloring, including lab, ptn, v_to_lab
+                        //touched_color.reset();
+                        //touched_color_list.reset();
+                        save_colmap.clear();
+                        save_colmap_v_to_col.clear();
+                        save_colmap_v_to_lab.clear();
+                        save_colmap_ptn.clear();
+                        for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                            const int v = quotient_component_worklist_v[_i];
+                            save_colmap_v_to_col.push_back(c1.vertex_to_col[v]);
+                            const int lab_pos = c1.vertex_to_lab[v];
+                            save_colmap_v_to_lab.push_back(lab_pos);
+                            save_colmap_ptn.push_back(c1.ptn[lab_pos]);
+                            save_cell_number = c1.cells;
+                            assert(c1.lab[lab_pos] == v);
+                        }
+
+                        int col = -1;
+
+                        certify = false;
+
+                        reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                        _automorphism_supp.reset();
+
+                        while (true) {
+                            // stay within component!
+                            col = select_color_component(g, &c1, quotient_component_start_pos,
+                                                         quotient_component_end_pos);
+                            if (col == -1) break;
+                            const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c1.ptn[col] + 1));
+                            const int v1 = c1.lab[rpos];
+                            const int init_color_class1 = R1.individualize_vertex(&c1, v1);
+
+                            if(!touched_color.get(init_color_class1)) {
+                               touched_color.set(init_color_class1);
+                               touched_color_list.push_back(init_color_class1);
+                            }
+                            if(!touched_color.get(col)) {
+                                touched_color.set(col);
+                                touched_color_list.push_back(col);
+                            }
+
+                            R1.refine_coloring(g, &c1, &I1, init_color_class1, nullptr, -1, -1,
+                                               nullptr, &touched_color, &touched_color_list);
+
+                            //const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
+                            const int v2 = c2.lab[rpos];
+                            const int init_color_class2 = R1.individualize_vertex(&c2, v2);
+                            R1.refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
+                                               nullptr, &touched_color, &touched_color_list);
+
+                            col = select_color_component(g, &c1, quotient_component_start_pos,
+                                                         quotient_component_end_pos);
+                            if (col == -1) break;
+
+                            for (int j = 0; j < touched_color_list.cur_pos; ++j) { // check incremental singleton automorphisms
+                                const int _c = touched_color_list.arr[j];
+                                int f = 0;
+                                if(c1.ptn[_c] == 0) {
+                                    while (f < c1.ptn[_c] + 1) {
+                                        const int i = _c + f;
+                                        ++f;
+                                        if (c1.lab[i] != c2.lab[i]) {
+                                            _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                                            _automorphism_supp.push_back(c1.lab[i]);
+                                        }
+                                    }
+                                }
+                            }
+
+                            certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
+                                                                     _automorphism_supp.cur_pos,
+                                                                     _automorphism_supp.arr);
+
+                            //reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                            //_automorphism_supp.reset();
+                            touched_color.reset();
+                            touched_color_list.reset();
+
+                            if(certify) {
+                                //std::cout << "early certify" << std::endl;
+                                break;
+                            }
+                        }
+
+                        if(!certify) {
+                            reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                            _automorphism_supp.reset();
+
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int i = quotient_component_worklist_v[_i];
+                                const int lab_p = c1.vertex_to_lab[i];
+                                assert(i >= 0);
+                                assert(i < g->v_size);
+                                if (c1.lab[lab_p] != c2.lab[lab_p]) {
+                                    _automorphism.arr[c1.lab[lab_p]] = c2.lab[lab_p];
+                                    _automorphism_supp.push_back(c1.lab[lab_p]);
+                                }
+                            }
+                        }
+
+                        certify = certify || R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
+                                                                 _automorphism_supp.cur_pos,
+                                                                 _automorphism_supp.arr);
+                        //std::cout << "(prep-red) sparse-ir random path certify: " << certify << std::endl;
+                        if (certify) {
+                            assert(R1.certify_automorphism(g, _automorphism.arr));
+                            touched_current_component = true;
+                            ++automorphisms_found;
+                            pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                 _automorphism_supp.arr,
+                                                 consume);
+                            multiply_to_group_size(2);
+                        }
+                        reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                        _automorphism_supp.reset();
+
+                        if (certify) {
+                            //std::cout << "certified normal, reading coloring" << std::endl;
+                            /*for (int i = 0; i < g->v_size; ++i) {
+                                colmap[i] = save_colmap[i];
+                            }*/
+                            int f = 0;
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int v = quotient_component_worklist_v[_i];
+                                colmap[v] = save_colmap_v_to_col[f]; // TODO reset c1 / c2 instead such that paths can just be restarted
+
+                                c1.vertex_to_col[v] = save_colmap_v_to_col[f];
+                                const int lab_pos   = save_colmap_v_to_lab[f];
+                                const int ptn_at_lab_pos = save_colmap_ptn[f];
+                                c1.vertex_to_lab[v] = lab_pos;
+                                c1.lab[lab_pos]     = v;
+                                c1.ptn[lab_pos]     = ptn_at_lab_pos;
+                                c1.cells = save_cell_number;
+
+                                c2.vertex_to_col[v] = save_colmap_v_to_col[f];
+                                c2.vertex_to_lab[v] = lab_pos;
+                                c2.lab[lab_pos]     = v;
+                                c2.ptn[lab_pos]     = ptn_at_lab_pos;
+                                c2.cells = save_cell_number;
+
+                                ++f;
+                            }
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int v = quotient_component_worklist_v[_i];
+                                const int list_index = _i - quotient_component_start_pos_v;
+                                assert(c1.ptn[c1.vertex_to_col[v]] >= 0);
+                                assert(c1.lab[c1.vertex_to_lab[v]] == v);
+                                assert(c1.vertex_to_col[c1.lab[c1.vertex_to_col[v]]] == c1.vertex_to_col[v]);
+
+                                assert(c2.ptn[c2.vertex_to_col[v]] >= 0);
+                                assert(c2.lab[c2.vertex_to_lab[v]] == v);
+                                assert(c2.vertex_to_col[c2.lab[c2.vertex_to_col[v]]] == c2.vertex_to_col[v]);
+                            }
+                        } else {
+                            std::cout << "did not certify" << std::endl;
+                            // TODO hmmmm
+                            // TODO: mark this component such that it is never touched again?
+                            // c1/c2 are now 'broken' for this component, never touch it again
+                            // can't reliably find automorphisms here
+                            touched_current_component = false;
+                        }
+
+                        break;
                     }
                     reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
-                    _automorphism_supp.reset();
+                    automorphism_supp.reset();
 
                     if (certify) {
-                        /*for (int i = 0; i < g->v_size; ++i) {
-                            colmap[i] = save_colmap[i];
-                        }*/
-                        int f = 0;
-                        for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                            const int i = quotient_component_worklist_v[_i];
-                            colmap[i] = save_colmap[f];
-                            ++f;
-                        }
-                    }
-
-                    break;
-                }
-                reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
-                automorphism_supp.reset();
-
-                if (certify) {
-                    if (c1.cells == g->v_size) {
-                        for (int i = 0; i < g->v_size; ++i) {
-                            colmap[i] = c1.vertex_to_col[i];
-                        }
-                    } else {
-                        for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                            const int _c = touched_color_list.arr[j];
-                            int f = 0;
-                            while (f < c1.ptn[_c] + 1) {
-                                assert(c1.vertex_to_col[c1.lab[_c + f]] == _c);
-                                colmap[c1.lab[_c + f]] = c1.vertex_to_col[c1.lab[_c + f]];
-                                ++f;
+                        if (c1.cells == g->v_size) {
+                            std::cout << "probably broken code 2" << std::endl;
+                            for (int i = 0; i < g->v_size; ++i) { // TODO only use component
+                                colmap[i] = c1.vertex_to_col[i];
+                            }
+                        } else {
+                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                                const int _c = touched_color_list.arr[j];
+                                int f = 0;
+                                while (f < c1.ptn[_c] + 1) {
+                                    assert(c1.vertex_to_col[c1.lab[_c + f]] == _c);
+                                    colmap[c1.lab[_c + f]] = c1.vertex_to_col[c1.lab[_c + f]]; // should be c1 or c2?
+                                    ++f;
+                                }
                             }
                         }
                     }
                 }
+
+                if (touched_current_component)
+                    quotient_component_touched.push_back(component);
+
+                quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
+                quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
+
+                ++component;
+
+                quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
+                quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
             }
-
-            if(touched_current_component)
-                quotient_component_touched.push_back(component);
-
-            quotient_component_start_pos   = quotient_component_worklist_boundary[component].first;
-            quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-
-            ++component;
-
-            quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-            quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
+            global_automorphisms_found += automorphisms_found;
+            if(automorphisms_found == 0)
+                break;
         }
-
         //for(int i = 0; i < quotient_component_touched.size(); ++i)
         //    std::cout << quotient_component_touched[i] << " ";
         //std::cout << std::endl;
-        return automorphisms_found;
+        return global_automorphisms_found;
     }
 
 
@@ -3241,8 +3354,17 @@ public:
         if(!init_quotient_arrays) {
             seen_vertex.initialize(g->v_size);
             seen_color.initialize(g->v_size);
-            v_to_component.initialize(g->v_size);
+
+            worklist.reserve(g->v_size);
+
+            quotient_component_worklist_v.reserve(g->v_size + 32);
+            quotient_component_worklist_col.reserve(g->v_size + 32);
+            quotient_component_worklist_col_sz.reserve(g->v_size + 32);
+            init_quotient_arrays = true;
         }
+
+        seen_vertex.reset();
+        seen_color.reset();
 
         std::vector<int> worklist;
         worklist.reserve(g->v_size);
@@ -3270,7 +3392,6 @@ public:
                 current_component_sz += 1;
                 seen_vertex.set(next_v);
                 quotient_component_worklist_v.push_back(next_v);
-                v_to_component.arr[next_v] = component;
                 for(int i = 0; i < g->d[next_v]; ++i) {
                     if(!seen_vertex.get(g->e[g->v[next_v] + i]))
                         worklist.push_back(g->e[g->v[next_v] + i]); // neighbours
@@ -3328,6 +3449,20 @@ public:
             std::cout << "(pre-red) before reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2 << std::endl;
             std::cout << "(pre-red) before reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
         }
+        g->initialize_coloring(&c, colmap);
+        //std::cout << c.cells << std::endl;
+        /*for(int i = 0; i < c.ptn_sz; ++i ){
+            if(c.vertex_to_col[i] == i && c.ptn[i] == 0) {
+                std::cout << "singleton " << i << std::endl;
+            }
+        }*/
+        R1.refine_coloring_first(g, &c, -1);
+        if(c.cells == g->v_size) {
+            g->v_size = 0;
+            g->e_size = 0;
+            g->d_size = 0;
+            return;
+        }
 
         automorphism.initialize(g->v_size);
         for(int i = 0; i < g->v_size; ++i) {
@@ -3338,82 +3473,41 @@ public:
         worklist_deg1.initialize(g->v_size);
         edge_scratch.initialize(g->e_size);
 
-        add_edge_buff.initialize(g->v_size);
-        add_edge_buff_act.initialize(g->v_size);
-
         translate_layer_fwd.reserve(g->v_size);
-        //translate_layer_bwd.reserve(g->v_size);
+
         rec.backward_translation_layers.emplace_back(std::vector<int>());
         const int back_ind = rec.backward_translation_layers.size()-1;
         rec.translation_layers.emplace_back(std::vector<int>());
         const int fwd_ind = rec.translation_layers.size()-1;
+        rec.backward_translation_layers[back_ind].reserve(g->v_size);
         for(int i = 0; i < g->v_size; ++i)
             rec.backward_translation_layers[back_ind].push_back(i);
-
 
         rec.domain_size = g->v_size;
 
         // assumes colmap is array of length g->v_size
         rec.del = mark_set();
         rec.del.initialize(g->v_size);
-        rec.del_e = mark_set();
-        rec.del_e.initialize(g->e_size);
+
         rec.canonical_recovery_string.reserve(g->v_size);
         for(int i = 0; i < rec.domain_size; ++i)
             rec.canonical_recovery_string.emplace_back(std::vector<int>());
-        //store_graph_aspects(g, &rec);
-
-        // refinement
-        //refinement<int, int, int> R;
-        g->initialize_coloring(&c, colmap);
-        R1.refine_coloring_first(g, &c, -1);
-
-        if(c.cells == g->v_size) {
-            g->v_size = 0;
-            g->e_size = 0;
-            g->d_size = 0;
-            return;
-        }
 
         // eliminate degree 1 + 0
+        // TODO delete edges to discrete vertices in-place here?
         red_deg10_assume_cref(g, &c, &rec, consume);
         copy_coloring_to_colmap(&c, colmap);
         mark_discrete_for_deletion(g, colmap, &rec);
         perform_del(g, colmap, &rec);
 
-        // TODO: reduce the number of del's performed and rather sparsify routines
 
-        // eliminate discrete colors
-        //perform_del_discrete(g, colmap, &rec);
+        if(g->v_size == 0)
+            return;
 
-        // TODO: maybe degree 2, edge-colors
-
-        /*red_quotient_matchings_(g, colmap, &rec, consume);*/
-
-        // TODO: twins?
-
-
-        // invariants: paths of length 2 for large regular components
-
-        /*for(int x = 0; x < 1; ++x) {
-            const int found_auto = sparse_ir_col_sz_2(g, colmap, consume);
-            perform_del_discrete(g, colmap, &rec);
-
-            sparse_ir(g, colmap, consume, SELECTOR_LARGEST); // TODO: should be performed in order of components, if available!
-            perform_del_discrete(g, colmap, &rec);
-        }*/
-        //sparse_ir(g, colmap, consume);
-        //perform_del_discrete(g, colmap, &rec);
-
-        /*for(int x = 0; x < 10; ++x) {
-            sparse_ir_col_sz_2(g, colmap, consume);
-            perform_del_discrete(g, colmap, &rec);
-        }*/
-        // eliminate degree 2, no edge-colors
-        //red_deg2_assume_cref(g, colmap, &rec, consume); // TODO: better more general algorithm
-        //perform_del2(g, colmap, &rec);
-
-        // TODO: explicitly create quotient graph and check components?
+        rec.del_e = mark_set();
+        rec.del_e.initialize(g->e_size);
+        add_edge_buff.initialize(g->v_size);
+        add_edge_buff_act.initialize(g->v_size);
 
         red_quotient_components(g, colmap, &rec, consume);
         perform_del_edge(g, colmap, &rec);
@@ -3421,13 +3515,13 @@ public:
         red_deg2_path_size_1(g, colmap, &rec, consume);
         perform_del2(g, colmap, &rec);
 
-        for(int x = 0; x < 32; ++x) {
+        //for(int x = 0; x < 16; ++x) {
             //compute_quotient_graph_components(g, colmap, consume);
-            const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 1);
-            if(auto_found < 1) {
-                break;
-            }
-        }
+        const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
+        //    if(auto_found < 1) {
+        //        break;
+        //    }
+        //}
 
         perform_del_discrete(g, colmap, &rec);
 
@@ -3491,14 +3585,16 @@ public:
                 red_deg2_path_size_1(g, colmap, &rec, consume);
                 perform_del2(g, colmap, &rec);
 
-                for(int x = 0; x < 16; ++x) {
+                /*for(int x = 0; x < 16; ++x) {
                     compute_quotient_graph_components(g, colmap, consume);
                     const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume);
                     perform_del_discrete(g, colmap, &rec);
                     if(auto_found < 1) {
                         break;
                     }
-                }
+                }*/
+                const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
+                perform_del_discrete(g, colmap, &rec);
 
                 sparse_ir(g, colmap, consume, SELECTOR_LARGEST);
                 perform_del_discrete(g, colmap, &rec);

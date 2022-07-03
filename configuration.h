@@ -29,6 +29,8 @@ struct configstruct {
     bool CONFIG_IR_ALWAYS_STORE = false;
     bool config_IR_SKIP_FIRST_REFINEMENT = false; // use if initial coloring has already been refined using >=1-WL
 
+    bool CONFIG_BULK_ALLOCATOR = true;
+
     bool CONFIG_IR_WRITE_GROUPORDER      = false;
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;

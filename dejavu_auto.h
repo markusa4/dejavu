@@ -1765,7 +1765,9 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
         for(int i = 0; i < g->v_size; ++i)
             colmap[i] = 0;
     }
+    config.CONFIG_BULK_ALLOCATOR = false;
     p.reduce(g, colmap, consume);
+    config.CONFIG_BULK_ALLOCATOR = true;
     config.config_IR_SKIP_FIRST_REFINEMENT = true;
     double prep_red_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer1).count());
     Clock::time_point timer2 = Clock::now();
