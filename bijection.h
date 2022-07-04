@@ -12,7 +12,6 @@
 template<class vertex_t>
 class bijection {
     bool init = false;
-    vertex_t* map = nullptr;
 
     void alloc(int n) {
         dealloc();
@@ -27,6 +26,7 @@ class bijection {
         }
     };
 public:
+    vertex_t* map = nullptr;
     bool mark = false;
     int res_sz;
     int map_sz;

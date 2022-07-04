@@ -396,6 +396,7 @@ public:
                          std::vector<vertex_t>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
         bool comp = true;
+        singleton_hint.reset();
         int individualize_pos = individualize_early;
         assure_initialized(g);
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
@@ -407,11 +408,20 @@ public:
             // initialize queue with all classes (except for largest one)
             for (int i = 0; i < c->ptn_sz;) {
                 cell_todo.add_cell(&queue_pointer, i);
-                i += c->ptn[i] + 1;
+                const int col_sz = c->ptn[i];
+                if(col_sz == 0) {
+                    //singleton_hint.push_back(i);
+                }
+                i += col_sz + 1;
+
             }
         } else {
+            const int col_sz = c->ptn[init_color_class];
             assert(c->vertex_to_col[c->lab[init_color_class]] == init_color_class);
             cell_todo.add_cell(&queue_pointer, init_color_class);
+            if(col_sz == 0) {
+                //singleton_hint.push_back(init_color_class);
+            }
         }
         int its = 0;
 
@@ -558,6 +568,8 @@ public:
 
                 if(skipped_largest || !is_largest) {
                     cell_todo.add_cell(&queue_pointer, new_class);
+                    //if(new_class_sz == 1)
+                        //singleton_hint.push_back(new_class);
                 } else {
                     skipped_largest = true;
                     skip += 1;
@@ -566,6 +578,8 @@ public:
                     int i = queue_pointer.get(old_class);
                     if(i >= 0) {
                         cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                        //if(new_class_sz == 1)
+                        //    singleton_hint.push_back(new_class);
                     }
                 }
             }

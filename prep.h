@@ -145,7 +145,7 @@ private:
                             if(!check_if_match)
                                 break;
                         }
-                        std::cout << check_if_match << std::endl;
+                        //std::cout << check_if_match << std::endl;
 
                         if(check_if_match) {
                             found_match += test_col.ptn[i] + 1;
@@ -2031,7 +2031,8 @@ public:
                             }
                         }
                     } else {
-                        std::cout << "this here" << std::endl;
+                        // discrete
+                        //std::cout << "this here" << std::endl;
                     }
                 } else {
                     touched_color.reset();
@@ -3097,9 +3098,13 @@ public:
                             }
                         }
                     } else {
-                        std::cout << "probably broken code 1" << std::endl;
-                        for (int i = 0; i < g->v_size; ++i) { // TODO only use component
+                        //for (int i = 0; i < g->v_size; ++i) {
+                        for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                            const int v = quotient_component_worklist_v[_i];
+                            const int i = c2.vertex_to_lab[i];
                             if (c1.lab[i] != c2.lab[i]) {
+                                assert(i >= 0);
+                                assert(i < g->v_size);
                                 _automorphism.arr[c1.lab[i]] = c2.lab[i];
                                 _automorphism_supp.push_back(c1.lab[i]);
                             }
@@ -3135,7 +3140,8 @@ public:
                                 }
                             }
                         } else {
-                            std::cout << "this here" << std::endl;
+                            // discrete
+                            //std::cout << "this here" << std::endl;
                         }
                     } else { // save entire coloring, including lab, ptn, v_to_lab
                         //touched_color.reset();
@@ -3307,8 +3313,11 @@ public:
 
                     if (certify) {
                         if (c1.cells == g->v_size) {
-                            std::cout << "probably broken code 2" << std::endl;
-                            for (int i = 0; i < g->v_size; ++i) { // TODO only use component
+                            //std::cout << "probably broken code 2" << std::endl;
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int i = quotient_component_worklist_v[_i];
+                                assert(i >= 0);
+                                assert(i < g->v_size);
                                 colmap[i] = c1.vertex_to_col[i];
                             }
                         } else {
@@ -3426,6 +3435,43 @@ public:
         std::cout << "[" << component  << "]" << std::endl;
     }
 
+    void del_discrete_edges_inplace(sgraph* g, coloring<int>*c) {
+        int rem_edges = 0;
+        int discrete_vert = 0;
+        rec.del.reset();
+        for(int i = 0; i < c->lab_sz;) {
+            const int col_sz = c->ptn[i];
+            if(col_sz == 0) {
+                ++discrete_vert;
+                rec.del.set(c->lab[i]);
+            }
+            i += col_sz + 1;
+        }
+
+        for(int v = 0; v < g->v_size; ++v) {
+            if(rec.del.get(v)) {
+                rem_edges += g->d[v];
+                g->d[v] = 0;
+                continue;
+            }
+            int write_pt_front = g->v[v];
+            int write_pt_back  = g->v[v] + g->d[v] - 1;
+            for(int n = g->v[v]; n < g->v[v] + g->d[v];) {
+                const int neigh = g->e[n];
+                if(rec.del.get(neigh)) {
+                    const int swap_neigh = g->e[g->v[v] + g->d[v] - 1];
+                    g->e[g->v[v] + g->d[v] - 1] = neigh;
+                    g->e[n] = swap_neigh;
+                    --g->d[v];
+                    ++rem_edges;
+                } else {
+                    ++n;
+                }
+            }
+        }
+        //std::cout << discrete_vert << ", " << rem_edges << std::endl;
+    }
+
     void reduce(sgraph* g, int* colmap, dejavu_consumer consume) {
         {
             int deg0 = 0;
@@ -3450,13 +3496,8 @@ public:
             std::cout << "(pre-red) before reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
         }
         g->initialize_coloring(&c, colmap);
-        //std::cout << c.cells << std::endl;
-        /*for(int i = 0; i < c.ptn_sz; ++i ){
-            if(c.vertex_to_col[i] == i && c.ptn[i] == 0) {
-                std::cout << "singleton " << i << std::endl;
-            }
-        }*/
         R1.refine_coloring_first(g, &c, -1);
+
         if(c.cells == g->v_size) {
             g->v_size = 0;
             g->e_size = 0;
@@ -3495,9 +3536,10 @@ public:
 
         // eliminate degree 1 + 0
         // TODO delete edges to discrete vertices in-place here?
+        del_discrete_edges_inplace(g, &c);
         red_deg10_assume_cref(g, &c, &rec, consume);
         copy_coloring_to_colmap(&c, colmap);
-        mark_discrete_for_deletion(g, colmap, &rec);
+        //mark_discrete_for_deletion(g, colmap, &rec);
         perform_del(g, colmap, &rec);
 
 
@@ -3515,13 +3557,7 @@ public:
         red_deg2_path_size_1(g, colmap, &rec, consume);
         perform_del2(g, colmap, &rec);
 
-        //for(int x = 0; x < 16; ++x) {
-            //compute_quotient_graph_components(g, colmap, consume);
         const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
-        //    if(auto_found < 1) {
-        //        break;
-        //    }
-        //}
 
         perform_del_discrete(g, colmap, &rec);
 
@@ -3530,15 +3566,6 @@ public:
 
         red_deg2_path_size_1(g, colmap, &rec, consume);
         perform_del2(g, colmap, &rec);
-
-        //red_deg2_assume_cref(g, colmap, &rec, consume);
-        //perform_del2(g, colmap, &rec);
-
-        //red_deg2_assume_cref(g, colmap, &rec, consume);
-        //perform_del2(g, colmap, &rec);
-
-        //red_quotient_components(g, colmap, &rec, consume); // TODO: bug on highschool1-aigio.dimacs
-        //perform_del_edge(g, colmap, &rec);
 
         if(g->v_size > 1) {
             int deg0 = 0;
@@ -3585,14 +3612,6 @@ public:
                 red_deg2_path_size_1(g, colmap, &rec, consume);
                 perform_del2(g, colmap, &rec);
 
-                /*for(int x = 0; x < 16; ++x) {
-                    compute_quotient_graph_components(g, colmap, consume);
-                    const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume);
-                    perform_del_discrete(g, colmap, &rec);
-                    if(auto_found < 1) {
-                        break;
-                    }
-                }*/
                 const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
                 perform_del_discrete(g, colmap, &rec);
 

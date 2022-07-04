@@ -12,7 +12,6 @@
 
 #include <stdlib.h> /* malloc, calloc, and free */
 #include <string.h> /* memcpy */
-#include <time.h> /* time_t */
 
 #include "saucy.h"
 
@@ -24,10 +23,6 @@ struct coloring {
 };
 
 struct saucy {
-	/* Time data */
-	time_t startTime;/* Time point at which Saucy was constructed */
-	uint timeLim;    /* Maximal number of seconds saucy is allowed to run */
-	
 	/* Graph data */
 	int n;           /* Size of domain */
 	const int *adj;  /* Neighbors of k: edg[adj[k]]..edg[adj[k+1]] */
@@ -1343,14 +1338,6 @@ unprepare_permutation(struct saucy *s)
 	}
 }
 
-static int 
-timeLimitReached(struct saucy *s)
-{
-  time_t now;
-  time(&now);
-  return difftime(now,s->startTime)>s->timeLim;
-}
-
 static int
 do_search(struct saucy *s)
 {
@@ -1365,7 +1352,7 @@ do_search(struct saucy *s)
 	min = backtrack(s);
 
 	/* Keep going while there are tree nodes to expand */
-	while (s->lev && !timeLimitReached(s)) {
+	while (s->lev) {
 
 		/* Descend to a new leaf node */	
 		if (descend(s, &s->right, s->start[s->lev], min)
@@ -1405,12 +1392,12 @@ saucy_search(
 	struct saucy *s,
 	const struct saucy_graph *g,
 	int directed,
+	const int *colors,
 	saucy_consumer *consumer,
 	void *arg,
 	struct saucy_stats *stats)
 {
 	int i, j, max = 0;
-  const int *colors = g->colors;
 
 	/* Save client information */
 	s->stats = stats;
@@ -1549,19 +1536,16 @@ saucy_search(
 	while (do_search(s));
 }
 
-static int *ints(int n) { return (int*) malloc(n * sizeof(int)); }
-static int *zeros(int n) { return (int*) calloc(n, sizeof(int)); }
-static char *bits(int n) { return (char*) calloc(n, sizeof(char)); }
+static int *ints(int n) { return malloc(n * sizeof(int)); }
+static int *zeros(int n) { return calloc(n, sizeof(int)); }
+static char *bits(int n) { return calloc(n, sizeof(char)); }
 
 struct saucy *
-saucy_alloc(int n, uint tlim)
+saucy_alloc(int n)
 {
-	struct saucy *s = (struct saucy*) malloc(sizeof(struct saucy));
+	struct saucy *s = malloc(sizeof(struct saucy));
 	if (s == NULL) return NULL;
 
-	time(&(s->startTime));
-	s->timeLim = tlim;
-	
 	s->ninduce = ints(n);
 	s->sinduce = ints(n);
 	s->indmark = bits(n);

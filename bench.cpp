@@ -2,9 +2,9 @@
 #include "parser.h"
 #include "dejavu_auto.h"
 #include <assert.h>
-#include "saucy/saucy.h"
 
 extern "C" {
+#include "saucy/saucy.h"
 #include "nauty/traces.h"
 }
 
@@ -203,7 +203,7 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
     sg.e = g->e_size;
     sg.edg = new int[g->e_size];
     sg.adj = new int[sg.n + 1];
-    sg.colors = new int[g->v_size];
+    //sg.colors = new int[g->v_size];
 
     int epos = 0;
 
@@ -228,13 +228,14 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
         }
     }
 
-    make_small_colmap(sg.colors, colmap, g->v_size);
+    int* small_colmap = new int[g->v_size];
+    make_small_colmap(small_colmap, colmap, g->v_size);
 
     Clock::time_point timer = Clock::now();
     // automorphisms
-    struct saucy *s = saucy_alloc(sg.n, 100000);
+    struct saucy *s = saucy_alloc(sg.n); // 100000
     struct saucy_stats stats;
-    saucy_search(s, &sg, 0, saucyConsume, 0, &stats);
+    saucy_search(s, &sg, 0, colmap, saucyConsume, 0, &stats);
     saucy_free(s);
     *saucy_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Group size: ";
@@ -469,14 +470,13 @@ int commandline_mode(int argc, char **argv) {
     p.parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
-        /*bijection<int> pr;
+        bijection<int> pr;
         std::cout << "Generating random bijection (seed " << seed << ")..." << std::endl;
         bijection<int>::random_bijection(&pr, g->v_size, seed);
         std::cout << "Permuting graph..." << std::endl;
         g->permute_graph(_g, &pr); // permute graph
         if(colmap != nullptr)
             permute_colmap(&colmap, g->v_size, pr.map);
-        delete g;*/
         _g = g;
     } else {
         _g = g;
