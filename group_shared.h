@@ -128,7 +128,7 @@ public:
                         gens_added += 1;
                         if(abort_counter > 0) {
                             config.CONFIG_RAND_ABORT += 1;
-                            PRINT("[Dej] d: " << config.CONFIG_RAND_ABORT << std::endl);
+                            PRINT("[Dej] d: " << config.CONFIG_RAND_ABORT);
                         }
                         abort_counter = 0;
                     }

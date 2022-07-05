@@ -1803,9 +1803,9 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
     std::cout << "(prep-res)  " << prep_res_time / 1000000.0 << "ms" << std::endl;
 
     // calculate automorphism group size
-    p.rec.exp += a.grp_sz_exp;
+    p.exp += a.grp_sz_exp;
     p.multiply_to_group_size(a.grp_sz_man);
-    std::cout << "(prep-res) group sz: " << p.rec.base << "*10^" << p.rec.exp << std::endl;
+    std::cout << "(prep-res) group sz: " << p.base << "*10^" << p.exp << std::endl;
     return a;
 }
 

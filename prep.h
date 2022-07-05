@@ -7,7 +7,7 @@
 #include "selector.h"
 #include <vector>
 
-struct recovery_map {
+/*struct recovery_map {
     int domain_size;
     mark_set del;
     mark_set del_e;
@@ -20,9 +20,22 @@ struct recovery_map {
 
     double base = 1;
     int    exp  = 0;
-};
+};*/
 
 class preprocessor {
+    int domain_size;
+    mark_set del;
+    mark_set del_e;
+
+    std::vector<std::vector<int>> translation_layers;
+    std::vector<std::vector<int>> backward_translation_layers;
+
+    std::vector<int> backward_translation;
+    std::vector<std::vector<int>> canonical_recovery_string;
+public:
+    double base = 1;
+    int    exp  = 0;
+
     work_list_t<std::vector<int>> add_edge_buff;
     work_list_t<int> worklist_deg0;
     work_list_t<int> worklist_deg1;
@@ -67,11 +80,11 @@ private:
         return false;
     }
 
-    void red_deg2_path_size_1(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+    void red_deg2_path_size_1(sgraph* g, int* colmap, dejavu_consumer consume) {
         if(g->v_size <= 1)
             return;
 
-        rec->del.reset();
+        del.reset();
 
         int found_match = 0;
 
@@ -151,7 +164,7 @@ private:
                             found_match += test_col.ptn[i] + 1;
                             for(int f = 0; f < test_col.ptn[i] + 1; ++f) {
                                 const int _test_v = test_col.lab[i + f];
-                                rec->del.set(_test_v);
+                                del.set(_test_v);
                             }
                             for(int f = 0; f < test_col.ptn[i] + 1; ++f) {
                                 const int _test_v = test_col.lab[i + f];
@@ -164,9 +177,9 @@ private:
                                     can_n = _n2;
                                 const int orig_test_v = translate_back(_test_v);
                                 const int orig_n1 = translate_back(can_n);
-                                for (int s = 0; s < rec->canonical_recovery_string[orig_test_v].size(); ++s)
-                                    rec->canonical_recovery_string[orig_n1].push_back(
-                                            rec->canonical_recovery_string[orig_test_v][s]);
+                                for (int s = 0; s < canonical_recovery_string[orig_test_v].size(); ++s)
+                                    canonical_recovery_string[orig_n1].push_back(
+                                            canonical_recovery_string[orig_test_v][s]);
                             }
                             //std::cout << "matched previous matching, removing paths" << std::endl;
                         }
@@ -228,7 +241,7 @@ private:
                         add_edge_buff_act.set(_n2);
                         add_edge_buff.arr[_n1].push_back(_n2);
                         add_edge_buff_act.set(_n1);
-                        rec->del.set(_test_v);
+                        del.set(_test_v);
 
                         int can_n;
                         if(test_col.vertex_to_col[_n1] < test_col.vertex_to_col[_n2])
@@ -237,8 +250,8 @@ private:
                             can_n = _n2;
                         const int orig_test_v = translate_back(_test_v);
                         const int orig_n1 = translate_back(can_n);
-                        for(int s = 0; s < rec->canonical_recovery_string[orig_test_v].size(); ++s)
-                            rec->canonical_recovery_string[orig_n1].push_back(rec->canonical_recovery_string[orig_test_v][s]);
+                        for(int s = 0; s < canonical_recovery_string[orig_test_v].size(); ++s)
+                            canonical_recovery_string[orig_n1].push_back(canonical_recovery_string[orig_test_v][s]);
 
                     }
                 }
@@ -249,18 +262,18 @@ private:
     }
 
 
-    void red_deg2_assume_cref(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+    void red_deg2_assume_cref(sgraph* g, int* colmap, dejavu_consumer consume) {
         if(g->v_size <= 1)
             return;
         add_edge_buff_act.reset();
-        rec->del.reset();
+        del.reset();
 
         worklist_deg1.reset();
 
-        add_edge_buff.initialize(rec->domain_size);
-        for(int i = 0; i < rec->domain_size; ++i)
+        add_edge_buff.initialize(domain_size);
+        for(int i = 0; i < domain_size; ++i)
             add_edge_buff.push_back(std::vector<int>()); // TODO: do this smarter... i know how many edges will end up here... should not allocate anything...
-        add_edge_buff_act.initialize(rec->domain_size);
+        add_edge_buff_act.initialize(domain_size);
 
         std::vector<int> test_v_to_min_endpoint;
         test_v_to_min_endpoint.reserve(g->v_size);
@@ -521,8 +534,8 @@ private:
                         ++deleted;
                         const int del_v = path.arr[i];
                         assert(g->d[del_v] == 2);
-                        //assert(!rec->del2.get(del_v));
-                        rec->del.set(del_v);
+                        //assert(!del2.get(del_v));
+                        del.set(del_v);
                     }
 
                     int unique_endpoint; // pick the unique endpoint to attach canonical information to
@@ -546,9 +559,9 @@ private:
                             //std::cout << colmap[path.arr[i]] << " ";
                         }
                         const int path_v_orig = translate_back(path.arr[i]);
-                        rec->canonical_recovery_string[unique_endpoint_orig].push_back(path_v_orig);
-                        rec->canonical_recovery_string[unique_endpoint_orig].insert(rec->canonical_recovery_string[unique_endpoint_orig].end(),
-                                                                                    rec->canonical_recovery_string[path_v_orig].begin(), rec->canonical_recovery_string[path_v_orig].end());
+                        canonical_recovery_string[unique_endpoint_orig].push_back(path_v_orig);
+                        canonical_recovery_string[unique_endpoint_orig].insert(canonical_recovery_string[unique_endpoint_orig].end(),
+                                                                                    canonical_recovery_string[path_v_orig].begin(), canonical_recovery_string[path_v_orig].end());
                     }
                     //if(path_length > 1)
                     //    std::cout<<std::endl;
@@ -574,7 +587,7 @@ private:
         }
 
         for(int i = 0; i < g->v_size; ++i) {
-            if(g->d[i] == 2 && !rec->del.get(i)) {
+            if(g->d[i] == 2 && !del.get(i)) {
                 //std::cout << test_v_to_min_endpoint[i] << ":" << test_v_to_max_endpoint[i] << ":" << colmap[i] << std::endl;
             }
         }
@@ -589,11 +602,11 @@ private:
     }
 
     void write_canonical_recovery_string_to_automorphism(const int from, const int to) {
-        assert(rec.canonical_recovery_string[from].size() == rec.canonical_recovery_string[to].size());
-        for(int i = 0; i < rec.canonical_recovery_string[to].size(); ++i) {
+        assert(canonical_recovery_string[from].size() == canonical_recovery_string[to].size());
+        for(int i = 0; i < canonical_recovery_string[to].size(); ++i) {
             //std::cout << i << std::endl;
-            const int str_from = rec.canonical_recovery_string[from][i];
-            const int str_to = rec.canonical_recovery_string[to][i];
+            const int str_from = canonical_recovery_string[from][i];
+            const int str_to = canonical_recovery_string[to][i];
             automorphism.arr[str_to]   = str_from;
             automorphism.arr[str_from] = str_to;
             automorphism_supp.push_back(str_from);
@@ -623,8 +636,8 @@ private:
         }
     }
 
-    void red_deg10_assume_cref(sgraph* g, const coloring<int>* c, recovery_map* rec, dejavu_consumer consume) {
-        rec->del.reset();
+    void red_deg10_assume_cref(sgraph* g, const coloring<int>* c, dejavu_consumer consume) {
+        //del.reset();
 
         worklist_deg0.reset();
         worklist_deg1.reset();
@@ -694,7 +707,7 @@ private:
 
         while(!worklist_deg1.empty()) {
             const int v_child = worklist_deg1.pop_back();
-            if(rec->del.get(v_child))
+            if(del.get(v_child))
                 continue;
             if(g_old_d2[v_child] != 1)
                 continue;
@@ -705,7 +718,7 @@ private:
             bool permute_parents_instead = false;
             //std::cout << "col " << v_child_col << "(" << child_col_sz << ")" << " from vertex " << v_child << std::endl;
             if(child_col_sz == 1) { // TODO this can never be mapped, this is bloat... should handle before?
-                rec->del.set(v_child);
+                del.set(v_child);
                 continue;
             } else {
                 parentlist.reset();
@@ -717,11 +730,11 @@ private:
                     const int e_pos_child = g->v[child];
                     int parent = g->e[e_pos_child];
 
-                    if(is_pairs && rec->del.get(child))
+                    if(is_pairs && del.get(child))
                         continue;
 
                     int search_parent = 0;
-                    while (rec->del.get(parent)) {
+                    while (del.get(parent)) {
                         ++search_parent;
                         parent = g->e[e_pos_child + search_parent];
                     }
@@ -729,8 +742,8 @@ private:
                     assert(is_pairs?c->vertex_to_col[parent] == c->vertex_to_col[child]:true);
                     if(c->vertex_to_col[parent] == c->vertex_to_col[child]) {
                         is_pairs = true;
-                        rec->del.set(child);
-                        rec->del.set(parent);
+                        del.set(child);
+                        del.set(parent);
                         pair_match.arr[child] = parent;
                         pair_match.arr[parent] = child;
                         if(parent < child) {
@@ -741,7 +754,7 @@ private:
                         continue;
                     }
 
-                    rec->del.set(child);
+                    del.set(child);
 
                     // save canonical info for parent
                     edge_scratch.arr[g->v[parent] + childcount.arr[parent]] = child;
@@ -846,8 +859,8 @@ private:
 
                     assert(g_old_d2[pair_to] == 1);
                     assert(g_old_d2[pair_from] == 1);
-                    assert(rec->del.get(pair_to));
-                    assert(rec->del.get(pair_from));
+                    assert(del.get(pair_to));
+                    assert(del.get(pair_from));
                     consume(g->v_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     automorphism_supp.reset();
@@ -860,7 +873,7 @@ private:
                     const int pair_to = pair_match.arr[pair_from];
 
                     const int original_parent = translate_back(first_pair_parent);
-                    rec->canonical_recovery_string[original_parent].push_back(translate_back(pair_to));
+                    canonical_recovery_string[original_parent].push_back(translate_back(pair_to));
                 }
 
                 permute_parents_instead = true;
@@ -972,8 +985,8 @@ private:
 
                     assert(g_old_d2[child_to] == 1);
                     assert(g_old_d2[child_from] == 1);
-                    assert(rec->del.get(child_to));
-                    assert(rec->del.get(child_from));
+                    assert(del.get(child_to));
+                    assert(del.get(child_from));
                     consume(g->v_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
                     automorphism_supp.reset();
@@ -988,11 +1001,11 @@ private:
         if(g->v_size > 1) {
             // search for parents that still remain in the graph, and rewrite childlist structure into canonical string
             for (int _i = 0; _i < g->v_size; ++_i) {
-                if (!rec->del.get(_i) && childcount.arr[_i] > 0 && c->ptn[c->vertex_to_col[_i]] > 0) { // should it be childcount.arr[_i] > 0 or childcount.arr[_i] >= 0? was childcount.arr[_i] >= 0 but that doesnt make sense?
+                if (!del.get(_i) && childcount.arr[_i] > 0 && c->ptn[c->vertex_to_col[_i]] > 0) { // should it be childcount.arr[_i] > 0 or childcount.arr[_i] >= 0? was childcount.arr[_i] >= 0 but that doesnt make sense?
                     stack1.reset();
                     stack1.push_back(std::pair<int, int>(g->v[_i], g->v[_i] + childcount.arr[_i]));
                     const int orig_i = translate_back(_i);
-                    rec->canonical_recovery_string[orig_i].reserve(childcount.arr[_i]); // TODO: segmentation fault! throw_length_error --- did i fix by switching orig_i to _i?
+                    canonical_recovery_string[orig_i].reserve(childcount.arr[_i]); // TODO: segmentation fault! throw_length_error --- did i fix by switching orig_i to _i?
                     while (!stack1.empty()) {
                         std::pair<int, int> from_to = stack1.pop_back();
                         int from = from_to.first;
@@ -1005,13 +1018,13 @@ private:
                             const int to_next = g->v[next] + childcount.arr[next];
                             ++from;
                             const int orig_next = translate_back(next);
-                            rec->canonical_recovery_string[orig_i].push_back(orig_next);
+                            canonical_recovery_string[orig_i].push_back(orig_next);
                             // write canonical recovery string of orig_next into orig_i, since it is now represented by
                             // orig_i
                             assert(next != _i);
                             assert(orig_next != orig_i);
-                            for(int j = 0; j < rec->canonical_recovery_string[orig_next].size(); ++j)
-                                rec->canonical_recovery_string[orig_i].push_back(rec->canonical_recovery_string[orig_next][j]);
+                            for(int j = 0; j < canonical_recovery_string[orig_next].size(); ++j)
+                                canonical_recovery_string[orig_i].push_back(canonical_recovery_string[orig_next][j]);
                             stack1.push_back(std::pair<int, int>(from, to));
                             stack1.push_back(std::pair<int, int>(from_next, to_next));
                         }
@@ -1023,7 +1036,7 @@ private:
 
         while(!worklist_deg0.empty()) {
             const int v_child = worklist_deg0.pop_back();
-            if (rec->del.get(v_child))
+            if (del.get(v_child))
                 continue;
             assert(g_old_d2[v_child] == 0);
 
@@ -1032,7 +1045,7 @@ private:
             const int child_col_sz = c->ptn[v_child_col] + 1;
             //std::cout << "col " << v_child_col << "(" << child_col_sz << ")" << " from vertex " << v_child << std::endl;
             const int parent_from = c->lab[v_child_col];
-            rec->del.set(parent_from);
+            del.set(parent_from);
 
             if(child_col_sz == 1)
                 continue;
@@ -1042,20 +1055,20 @@ private:
                 ++j;
                 const int parent_to = c->lab[i];
                 assert(g_old_d2[parent_to] == 0);
-                rec->del.set(parent_to);
+                del.set(parent_to);
 
                 const int orig_parent_from = translate_back(parent_from);
                 const int orig_parent_to   = translate_back(parent_to);
 
-                assert(rec->canonical_recovery_string[orig_parent_to].size() == rec->canonical_recovery_string[orig_parent_from].size());
+                assert(canonical_recovery_string[orig_parent_to].size() == canonical_recovery_string[orig_parent_from].size());
 
                 automorphism.arr[orig_parent_to]   = orig_parent_from;
                 automorphism.arr[orig_parent_from] = orig_parent_to;
                 automorphism_supp.push_back(orig_parent_from);
                 automorphism_supp.push_back(orig_parent_to);
-                for(int i = 0; i < rec->canonical_recovery_string[orig_parent_to].size(); ++i) {
-                    const int str_from = rec->canonical_recovery_string[orig_parent_from][i];
-                    const int str_to = rec->canonical_recovery_string[orig_parent_to][i];
+                for(int i = 0; i < canonical_recovery_string[orig_parent_to].size(); ++i) {
+                    const int str_from = canonical_recovery_string[orig_parent_from][i];
+                    const int str_to = canonical_recovery_string[orig_parent_to][i];
                     automorphism.arr[str_to]   = str_from;
                     automorphism.arr[str_from] = str_to;
                     automorphism_supp.push_back(str_from);
@@ -1069,12 +1082,12 @@ private:
         }
     }
 
-    void red_quotient_components(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+    void red_quotient_components(sgraph* g, int* colmap, dejavu_consumer consume) {
         if(g->v_size <= 1)
             return;
 
         //std::cout << "(prep-red) deg1" << std::endl;
-        rec->del_e.reset();
+        del_e.reset();
 
         worklist_deg0.reset();
         worklist_deg1.reset();
@@ -1135,7 +1148,7 @@ private:
                     if (test_vec[test_col.vertex_to_col[v_neigh]] ==
                         test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
                         edge_cnt += 1;
-                        rec->del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
+                        del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
                     }
 
                     if(ii == 0) {
@@ -1159,9 +1172,9 @@ private:
         //std::cout << "independent_con: " << edge_cnt << "/" << g->e_size << std::endl;
     }
 
-    void red_quotient_matchings_(sgraph* g, int* colmap, recovery_map* rec, dejavu_consumer consume) {
+    void red_quotient_matchings_(sgraph* g, int* colmap, dejavu_consumer consume) {
         //std::cout << "(prep-red) deg1" << std::endl;
-        rec->del.reset();
+        del.reset();
 
         worklist_deg0.reset();
         worklist_deg1.reset();
@@ -1273,10 +1286,10 @@ private:
         std::cout << "has_matching_color: " << v_has_matching_color << "/" << g->v_size << std::endl;
     }
     /*void store_graph_aspects(sgraph* g, recovery_map* rec) {
-        rec->old_d.clear();
-        rec->old_d.reserve(g->v_size);
+        old_d.clear();
+        old_d.reserve(g->v_size);
         for (int i = 0; i < g->v_size; ++i) {
-            rec->old_d.push_back(g->d[i]);
+            old_d.push_back(g->d[i]);
         }
     }*/
 
@@ -1286,7 +1299,7 @@ private:
         }
     }
 
-    void perform_del(sgraph*g, int* colmap, recovery_map* rec) {
+    void perform_del(sgraph*g, int* colmap) {
         // TODO: "sparse" deletion?
 
         // copy some stuff
@@ -1298,28 +1311,28 @@ private:
         translate_layer_fwd.clear();
         translate_layer_bwd.clear();
 
-        for(int i = 0; i < rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].size(); ++i)
-            translate_layer_bwd.push_back(rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][i]);
+        for(int i = 0; i < backward_translation_layers[backward_translation_layers.size() - 1].size(); ++i)
+            translate_layer_bwd.push_back(backward_translation_layers[backward_translation_layers.size() - 1][i]);
 
         // create translation array from old graph to new graph vertices
         int cnt = 0;
         int new_vsize = 0;
-        //rec->translation_layers[fwd_ind].reserve(g->v_size);
-        //rec->backward_translation_layers[back_ind].reserve(g->v_size);
+        //translation_layers[fwd_ind].reserve(g->v_size);
+        //backward_translation_layers[back_ind].reserve(g->v_size);
         int pos_now = 0;
         for (int i = 0; i < g->v_size; ++i) {
-            if (!rec->del.get(i)) {
-                //rec->translation_layers[fwd_ind].push_back(cnt);
+            if (!del.get(i)) {
+                //translation_layers[fwd_ind].push_back(cnt);
                 translate_layer_fwd.push_back(cnt);
-                //rec->backward_translation_layers[back_ind].push_back(rec->translation_layers[fwd_ind].size() - 1); // TODO at most need 2 arrays
+                //backward_translation_layers[back_ind].push_back(translation_layers[fwd_ind].size() - 1); // TODO at most need 2 arrays
                 //translate_layer_bwd.push_back(translate_layer_fwd.size() - 1);
                 //translate_layer_fwd.size() - 1
                 const int translate_back = translate_layer_bwd[translate_layer_fwd.size() - 1];
-                rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][cnt] = translate_back;
+                backward_translation_layers[backward_translation_layers.size() - 1][cnt] = translate_back;
                 ++cnt;
                 ++new_vsize;
             } else {
-                //rec->translation_layers[fwd_ind].push_back(-1);
+                //translation_layers[fwd_ind].push_back(-1);
                 translate_layer_fwd.push_back(-1);
             }
         }
@@ -1331,7 +1344,7 @@ private:
             return;
         }
 
-        rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].resize(cnt);
+        backward_translation_layers[backward_translation_layers.size() - 1].resize(cnt);
 
         g_old_v.reserve(g->v_size);
         //g_old_e.reserve(g->e_size);
@@ -1356,7 +1369,7 @@ private:
         int epos  = 0;
         for (int i = 0; i < g->v_size; ++i) { // TODO: maybe iterate over new_vsize and use backward array?
             const int old_v = i;
-            //const int new_v = rec->translation_layers[fwd_ind][i];
+            //const int new_v = translation_layers[fwd_ind][i];
             const int new_v = translate_layer_fwd[i];
 
             if (new_v >= 0) {
@@ -1365,7 +1378,7 @@ private:
                 g->v[new_v] = epos;
                 for(int j = g_old_v[old_v]; j < g_old_v[old_v] + g_old_d2[old_v]; ++j) {
                     const int ve = edge_scratch.arr[j];
-                    //const int new_ve = rec->translation_layers[fwd_ind][ve];
+                    //const int new_ve = translation_layers[fwd_ind][ve];
                     const int new_ve = translate_layer_fwd[ve];
                     if(new_ve >= 0) {
                         assert(new_ve < new_vsize);
@@ -1380,12 +1393,12 @@ private:
         }
 
         g->e_size = epos;
-
         g->v_size = new_vsize;
         g->d_size = new_vsize;
+        del.reset();
     }
 
-    void perform_del_edge(sgraph*g, int* colmap, recovery_map* rec) {
+    void perform_del_edge(sgraph*g, int* colmap) {
         if(g->v_size <= 1)
             return;
 
@@ -1433,7 +1446,7 @@ private:
                 for(int j = g_old_v[old_v]; j < g_old_v[old_v] + g_old_d2[old_v]; ++j) {
                     const int ve = edge_scratch.arr[j];
                     const int new_ve = ve;
-                    if(!rec->del_e.get(j)) {
+                    if(!del_e.get(j)) {
                         assert(new_ve < new_vsize);
                         assert(new_ve >= 0);
                         ++new_d;
@@ -1452,7 +1465,7 @@ private:
         std::cout << "edges: " << pre_esize << " -> " << g->e_size << std::endl;
     }
 
-    void perform_del2(sgraph*g, int* colmap, recovery_map* rec) {
+    void perform_del2(sgraph*g, int* colmap) {
         if(g->v_size <= 1)
             return;
 
@@ -1465,21 +1478,21 @@ private:
 
         edge_scratch.reset();
 
-        for(int i = 0; i < rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].size(); ++i)
-            translate_layer_bwd.push_back(rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][i]);
+        for(int i = 0; i < backward_translation_layers[backward_translation_layers.size() - 1].size(); ++i)
+            translate_layer_bwd.push_back(backward_translation_layers[backward_translation_layers.size() - 1][i]);
 
         // create translation array from old graph to new graph vertices
         int cnt = 0;
         int new_vsize = 0;
         for (int i = 0; i < g->v_size; ++i) {
-            if (!rec->del.get(i)) {
+            if (!del.get(i)) {
                 translate_layer_fwd.push_back(cnt);
                 const int translate_back = translate_layer_bwd[translate_layer_fwd.size() - 1];
-                rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][cnt] = translate_back;
+                backward_translation_layers[backward_translation_layers.size() - 1][cnt] = translate_back;
                 ++cnt;
                 ++new_vsize;
             } else {
-                //rec->translation_layers[fwd_ind].push_back(-1);
+                //translation_layers[fwd_ind].push_back(-1);
                 translate_layer_fwd.push_back(-1);
             }
         }
@@ -1510,13 +1523,13 @@ private:
             edge_scratch.push_back(g->e[i]);
         }
 
-        rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].resize(cnt);
+        backward_translation_layers[backward_translation_layers.size() - 1].resize(cnt);
 
         // make graph smaller using the translation array
         int epos  = 0;
         for (int i = 0; i < g->v_size; ++i) {
             const int old_v = i;
-            //const int new_v = rec->translation_layers[fwd_ind][old_v];
+            //const int new_v = translation_layers[fwd_ind][old_v];
             const int new_v = translate_layer_fwd[old_v];
 
             if (new_v >= 0) {
@@ -1524,7 +1537,7 @@ private:
                 g->v[new_v] = epos;
                 for(int j = g_old_v[old_v]; j < g_old_v[old_v] + g_old_d2[old_v]; ++j) {
                     const int ve = edge_scratch.arr[j];
-                    //const int new_ve = rec->translation_layers[fwd_ind][ve];
+                    //const int new_ve = translation_layers[fwd_ind][ve];
                     const int new_ve = translate_layer_fwd[ve];
                     if(new_ve >= 0) {
                         assert(new_ve < new_vsize);
@@ -1540,10 +1553,10 @@ private:
                         add_edge_buff.arr[old_v].pop_back();
                         //const int edge_to_old = add_edge_buff.arr[old_v];
                         assert(add_edge_buff_act.get(edge_to_old));
-                        //const int edge_to_new = rec->translation_layers[fwd_ind][edge_to_old];
+                        //const int edge_to_new = translation_layers[fwd_ind][edge_to_old];
                         const int edge_to_new = translate_layer_fwd[edge_to_old];
                         assert(edge_to_old >= 0);
-                        assert(edge_to_old <= rec->domain_size);
+                        assert(edge_to_old <= domain_size);
                         assert(edge_to_new >= 0);
                         assert(edge_to_new <= new_vsize);
                         //std::cout << "adding edge " << old_v << "<->" << edge_to_old << std::endl;
@@ -1566,12 +1579,12 @@ private:
         if(colmap != nullptr) {
             for (int i = 0; i < g->v_size; ++i) {
                 const int old_v = i;
-                //const int new_v = rec->translation_layers[fwd_ind][i];
+                //const int new_v = translation_layers[fwd_ind][i];
                 const int new_v = translate_layer_fwd[i];
                 assert(new_v < new_vsize);
                 if (new_v >= 0) {
                     assert(old_colmap[old_v] >= 0);
-                    assert(old_colmap[old_v] < rec->domain_size);
+                    assert(old_colmap[old_v] < domain_size);
                     colmap[new_v] = old_colmap[old_v];
                 }
             }
@@ -1592,38 +1605,39 @@ private:
         }
 
         add_edge_buff_act.reset();
+        del.reset();
     }
 
-    void mark_discrete_for_deletion(sgraph*g, int* colmap, recovery_map* rec) {
+    void mark_discrete_for_deletion(sgraph*g, int* colmap) {
         int discrete_cnt = 0;
         worklist_deg0.reset();
-        for(int i = 0; i < rec->domain_size; ++i) {
+        for(int i = 0; i < domain_size; ++i) {
             worklist_deg0.push_back(0);
         }
         for(int i = 0; i < g->v_size; ++i) {
-            assert(colmap[i] < rec->domain_size);
+            assert(colmap[i] < domain_size);
             worklist_deg0.arr[colmap[i]]++;
         }
         for(int i = 0; i < g->v_size; ++i) {
             if(worklist_deg0.arr[colmap[i]] == 1)
-                rec->del.set(i);
+                del.set(i);
         }
         worklist_deg0.reset();
     }
 
-    void perform_del_discrete(sgraph*g, int* colmap, recovery_map* rec) {
+    void perform_del_discrete(sgraph*g, int* colmap) {
         if(g->v_size <= 1)
             return;
 
         //work_list_t<int> work;
-        //color_count.initialize(rec->domain_size);
+        //color_count.initialize(domain_size);
         int discrete_cnt = 0;
         worklist_deg0.reset();
-        for(int i = 0; i < rec->domain_size; ++i) {
+        for(int i = 0; i < domain_size; ++i) {
             worklist_deg0.push_back(0);
         }
         for(int i = 0; i < g->v_size; ++i) {
-            assert(colmap[i] < rec->domain_size);
+            assert(colmap[i] < domain_size);
             worklist_deg0.arr[colmap[i]]++;
         }
         for(int i = 0; i < g->v_size; ++i) {
@@ -1640,10 +1654,10 @@ private:
         }
 
         // add translation layers for this deletion
-        /*rec->backward_translation_layers.emplace_back(std::vector<int>());
-        const int back_ind = rec->backward_translation_layers.size()-1;
-        rec->translation_layers.emplace_back(std::vector<int>());
-        const int fwd_ind = rec->translation_layers.size()-1;*/
+        /*backward_translation_layers.emplace_back(std::vector<int>());
+        const int back_ind = backward_translation_layers.size()-1;
+        translation_layers.emplace_back(std::vector<int>());
+        const int fwd_ind = translation_layers.size()-1;*/
 
         // copy some stuff
         g_old_v.clear();
@@ -1652,8 +1666,8 @@ private:
         translate_layer_fwd.clear();
         translate_layer_bwd.clear();
 
-        for(int i = 0; i < rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].size(); ++i)
-            translate_layer_bwd.push_back(rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][i]);
+        for(int i = 0; i < backward_translation_layers[backward_translation_layers.size() - 1].size(); ++i)
+            translate_layer_bwd.push_back(backward_translation_layers[backward_translation_layers.size() - 1][i]);
 
         g_old_v.reserve(g->v_size);
         g_old_d2.reserve(g->v_size);
@@ -1678,18 +1692,18 @@ private:
         // create translation array from old graph to new graph vertices
         int cnt = 0;
         int new_vsize = 0;
-        /*rec->translation_layers[fwd_ind] = std::vector<int>();  // TODO: do I really need to save multiple of these?
-        rec->backward_translation_layers[back_ind] = std::vector<int>();
-        rec->translation_layers[fwd_ind].reserve(g->v_size);
-        rec->backward_translation_layers[back_ind].reserve(g->v_size);*/
+        /*translation_layers[fwd_ind] = std::vector<int>();  // TODO: do I really need to save multiple of these?
+        backward_translation_layers[back_ind] = std::vector<int>();
+        translation_layers[fwd_ind].reserve(g->v_size);
+        backward_translation_layers[back_ind].reserve(g->v_size);*/
         for (int i = 0; i < g->v_size; ++i) {
             if (worklist_deg0.arr[colmap[i]] != 1) {
                 translate_layer_fwd.push_back(cnt);
-                //rec->backward_translation_layers[back_ind].push_back(rec->translation_layers[fwd_ind].size() - 1);
+                //backward_translation_layers[back_ind].push_back(translation_layers[fwd_ind].size() - 1);
                 //translate_layer_bwd.push_back(translate_layer_fwd.size() - 1);
                 //translate_layer_fwd.size() - 1
                 const int translate_back = translate_layer_bwd[translate_layer_fwd.size() - 1];
-                rec->backward_translation_layers[rec->backward_translation_layers.size() - 1][cnt] = translate_back;
+                backward_translation_layers[backward_translation_layers.size() - 1][cnt] = translate_back;
                 ++cnt;
                 ++new_vsize;
             } else {
@@ -1697,7 +1711,7 @@ private:
             }
         }
 
-        rec->backward_translation_layers[rec->backward_translation_layers.size() - 1].resize(cnt);
+        backward_translation_layers[backward_translation_layers.size() - 1].resize(cnt);
 
         // make graph smaller using the translation array
         int epos  = 0;
@@ -1740,11 +1754,11 @@ private:
         // copy old colmap for remaining vertices
         for (int i = 0; i < g->v_size; ++i) {
             const int old_v = i;
-            const int new_v = rec->translate3[i];
+            const int new_v = translate3[i];
             assert(new_v < new_vsize);
             if (new_v >= 0) {
                 assert(old_colmap[old_v] >= 0);
-                assert(old_colmap[old_v] < rec->domain_size);
+                assert(old_colmap[old_v] < domain_size);
                 colmap[new_v] = old_colmap[old_v];
             }
         }*/
@@ -1762,9 +1776,9 @@ private:
             assert(g->e[i] < g->v_size);
             assert(g->e[i] >= 0);
         }
+        del.reset();
     }
 public:
-    recovery_map rec;
     coloring<int> c;
     work_list_t<int> automorphism;
     work_list_t<int> automorphism_supp;
@@ -1773,34 +1787,34 @@ public:
     void meld_translation_layers() {
         if(layers_melded)
             return;
-        const int layers = rec.translation_layers.size();
-        rec.backward_translation.reserve(layers - 1);
-        const int reduced_size = rec.backward_translation_layers[layers - 1].size();
+        const int layers = translation_layers.size();
+        backward_translation.reserve(layers - 1);
+        const int reduced_size = backward_translation_layers[layers - 1].size();
         for(int i = 0; i < reduced_size; ++i)
-            rec.backward_translation.push_back(i);
+            backward_translation.push_back(i);
         for(int i = 0; i < reduced_size; ++i) {
             int next_v = i;
             for(int l = layers - 1; l >= 0; --l) {
-                next_v = rec.backward_translation_layers[l][next_v];
+                next_v = backward_translation_layers[l][next_v];
             }
-            rec.backward_translation[i] = next_v;
+            backward_translation[i] = next_v;
         }
         layers_melded = true;
     }
 
     int translate_back(int v) {
-        const int layers = rec.translation_layers.size();
+        const int layers = translation_layers.size();
         for(int l = layers - 1; l >= 0; --l) {
-            v = rec.backward_translation_layers[l][v];
+            v = backward_translation_layers[l][v];
         }
         return v;
     }
 
     void multiply_to_group_size(double n) {
-        rec.base *= n;
-        while(rec.base > 10) {
-            rec.base = rec.base / 10;
-            rec.exp += 1;
+        base *= n;
+        while(base > 10) {
+            base = base / 10;
+            exp += 1;
         }
     }
 
@@ -2668,26 +2682,26 @@ public:
             const int orig_v_to   = translate_back(v_to);
             assert(v_from >= 0);
             assert(v_to >= 0);
-            assert(orig_v_from < rec.domain_size);
+            assert(orig_v_from < domain_size);
             assert(orig_v_from >= 0);
-            assert(orig_v_to < rec.domain_size);
+            assert(orig_v_to < domain_size);
             assert(orig_v_to >= 0);
             assert(automorphism.arr[orig_v_from] == orig_v_from);
             automorphism.arr[orig_v_from] = orig_v_to;
             automorphism_supp.push_back(orig_v_from);
 
-            assert(rec.canonical_recovery_string[orig_v_to].size() == rec.canonical_recovery_string[orig_v_from].size());
+            assert(canonical_recovery_string[orig_v_to].size() == canonical_recovery_string[orig_v_from].size());
 
-            for(int j = 0; j < rec.canonical_recovery_string[orig_v_to].size(); ++j) {
-                const int v_from_t = rec.canonical_recovery_string[orig_v_from][j];
-                const int v_to_t   = rec.canonical_recovery_string[orig_v_to][j];
+            for(int j = 0; j < canonical_recovery_string[orig_v_to].size(); ++j) {
+                const int v_from_t = canonical_recovery_string[orig_v_from][j];
+                const int v_to_t   = canonical_recovery_string[orig_v_to][j];
                 assert(automorphism.arr[v_from_t] == v_from_t);
                 automorphism.arr[v_from_t] = v_to_t;
                 automorphism_supp.push_back(v_from_t);
             }
         }
 
-        consume(rec.domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+        consume(domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         automorphism_supp.reset();
     }
@@ -2698,34 +2712,34 @@ public:
 
         for(int i = 0; i < _supp; ++i) {
             const int v_from      = _automorphism_supp[i];
-            const int orig_v_from = rec.backward_translation[v_from];
+            const int orig_v_from = backward_translation[v_from];
             const int v_to        = _automorphism[v_from];
             assert(v_from != v_to);
-            const int orig_v_to   = rec.backward_translation[v_to];
-            assert(v_from < rec.backward_translation.size());
+            const int orig_v_to   = backward_translation[v_to];
+            assert(v_from < backward_translation.size());
             assert(v_from >= 0);
-            assert(v_to < rec.backward_translation.size());
+            assert(v_to < backward_translation.size());
             assert(v_to >= 0);
-            assert(orig_v_from < rec.domain_size);
+            assert(orig_v_from < domain_size);
             assert(orig_v_from >= 0);
-            assert(orig_v_to < rec.domain_size);
+            assert(orig_v_to < domain_size);
             assert(orig_v_to >= 0);
             assert(automorphism.arr[orig_v_from] == orig_v_from);
             automorphism.arr[orig_v_from] = orig_v_to;
             automorphism_supp.push_back(orig_v_from);
 
-            assert(rec.canonical_recovery_string[orig_v_to].size() == rec.canonical_recovery_string[orig_v_from].size());
+            assert(canonical_recovery_string[orig_v_to].size() == canonical_recovery_string[orig_v_from].size());
 
-            for(int j = 0; j < rec.canonical_recovery_string[orig_v_to].size(); ++j) {
-                const int v_from_t = rec.canonical_recovery_string[orig_v_from][j];
-                const int v_to_t   = rec.canonical_recovery_string[orig_v_to][j];
+            for(int j = 0; j < canonical_recovery_string[orig_v_to].size(); ++j) {
+                const int v_from_t = canonical_recovery_string[orig_v_from][j];
+                const int v_to_t   = canonical_recovery_string[orig_v_to][j];
                 assert(automorphism.arr[v_from_t] == v_from_t);
                 automorphism.arr[v_from_t] = v_to_t;
                 automorphism_supp.push_back(v_from_t);
             }
         }
 
-        consume(rec.domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
+        consume(domain_size, automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         reset_automorphism(automorphism.arr, automorphism_supp.cur_pos, automorphism_supp.arr);
         automorphism_supp.reset();
     }
@@ -3194,9 +3208,10 @@ public:
                             R1.refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
                                                nullptr, &touched_color, &touched_color_list);
 
-                            col = select_color_component(g, &c1, quotient_component_start_pos,
+                            /*col = select_color_component(g, &c1, quotient_component_start_pos,
                                                          quotient_component_end_pos);
-                            if (col == -1) break;
+
+                            if (col == -1) break;*/
 
                             for (int j = 0; j < touched_color_list.cur_pos; ++j) { // check incremental singleton automorphisms
                                 const int _c = touched_color_list.arr[j];
@@ -3222,10 +3237,8 @@ public:
                             touched_color.reset();
                             touched_color_list.reset();
 
-                            if(certify) {
-                                //std::cout << "early certify" << std::endl;
-                                break;
-                            }
+                            if(certify)    break;
+                            //if (col == -1) break;
                         }
 
                         if(!certify) {
@@ -3438,18 +3451,18 @@ public:
     void del_discrete_edges_inplace(sgraph* g, coloring<int>*c) {
         int rem_edges = 0;
         int discrete_vert = 0;
-        rec.del.reset();
+        del.reset();
         for(int i = 0; i < c->lab_sz;) {
             const int col_sz = c->ptn[i];
             if(col_sz == 0) {
                 ++discrete_vert;
-                rec.del.set(c->lab[i]);
+                del.set(c->lab[i]);
             }
             i += col_sz + 1;
         }
 
         for(int v = 0; v < g->v_size; ++v) {
-            if(rec.del.get(v)) {
+            if(del.get(v)) {
                 rem_edges += g->d[v];
                 g->d[v] = 0;
                 continue;
@@ -3458,7 +3471,7 @@ public:
             int write_pt_back  = g->v[v] + g->d[v] - 1;
             for(int n = g->v[v]; n < g->v[v] + g->d[v];) {
                 const int neigh = g->e[n];
-                if(rec.del.get(neigh)) {
+                if(del.get(neigh)) {
                     const int swap_neigh = g->e[g->v[v] + g->d[v] - 1];
                     g->e[g->v[v] + g->d[v] - 1] = neigh;
                     g->e[n] = swap_neigh;
@@ -3474,7 +3487,7 @@ public:
 
     void reduce(sgraph* g, int* colmap, dejavu_consumer consume) {
         {
-            int deg0 = 0;
+            /*int deg0 = 0;
             int deg1 = 0;
             int deg2 = 0;
             for (int i = 0; i < g->v_size; ++i) {
@@ -3492,7 +3505,7 @@ public:
                         break;
                 }
             }
-            std::cout << "(pre-red) before reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2 << std::endl;
+            std::cout << "(pre-red) before reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2 << std::endl;*/
             std::cout << "(pre-red) before reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
         }
         g->initialize_coloring(&c, colmap);
@@ -3516,56 +3529,56 @@ public:
 
         translate_layer_fwd.reserve(g->v_size);
 
-        rec.backward_translation_layers.emplace_back(std::vector<int>());
-        const int back_ind = rec.backward_translation_layers.size()-1;
-        rec.translation_layers.emplace_back(std::vector<int>());
-        const int fwd_ind = rec.translation_layers.size()-1;
-        rec.backward_translation_layers[back_ind].reserve(g->v_size);
+        backward_translation_layers.emplace_back(std::vector<int>());
+        const int back_ind = backward_translation_layers.size()-1;
+        translation_layers.emplace_back(std::vector<int>());
+        const int fwd_ind = translation_layers.size()-1;
+        backward_translation_layers[back_ind].reserve(g->v_size);
         for(int i = 0; i < g->v_size; ++i)
-            rec.backward_translation_layers[back_ind].push_back(i);
+            backward_translation_layers[back_ind].push_back(i);
 
-        rec.domain_size = g->v_size;
+        domain_size = g->v_size;
 
         // assumes colmap is array of length g->v_size
-        rec.del = mark_set();
-        rec.del.initialize(g->v_size);
+        del = mark_set();
+        del.initialize(g->v_size);
 
-        rec.canonical_recovery_string.reserve(g->v_size);
-        for(int i = 0; i < rec.domain_size; ++i)
-            rec.canonical_recovery_string.emplace_back(std::vector<int>());
+        canonical_recovery_string.reserve(g->v_size);
+        for(int i = 0; i < domain_size; ++i)
+            canonical_recovery_string.emplace_back(std::vector<int>());
 
         // eliminate degree 1 + 0
         // TODO delete edges to discrete vertices in-place here?
         del_discrete_edges_inplace(g, &c);
-        red_deg10_assume_cref(g, &c, &rec, consume);
+        red_deg10_assume_cref(g, &c, consume);
         copy_coloring_to_colmap(&c, colmap);
         //mark_discrete_for_deletion(g, colmap, &rec);
-        perform_del(g, colmap, &rec);
+        perform_del(g, colmap);
 
 
         if(g->v_size == 0)
             return;
 
-        rec.del_e = mark_set();
-        rec.del_e.initialize(g->e_size);
+        del_e = mark_set();
+        del_e.initialize(g->e_size);
         add_edge_buff.initialize(g->v_size);
         add_edge_buff_act.initialize(g->v_size);
 
-        red_quotient_components(g, colmap, &rec, consume);
-        perform_del_edge(g, colmap, &rec);
+        red_quotient_components(g, colmap, consume);
+        perform_del_edge(g, colmap);
 
-        red_deg2_path_size_1(g, colmap, &rec, consume);
-        perform_del2(g, colmap, &rec);
+        red_deg2_path_size_1(g, colmap, consume);
+        perform_del2(g, colmap);
 
         const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
 
-        perform_del_discrete(g, colmap, &rec);
+        perform_del_discrete(g, colmap);
 
         sparse_ir(g, colmap, consume, SELECTOR_LARGEST);
-        perform_del_discrete(g, colmap, &rec);
+        perform_del_discrete(g, colmap);
 
-        red_deg2_path_size_1(g, colmap, &rec, consume);
-        perform_del2(g, colmap, &rec);
+        red_deg2_path_size_1(g, colmap, consume);
+        perform_del2(g, colmap);
 
         if(g->v_size > 1) {
             int deg0 = 0;
@@ -3591,35 +3604,35 @@ public:
 
             while(deg0 > 0 || deg1 > 0) {
                 // refinement
-                std::cout << "(prep-red) loop [collected grp_sz " << rec.base << "*10^" << rec.exp << std::endl;
+                std::cout << "(prep-red) loop [collected grp_sz " << base << "*10^" << exp << std::endl;
                 coloring<int> c2;
                 refinement<int, int, int> R2;
                 g->initialize_coloring(&c2, colmap);
                 R2.refine_coloring_first(g, &c2, -1);
 
                 // eliminate degree 1 + 0
-                red_deg10_assume_cref(g, &c2, &rec, consume);
+                red_deg10_assume_cref(g, &c2, consume);
                 copy_coloring_to_colmap(&c2, colmap);
-                mark_discrete_for_deletion(g, colmap, &rec);
-                perform_del(g, colmap, &rec);
+                mark_discrete_for_deletion(g, colmap);
+                perform_del(g, colmap);
                 //perform_del_discrete(g, colmap, &rec);
-                red_deg2_assume_cref(g, colmap, &rec, consume);
-                perform_del2(g, colmap, &rec);
+                red_deg2_assume_cref(g, colmap, consume);
+                perform_del2(g, colmap);
 
-                red_quotient_components(g, colmap, &rec, consume);
-                perform_del_edge(g, colmap, &rec);
+                red_quotient_components(g, colmap, consume);
+                perform_del_edge(g, colmap);
 
-                red_deg2_path_size_1(g, colmap, &rec, consume);
-                perform_del2(g, colmap, &rec);
+                red_deg2_path_size_1(g, colmap, consume);
+                perform_del2(g, colmap);
 
                 const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
-                perform_del_discrete(g, colmap, &rec);
+                perform_del_discrete(g, colmap);
 
                 sparse_ir(g, colmap, consume, SELECTOR_LARGEST);
-                perform_del_discrete(g, colmap, &rec);
+                perform_del_discrete(g, colmap);
 
-                red_deg2_path_size_1(g, colmap, &rec, consume);
-                perform_del2(g, colmap, &rec);
+                red_deg2_path_size_1(g, colmap, consume);
+                perform_del2(g, colmap);
 
                 {
                     deg0 = 0;
@@ -3648,9 +3661,9 @@ public:
             }
         }
 
-        std::cout << "(prep-red) translation layers: " << rec.backward_translation_layers.size() << std::endl;
+        std::cout << "(prep-red) translation layers: " << backward_translation_layers.size() << std::endl;
 
-         //std::cout << "(pre-red) group size: " << rec.base << "*10^" << rec.exp << std::endl;
+         //std::cout << "(pre-red) group size: " << base << "*10^" << exp << std::endl;
 
         g->sanity_check();
 
@@ -3669,7 +3682,7 @@ public:
 
     void restore(sgraph* g, dejavu_stats* a, dejavu_consumer consume) {
         //sparse_group group;
-        //group.domain_size = rec.domain_size;
+        //group.domain_size = domain_size;
         //group.initialize_from_automorphism_info(a, &rec);
     }
 };
