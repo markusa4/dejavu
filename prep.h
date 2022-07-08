@@ -7,10 +7,69 @@
 #include "selector.h"
 #include <vector>
 
+class tiny_orbit {
+    mark_set          touched;
+    work_list_t<int>  reset_arr;
+    work_list_t<int>  map_arr;
+public:
+    int find_and_cut_orbit(const int v1) {
+        int orbit1 = map_arr.arr[v1];
+        while(orbit1 != map_arr.arr[orbit1])
+            orbit1 = map_arr.arr[orbit1];
+        map_arr.arr[v1] = orbit1;
+        return orbit1;
+    }
+
+    void combine_orbits(const int v1, const int v2) {
+        if(v1 != v2) {
+            if(!touched.get(v1))
+                reset_arr.push_back(v1);
+            if(!touched.get(v2))
+                reset_arr.push_back(v2);
+            touched.set(v1);
+            touched.set(v2);
+            int orbit1 = find_and_cut_orbit(v1);
+            int orbit2 = find_and_cut_orbit(v2);
+            if(orbit1 < orbit2) {
+                map_arr.arr[orbit2] = orbit1;
+            } else {
+                map_arr.arr[orbit1] = orbit2;
+            }
+        }
+    }
+
+    bool are_in_same_orbit(const int v1, const int v2) {
+        if(v1 == v2)
+            return true;
+        int orbit1 = find_and_cut_orbit(v1);
+        int orbit2 = find_and_cut_orbit(v2);
+        return (orbit1 == orbit2);
+    }
+
+    void reset() {
+        while(!reset_arr.empty()) {
+            const int v = reset_arr.pop_back();
+            map_arr.arr[v] = v;
+        }
+        touched.reset();
+    }
+
+    void initialize(int domain_size) {
+        touched.initialize(domain_size);
+        reset_arr.initialize(domain_size);
+        map_arr.initialize(domain_size);
+        for(int i = 0; i < domain_size; ++i) {
+            map_arr.push_back(i);
+        }
+    }
+};
+
 class preprocessor {
     int domain_size;
     mark_set del;
     mark_set del_e;
+
+    tiny_orbit orbit;
 
     std::vector<std::vector<int>> translation_layers;
     std::vector<std::vector<int>> backward_translation_layers;
@@ -20,6 +79,9 @@ class preprocessor {
 public:
     double base = 1;
     int    exp  = 0;
+    int    avg_support_sparse_ir        = 0;
+    int    avg_reached_end_of_component = 0;
+    double avg_end_of_comp = 0.0;
 
     work_list_t<std::vector<int>> add_edge_buff;
     work_list_t<int> worklist_deg0;
@@ -196,7 +258,7 @@ private:
                     }
 
                     if(col_cycle) {
-                        std::cout << "neighbours :-(" << std::endl;
+                        PRINT("neighbours :-(");
                         i += test_col.ptn[i] + 1;
                         continue;
                     }
@@ -243,7 +305,7 @@ private:
             }
             i += test_col.ptn[i] + 1;
         }
-        std::cout << "found matching vertices: " << found_match << std::endl;
+        PRINT("found matching vertices: " << found_match);
     }
 
 
@@ -259,15 +321,6 @@ private:
         for(int i = 0; i < domain_size; ++i)
             add_edge_buff.push_back(std::vector<int>()); // TODO: do this smarter... i know how many edges will end up here... should not allocate anything...
         add_edge_buff_act.initialize(domain_size);
-
-        std::vector<int> test_v_to_min_endpoint;
-        test_v_to_min_endpoint.reserve(g->v_size);
-        for(int i = 0; i < g->v_size; ++i)
-            test_v_to_min_endpoint.push_back(-1);
-        std::vector<int> test_v_to_max_endpoint;
-        test_v_to_max_endpoint.reserve(g->v_size);
-        for(int i = 0; i < g->v_size; ++i)
-            test_v_to_max_endpoint.push_back(-1);
 
         work_list_t<int> smallest_endpoint_cnt;
         smallest_endpoint_cnt.initialize(g->v_size);
@@ -459,16 +512,6 @@ private:
                 }
             }
 
-            ///////////////////////////////////////////////////
-            // TESTCODE
-            const int min_endpoint = std::min(endpoint1, endpoint2);
-            const int max_endpoint = std::max(endpoint1, endpoint2);
-            for(int i = 0; i < path.cur_pos; ++i) {
-                test_v_to_min_endpoint[path.arr[i]] = min_endpoint;
-                test_v_to_max_endpoint[path.arr[i]] = max_endpoint;
-            }
-            //////////////////////////////////////////////////
-
             total_path_length += path_length;
 
             if(cycle) {
@@ -481,10 +524,10 @@ private:
                 if((smallest_endpoint_cnt.arr[endpoint1] == 1)  || smallest_endpoint_cnt.arr[endpoint2] == 1) {
                     // TODO actually there is an underlying graph -- "DAC parts" of the graph can be used to attach paths to canonical endpoints?
 
-                    if(check_if_neighbour(g, endpoint1, endpoint2)) {
+                    /*if(check_if_neighbour(g, endpoint1, endpoint2)) {
                         //std::cout << "neighbours!" << std::endl;
                         continue;
-                    }
+                    }*/
 
                     const int col_endpoint2 = colmap[endpoint2];
                     bool col_cycle = false;
@@ -496,7 +539,7 @@ private:
                         }
                     }
                     if(col_cycle) {
-                        std::cout << "col cycle!" << std::endl;
+                        //PRINT("col neighbours!");
                         continue;
                     }
 
@@ -547,36 +590,16 @@ private:
                     //    std::cout<<std::endl;
                     path.reset();
                 } else {
-                    //std::cout << endpoint1 << "(" << colmap[endpoint1] << ")" << "<->" << endpoint2 << "(" << colmap[endpoint2] << ")" << std::endl;
                     // TODO: endpoint that is only connected to uniquely colored paths is also unique endpoint
                     // TODO: can reduce and canonize these by sorting according to color e.g.
-                    std::vector<int> col_list;
-                    for(int f = 0; f < g->d[endpoint1]; ++f) {
-                        const int col_other = colmap[g->e[g->v[endpoint1] + f]];
-                        if(g->d[g->e[g->v[endpoint1] + f]] == 2) {
-                            col_list.push_back(col_other);
-                        }
-                    }
-                    std::sort(col_list.begin(), col_list.end());
-                    for(int i = 0; i < col_list.size(); ++i) {
-                        //std::cout << col_list[i] << " ";
-                    }
-                    //std::cout << std::endl;
                 }
-            }
-        }
-
-        for(int i = 0; i < g->v_size; ++i) {
-            if(g->d[i] == 2 && !del.get(i)) {
-                //std::cout << test_v_to_min_endpoint[i] << ":" << test_v_to_max_endpoint[i] << ":" << colmap[i] << std::endl;
             }
         }
 
         assert(num_paths1 == num_paths2);
         if(num_paths1 != 0) {
-            std::cout << "(prep-red) total paths: " << num_paths1 << " (avg length: " << total_path_length / num_paths1
-                      << ")" << std::endl;
-            std::cout << "(prep-red) unique endpoints: " << unique_smallest_endpoint_paths << std::endl;
+            PRINT("(prep-red) total paths: " << num_paths1 << " (avg length: " << total_path_length / num_paths1
+                      << ")" << std::endl << "(prep-red) unique endpoints: " << unique_smallest_endpoint_paths);
         }
     }
 
@@ -1207,7 +1230,7 @@ private:
                     assert(test_vec[test_col.vertex_to_col[v_neigh]] < g->v_size);
                     if(test_vec[test_col.vertex_to_col[v_neigh]] == test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
                         // TODO: remove these edges!
-                        std::cout << (test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) << " <-> " << (test_col.ptn[i] + 1) << std::endl;
+                        //std::cout << (test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) << " <-> " << (test_col.ptn[i] + 1) << std::endl;
                         edge_cnt += (test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) * (test_col.ptn[i] + 1);
 
                         //std::cout << "should remove edges" << std::endl;
@@ -1243,9 +1266,9 @@ private:
             i += test_col.ptn[i] + 1;
         }
 
-        std::cout << "independent_con: " << edge_cnt << "/" << g->e_size << std::endl;
-        std::cout << "has_matching_indep_color: " << cnt << "/" << g->v_size << std::endl;
-        std::cout << "has_matching_color: " << v_has_matching_color << "/" << g->v_size << std::endl;
+        //std::cout << "independent_con: " << edge_cnt << "/" << g->e_size << std::endl;
+        //std::cout << "has_matching_indep_color: " << cnt << "/" << g->v_size << std::endl;
+        //std::cout << "has_matching_color: " << v_has_matching_color << "/" << g->v_size << std::endl;
     }
     /*void store_graph_aspects(sgraph* g, recovery_map* rec) {
         old_d.clear();
@@ -1424,7 +1447,7 @@ private:
         g->v_size = new_vsize;
         g->d_size = new_vsize;
 
-        std::cout << "edges: " << pre_esize << " -> " << g->e_size << std::endl;
+        //std::cout << "edges: " << pre_esize << " -> " << g->e_size << std::endl;
     }
 
     void perform_del2(sgraph*g, int* colmap) {
@@ -1833,6 +1856,7 @@ public:
                 _automorphism.arr[i] = i;
             touched_color.initialize(g->v_size);
             touched_color_list.initialize(g->v_size);
+            orbit.initialize(g->v_size);
             ir_quotient_component_init = true;
         }
 
@@ -2263,7 +2287,7 @@ public:
                                        nullptr, nullptr, nullptr);
                 }
 
-                std::cout << "(prep-red) sparse-ir random paths: "<< I1.acc << ", " << I2.acc << std::endl;
+                //std::cout << "(prep-red) sparse-ir random paths: "<< I1.acc << ", " << I2.acc << std::endl;
                 reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                 _automorphism_supp.reset();
 
@@ -2275,7 +2299,7 @@ public:
                 }
 
                 certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
-                std::cout << "(prep-red) sparse-ir random path certify: " << certify << std::endl;
+                //std::cout << "(prep-red) sparse-ir random path certify: " << certify << std::endl;
                 if(certify) {
                     ++found_automorphisms;
                     pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr,
@@ -2582,7 +2606,7 @@ public:
         }
 
         if(!individualize_later.empty()) {
-            std::cout << "(pre-red) sparse-ir completed orbits: " << individualize_later.size() << std::endl;
+            PRINT("(pre-red) sparse-ir completed orbits: " << individualize_later.size());
             for (int i = 0; i < individualize_later.size(); ++i) {
                 const int ind_vert = individualize_later[i];
                 const int init_c = R1.individualize_vertex(&original_c, ind_vert);
@@ -2751,11 +2775,11 @@ public:
                 quotient_component_worklist_boundary.emplace_back(
                         std::pair<int, int>(quotient_component_worklist_col.size(),
                                             quotient_component_worklist_v.size()));
-                std::cout << current_component_sz << " ";
+                //std::cout << current_component_sz << " ";
                 current_component_sz = 0;
                 ++component;
             }
-            std::cout << "[" << component  << "]" << std::endl;
+            //std::cout << "[" << component  << "]" << std::endl;
         } else {
             // go component by component and only check old touched components
             int old_component = 0;
@@ -2870,7 +2894,7 @@ public:
                 }
             }
             //std::cout << "[" << new_component  << "]" << std::endl;
-            std::cout << "[" << quotient_component_touched.size() << ", " << touched_vertices << "]" << std::endl;
+            //std::cout << "[" << quotient_component_touched.size() << ", " << touched_vertices << "]" << std::endl;
         }
     }
 
@@ -2889,9 +2913,6 @@ public:
 
         int global_automorphisms_found = 0;
 
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
-        int selector_seed = seed;
-
         std::vector<int> save_colmap_v_to_col;
         std::vector<int> save_colmap_v_to_lab;
         std::vector<int> save_colmap_ptn;
@@ -2904,10 +2925,18 @@ public:
                 _automorphism.arr[i] = i;
             touched_color.initialize(g->v_size);
             touched_color_list.initialize(g->v_size);
+            orbit.initialize(g->v_size);
             ir_quotient_component_init = true;
         }
 
+        coloring<int> c2;
+        c2.copy(&c1);
+
         for(int x = 0; x < num_paths; ++x) {
+            if(x > 0 && quotient_component_touched.empty()) {
+                break;
+            }
+
             compute_quotient_graph_components_update(g, &c1, consume);
 
             int automorphisms_found = 0;
@@ -2924,9 +2953,6 @@ public:
             invariant I1, I2;
             I1.only_acc = true;
             I2.only_acc = true;
-
-            coloring<int> c2;
-            c2.copy(&c1);
 
             bool certify = true;
             int quotient_component_start_pos = 0;
@@ -2961,7 +2987,7 @@ public:
                     bool only_discrete_prev = true;
                     int cell = -1;
                     for (int _i = start_search_here; _i < quotient_component_end_pos; ++_i) {
-                        const int col = quotient_component_worklist_col[_i];
+                        const int col    = quotient_component_worklist_col[_i];
                         const int col_sz = quotient_component_worklist_col_sz[_i];
 
                         if (only_discrete_prev)
@@ -2977,19 +3003,32 @@ public:
                                 //start_search_here = i;
                                 only_discrete_prev = false;
                             }
+                            //if((c1.ptn[i] > 0) && (g->d[c1.lab[i]] == 0 || g->d[c1.lab[i]] == 1)) {
+                            //    cell = i;
+                            //    break;
+                            //}
                             if (c1.ptn[i] == 1) {
                                 cell = i;
                                 break;
                             }
                         }
+
+                        if(cell >= 0 && (g->d[c1.lab[cell]] == 0 || g->d[c1.lab[cell]] == 1)) {
+                            break;
+                        }
+
+                        if(cell>= 0)
+                            break;
                     }
 
-                    if(cell >= 0 && (g->d[c1.lab[cell]] == 0 || g->d[c1.lab[cell]] == 1)) {
-                        cell = -1;
-                    }
+                    //if(cell >= 0 && (g->d[c1.lab[cell]] == 0 || g->d[c1.lab[cell]] == 1)) {
+                    //    cell = -1;
+                    //}
 
-                    if (cell == -1)
+                    if (cell == -1) {
                         break;
+                    } else {
+                    }
 
                     touched_color.reset();
                     touched_color_list.reset();
@@ -3058,7 +3097,6 @@ public:
                     assert(certify ? R1.certify_automorphism(g, _automorphism.arr) : true);
                     //std::cout << "(pre-red) sparse-ir certify: " << certify << std::endl;
                     if (certify) {
-                        //std::cout << "certified sparse" << std::endl;
                         ++automorphisms_found;
                         pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
                                              _automorphism_supp.arr,
@@ -3082,7 +3120,12 @@ public:
                             }
                         } else {
                             // discrete
-                            //std::cout << "this here" << std::endl;
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int v = quotient_component_worklist_v[_i];
+                                colmap[v] = c1.vertex_to_col[v];
+                            }
+                            touched_current_component = false;
+                            break;
                         }
                     } else { // save entire coloring, including lab, ptn, v_to_lab
                         //touched_color.reset();
@@ -3113,7 +3156,7 @@ public:
                             col = select_color_component(g, &c1, quotient_component_start_pos,
                                                          quotient_component_end_pos);
                             if (col == -1) break;
-                            const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c1.ptn[col] + 1));
+                            const int rpos = col + (0 % (c1.ptn[col] + 1));
                             const int v1 = c1.lab[rpos];
                             const int init_color_class1 = R1.individualize_vertex(&c1, v1);
 
@@ -3196,6 +3239,10 @@ public:
                                                  _automorphism_supp.arr,
                                                  consume);
                             multiply_to_group_size(2);
+                            /*const int test_col = select_color_component(g, &c1, quotient_component_start_pos, quotient_component_end_pos);
+                            if(test_col == -1) {
+                                touched_current_component = false;
+                            }*/
                         }
                         reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                         _automorphism_supp.reset();
@@ -3206,7 +3253,7 @@ public:
                                 colmap[i] = save_colmap[i];
                             }*/
                             int f = 0;
-                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // TODO could use touched...
                                 const int v = quotient_component_worklist_v[_i];
                                 colmap[v] = save_colmap_v_to_col[f]; // TODO reset c1 / c2 instead such that paths can just be restarted
 
@@ -3238,7 +3285,7 @@ public:
                                 assert(c2.vertex_to_col[c2.lab[c2.vertex_to_col[v]]] == c2.vertex_to_col[v]);
                             }
                         } else {
-                            std::cout << "did not certify" << std::endl;
+                            std::cout << "did not certifyX" << (c1.cells == g->v_size) << std::endl;
                             // TODO hmmmm
                             // TODO: mark this component such that it is never touched again?
                             // c1/c2 are now 'broken' for this component, never touch it again
@@ -3248,6 +3295,7 @@ public:
 
                         break;
                     }
+
                     reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                     automorphism_supp.reset();
 
@@ -3274,8 +3322,13 @@ public:
                     }
                 }
 
-                if (touched_current_component)
+                if(c1.cells == g->v_size)
+                    break;
+
+                if (touched_current_component) {
                     quotient_component_touched.push_back(component);
+                    del_discrete_edges_inplace_component(g, &c1, quotient_component_start_pos);
+                }
 
                 quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
                 quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
@@ -3286,6 +3339,9 @@ public:
                 quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
             }
             global_automorphisms_found += automorphisms_found;
+
+            if(c1.cells == g->v_size)
+                break;
             if(automorphisms_found == 0)
                 break;
         }
@@ -3295,14 +3351,85 @@ public:
         return global_automorphisms_found;
     }
 
+    void add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
+        for(int i = 0; i < nsupp; ++i) {
+            orbit->combine_orbits(automorphism[supp[i]], supp[i]);
+        }
+    }
+
+    int select_color_component_min_cost(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int max_cell_size) {
+        bool only_discrete_prev = true;
+        int cell = -1;
+        int cell_d = 1;
+        for (int _i = component_start_pos; _i < component_end_pos; ++_i) {
+            const int col = quotient_component_worklist_col[_i];
+            const int col_sz = quotient_component_worklist_col_sz[_i];
+
+            //if (only_discrete_prev)
+            //    start_search_here = _i;
+
+            if (col == -1) {// reached end of component
+                break;
+            }
+            for (int i = col; i < col + col_sz + 1; ++i) {
+                if (c1->vertex_to_col[c1->lab[i]] != i)
+                    continue; // not a color
+                if (c1->ptn[i] > 0 && only_discrete_prev) {
+                    //start_search_here = i;
+                    only_discrete_prev = false;
+                }
+                const int i_d = g->d[c1->lab[i]];
+                //if(c1->ptn[i] >= 1 && (i_d == 0 || i_d == 1)) {
+                //    cell = i;
+                //    break;
+                //}
+                if(c1->ptn[i] >= 1 && (i_d == 0)) {
+                    cell = i;
+                    break;
+                }
+                if (c1->ptn[i] >= 1 && c1->ptn[i] + 1 <= max_cell_size && (i_d != 1)) { // && (i_d != 1)
+                    if(cell == -1 || c1->ptn[i] < c1->ptn[cell]) {
+                        cell = i;
+                        cell_d = i_d;
+                    }
+                }
+            }
+            //if(cell != -1 && (g->d[c1->lab[cell]] == 0 || g->d[c1->lab[cell]] == 1)) {
+            //    cell = -1;
+            //    break;
+            //}
+            if(cell != -1 && (g->d[c1->lab[cell]] == 0)) {
+                cell = -1;
+                break;
+            }
+
+            if(cell != -1 && c1->ptn[cell] < 3)
+                break;
+        }
+
+        return cell;
+    }
+
     int sparse_ir_quotient_components(sgraph* g, int* colmap, dejavu_consumer consume, int max_col_size, int num_paths) {
-        if(g->v_size <= 1)
+        if(g->v_size <= 1 || num_paths <= 0)
             return 0;
 
-        std::cout << "sparse_ir_quotient_components" << std::endl;
+        // TODO this needs to use exploit orbits at least a little bit
+
+        avg_support_sparse_ir     = 0;
+        avg_reached_end_of_component = 0;
+        int avg_support_sparse_ir_num = 0;
+        int avg_support_sparse_ir_num2 = 0;
+
+        //std::cout << "sparse_ir_quotient_components" << std::endl;
 
         quotient_component_touched.clear();
         quotient_component_touched_swap.clear();
+
+        mark_set touched_color_cache;
+        work_list_t<int> touched_color_list_cache;
+        touched_color_cache.initialize(g->v_size);
+        touched_color_list_cache.initialize(g->v_size);
 
         coloring<int> c1;
         g->initialize_coloring(&c1, colmap);
@@ -3312,18 +3439,8 @@ public:
 
         int global_automorphisms_found = 0;
 
-        unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
-        int selector_seed = seed;
-
-        std::vector<int> save_colmap_v_to_col;
-        std::vector<int> save_colmap_v_to_lab;
-        std::vector<int> save_colmap_ptn;
-        int save_cell_number = -1;
-
-        std::vector<int> save_colmap_v_to_col_2;
-        std::vector<int> save_colmap_v_to_lab_2;
-        std::vector<int> save_colmap_ptn_2;
-        int save_cell_number_2 = -1;
+        //unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
+        //int selector_seed = seed;
 
         if (!ir_quotient_component_init) {
             _automorphism.initialize(g->v_size);
@@ -3333,19 +3450,32 @@ public:
             touched_color.initialize(g->v_size);
             touched_color_list.initialize(g->v_size);
             ir_quotient_component_init = true;
+            orbit.initialize(g->v_size);
         }
 
         reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
         _automorphism_supp.reset();
 
+        coloring<int> c2;
+        c2.copy(&c1);
+        c2.copy_ptn(&c1);
+
+        coloring<int> c3;
+        c3.copy(&c1);
+        c3.copy_ptn(&c1);
+
         for(int x = 0; x < num_paths; ++x) {
+            if(x > 0 && quotient_component_touched.empty()) {
+                break;
+            }
+
+            //if(x == 4) {
+            //    del_discrete_edges_inplace(g, &c1); // TODO: do this per-component
+            //}
             //std::cout << "path: " << x << std::endl;
             compute_quotient_graph_components_update(g, &c1, consume);
 
             int automorphisms_found = 0;
-
-            save_colmap.reserve(g->v_size);
-            save_colmap.clear();
 
             quotient_component_touched_swap.clear();
             quotient_component_touched_swap.swap(quotient_component_touched);
@@ -3356,9 +3486,6 @@ public:
             invariant I1, I2;
             I1.only_acc = true;
             I2.only_acc = true;
-
-            coloring<int> c2;
-            c2.copy(&c1);
 
             bool certify = true;
             int quotient_component_start_pos = 0;
@@ -3386,35 +3513,13 @@ public:
                 while (certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
                     ++next_touched_component_i;
                     // select a color class of size 2
-                    bool only_discrete_prev = true;
-                    int cell = -1;
-                    for (int _i = start_search_here; _i < quotient_component_end_pos; ++_i) {
-                        const int col = quotient_component_worklist_col[_i];
-                        const int col_sz = quotient_component_worklist_col_sz[_i];
+                    int cell = select_color_component_min_cost(g, &c1, quotient_component_start_pos, quotient_component_end_pos, max_col_size);
 
-                        if (only_discrete_prev)
-                            start_search_here = _i;
+                    orbit.reset();
 
-                        if (col == -1) {// reached end of component
-                            break;
-                        }
-                        for (int i = col; i < col + col_sz + 1; ++i) {
-                            if (c1.vertex_to_col[c1.lab[i]] != i)
-                                continue; // not a color
-                            if (c1.ptn[i] > 0 && only_discrete_prev) {
-                                //start_search_here = i;
-                                only_discrete_prev = false;
-                            }
-                            if (c1.ptn[i] >= 1 && c1.ptn[i] + 1 <= max_col_size) {
-                                cell = i;
-                                break;
-                            }
-                        }
-                    }
-
-                    if(cell >= 0 && (g->d[c1.lab[cell]] == 0 || g->d[c1.lab[cell]] == 1)) {
-                        cell = -1;
-                    }
+                    //if(cell >= 0 && (g->d[c1.lab[cell]] == 0 || g->d[c1.lab[cell]] == 1)) {
+                    //    cell = -1;
+                    //}
 
                     if (cell == -1) {
                         //std::cout << "skipping component " << quotient_component_start_pos << std::endl;
@@ -3423,26 +3528,10 @@ public:
 
                     const int cell_sz = c1.ptn[cell];
 
-                    std::cout << "cell " << cell << " cell_sz " << cell_sz << std::endl;
+                    //std::cout << "cell " << cell << " cell_sz " << cell_sz << std::endl;
 
                     touched_color.reset();
                     touched_color_list.reset();
-
-                    if(cell_sz > 1 || true) {
-                        // save entire coloring, including lab, ptn, v_to_lab
-                        save_colmap_v_to_col_2.clear();
-                        save_colmap_v_to_lab_2.clear();
-                        save_colmap_ptn_2.clear();
-                        for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                            const int v = quotient_component_worklist_v[_i];
-                            save_colmap_v_to_col_2.push_back(c1.vertex_to_col[v]);
-                            const int lab_pos = c1.vertex_to_lab[v];
-                            save_colmap_v_to_lab_2.push_back(lab_pos);
-                            save_colmap_ptn_2.push_back(c1.ptn[lab_pos]);
-                            save_cell_number_2 = c1.cells;
-                            assert(c1.lab[lab_pos] == v);
-                        }
-                    }
 
 
                     I1.acc = 0;
@@ -3456,6 +3545,7 @@ public:
                     touched_color.set(init_c1);
                     touched_color_list.push_back(cell);
                     touched_color_list.push_back(init_c1);
+                    assert(cell != init_c1);
 
                     R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color,
                                        &touched_color_list); // TODO: save difference of c1 to before individualization now using touched and c2? or have c3 that is only updated once c1 is confirmed?
@@ -3466,12 +3556,13 @@ public:
 
                     if (I1.acc != I2.acc) {
                         std::cout << "probably broken code 0" << std::endl; // TODO: I am not recovering both colorings?
-                        for (int i = 0; i < g->v_size; ++i) { // TODO only use component
+                        /*for (int i = 0; i < g->v_size; ++i) { // TODO only use component
                             colmap[i] = c1.vertex_to_col[i];
-                        }
+                        }*/
                         I2.acc = I1.acc;
-                        c2.copy(&c1);
-                        continue;
+                        c1.copy(&c3); // TODO not this
+                        touched_current_component = false;
+                        break;
                     }
 
                     reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
@@ -3515,34 +3606,53 @@ public:
                     bool all_certified = certify;
                     if (certify) {
                         //std::cout << "certified sparse" << std::endl;
+                        avg_support_sparse_ir += _automorphism_supp.cur_pos;
+                        avg_support_sparse_ir_num += 1;
                         pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
                                              _automorphism_supp.arr,
                                              consume);
+                        assert(_automorphism.arr[ind_v1] == ind_v2);
+                        add_automorphism_to_orbit(&orbit, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                  _automorphism_supp.arr);
+
                         for(int k = 2; (k < cell_sz + 1) && all_certified; ++k) {
-                            // TODO: reset c2 using only touched?
                             // reset c2 to before individualization
-                            {
-                                int f = 0;
+                            assert(touched_color_list.cur_pos <= quotient_component_end_pos_v - quotient_component_start_pos_v);
+                            const int ind_vk = c3.lab[cell + k];
+                            if(orbit.are_in_same_orbit(ind_v1, ind_vk)) {
+                                //std::cout << "skip" << std::endl;
+                                continue;
+                            }
+
+                            if(g->v_size == c1.cells || touched_color_list.cur_pos >= (0.5*(quotient_component_end_pos_v - quotient_component_start_pos_v))) {
                                 for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                     const int v = quotient_component_worklist_v[_i];
-                                    colmap[v] = save_colmap_v_to_col_2[f];
-
-                                    // reset c1 / c2 such that paths can be restarted in next outer loop iteration
-                                    const int lab_pos = save_colmap_v_to_lab_2[f];
-                                    const int ptn_at_lab_pos = save_colmap_ptn_2[f];
-
-                                    c2.vertex_to_col[v] = save_colmap_v_to_col_2[f];
-                                    c2.vertex_to_lab[v] = lab_pos;
+                                    const int lab_pos = c3.vertex_to_lab[v];
+                                    c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                    c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
                                     c2.lab[lab_pos] = v;
-                                    c2.ptn[lab_pos] = ptn_at_lab_pos;
-                                    c2.cells = save_cell_number_2;
-
-                                    ++f;
+                                    c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                    c2.cells = c3.cells;
+                                }
+                            } else {
+                                for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
+                                    const int reset_col = touched_color_list.arr[_i];
+                                    if(c3.vertex_to_col[c3.lab[reset_col]] == reset_col ) {
+                                        for(int l = 0; l < c3.ptn[reset_col] + 1; ++l) {
+                                            const int v = c3.lab[reset_col + l];
+                                            const int lab_pos = c3.vertex_to_lab[v];
+                                            assert(lab_pos == reset_col + l);
+                                            c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                            c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                            c2.lab[lab_pos] = v;
+                                            c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                        }
+                                        c2.cells = c3.cells;
+                                    }
                                 }
                             }
 
                             // individualize and test cell + k
-                            const int ind_vk = c2.lab[cell + k];
                             const int init_ck = R1.individualize_vertex(&c2, ind_vk);
                             I2.acc = 0;
                             R1.refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1, nullptr, &touched_color,
@@ -3583,6 +3693,16 @@ public:
                                 certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
                                                                          _automorphism_supp.cur_pos,
                                                                          _automorphism_supp.arr);
+                                if(certify) {
+                                    avg_support_sparse_ir += _automorphism_supp.cur_pos;
+                                    avg_support_sparse_ir_num += 1;
+                                    pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                         _automorphism_supp.arr,
+                                                         consume);
+                                    assert(_automorphism.arr[ind_v1] == ind_vk);
+                                    add_automorphism_to_orbit(&orbit, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                              _automorphism_supp.arr);
+                                }
                             } else {
                                 certify = false;
                             }
@@ -3592,14 +3712,16 @@ public:
                         if(all_certified) {
                             automorphisms_found += cell_sz ;
                             touched_current_component = true;
+                            avg_support_sparse_ir_num2   += 1;
                             //std::cout << "all_certified early" << std::endl;
                             multiply_to_group_size(cell_sz + 1);
-                            // reset c2 to c1
+                            // reset c2 and c3 to c1
                             if (c1.cells != g->v_size) {
                                 for (int j = 0; j < touched_color_list.cur_pos; ++j) {
                                     const int _c = touched_color_list.arr[j];
                                     int f = 0;
                                     c2.cells = c1.cells;
+                                    c3.cells = c1.cells;
                                     while (f < c1.ptn[_c] + 1) {
                                         const int i = _c + f;
                                         ++f;
@@ -3607,6 +3729,11 @@ public:
                                         c2.lab[i] = c1.lab[i];
                                         c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
                                         c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
+
+                                        c3.ptn[i] = c1.ptn[i];
+                                        c3.lab[i] = c1.lab[i];
+                                        c3.vertex_to_col[c3.lab[i]] = c1.vertex_to_col[c1.lab[i]];
+                                        c3.vertex_to_lab[c3.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
                                     }
                                 }
                             }
@@ -3618,46 +3745,38 @@ public:
                     //    touched_current_component = false;
 
                     if(!all_certified) {
-                        // TODO: need 2 differen save_colmap?
-                        // TODO: for each v in cell start by individualizing cell+k first
-                        // TODO: save selector choices
-                        // save entire coloring, including lab, ptn, v_to_lab
-                        save_colmap_v_to_col.clear();
-                        save_colmap_v_to_lab.clear();
-                        save_colmap_ptn.clear();
-                        for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                            const int v = quotient_component_worklist_v[_i];
-                            save_colmap_v_to_col.push_back(c1.vertex_to_col[v]);
-                            const int lab_pos = c1.vertex_to_lab[v];
-                            save_colmap_v_to_lab.push_back(lab_pos);
-                            save_colmap_ptn.push_back(c1.ptn[lab_pos]);
-                            save_cell_number = c1.cells;
-                            assert(c1.lab[lab_pos] == v);
-                        }
-
                         int col = -1;
                         certify = false;
                         reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                         _automorphism_supp.reset();
 
                         // reset c2 to before individualization
-                        {
-                            int f = 0;
+                        assert(touched_color_list.cur_pos <= quotient_component_end_pos_v - quotient_component_start_pos_v);
+                        if(g->v_size == c1.cells || touched_color_list.cur_pos >= (0.5*(quotient_component_end_pos_v - quotient_component_start_pos_v))) {
                             for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                 const int v = quotient_component_worklist_v[_i];
-                                colmap[v] = save_colmap_v_to_col_2[f];
-
-                                // reset c1 / c2 such that paths can be restarted in next outer loop iteration
-                                const int lab_pos = save_colmap_v_to_lab_2[f];
-                                const int ptn_at_lab_pos = save_colmap_ptn_2[f];
-
-                                c2.vertex_to_col[v] = save_colmap_v_to_col_2[f];
-                                c2.vertex_to_lab[v] = lab_pos;
+                                const int lab_pos = c3.vertex_to_lab[v];
+                                c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
                                 c2.lab[lab_pos] = v;
-                                c2.ptn[lab_pos] = ptn_at_lab_pos;
-                                c2.cells = save_cell_number_2;
-
-                                ++f;
+                                c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                c2.cells = c3.cells;
+                            }
+                        } else {
+                            for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
+                                const int reset_col = touched_color_list.arr[_i];
+                                if(c3.vertex_to_col[c3.lab[reset_col]] == reset_col ) {
+                                    for(int l = 0; l < c3.ptn[reset_col] + 1; ++l) {
+                                        const int v = c3.lab[reset_col + l];
+                                        const int lab_pos = c3.vertex_to_lab[v];
+                                        assert(lab_pos == reset_col + l);
+                                        c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                        c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                        c2.lab[lab_pos] = v;
+                                        c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                    }
+                                    c2.cells = c3.cells;
+                                }
                             }
                         }
 
@@ -3668,40 +3787,68 @@ public:
 
 
                         int num_inds = 0;
+                        int touched_start_pos = 0;
+
+                        touched_color_cache.reset();
+                        touched_color_list_cache.reset();
+
+                        for(int k = 0; k < touched_color_list.cur_pos; ++k) {
+                            touched_color_cache.set(touched_color_list.arr[k]);
+                            touched_color_list_cache.arr[k] = touched_color_list.arr[k];
+                        }
+                        touched_color_list_cache.cur_pos = touched_color_list.cur_pos;
+
 
                         while (true) {
                             // stay within component!
                             col = select_color_component(g, &c1, quotient_component_start_pos,
                                                          quotient_component_end_pos);
                             if (col == -1) break;
-                            const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c1.ptn[col] + 1));
+                            const int rpos = col + (0 % (c1.ptn[col] + 1));
                             const int v1 = c1.lab[rpos];
                             const int init_color_class1 = R1.individualize_vertex(&c1, v1);
 
-                            if(!touched_color.get(init_color_class1)) {
-                                touched_color.set(init_color_class1);
-                                touched_color_list.push_back(init_color_class1);
+                            if(!touched_color_cache.get(init_color_class1)) {
+                                touched_color_cache.set(init_color_class1);
+                                touched_color_list_cache.push_back(init_color_class1);
                             }
-                            if(!touched_color.get(col)) {
-                                touched_color.set(col);
-                                touched_color_list.push_back(col);
+                            if(!touched_color_cache.get(col)) {
+                                touched_color_cache.set(col);
+                                touched_color_list_cache.push_back(col);
                             }
 
                             R1.refine_coloring(g, &c1, &I1, init_color_class1, nullptr, -1, -1,
-                                               nullptr, &touched_color, &touched_color_list);
+                                               nullptr, &touched_color_cache, &touched_color_list_cache);
 
                             //const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
                             const int v2 = c2.lab[rpos];
                             const int init_color_class2 = R1.individualize_vertex(&c2, v2);
                             R1.refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
-                                               nullptr, &touched_color, &touched_color_list);
+                                               nullptr, &touched_color_cache, &touched_color_list_cache);
 
-                            assert(I1.acc == I2.acc);
+                            if(c1.cells == g->v_size) {
+                                //std::cout << "filling colorsA" << std::endl;
+                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                    const int v = quotient_component_worklist_v[_i];
+                                    const int v_col1 = c1.vertex_to_col[v];
+                                    if (!touched_color_cache.get(v_col1) && !touched_color.get(v_col1)) {
+                                        touched_color_cache.set(v_col1);
+                                        touched_color_list_cache.push_back(v_col1);
+                                    }
+                                }
+                            }
 
-                            for (int j = 0; j < touched_color_list.cur_pos; ++j) { // check incremental singleton automorphisms
-                                const int _c = touched_color_list.arr[j];
+                            //assert(I1.acc == I2.acc);
+
+                            for (int j = 0; j < touched_color_list_cache.cur_pos; ++j) { // check incremental singleton automorphisms
+                                const int _c = touched_color_list_cache.arr[j];
+                                if(!touched_color.get(_c)) {
+                                    touched_color.set(_c);
+                                    touched_color_list.push_back(_c);
+                                }
                                 int f = 0;
-                                if(c1.ptn[_c] == 0) {
+                                assert(c1.cells != g->v_size || (c1.ptn[_c] == 0));
+                                if(c1.ptn[_c] == 0 && c2.ptn[_c] == 0) {
                                     while (f < c1.ptn[_c] + 1) {
                                         const int i = _c + f;
                                         ++f;
@@ -3719,19 +3866,48 @@ public:
                                                                      _automorphism_supp.cur_pos,
                                                                      _automorphism_supp.arr);
 
-                            touched_color.reset();
-                            touched_color_list.reset();
+                            touched_color_cache.reset();
+                            touched_color_list_cache.reset();
 
                             if(certify)    break;
+                        }
+
+                        if(!certify && (g->v_size == c1.cells)) {
+                            reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                            _automorphism_supp.reset();
+                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
+                                const int _c = touched_color_list.arr[j];
+                                int f = 0;
+                                assert(c1.cells != g->v_size || (c1.ptn[_c] == 0));
+                                if(c1.ptn[_c] == 0) {
+                                    while (f < c1.ptn[_c] + 1) {
+                                        const int i = _c + f;
+                                        ++f;
+                                        if (c1.lab[i] != c2.lab[i]) {
+                                            _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                                            _automorphism_supp.push_back(c1.lab[i]);
+                                        }
+                                    }
+                                }
+                            }
+                            certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
+                                                                     _automorphism_supp.cur_pos,
+                                                                     _automorphism_supp.arr);
+                            //if(certify)
+                            //    std::cout << "recheck success " << (g->v_size == c1.cells) << std::endl;
                         }
 
                         bool certify_before = certify;
 
                         if (certify) {
                             assert(R1.certify_automorphism(g, _automorphism.arr));
+                            avg_support_sparse_ir += _automorphism_supp.cur_pos;
+                            avg_support_sparse_ir_num += 1;
                             pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
                                                  _automorphism_supp.arr,
                                                  consume);
+                            add_automorphism_to_orbit(&orbit, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                      _automorphism_supp.arr);
                            // multiply_to_group_size(2);
                            all_certified = true;
 
@@ -3739,38 +3915,53 @@ public:
                             _automorphism_supp.reset();
 
                             for(int k = 2; (k < cell_sz + 1) && all_certified; ++k) {
+                                const int ind_vk = c3.lab[cell + k];
+                                if(orbit.are_in_same_orbit(ind_v1, ind_vk)) {
+                                    //std::cout << "skip" << std::endl;
+                                    continue;
+                                }
+
                                 // TODO: reset c2 using only touched?
                                 // reset c2 to before individualization
-                                {
-                                    int f = 0;
+                                assert(touched_color_list.cur_pos <= quotient_component_end_pos_v - quotient_component_start_pos_v);
+                                if(g->v_size == c1.cells || touched_color_list.cur_pos >= (0.5*(quotient_component_end_pos_v - quotient_component_start_pos_v))) {
                                     for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                         const int v = quotient_component_worklist_v[_i];
-                                        colmap[v] = save_colmap_v_to_col_2[f];
-
-                                        // reset c1 / c2 such that paths can be restarted in next outer loop iteration
-                                        const int lab_pos = save_colmap_v_to_lab_2[f];
-                                        const int ptn_at_lab_pos = save_colmap_ptn_2[f];
-
-                                        c2.vertex_to_col[v] = save_colmap_v_to_col_2[f];
-                                        c2.vertex_to_lab[v] = lab_pos;
+                                        const int lab_pos = c3.vertex_to_lab[v];
+                                        c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                        c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
                                         c2.lab[lab_pos] = v;
-                                        c2.ptn[lab_pos] = ptn_at_lab_pos;
-                                        c2.cells = save_cell_number_2;
-
-                                        ++f;
+                                        c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                        c2.cells = c3.cells;
+                                    }
+                                } else {
+                                    for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
+                                        const int reset_col = touched_color_list.arr[_i];
+                                        if(c3.vertex_to_col[c3.lab[reset_col]] == reset_col ) {
+                                            for(int l = 0; l < c3.ptn[reset_col] + 1; ++l) {
+                                                const int v = c3.lab[reset_col + l];
+                                                const int lab_pos = c3.vertex_to_lab[v];
+                                                assert(lab_pos == reset_col + l);
+                                                c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                                c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                                c2.lab[lab_pos] = v;
+                                                c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                            }
+                                            c2.cells = c3.cells;
+                                        }
                                     }
                                 }
 
-                                touched_color.reset();
-                                touched_color_list.reset();
-
                                 // individualize and test cell + k
-                                const int ind_vk = c2.lab[cell + k];
                                 const int init_ck = R1.individualize_vertex(&c2, ind_vk);
-                                touched_color.set(cell);
-                                touched_color_list.push_back(cell);
-                                touched_color.set(init_ck);
-                                touched_color_list.push_back(init_ck);
+                                if(!touched_color.get(cell)) {
+                                    touched_color.set(cell);
+                                    touched_color_list.push_back(cell);
+                                }
+                                if(!touched_color.get(init_ck)) {
+                                    touched_color.set(init_ck);
+                                    touched_color_list.push_back(init_ck);
+                                }
                                 I2.acc = 0;
                                 R1.refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1, nullptr, &touched_color,
                                                    &touched_color_list);
@@ -3783,68 +3974,102 @@ public:
 
                                 int repeat_num_inds = 0;
 
-                                while(repeat_num_inds < num_inds) {
-                                    // stay within component!
-                                    col = select_color_component(g, &c2, quotient_component_start_pos,
-                                                                 quotient_component_end_pos);
-                                    if (col == -1) {
-                                        break;
+                                bool should_add_ind = false;
+                                do {
+                                    while (repeat_num_inds < num_inds) {
+                                        // stay within component!
+                                        col = select_color_component(g, &c2, quotient_component_start_pos,
+                                                                     quotient_component_end_pos);
+                                        if (col == -1) {
+                                            break;
+                                        }
+                                        const int rpos =
+                                                col + (0 % (c2.ptn[col] + 1));
+                                        const int v2 = c2.lab[rpos];
+                                        const int init_color_class2 = R1.individualize_vertex(&c2, v2);
+                                        if (!touched_color.get(init_color_class2)) {
+                                            touched_color.set(init_color_class2);
+                                            touched_color_list.push_back(init_color_class2);
+                                        }
+                                        if(!touched_color.get(col)) {
+                                            touched_color.set(col);
+                                            touched_color_list.push_back(col);
+                                        }
+                                        R1.refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
+                                                           nullptr, &touched_color, &touched_color_list);
+                                        ++repeat_num_inds;
                                     }
-                                    const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
-                                    const int v2 = c2.lab[rpos];
-                                    const int init_color_class2 = R1.individualize_vertex(&c2, v2);
-                                    if(!touched_color.get(init_color_class2)) {
-                                        touched_color.set(init_color_class2);
-                                        touched_color_list.push_back(init_color_class2);
-                                    }
-                                    /*if(!touched_color.get(col)) {
-                                        touched_color.set(col);
-                                        touched_color_list.push_back(col);
-                                    }*/
-                                    R1.refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
-                                                       nullptr, &touched_color, &touched_color_list);
-                                    ++repeat_num_inds;
-                                }
 
+                                    should_add_ind = false;
 
-                                if(I1.acc == I2.acc && c1.cells == c2.cells) {
-                                    for (int j = 0;
-                                         j < touched_color_list.cur_pos; ++j) { // check the singleton automorphism
-                                        const int _c = touched_color_list.arr[j];
-                                        int f = 0;
-                                        while (f < c1.ptn[_c] + 1) {
-                                            const int i = _c + f;
-                                            ++f;
-                                            if (c1.lab[i] != c2.lab[i]) {
-                                                //assert(_automorphism.arr[c1.lab[i]] == c1.lab[i]);
-                                                _automorphism.arr[c1.lab[i]] = c2.lab[i];
-                                                _automorphism_supp.push_back(c1.lab[i]);
+                                   // std::cout << I1.acc << ", " << I2.acc << std::endl;
+
+                                    if (I1.acc == I2.acc && c1.cells == c2.cells) {
+                                        for (int j = 0; j < touched_color_list.cur_pos; ++j) { // check the singleton automorphism
+                                            const int _c = touched_color_list.arr[j];
+                                            int f = 0;
+                                            if(c1.ptn[_c] == 0) {
+                                                while (f < c1.ptn[_c] + 1) {
+                                                    const int i = _c + f;
+                                                    ++f;
+                                                    if (c1.lab[i] != c2.lab[i]) {
+                                                        //assert(_automorphism.arr[c1.lab[i]] == c1.lab[i]);
+                                                        _automorphism.arr[c1.lab[i]] = c2.lab[i];
+                                                        _automorphism_supp.push_back(c1.lab[i]);
+                                                    }
+                                                }
                                             }
                                         }
-                                    }
 
-                                    certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
-                                                                             _automorphism_supp.cur_pos,
-                                                                             _automorphism_supp.arr);
-                                } else {
-                                    certify = false;
-                                }
+                                        certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.arr,
+                                                                                 _automorphism_supp.cur_pos,
+                                                                                 _automorphism_supp.arr);
+                                        should_add_ind = !certify;
+                                    } else {
+                                        certify = false;
+                                    }
+                                    if(should_add_ind) {
+                                        col = select_color_component(g, &c1, quotient_component_start_pos,
+                                                                     quotient_component_end_pos);
+                                        if (col == -1) { should_add_ind = false; break; }
+                                        const int rpos = col + (0 % (c1.ptn[col] + 1));
+                                        const int v1 = c1.lab[rpos];
+                                        const int init_color_class1 = R1.individualize_vertex(&c1, v1);
+                                        R1.refine_coloring(g, &c1, &I1, init_color_class1, nullptr, -1, -1,
+                                                           nullptr, &touched_color, &touched_color_list);
+                                        num_inds += 1;
+
+                                        reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
+                                        _automorphism_supp.reset();
+                                    }
+                                } while(should_add_ind);
 
                                 all_certified = certify && all_certified;
                                 if(certify) {
+                                    avg_support_sparse_ir += _automorphism_supp.cur_pos;
+                                    avg_support_sparse_ir_num += 1;
                                     pre_consumer_inplace(g->v_size, _automorphism.arr, _automorphism_supp.cur_pos,
                                                          _automorphism_supp.arr,
                                                          consume);
+                                    assert(_automorphism.arr[ind_v1] == ind_vk);
+                                    add_automorphism_to_orbit(&orbit, _automorphism.arr, _automorphism_supp.cur_pos,
+                                                              _automorphism_supp.arr);
                                 }
-
                                 reset_automorphism(_automorphism.arr, _automorphism_supp.cur_pos, _automorphism_supp.arr);
                                 _automorphism_supp.reset();
                             }
 
                            if(all_certified) {
                                automorphisms_found += cell_sz + 1;
-                               touched_current_component = true;
                                multiply_to_group_size(cell_sz + 1);
+                               touched_current_component = true;
+
+                               avg_support_sparse_ir_num2   += 1;
+                               const int test_col = select_color_component(g, &c1, quotient_component_start_pos, quotient_component_end_pos);
+                               if(test_col == -1) {
+                                   avg_reached_end_of_component += 1;
+                                   touched_current_component = false;
+                               }
                            }
                         }
 
@@ -3852,27 +4077,62 @@ public:
 
                         if (certify) {
                             int f = 0;
-                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                const int v = quotient_component_worklist_v[_i];
-                                colmap[v] = save_colmap_v_to_col[f];
+                            // TODO i think these operations are the bottleneck
+                            I1.acc = 0;
+                            assert(touched_color.get(c3.vertex_to_col[ind_v1]));
+                            const int init_c3 = R1.individualize_vertex(&c3, ind_v1);
+                            assert(touched_color.get(init_c3));
+                            const int touched_col_prev = touched_color_list.cur_pos;
+                            R1.refine_coloring(g, &c3, &I1, init_c3, nullptr, -1, -1,
+                                               nullptr, &touched_color, &touched_color_list);
+                            assert(touched_col_prev == touched_color_list.cur_pos);
 
-                                // reset c1 / c2 such that paths can be restarted in next outer loop iteration
-                                c1.vertex_to_col[v] = save_colmap_v_to_col[f];
-                                const int lab_pos   = save_colmap_v_to_lab[f];
-                                const int ptn_at_lab_pos = save_colmap_ptn[f];
-                                c1.vertex_to_lab[v] = lab_pos;
-                                c1.lab[lab_pos]     = v;
-                                c1.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c1.cells = save_cell_number;
+                            assert(touched_color_list.cur_pos <= quotient_component_end_pos_v - quotient_component_start_pos_v);
+                            if(g->v_size == c1.cells || touched_color_list.cur_pos >= (0.5*(quotient_component_end_pos_v - quotient_component_start_pos_v))) {
+                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                    const int v = quotient_component_worklist_v[_i];
+                                    colmap[v] = c3.vertex_to_col[v];
 
-                                c2.vertex_to_col[v] = save_colmap_v_to_col[f];
-                                c2.vertex_to_lab[v] = lab_pos;
-                                c2.lab[lab_pos]     = v;
-                                c2.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c2.cells = save_cell_number;
+                                    c1.vertex_to_col[v] = c3.vertex_to_col[v];
+                                    c1.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                    const int lab_pos = c3.vertex_to_lab[v];
+                                    c1.lab[lab_pos] = v;
+                                    c1.ptn[lab_pos] = c3.ptn[lab_pos];
+                                    c1.cells = c3.cells;
 
-                                ++f;
+                                    c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                    c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                    c2.lab[lab_pos] = v;
+                                    c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                    c2.cells = c3.cells;
+                                }
+                            } else {
+                                for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
+                                    const int reset_col = touched_color_list.arr[_i];
+                                    if(c3.vertex_to_col[c3.lab[reset_col]] == reset_col ) {
+                                        for(int k = 0; k < c3.ptn[reset_col] + 1; ++k) {
+                                            const int v = c3.lab[reset_col + k];
+                                            colmap[v] = c3.vertex_to_col[v];
+
+                                            c1.vertex_to_col[v] = c3.vertex_to_col[v];
+                                            c1.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                            const int lab_pos = c3.vertex_to_lab[v];
+                                            assert(lab_pos == reset_col + k);
+                                            c1.lab[lab_pos] = v;
+                                            c1.ptn[lab_pos] = c3.ptn[lab_pos];
+
+                                            c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                            c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                            c2.lab[lab_pos] = v;
+                                            c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                        }
+                                        c1.cells = c3.cells;
+                                        c2.cells = c3.cells;
+                                    }
+                                }
                             }
+
+
                             for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                 const int v = quotient_component_worklist_v[_i];
                                 const int list_index = _i - quotient_component_start_pos_v;
@@ -3883,35 +4143,36 @@ public:
                                 assert(c2.ptn[c2.vertex_to_col[v]] >= 0);
                                 assert(c2.lab[c2.vertex_to_lab[v]] == v);
                                 assert(c2.vertex_to_col[c2.lab[c2.vertex_to_col[v]]] == c2.vertex_to_col[v]);
+
+                                assert(c1.vertex_to_col[v] == c3.vertex_to_col[v]);
+                                assert(c2.vertex_to_col[v] == c3.vertex_to_col[v]);
+                                assert(c1.ptn[c1.vertex_to_col[v]] == c3.ptn[c1.vertex_to_col[v]]);
+                                assert(c2.ptn[c2.vertex_to_col[v]] == c3.ptn[c1.vertex_to_col[v]]);
                             }
                         } else {
-                            //std::cout << "did not certify" << std::endl;
+                            std::cout << "did not certifyY" << (c1.cells == g->v_size) << ", " << cell_sz << std::endl;
                             int f = 0;
                             for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // TODO: why is this necessary?
                                 const int v = quotient_component_worklist_v[_i];
-                                colmap[v] = save_colmap_v_to_col_2[f];
 
                                 // reset c1 / c2 such that paths can be restarted in next outer loop iteration
-                                c1.vertex_to_col[v] = save_colmap_v_to_col_2[f];
-                                const int lab_pos   = save_colmap_v_to_lab_2[f];
-                                const int ptn_at_lab_pos = save_colmap_ptn_2[f];
-                                c1.vertex_to_lab[v] = lab_pos;
-                                c1.lab[lab_pos]     = v;
-                                c1.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c1.cells = save_cell_number_2;
+                                c1.vertex_to_col[v] = c3.vertex_to_col[v];
+                                c1.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                const int lab_pos = c3.vertex_to_lab[v];
+                                c1.lab[lab_pos] = v;
+                                c1.ptn[lab_pos] = c3.ptn[lab_pos];
+                                c1.cells = c3.cells;
 
-                                c2.vertex_to_col[v] = save_colmap_v_to_col_2[f];
-                                c2.vertex_to_lab[v] = lab_pos;
-                                c2.lab[lab_pos]     = v;
-                                c2.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c2.cells = save_cell_number_2;
-
-                                ++f;
+                                c2.vertex_to_col[v] = c3.vertex_to_col[v];
+                                c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
+                                c2.lab[lab_pos] = v;
+                                c2.ptn[lab_pos] = c3.ptn[lab_pos];
+                                c2.cells = c3.cells;
                             }
                             // we did not find an automorphism
                             // c1/c2 are now 'broken' for this component, i.e., we can not find automorphisms here
                             // so we just never touch it again
-                            std::cout << "touched_current_component: " << touched_current_component << std::endl;
+                            //std::cout << "touched_current_component: " << touched_current_component << std::endl;
                             touched_current_component = false;
                         }
 
@@ -3943,9 +4204,10 @@ public:
                     }
                 }
 
-                if (touched_current_component)
+                if (touched_current_component) {
                     quotient_component_touched.push_back(component);
-
+                    del_discrete_edges_inplace_component(g, &c1, quotient_component_start_pos);
+                }
                 quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
                 quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
 
@@ -3961,6 +4223,16 @@ public:
         //for(int i = 0; i < quotient_component_touched.size(); ++i)
         //    std::cout << quotient_component_touched[i] << " ";
         //std::cout << std::endl;
+        if(avg_support_sparse_ir > 0 && avg_support_sparse_ir_num > 0) {
+            avg_support_sparse_ir = avg_support_sparse_ir / avg_support_sparse_ir_num;
+        }
+        std::cout << avg_support_sparse_ir << "/" << g->v_size << std::endl;
+        std::cout << (1.0*avg_reached_end_of_component) / (avg_support_sparse_ir_num2*1.0) << std::endl;
+        if(avg_support_sparse_ir_num2 > 0) {
+            avg_end_of_comp = (1.0 * avg_reached_end_of_component) / (avg_support_sparse_ir_num2 * 1.0);
+        } else {
+            avg_end_of_comp = 0;
+        }
         return global_automorphisms_found;
     }
 
@@ -4081,6 +4353,60 @@ public:
         //std::cout << discrete_vert << ", " << rem_edges << std::endl;
     }
 
+    void del_discrete_edges_inplace_component(sgraph* g, coloring<int>*c, int component_start_pos) {
+        int rem_edges = 0;
+        int discrete_vert = 0;
+        for (int _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
+            const int col = quotient_component_worklist_col[_i];
+            const int col_sz = quotient_component_worklist_col_sz[_i];
+
+            if (col == -1) {// reached end of component
+                break;
+            }
+
+            for (int i = col; i < col + col_sz + 1; ++i) {
+                if (c->vertex_to_col[c->lab[i]] != i)
+                    continue; // not a color
+                if (c->ptn[i] == 0) {
+                    ++discrete_vert;
+                    del.set(c->lab[i]);
+                }
+            }
+        }
+
+        for (int _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
+            const int col = quotient_component_worklist_col[_i];
+            const int col_sz = quotient_component_worklist_col_sz[_i];
+
+            if (col == -1) {// reached end of component
+                break;
+            }
+
+            for (int i = col; i < col + col_sz + 1; ++i) {
+                const int v = c->lab[i];
+                if (del.get(v)) {
+                    rem_edges += g->d[v];
+                    g->d[v] = 0;
+                    continue;
+                }
+                int write_pt_front = g->v[v];
+                int write_pt_back = g->v[v] + g->d[v] - 1;
+                for (int n = g->v[v]; n < g->v[v] + g->d[v];) {
+                    const int neigh = g->e[n];
+                    if (del.get(neigh)) {
+                        const int swap_neigh = g->e[g->v[v] + g->d[v] - 1];
+                        g->e[g->v[v] + g->d[v] - 1] = neigh;
+                        g->e[n] = swap_neigh;
+                        --g->d[v];
+                        ++rem_edges;
+                    } else {
+                        ++n;
+                    }
+                }
+            }
+        }
+    }
+
     void reduce(sgraph* g, int* colmap, dejavu_consumer consume) {
         {
             /*int deg0 = 0;
@@ -4167,8 +4493,10 @@ public:
         perform_del2(g, colmap);
 
         const int auto_found = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
-
-        perform_del_discrete(g, colmap);
+        if(auto_found > 0) {
+            perform_del_discrete(g, colmap);
+        }
+        std::cout << "sparse_ir_qco_2 " << auto_found << std::endl;
 
         sparse_ir(g, colmap, consume, SELECTOR_LARGEST);
         perform_del_discrete(g, colmap);
@@ -4176,7 +4504,15 @@ public:
         red_deg2_path_size_1(g, colmap, consume);
         perform_del2(g, colmap);
 
-        const int test = sparse_ir_quotient_components(g, colmap, consume, 8, 8);
+        // TODO: look at average support of automorphisms to decide whether its worth?
+        // TODO: active support vs. "implied" support - amalgam of number of individualizations and support is crucial factor
+        // TODO: path length vs. base?
+        // TODO: If I'm just badly emulating the IR solver without proper Schreier-Sims, should immediately stop
+        const int test = sparse_ir_quotient_components(g, colmap, consume, 16, 4);
+        std::cout << "sparse_ir_qco_X " << test << std::endl;
+        if(test > 0) {
+            perform_del_discrete(g, colmap);
+        }
 
         if(g->v_size > 1) {
             int deg0 = 0;
@@ -4197,16 +4533,31 @@ public:
                         break;
                 }
             }
+
+            if(deg0 == 0 && deg1 == 0 && deg2 != 0) {
+                red_deg2_assume_cref(g, colmap, consume);
+                perform_del2(g, colmap);
+            }
+
             std::cout << "(pre-red) after reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2 << std::endl;
             std::cout << "(pre-red) after reduction (G, E) " << g->v_size << ", " << g->e_size << std::endl;
 
+            int back_off = 1;
+            int add_on   = 0;
+
             while(deg0 > 0 || deg1 > 0) {
+                if(avg_end_of_comp > 0.5 && (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) > 0.1) {
+                    back_off = back_off * 16; // TODO this is not "fine" enough
+                }
+                if(avg_end_of_comp < 0.1 || (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) < 0.01) {
+                    add_on += 4;
+                }
                 // refinement
-                std::cout << "(prep-red) loop [collected grp_sz " << base << "*10^" << exp << std::endl;
+                std::cout << "(prep-red) loop [collected grp_sz " << base << "*10^" << exp << "] [bo, ao ] "<< back_off << ", " << add_on << std::endl;
                 coloring<int> c2;
-                refinement<int, int, int> R2;
+                //refinement<int, int, int> R2;
                 g->initialize_coloring(&c2, colmap);
-                R2.refine_coloring_first(g, &c2, -1);
+                //R2.refine_coloring_first(g, &c2, -1);
 
                 // eliminate degree 1 + 0
                 red_deg10_assume_cref(g, &c2, consume);
@@ -4217,13 +4568,14 @@ public:
                 red_deg2_assume_cref(g, colmap, consume);
                 perform_del2(g, colmap);
 
-                red_quotient_components(g, colmap, consume);
-                perform_del_edge(g, colmap);
+                //red_quotient_components(g, colmap, consume);
+                //perform_del_edge(g, colmap);
 
                 red_deg2_path_size_1(g, colmap, consume);
                 perform_del2(g, colmap);
 
                 const int test2 = sparse_ir_col_sz_2_quotient_components(g, colmap, consume, 16);
+                std::cout << "sparse_ir_qco_2 " << test2 << std::endl;
                 perform_del_discrete(g, colmap);
 
                 sparse_ir(g, colmap, consume, SELECTOR_LARGEST);
@@ -4232,8 +4584,11 @@ public:
                 red_deg2_path_size_1(g, colmap, consume);
                 perform_del2(g, colmap);
 
-                const int test3 = sparse_ir_quotient_components(g, colmap, consume, 8, 8);
-
+                const int test3 = sparse_ir_quotient_components(g, colmap, consume, 16, 5 - back_off + add_on);
+                std::cout << "sparse_ir_qco_X " << test3 << std::endl;
+                if(test3 > 0) {
+                    perform_del_discrete(g, colmap);
+                }
                 {
                     deg0 = 0;
                     deg1 = 0;

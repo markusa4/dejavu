@@ -862,7 +862,8 @@ private:
             bool test = true;
             if(switches->done_created_group && automorphism.mark && automorphism.certified) {
                 test = G->add_permutation(&automorphism, &idle_ms, done);
-                if(test && foreign_base_done) { //
+                if(test && foreign_base_done && !(switches->current_mode == MODE_AUTO_NON_UNIFORM_PROBE)
+                        && !(switches->current_mode == MODE_AUTO_NON_UNIFORM_PROBE_IT)) { //
                     G->sift_random();
                 }
             }

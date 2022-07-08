@@ -73,6 +73,12 @@ public:
     }
 
     bool add_permutation(bijection<vertex_t>* p, int* idle_ms, bool* done) {
+        int support = 0;
+        //for(int i = 0; i < domain_size; ++i) {
+        //    support += (p->map[i] != i);
+        //}
+        //std::cout << support << "/" << domain_size << std::endl;
+
         int* map = p->extract_map();
         filterstate state;
         state.ingroup = false;
