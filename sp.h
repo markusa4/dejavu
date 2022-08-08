@@ -6,62 +6,9 @@
 #include "selector.h"
 #include <vector>
 
-class tiny_orbit {
-    mark_set          touched;
-    work_list_t<int>  reset_arr;
-    work_list_t<int>  map_arr;
-public:
-    int find_and_cut_orbit(const int v1) {
-        int orbit1 = map_arr[v1];
-        while(orbit1 != map_arr[orbit1])
-            orbit1 = map_arr[orbit1];
-        map_arr[v1] = orbit1;
-        return orbit1;
-    }
-
-    void combine_orbits(const int v1, const int v2) {
-        if(v1 != v2) {
-            if(!touched.get(v1))
-                reset_arr.push_back(v1);
-            if(!touched.get(v2))
-                reset_arr.push_back(v2);
-            touched.set(v1);
-            touched.set(v2);
-            int orbit1 = find_and_cut_orbit(v1);
-            int orbit2 = find_and_cut_orbit(v2);
-            if(orbit1 < orbit2) {
-                map_arr[orbit2] = orbit1;
-            } else {
-                map_arr[orbit1] = orbit2;
-            }
-        }
-    }
-
-    bool are_in_same_orbit(const int v1, const int v2) {
-        if(v1 == v2)
-            return true;
-        int orbit1 = find_and_cut_orbit(v1);
-        int orbit2 = find_and_cut_orbit(v2);
-        return (orbit1 == orbit2);
-    }
-
-    void reset() {
-        while(!reset_arr.empty()) {
-            const int v = reset_arr.pop_back();
-            map_arr[v] = v;
-        }
-        touched.reset();
-    }
-
-    void initialize(int domain_size) {
-        touched.initialize(domain_size);
-        reset_arr.initialize(domain_size);
-        map_arr.initialize(domain_size);
-        for(int i = 0; i < domain_size; ++i) {
-            map_arr.push_back(i);
-        }
-    }
-};
+enum preop { deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop};
+std::vector<preop> default_schedule = {preop::deg01, preop::qcedgeflip, preop::deg2ma, preop::deg2ue, preop::probe2qc,
+                                       preop::deg2ma, preop::probeqc, redloop};
 
 class sp {
 public:
@@ -631,7 +578,8 @@ private:
         return;
     }
 
-    void red_deg10_assume_cref(sgraph* g, const coloring<int>* c, dejavu_hook consume) {
+    void red_deg10_assume_cref(sgraph* g, int* colmap, dejavu_hook consume) {
+        g->initialize_coloring(&c, colmap);
         //del.reset();
 
         worklist_deg0.reset();
@@ -668,21 +616,21 @@ private:
         map.initialize(g->v_size);
 
 
-        for(int i = 0; i < c->ptn_sz;) {
-            const int v = c->lab[i];
+        for(int i = 0; i < c.ptn_sz;) {
+            const int v = c.lab[i];
             switch(g_old_v[v]) {
                 case 0:
                     worklist_deg0.push_back(v);
                     break;
                 case 1:
-                    if(c->ptn[c->vertex_to_col[v]] > 0)
+                    if(c.ptn[c.vertex_to_col[v]] > 0)
                         worklist_deg1.push_back(v);
                     // TODO: should early-out with less overhead!
                     break;
                 default:
                     break;
             }
-            i += c->ptn[i] + 1;
+            i += c.ptn[i] + 1;
         }
 
         while(!worklist_deg1.empty()) {
@@ -692,8 +640,8 @@ private:
             if(g_old_v[v_child] != 1)
                 continue;
 
-            const int v_child_col = c->vertex_to_col[v_child];
-            const int child_col_sz = c->ptn[v_child_col] + 1;
+            const int v_child_col = c.vertex_to_col[v_child];
+            const int child_col_sz = c.ptn[v_child_col] + 1;
             bool is_pairs = false;
             bool permute_parents_instead = false;
             if(child_col_sz == 1) {
@@ -704,10 +652,10 @@ private:
                 is_parent.reset();
                 int last_parent_child_count = -1;
                 for (int i = v_child_col; i < v_child_col + child_col_sz; ++i) {
-                    int child = c->lab[i];
+                    int child = c.lab[i];
                     int next_child = -1;
                     if(i < v_child_col + child_col_sz - 1)
-                        next_child = c->lab[i + 1];
+                        next_child = c.lab[i + 1];
 
                     // search for parent
                     const int e_pos_child = g->v[child];
@@ -722,8 +670,8 @@ private:
                         parent = g->e[e_pos_child + search_parent];
                     }
 
-                    assert(is_pairs?c->vertex_to_col[parent] == c->vertex_to_col[child]:true);
-                    if(c->vertex_to_col[parent] == c->vertex_to_col[child]) {
+                    assert(is_pairs?c.vertex_to_col[parent] == c.vertex_to_col[child]:true);
+                    if(c.vertex_to_col[parent] == c.vertex_to_col[child]) {
                         is_pairs = true;
                         del.set(child);
                         del.set(parent);
@@ -790,7 +738,7 @@ private:
 
                     multiply_to_group_size(2);
 
-                    assert(c->vertex_to_col[pair_from] == c->vertex_to_col[pair_to]);
+                    assert(c.vertex_to_col[pair_from] == c.vertex_to_col[pair_to]);
                     assert(pair_from != pair_to);
                     int pos = 0;
 
@@ -919,7 +867,7 @@ private:
                     } else {
                         child_to = parentlist[i];
                     }
-                    assert(c->vertex_to_col[child_from] == c->vertex_to_col[child_to]);
+                    assert(c.vertex_to_col[child_from] == c.vertex_to_col[child_to]);
                     assert(child_from != child_to);
                     int pos = 0;
 
@@ -989,7 +937,7 @@ private:
         if(g->v_size > 1) {
             // search for parents that still remain in the graph, and rewrite childlist structure into canonical string
             for (int _i = 0; _i < g->v_size; ++_i) {
-                if (!del.get(_i) && childcount[_i] > 0 && c->ptn[c->vertex_to_col[_i]] > 0) { // should it be childcount[_i] > 0 or childcount[_i] >= 0? was childcount[_i] >= 0 but that doesnt make sense?
+                if (!del.get(_i) && childcount[_i] > 0 && c.ptn[c.vertex_to_col[_i]] > 0) { // should it be childcount[_i] > 0 or childcount[_i] >= 0? was childcount[_i] >= 0 but that doesnt make sense?
                     stack1.reset();
                     stack1.push_back(std::pair<int, int>(g->v[_i], g->v[_i] + childcount[_i]));
                     const int orig_i = translate_back(_i);
@@ -1030,9 +978,9 @@ private:
             assert(g_old_v[v_child] == 0);
 
             is_parent.reset();
-            const int v_child_col = c->vertex_to_col[v_child];
-            const int child_col_sz = c->ptn[v_child_col] + 1;
-            const int parent_from = c->lab[v_child_col];
+            const int v_child_col = c.vertex_to_col[v_child];
+            const int child_col_sz = c.ptn[v_child_col] + 1;
+            const int parent_from = c.lab[v_child_col];
             del.set(parent_from);
 
             if(child_col_sz == 1)
@@ -1041,7 +989,7 @@ private:
             for (int i = v_child_col + 1; i < v_child_col + child_col_sz; ++i) {
                 multiply_to_group_size(j);
                 ++j;
-                const int parent_to = c->lab[i];
+                const int parent_to = c.lab[i];
                 assert(g_old_v[parent_to] == 0);
                 del.set(parent_to);
 
@@ -1608,7 +1556,6 @@ private:
         if(g->v_size <= 1)
             return;
 
-        // TODO: ORBITS!
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() * ((1 * 5) * 5135235);
         int selector_seed = seed;
 
@@ -2067,8 +2014,8 @@ private:
                     quotient_component_workspace.clear();
                     int discrete_vertices = 0;
                     for (int vi = component_vstart; vi < component_vend; ++vi) {
-                        const int vs = quotient_component_worklist_v[vi]; // need to copy this away
-                        if (c1->ptn[c1->vertex_to_col[vs]] == 0) { // set up fake discrete vertex component, not gonna use it
+                        const int vs = quotient_component_worklist_v[vi]; // need to copy this
+                        if (c1->ptn[c1->vertex_to_col[vs]] == 0) { // set up dummy component for all discrete vertices
                             assert(c1->vertex_to_col[vs] == c1->vertex_to_lab[vs]);
                             seen_vertex.set(vs);
                             ++v_write_pos;
@@ -2201,6 +2148,9 @@ private:
         coloring<int> c2;
         c2.copy(&c1);
 
+        coloring<int> c3;
+        c3.copy(&c1);
+
         for(int x = 0; x < num_paths; ++x) {
             if(x > 0 && quotient_component_touched.empty()) {
                 break;
@@ -2231,7 +2181,7 @@ private:
             int quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
             int quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
 
-            while (quotient_component_start_pos < quotient_component_worklist_col.size()) { // TODO: get rid of the color array?
+            while (quotient_component_start_pos < quotient_component_worklist_col.size()) {
                 assert(quotient_component_start_pos_v < quotient_component_worklist_v.size());
                 // additional loop here for components?
                 int start_search_here = quotient_component_start_pos;
@@ -2362,8 +2312,10 @@ private:
                                              consume);
                         multiply_to_group_size(2);
 
+                        reset_coloring_to_coloring_touched(g, &c2, &c1, quotient_component_start_pos_v, quotient_component_end_pos_v);
+                        //reset_coloring_to_coloring_touched(g, &c3, &c1, quotient_component_start_pos_v, quotient_component_end_pos_v);
                         // reset c2 to c1
-                        if (c1.cells != g->v_size) {
+                        /*if (c1.cells != g->v_size) {
                             for (int j = 0; j < touched_color_list.cur_pos; ++j) {
                                 const int _c = touched_color_list[j];
                                 int f = 0;
@@ -2379,6 +2331,13 @@ private:
                             }
                         } else {
                             // discrete
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
+                                const int v = quotient_component_worklist_v[_i];
+                                colmap[v] = c1.vertex_to_col[v];
+                            }
+                        }*/
+
+                        if(c1.cells == g->v_size) {
                             for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                 const int v = quotient_component_worklist_v[_i];
                                 colmap[v] = c1.vertex_to_col[v];
@@ -2517,27 +2476,32 @@ private:
                         _automorphism_supp.reset();
 
                         if (certify) {
-                            int f = 0;
-                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // TODO could use touched...
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // could use touched?
                                 const int v = quotient_component_worklist_v[_i];
-                                colmap[v] = save_colmap_v_to_col[f]; // TODO reset c1 / c2 instead such that paths can just be restarted
-
-                                c1.vertex_to_col[v] = save_colmap_v_to_col[f];
-                                const int lab_pos   = save_colmap_v_to_lab[f];
-                                const int ptn_at_lab_pos = save_colmap_ptn[f];
+                                colmap[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
+                            }
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // could use touched?
+                                const int v = quotient_component_worklist_v[_i];
+                                c1.vertex_to_col[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
+                                const int lab_pos = save_colmap_v_to_lab[_i - quotient_component_start_pos_v];
+                                const int ptn_at_lab_pos = save_colmap_ptn[_i - quotient_component_start_pos_v];
                                 c1.vertex_to_lab[v] = lab_pos;
-                                c1.lab[lab_pos]     = v;
-                                c1.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c1.cells = save_cell_number;
+                                c1.lab[lab_pos] = v;
+                                c1.ptn[lab_pos] = ptn_at_lab_pos;
+                            }
+                            c1.cells = save_cell_number;
 
-                                c2.vertex_to_col[v] = save_colmap_v_to_col[f];
+                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) { // could use touched?
+                                const int v = quotient_component_worklist_v[_i];
+                                const int lab_pos = save_colmap_v_to_lab[_i - quotient_component_start_pos_v];
+                                const int ptn_at_lab_pos = save_colmap_ptn[_i - quotient_component_start_pos_v];
+                                c2.vertex_to_col[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
                                 c2.vertex_to_lab[v] = lab_pos;
                                 c2.lab[lab_pos]     = v;
                                 c2.ptn[lab_pos]     = ptn_at_lab_pos;
-                                c2.cells = save_cell_number;
-
-                                ++f;
                             }
+                            c2.cells = save_cell_number;
+
                             for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
                                 const int v = quotient_component_worklist_v[_i];
                                 const int list_index = _i - quotient_component_start_pos_v;
@@ -2781,7 +2745,8 @@ private:
                 while (certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
                     ++next_touched_component_i;
                     // select a color class of size 2
-                    int cell = select_color_component_min_cost(g, &c1, quotient_component_start_pos, quotient_component_end_pos, max_col_size);
+                    int cell = select_color_component_min_cost(g, &c1, quotient_component_start_pos,
+                                                               quotient_component_end_pos, max_col_size);
 
                     orbit.reset();
 
@@ -2805,12 +2770,12 @@ private:
                     touched_color_list.push_back(init_c1);
                     assert(cell != init_c1);
 
-                    R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color,
-                                       &touched_color_list);
+                    R1.refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1,
+                                       nullptr, &touched_color,&touched_color_list);
 
                     const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
-                    R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color,
-                                       &touched_color_list);
+                    R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1,
+                                       nullptr, &touched_color,&touched_color_list);
 
                     if (I1.acc != I2.acc) {
                         I2.acc = I1.acc;
@@ -2885,8 +2850,8 @@ private:
                             // individualize and test cell + k
                             const int init_ck = R1.individualize_vertex(&c2, ind_vk);
                             I2.acc = 0;
-                            R1.refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1, nullptr, &touched_color,
-                                               &touched_color_list);
+                            R1.refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1,
+                                               nullptr, &touched_color,&touched_color_list);
                             reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array());
                             _automorphism_supp.reset();
 
@@ -2967,8 +2932,8 @@ private:
 
                         I2.acc = 0;
                         const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
-                        R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color,
-                                           &touched_color_list);
+                        R1.refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1,
+                                           nullptr, &touched_color,&touched_color_list);
 
 
                         int num_inds = 0;
@@ -3049,10 +3014,6 @@ private:
                             }
 
                             ++num_inds;
-
-                            //certify = R1.certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                            //                                         _automorphism_supp.cur_pos,
-                            //                                         _automorphism_supp.get_array());
 
                             certify = !dont_bother_certify;
                             if(certify && last_failure >= 0) {
@@ -3492,9 +3453,10 @@ private:
 
 public:
     // main routine of the preprocessor, reduces (g, colmap) -- returns automorphisms through hook
-    void reduce(sgraph* g, int* colmap, dejavu_hook hook) {
+    // optional parameter schedule defines the order of applied techniques
+    void reduce(sgraph* g, int* colmap, dejavu_hook hook, std::vector<preop>* schedule=&default_schedule) {
         config.CONFIG_BULK_ALLOCATOR = false;
-        config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
+        g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
         int deg0, deg1, deg2;
         PRINT("(pre-red) before reduction (G, E) " << g->v_size << ", " << g->e_size);
 
@@ -3539,108 +3501,114 @@ public:
 
         // eliminate degree 1 + 0 and discrete vertices
         del_discrete_edges_inplace(g, &c);
-        red_deg10_assume_cref(g, &c, hook);
         copy_coloring_to_colmap(&c, colmap);
-        perform_del(g, colmap);
 
+        if(schedule != nullptr) {
+            del_e = mark_set();
+            del_e.initialize(g->e_size);
+            add_edge_buff.initialize(g->v_size);
+            add_edge_buff_act.initialize(g->v_size);
 
-        if(g->v_size == 0)
-            return;
-
-        del_e = mark_set();
-        del_e.initialize(g->e_size);
-        add_edge_buff.initialize(g->v_size);
-        add_edge_buff_act.initialize(g->v_size);
-
-        red_quotient_components(g, colmap, hook);
-        perform_del_edge(g, colmap);
-
-        red_deg2_path_size_1(g, colmap);
-        perform_del_add_edge(g, colmap);
-
-        red_deg2_unique_endpoint(g, colmap, hook);
-        perform_del_add_edge(g, colmap);
-
-        const int auto_found = sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 16);
-        if(auto_found > 0) {
-            perform_del_discrete(g, colmap);
-        }
-        PRINT("(pre-red) sparse_ir_qco_2 " << auto_found);
-
-        sparse_ir_probe(g, colmap, hook, SELECTOR_FIRST); // SELECTOR_LARGEST
-        perform_del_discrete(g, colmap);
-
-        red_deg2_path_size_1(g, colmap);
-        perform_del_add_edge(g, colmap);
-
-        const int test = sparse_ir_probe_quotient_components(g, colmap, hook, 16, 4);
-        PRINT("(pre-red) sparse_ir_qco_X " << test);
-        if(test > 0) {
-            perform_del_discrete(g, colmap);
-        }
-
-        if(g->v_size > 1) {
-            count_graph_deg(g, &deg0, &deg1, &deg2);
-
-            PRINT("(pre-red) after reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2);
-            PRINT("(pre-red) after reduction (G, E) " << g->v_size << ", " << g->e_size);
-
-            int back_off = 1;
-            int add_on   = 0;
-
-            // continue reducing as long as we discover new degree 0 or degree 1 vertices
-            while(deg0 > 0 || deg1 > 0) {
-
-                // heuristics to activate / deactivate techniques
-                // this could be more sophisticated...
-                if(avg_end_of_comp > 0.5 && (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) > 0.1) {
-                    back_off = back_off * 16; // heuristic to stop using the more expensive techniques
+            for(int pc = 0; pc < schedule->size(); ++pc) {
+                if (g->v_size <= 1) {
+                    return;
                 }
-                if(avg_end_of_comp < 0.1 || (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) < 0.01) {
-                    add_on += 4; // heuristic to stop continue using some of the techniques
+                preop next_op = (*schedule)[pc];
+                switch(next_op) {
+                    case preop::deg01: {
+                        red_deg10_assume_cref(g, colmap, hook);
+                        perform_del(g, colmap);
+                        break;
+                    }
+                    case preop::deg2ma: {
+                        red_deg2_path_size_1(g, colmap);
+                        perform_del_add_edge(g, colmap);
+                        break;
+                    }
+                    case preop::deg2ue: {
+                        red_deg2_unique_endpoint(g, colmap, hook);
+                        perform_del_add_edge(g, colmap);
+                        break;
+                    }
+                    case preop::probe2qc: {
+                        const int auto_found = sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 16);
+                        if (auto_found > 0) {
+                            perform_del_discrete(g, colmap);
+                        }
+                    }
+                        break;
+                    case preop::probeqc: {
+                        const int auto_found = sparse_ir_probe_quotient_components(g, colmap, hook, 16, 4);
+                        if (auto_found > 0) {
+                            perform_del_discrete(g, colmap);
+                        }
+                        break;
+                    }
+                    case preop::probeflat: {
+                        sparse_ir_probe(g, colmap, hook, SELECTOR_FIRST); // SELECTOR_LARGEST
+                        perform_del_discrete(g, colmap);
+                        break;
+                    }
+                    case preop::redloop: {
+                        if (g->v_size > 1) {
+                            count_graph_deg(g, &deg0, &deg1, &deg2);
+
+                            int back_off = 1;
+                            int add_on = 0;
+
+                            // continue reducing as long as we discover new degree 0 or degree 1 vertices
+                            while (deg0 > 0 || deg1 > 0) {
+                                // heuristics to activate / deactivate techniques
+                                // this could be more sophisticated...
+                                if (avg_end_of_comp > 0.5 && (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) > 0.1) {
+                                    back_off = back_off * 16; // heuristic to stop using the more expensive techniques
+                                }
+                                if (avg_end_of_comp < 0.1 || (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) < 0.01) {
+                                    add_on += 4; // heuristic to stop continue using some of the techniques
+                                }
+
+                                red_deg10_assume_cref(g, colmap, hook);
+                                mark_discrete_for_deletion(g, colmap);
+                                perform_del(g, colmap);
+
+                                red_deg2_unique_endpoint(g, colmap, hook);
+                                perform_del_add_edge(g, colmap);
+
+                                red_deg2_path_size_1(g, colmap);
+                                perform_del_add_edge(g, colmap);
+
+                                sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 16);
+                                perform_del_discrete(g, colmap);
+
+                                sparse_ir_probe(g, colmap, hook, SELECTOR_LARGEST);
+                                perform_del_discrete(g, colmap);
+
+                                red_deg2_path_size_1(g, colmap);
+                                perform_del_add_edge(g, colmap);
+
+                                sparse_ir_probe_quotient_components(g, colmap, hook, 16, 5 - back_off + add_on);
+                                perform_del_discrete(g, colmap);
+
+                                count_graph_deg(g, &deg0, &deg1, &deg2);
+                            }
+                        }
+                        break;
+                    }
+                    case preop::qcedgeflip: {
+                        red_quotient_components(g, colmap, hook);
+                        perform_del_edge(g, colmap);
+                        break;
+                    }
                 }
-
-                PRINT("(prep-red) loop [collected grp_sz " << base << "*10^" << exp << "] [bo, ao ] "<< back_off << ", " << add_on);
-
-                coloring<int> c2;
-                g->initialize_coloring(&c2, colmap);
-
-                red_deg10_assume_cref(g, &c2, hook);
-                copy_coloring_to_colmap(&c2, colmap);
-                mark_discrete_for_deletion(g, colmap);
-                perform_del(g, colmap);
-
-                red_deg2_unique_endpoint(g, colmap, hook);
-                perform_del_add_edge(g, colmap);
-
-                red_deg2_path_size_1(g, colmap);
-                perform_del_add_edge(g, colmap);
-
-                const int test2 = sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 16);
-                PRINT("(pre-red) sparse_ir_qco_2 " << test2);
-                perform_del_discrete(g, colmap);
-
-                sparse_ir_probe(g, colmap, hook, SELECTOR_LARGEST);
-                perform_del_discrete(g, colmap);
-
-                red_deg2_path_size_1(g, colmap);
-                perform_del_add_edge(g, colmap);
-
-                const int test3 = sparse_ir_probe_quotient_components(g, colmap, hook, 16, 5 - back_off + add_on);
-                PRINT("(pre-red) sparse_ir_qco_X " << test3);
-                if(test3 > 0) {
-                    perform_del_discrete(g, colmap);
-                }
-
-                count_graph_deg(g, &deg0, &deg1, &deg2);
-                PRINT("(pre-red)[2] after reduction (0, 1, 2) " << deg0 << ", " << deg1 << ", " << deg2);
-                PRINT("(pre-red)[2] after reduction (G, E) " << g->v_size << ", " << g->e_size);
             }
         }
+
         g->sanity_check();
 
         // could do multiple calls for now obviously independent components -- could use "buffer consumer" to translate domains
     }
 };
+
+
 
 #endif //DEJAVU_SP_H

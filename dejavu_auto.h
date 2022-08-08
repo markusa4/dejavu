@@ -1758,7 +1758,7 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 // TODO: add automorphism consumer
 
 dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook consume) {
-    config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
+    g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
     sp p;
     if(colmap == nullptr) {

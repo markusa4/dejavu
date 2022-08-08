@@ -11,7 +11,7 @@
 #include <cstring>
 
 template<class vertex_t, class degree_t, class edge_t>
-class alignas(16) sgraph_t {
+class sgraph_t {
     struct vertexComparator {
         vertexComparator(const sgraph_t<vertex_t, degree_t, edge_t>& g) : g(g) {}
         const sgraph_t& g;
@@ -40,6 +40,8 @@ public:
     int v_size;
     int d_size;
     int e_size;
+
+    bool dense = false;
 
     int max_degree;
 

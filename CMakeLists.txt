@@ -3,15 +3,37 @@ project(dejavu)
 
 set(CMAKE_CXX_STANDARD 14)
 add_compile_options("-O3")
+add_compile_options("-W")
 add_definitions(-DNDEBUG)
-#add_definitions(-g)
+#add_definitions(-COMPILE_BENCH_AUTO)
+add_definitions(-DDEJAVU_STANDALONE)
+add_definitions(-g)
 set(CMAKE_CXX_STANDARD_LIBRARIES -lpthread)
 
 add_executable(dejavu-auto schreier_sequential.cpp utility.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu_auto.cpp dejavu_auto.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h)
 add_executable(dejavu-iso  utility.cpp dejavu_iso.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h dejavu_iso.cpp schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
 # add_executable(dejavu-api-test utility.cpp dejavu_iso.h dejavu_api.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h dejavu_api.cpp schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
-SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -W -static -static-libgcc -static-libstdc++")
+
+set(source_list "nauty/gtnauty.o;nauty/gtools.o;nauty/gutil1.o;nauty/gutil2.o;nauty/naugraph.o;nauty/naugroup.o;nauty/naurng.o;nauty/nausparse.o;nauty/nautil.o;nauty/nautinv.o;nauty/naututil.o;nauty/nauty.o;nauty/traces.o;nauty/schreier.o")
+add_custom_target(nauty_target
+        COMMAND make all
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/nauty
+        )
+set(conauto_source_list "conauto/conauto.o;conauto/factor.o;conauto/graph.o;conauto/groups.o;conauto/mismatches.o;conauto/orbits.o;conauto/refinements.o;conauto/seqpart.o;conauto/sort.o")
+
+
+#if (DEFINED COMPILE_BENCH_AUTO)
+add_executable(bench schreier_sequential.cpp utility.cpp bench.cpp saucy/saucy.c sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu_auto.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h conauto/conauto.h)
+add_dependencies(bench nauty_target)
+add_library(bliss STATIC IMPORTED)
+set_target_properties(bliss PROPERTIES
+        IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/bliss/libbliss.a"
+        )
+target_link_libraries(bench bliss)
+#endif ()
+
+#SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS}")
+#SET(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -W -static -static-libgcc -static-libstdc++")
 add_library(dejavu-api SHARED dejavu_api.h dejavu_api_impl.cpp utility.cpp dejavu_iso.h sgraph.h invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h configuration.h bfs.h schreier_shared.h schreier_shared.cpp schreier_sequential.cpp naurng.cpp)
 
 
@@ -82,19 +104,8 @@ if (DEFINED COMPILE_PYTHON3API_LINK_BOOST_MANUAL)
     target_include_directories(dejavupy PRIVATE ${Python3_INCLUDE_DIRS} ${BOOST_INCLUDEDIR})
 endif ()
 
-set(source_list "nauty/gtnauty.o;nauty/gtools.o;nauty/gutil1.o;nauty/gutil2.o;nauty/naugraph.o;nauty/naugroup.o;nauty/naurng.o;nauty/nausparse.o;nauty/nautil.o;nauty/nautinv.o;nauty/naututil.o;nauty/nauty.o;nauty/traces.o;nauty/schreier.o")
-add_custom_target(nauty_target
-        COMMAND make all
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/nauty
-        )
-set(conauto_source_list "conauto/conauto.o;conauto/factor.o;conauto/graph.o;conauto/groups.o;conauto/mismatches.o;conauto/orbits.o;conauto/refinements.o;conauto/seqpart.o;conauto/sort.o")
 
 if (DEFINED COMPILE_BENCH_ISO)
         add_executable(bench-iso ${conauto_source_list} schreier_sequential.cpp utility.cpp bench_iso.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu_iso.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h)
         add_dependencies(bench-iso nauty_target)
-endif ()
-
-if (DEFINED COMPILE_BENCH_AUTO)
-	add_executable(bench schreier_sequential.cpp utility.cpp bench.cpp sgraph.h naurng.h naurng.cpp invariant.cpp invariant.h refinement.cpp refinement.h selector.h coloring.h parser.cpp parser.h bijection.h dejavu_auto.h configuration.h schreier_shared.h schreier_shared.cpp bfs.h ${source_list} naudefs.h conauto/conauto.h)
-	add_dependencies(bench nauty_target)
 endif ()

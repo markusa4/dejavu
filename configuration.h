@@ -3,9 +3,9 @@
 
 // hook for automorphisms found in dejavu
 // void dejavu_hook(int n, const int *perm, int nsupp, const int *support)
-// int n:     domain size of the graph and automorphism group
-// int* perm: permutation in one-line notation, i.e., perm[i] = j if and only if the permutation maps i to j
-// int nsupp: number of vertices moved by the permutation, i.e., support of the permutation and length of int* support array
+// int n:        domain size of the graph and automorphism group
+// int* perm:    permutation in one-line notation, i.e., perm[i] = j if and only if the permutation maps i to j
+// int nsupp:    number of vertices moved by the permutation, i.e., support of the permutation and length of int* support array
 // int* support: vertices moved by the permutation
 // IMPORTANT NOTE: Try to avoid sequential reads of perm, rather use the support array to only access those parts of the
 // permutation that are non-trivial.
@@ -13,7 +13,6 @@ typedef void dejavu_hook(int, const int *, int, const int *);
 
 struct configstruct {
     int  CONFIG_IR_CELL_SELECTOR  = 3;     // selector type, if CONFIG_IR_FORCE_SELECTOR is set
-    bool CONFIG_IR_DENSE          = true;  // automatically set by the solver
     int  CONFIG_IR_SIZE_FACTOR    = 10;    // tradeoff between restarts and allowed breadth-first width (default 10)
     bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
     bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search tree (maybe good for asymmetric)

@@ -154,6 +154,75 @@ private:
 typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
 typedef work_list_t<int> work_list;
 
+class tiny_orbit {
+    int               sz;
+    mark_set          touched;
+    work_list_t<int>  reset_arr;
+    work_list_t<int>  map_arr;
+public:
+    int find_and_cut_orbit(const int v1) {
+        assert(v1 >= 0);
+        assert(v1 < sz);
+        int orbit1 = map_arr[v1];
+        while(orbit1 != map_arr[orbit1])
+            orbit1 = map_arr[orbit1];
+        map_arr[v1] = orbit1;
+        return orbit1;
+    }
+
+    void combine_orbits(const int v1, const int v2) {
+        assert(v1 >= 0);
+        assert(v2 >= 0);
+        assert(v1 < sz);
+        assert(v2 < sz);
+        if(v1 != v2) {
+            if(!touched.get(v1))
+                reset_arr.push_back(v1);
+            if(!touched.get(v2))
+                reset_arr.push_back(v2);
+            touched.set(v1);
+            touched.set(v2);
+            int orbit1 = find_and_cut_orbit(v1);
+            int orbit2 = find_and_cut_orbit(v2);
+            if(orbit1 < orbit2) {
+                map_arr[orbit2] = orbit1;
+            } else {
+                map_arr[orbit1] = orbit2;
+            }
+        }
+    }
+
+    bool are_in_same_orbit(const int v1, const int v2) {
+        assert(v1 >= 0);
+        assert(v2 >= 0);
+        assert(v1 < sz);
+        assert(v2 < sz);
+        if(v1 == v2)
+            return true;
+        int orbit1 = find_and_cut_orbit(v1);
+        int orbit2 = find_and_cut_orbit(v2);
+        return (orbit1 == orbit2);
+    }
+
+    void reset() {
+        while(!reset_arr.empty()) {
+            const int v = reset_arr.pop_back();
+            map_arr[v] = v;
+        }
+        touched.reset();
+    }
+
+    void initialize(int domain_size) {
+        sz = domain_size;
+        touched.initialize(domain_size);
+        reset_arr.initialize(domain_size);
+        map_arr.initialize(domain_size);
+        for(int i = 0; i < domain_size; ++i) {
+            map_arr.push_back(i);
+        }
+    }
+};
+
 // queue with fixed size limitation
 class work_queue {
 public:
@@ -459,11 +528,11 @@ public:
 
             const bool pre_comp = comp;
 
-            if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
+            if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 comp = refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
                                                               &color_class_splits, I);
-            } else if(config.CONFIG_IR_DENSE) {
+            } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     comp = refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
                                                                     &color_class_splits, I);
@@ -670,11 +739,11 @@ public:
                 dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
             }
 
-            if(next_color_class_sz == 1 && !(config.CONFIG_IR_DENSE && dense_dense)) {
+            if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 refine_color_class_singleton_first(g, c, next_color_class, next_color_class_sz,
                                                                   &color_class_splits);
-            } else if(config.CONFIG_IR_DENSE) {
+            } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     refine_color_class_dense_dense_first(g, c, next_color_class, next_color_class_sz,
                                                                         &color_class_splits);
