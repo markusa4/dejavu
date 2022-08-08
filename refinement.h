@@ -120,6 +120,16 @@ public:
         sort_t<T>(arr, cur_pos);
     }
 
+    T* get_array() {
+        return arr;
+    }
+
+    T& operator [](int index) {
+        assert(index >= 0);
+        assert(index < arr_sz);
+        return arr[index];
+    }
+
     void sort_after_map(T* map) {
         struct comparator_map {
             T* map;
@@ -135,9 +145,9 @@ public:
     }
 
     int  cur_pos = 0;
-    T*   arr  = nullptr;
     bool init = false;
 private:
+    T*  arr  = nullptr;
     int arr_sz = -1;
 };
 
@@ -1505,7 +1515,7 @@ private:
             vertex_worklist.reset();
 
             // copy cell for rearranging
-            memcpy(vertex_worklist.arr, c->lab + col, col_sz * sizeof(vertex_t));
+            memcpy(vertex_worklist.get_array(), c->lab + col, col_sz * sizeof(vertex_t));
             vertex_worklist.cur_pos = col_sz;
 
             // determine colors and rearrange
@@ -1595,7 +1605,7 @@ private:
         // write invariant first...
         for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
             //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-            comp = I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes.arr[i])) && comp;
+            comp = I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes[i])) && comp;
             // contains information about color degree (= 1)
         }
 
@@ -1604,7 +1614,7 @@ private:
             vertex_worklist.sort();
 
         for(i = 0; i < vertex_worklist.cur_pos; ++i) {
-            comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist.arr[i]) && comp; // size
+            comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist[i]) && comp; // size
             // should contain information about color degree
         }
 

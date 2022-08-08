@@ -6,7 +6,7 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
-#include "prep.h"
+#include "sp.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_shared.h"
@@ -175,7 +175,7 @@ private:
 
         numnodes  = 0;
         colorcost = 0;
-	coloring<vertex_t>* init_c;
+	    coloring<vertex_t>* init_c;
         // preprocessing
         if(master) {
             init_c  = start_c;
@@ -1708,7 +1708,7 @@ private:
                             stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(leaf.extract_map(), g->v_size, true, look_close)));
                 } else {
                     vertex_t* base = new vertex_t[w->_collect_base_sz];
-                    memcpy(base, w->_collect_base.arr, sizeof(vertex_t) * w->_collect_base_sz); // ToDo: better solution to this, use bijection?
+                    memcpy(base, w->_collect_base.get_array(), sizeof(vertex_t) * w->_collect_base_sz); // ToDo: better solution to this, use bijection?
                     switches->leaf_store.insert(std::pair<long,
                             stored_leaf<vertex_t>>(I->acc, stored_leaf<vertex_t>(base, w->_collect_base_sz, false, look_close, elem)));
                 }
@@ -1720,7 +1720,7 @@ private:
             for(size_t i = 0; i < pointers.size(); ++i) {
                 // use reconstruction method on actual leaf to make it isomorphism-invariant
                 if(w->_collect_early_individualized.size() > 0) {
-                    reconstruct_leaf(w, g, elem->c, w->_collect_base.arr, w->_collect_base_sz, &leaf);
+                    reconstruct_leaf(w, g, elem->c, w->_collect_base.get_array(), w->_collect_base_sz, &leaf);
                 }
 
                 // compute automorphism
@@ -1757,10 +1757,10 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 
 // TODO: add automorphism consumer
 
-dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_consumer consume) {
+dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook consume) {
     config.CONFIG_IR_DENSE = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
-    preprocessor p;
+    sp p;
     if(colmap == nullptr) {
         colmap = new int[g->v_size]; // TODO: memory leak
         for(int i = 0; i < g->v_size; ++i)
@@ -1790,7 +1790,7 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
                         automorphism_supp.push_back(i);
                 }
                 //std::cout << automorphism_supp.cur_pos << std::endl;
-                p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.arr, consume);
+                p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(), consume);
                 gen_next = gen_next->next;
             } while (gen_next != gens);
         }
