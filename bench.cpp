@@ -6,6 +6,7 @@
 extern "C" {
 #include "saucy/saucy.h"
 #include "nauty/traces.h"
+#include "bliss/bliss_C.h"
 }
 
 #include "nauty/naugroup.h"
@@ -67,8 +68,7 @@ void make_lab_ptn_from_colmap(int* lab, int* ptn, int* colmap, int colmap_sz) {
     }
 }
 
-void make_small_colmap(int* smallcolmap, int* colmap, int colmap_sz) {
-    int* lab = new int[colmap_sz];
+void make_small_colmap(int* lab, int* smallcolmap, int* colmap, int colmap_sz) {
     for(int i = 0; i < colmap_sz; ++i) {
         lab[i] = i;
     }
@@ -77,7 +77,7 @@ void make_small_colmap(int* smallcolmap, int* colmap, int colmap_sz) {
     std::sort(lab, lab + colmap_sz, colorComparator(colmap));
 
     int col_small = -1;
-    int last_col_orig  = -1;
+    int last_col_orig  = INT32_MAX;
 
     for(int i = 0; i < colmap_sz; i++) {
         if (colmap[lab[i]] != last_col_orig) {
@@ -87,7 +87,6 @@ void make_small_colmap(int* smallcolmap, int* colmap, int colmap_sz) {
         smallcolmap[lab[i]] = col_small;
     }
 
-    delete[] lab;
 }
 
 void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_time) {
@@ -185,6 +184,39 @@ int bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_t
     return acc;
 }
 
+static void blissHook(void *user_param, unsigned int N, const unsigned int *aut) {
+    return;
+}
+
+
+int bench_bliss(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
+    // touch the graph (mitigate cache variance)
+
+    BlissGraph* bgraph = bliss_new(0);
+    for(int i = 0; i < g->v_size; ++i) {
+        bliss_add_vertex(bgraph, colmap[i]);
+    }
+
+    for(int i = 0; i < g->v_size; ++i) {
+        const int npt = g->v[i];
+        const int nd  = g->d[i];
+        for(int j = 0; j < nd; ++j) {
+            const int adj_n = g->e[npt + j];
+            if(i < adj_n) {
+                bliss_add_edge(bgraph, i, adj_n);
+            }
+        }
+    }
+
+    Clock::time_point timer = Clock::now();
+    BlissStats s;
+    bliss_find_automorphisms(bgraph, &blissHook, nullptr, &s);
+    *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    finished = true;
+
+    return true;
+}
+
 int test_cycle = 0;
 
 static int saucyConsume(int n, const int *perm, int nsupp, int * support, void *) {
@@ -198,6 +230,17 @@ static int saucyConsume(int n, const int *perm, int nsupp, int * support, void *
 
 
 void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_time) {
+    int* small_colmap         = new int[g->v_size];
+    //int* small_colmap_ordered = new int[g->v_size];
+    int* lab                  = new int[g->v_size];
+    if(colmap == nullptr) {
+        colmap = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i) {
+            colmap[i] = 0;
+        }
+    }
+    make_small_colmap(lab, small_colmap, colmap, g->v_size);
+
     saucy_graph sg;
     sg.n = g->v_size;
     sg.e = g->e_size;
@@ -208,6 +251,7 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
     int epos = 0;
 
     for(int i = 0; i < g->v_size; ++i) {
+        //const int i = lab[ii];
         const int npt = g->v[i];
         const int nd  = g->d[i];
         sg.adj[i] = epos;
@@ -218,29 +262,29 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
         }
     }
 
+    /*for(int ii = 0; ii < g->v_size; ++ii) {
+        const int i = lab[ii];
+        small_colmap_ordered[]
+    }*/
+
     sg.adj[g->v_size] = epos;
     assert(epos == g->e_size);
 
-    if(colmap == nullptr) {
-        colmap = new int[g->v_size];
-        for(int i = 0; i < g->v_size; ++i) {
-            colmap[i] = 0;
-        }
-    }
-
-    int* small_colmap = new int[g->v_size];
-    make_small_colmap(small_colmap, colmap, g->v_size);
 
     Clock::time_point timer = Clock::now();
     // automorphisms
     struct saucy *s = saucy_alloc(sg.n); // 100000
     struct saucy_stats stats;
-    saucy_search(s, &sg, 0, colmap, saucyConsume, 0, &stats);
+    saucy_search(s, &sg, 0, small_colmap, saucyConsume, 0, &stats);
     saucy_free(s);
     *saucy_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Group size: ";
     std::cout << stats.grpsize_base << "*10^" << stats.grpsize_exp << std::endl;
     finished = true;
+
+    delete[] small_colmap;
+    //delete[] small_colmap_ordered;
+    delete[] lab;
 }
 
 void test_auto(int i, int* x1, int x2) {
@@ -319,10 +363,12 @@ int commandline_mode(int argc, char **argv) {
     std::fstream stat_file;
     std::string stat_filename = "test.dat";
     bool entered_stat_file = true;
+    bool preprocess = false;
     bool comp_nauty = false;
     bool comp_traces = false;
     bool comp_saucy = false;
     bool comp_dejavu = false;
+    bool comp_bliss  = false;
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
@@ -399,6 +445,10 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
+        if (arg == "__PREP") {
+            preprocess = true;
+        }
+
         if (arg == "__NAUTY") {
             comp_nauty = true;
         }
@@ -413,6 +463,9 @@ int commandline_mode(int argc, char **argv) {
 
         if (arg == "__SAUCY") {
             comp_saucy = true;
+        }
+        if (arg == "__BLISS") {
+            comp_bliss = true;
         }
 
 
@@ -482,6 +535,27 @@ int commandline_mode(int argc, char **argv) {
         _g = g;
     }
 
+    if(colmap == nullptr) {
+        colmap = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i) {
+            colmap[i] = 0;
+        }
+    }
+
+    double prep_time;
+    if(preprocess) {
+        std::cout << "------------------------------------------------------------------" << std::endl;
+        std::cout << "sp" << std::endl;
+        std::cout << "------------------------------------------------------------------" << std::endl;
+
+        Clock::time_point timer = Clock::now();
+        sp preprocessor;
+        preprocessor.reduce(g, colmap, empty_consumer);
+        prep_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+
+        std::cout << "Prep time: " << prep_time / 1000000.0 << "ms" << std::endl;
+    }
+
     if(comp_nauty) {
         std::cout << "------------------------------------------------------------------" << std::endl;
         std::cout << "nauty" << std::endl;
@@ -499,7 +573,7 @@ int commandline_mode(int argc, char **argv) {
             killer.join();
     }
     if(comp_nauty) {
-        std::cout << "Solve time: " << nauty_solve_time / 1000000.0 << "ms" << std::endl;
+        std::cout << "Solve time: " << (nauty_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
     }
     if(comp_traces) {
         std::cout << "------------------------------------------------------------------" << std::endl;
@@ -518,7 +592,7 @@ int commandline_mode(int argc, char **argv) {
             killer.join();
     }
     if(comp_traces) {
-        std::cout << "Solve time: " << traces_solve_time / 1000000.0 << "ms" << std::endl;
+        std::cout << "Solve time: " << (traces_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
     }
 
     if(comp_saucy) {
@@ -538,7 +612,27 @@ int commandline_mode(int argc, char **argv) {
             killer.join();
     }
     if(comp_saucy) {
-        std::cout << "Solve time: " << saucy_solve_time / 1000000.0 << "ms" << std::endl;
+        std::cout << "Solve time: " << (saucy_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
+    }
+
+    if(comp_bliss) {
+        std::cout << "------------------------------------------------------------------" << std::endl;
+        std::cout << "bliss" << std::endl;
+        std::cout << "------------------------------------------------------------------" << std::endl;
+    }
+    double bliss_solve_time;
+    if(comp_bliss) {
+        finished = false;
+        nauty_kill_request = 0;
+        std::thread killer;
+        if(timeout > 0)
+            killer = std::thread(kill_thread, &nauty_kill_request, timeout);
+        bench_bliss(_g, colmap, &bliss_solve_time);
+        if(timeout > 0)
+            killer.join();
+    }
+    if(comp_bliss) {
+        std::cout << "Solve time: " << (bliss_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
     }
 
     if(comp_dejavu) {
@@ -558,7 +652,7 @@ int commandline_mode(int argc, char **argv) {
             killer.join();
     }
     if(comp_dejavu) {
-        std::cout << "Solve time: " << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
+        std::cout << "Solve time: " << (dejavu_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
     }
 
     // std::cout << "Compare (nauty): " << nauty_solve_time / dejavu_solve_time << std::endl;

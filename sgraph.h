@@ -55,6 +55,11 @@ public:
         c->alloc(this->v_size);
         std::memset(c->ptn, 1, sizeof(int) * v_size);
 
+        if(this->v_size < c->lab_sz) {
+            c->lab_sz = this->v_size;
+            c->ptn_sz = this->v_size;
+        }
+
         if(v_size == 0)
             return;
 

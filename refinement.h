@@ -830,9 +830,8 @@ public:
         return true;
     }
 
-    // certify an automorphism on a graph
-    // TODO need to check colors too?
-    bool certify_automorphism_sparse(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* colmap, int* p, int supp, int* supp_arr) {
+    // certify an automorphism on a graph, sparse
+    bool certify_automorphism_sparse(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -878,7 +877,8 @@ public:
         return true;
     }
 
-    std::pair<bool, int> certify_automorphism_sparse_report_fail(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* colmap, int* p, int supp, int* supp_arr) {
+    // certify an automorphism on a graph, sparse, report on which vertex failed
+    std::pair<bool, int> certify_automorphism_sparse_report_fail(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -911,8 +911,6 @@ public:
                 if(!scratch_set.get(vertex_j)) {
                     return std::pair<bool, int>(false, i);
                 }
-                //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
-                //    return std::pair<bool, int>(false, i);
                 scratch_set.unset(vertex_j);
                 found -= 1;
             }
@@ -924,7 +922,8 @@ public:
         return std::pair<bool, int>(true, -1);
     }
 
-    bool check_single_failure(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* colmap, int* p, int failure) {
+    // certify an automorphism, for a single vertex
+    bool check_single_failure(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int failure) {
         int i, found;
 
         assure_initialized(g);
@@ -955,8 +954,6 @@ public:
             if(!scratch_set.get(vertex_j)) {
                 return false;
             }
-            //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
-            //    return false;
             scratch_set.unset(vertex_j);
             found -= 1;
         }
@@ -1063,7 +1060,7 @@ private:
     vertex_t* scratch;
     int* workspace_int;
 
-    void assure_initialized(sgraph_t<vertex_t, degree_t, edge_t>  *g) {
+    void assure_initialized(const sgraph_t<vertex_t, degree_t, edge_t>  *g) {
         if(!initialized) {
             const int n = g->v_size;
 
