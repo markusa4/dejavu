@@ -189,7 +189,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu-auto 頭文字D" << std::endl;
+    std::cout << "dejavu-auto" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 

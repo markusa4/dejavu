@@ -6,7 +6,7 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
-#include "sp.h"
+#include "gprep.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_shared.h"
@@ -207,7 +207,7 @@ private:
 
         // first color refinement, initialize some more shared structures, launch threads
         if (master) {
-            PRINT("[Dej] Dense graph: " << (config.CONFIG_IR_DENSE?"true":"false"));
+            PRINT("[Dej] Dense graph: " << (g->dense?"true":"false"));
             switches->current_mode = modes_auto::MODE_AUTO_TOURNAMENT;
 
             // first color refinement
@@ -1760,14 +1760,15 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook consume) {
     g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
-    sp p;
+    gprep p;
     if(colmap == nullptr) {
         colmap = new int[g->v_size]; // TODO: memory leak
         for(int i = 0; i < g->v_size; ++i)
             colmap[i] = 0;
     }
     config.CONFIG_BULK_ALLOCATOR = false;
-    p.reduce(g, colmap, consume);
+    if(config.CONFIG_PREPROCESS)
+        p.reduce(g, colmap, consume);
     config.CONFIG_BULK_ALLOCATOR = true;
     config.config_IR_SKIP_FIRST_REFINEMENT = true;
     double prep_red_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer1).count());
@@ -1784,13 +1785,18 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
         if (gens != nullptr) {
             shared_permnode *gen_next = gens;
             do {
-                automorphism_supp.reset();
-                for (int i = 0; i < g->v_size; ++i) {
-                    if (gen_next->p[i] != i)
-                        automorphism_supp.push_back(i);
+                if(config.CONFIG_PREPROCESS) {
+                    automorphism_supp.reset();
+                    for (int i = 0; i < g->v_size; ++i) {
+                        if (gen_next->p[i] != i)
+                            automorphism_supp.push_back(i);
+                    }
+                    //std::cout << automorphism_supp.cur_pos << std::endl;
+                    p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(),
+                                   consume);
+                } else {
+                    consume(g->v_size, gen_next->p, g->v_size, gen_next->p);
                 }
-                //std::cout << automorphism_supp.cur_pos << std::endl;
-                p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(), consume);
                 gen_next = gen_next->next;
             } while (gen_next != gens);
         }
@@ -1806,7 +1812,7 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
     // calculate automorphism group size
     p.exp += a.grp_sz_exp;
     p.multiply_to_group_size(a.grp_sz_man);
-    std::cout << "(prep-res) group sz: " << p.base << "*10^" << p.exp << std::endl;
+    std::cout << "Group size: " << p.base << "*10^" << p.exp << std::endl;
     return a;
 }
 

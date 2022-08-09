@@ -862,7 +862,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, int* p) {
+    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* p) {
         int i, found;
 
         assure_initialized(g);
@@ -872,6 +872,46 @@ public:
             if(image_i == i)
                 continue;
             if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p[vertex_j];
+                scratch_set.set(image_j);
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // certify an automorphism on a graph
+    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p) {
+        int i, found;
+
+        assure_initialized(g);
+
+        for(i = 0; i < g->v_size; ++i) {
+            const int image_i = p[i];
+            if(image_i == i)
+                continue;
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+            if(colmap[i] != colmap[image_i]) // colors must be equal
                 return false;
 
             scratch_set.reset();

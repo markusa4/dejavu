@@ -34,7 +34,7 @@ struct configstruct {
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;
     bool CONFIG_PREPROCESS_EDGELIST_SORT = false;
-    bool CONFIG_PREPROCESS               = false;
+    bool CONFIG_PREPROCESS               = true;
     bool CONFIG_SOLVE_ISO                = false;
 
     bool ONLY_COLOR_REF_INVARIANT       = false;

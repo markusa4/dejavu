@@ -1,5 +1,5 @@
-#ifndef DEJAVU_SP_H
-#define DEJAVU_SP_H
+#ifndef DEJAVU_GPREP_H
+#define DEJAVU_GPREP_H
 
 #include "sgraph.h"
 #include "refinement.h"
@@ -10,7 +10,11 @@ enum preop { deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, re
 std::vector<preop> default_schedule = {preop::deg01, preop::qcedgeflip, preop::deg2ma, preop::deg2ue, preop::probe2qc,
                                        preop::deg2ma, preop::probeqc, redloop};
 
-class sp {
+// preprocessor for symmetry detection
+// Example usage:
+// gprep p;
+// p.reduce(&g, col, hook);
+class gprep {
 public:
     double base = 1;
     int    exp  = 0;
@@ -22,6 +26,8 @@ public:
     bool layers_melded = false;
 
 private:
+    dejavu_hook* saved_hook;
+
     mark_set del;
     mark_set del_e;
 
@@ -202,6 +208,7 @@ private:
                                     can_n = _n2;
                                 const int orig_test_v = translate_back(_test_v);
                                 const int orig_n1 = translate_back(can_n);
+                                canonical_recovery_string[orig_n1].push_back(orig_test_v);
                                 for (int s = 0; s < canonical_recovery_string[orig_test_v].size(); ++s)
                                     canonical_recovery_string[orig_n1].push_back(
                                             canonical_recovery_string[orig_test_v][s]);
@@ -243,6 +250,8 @@ private:
 
                     found_match += test_col.ptn[i] + 1;
 
+                    const int debug_str_sz = canonical_recovery_string[translate_back(test_v)].size();
+
                     for(int f = 0; f < test_col.ptn[i] + 1; ++f) {
                         const int _test_v = test_col.lab[i + f];
                         assert(g->d[_test_v] == 2);
@@ -264,10 +273,12 @@ private:
                         else
                             can_n = _n2;
                         const int orig_test_v = translate_back(_test_v);
-                        const int orig_n1 = translate_back(can_n);
-                        for(int s = 0; s < canonical_recovery_string[orig_test_v].size(); ++s)
+                        const int orig_n1     = translate_back(can_n);
+                        assert(debug_str_sz == canonical_recovery_string[orig_test_v].size());
+                        canonical_recovery_string[orig_n1].push_back(orig_test_v);
+                        for(int s = 0; s < canonical_recovery_string[orig_test_v].size(); ++s) {
                             canonical_recovery_string[orig_n1].push_back(canonical_recovery_string[orig_test_v][s]);
-
+                        }
                     }
                 }
             }
@@ -277,7 +288,7 @@ private:
         worklist_deg0.reset();
         worklist_deg1.reset();
         touched_color_cache.reset();
-        PRINT("found matching vertices: " << found_match);
+        PRINT("(prep-red) found matching vertices: " << found_match);
     }
 
 
@@ -804,8 +815,33 @@ private:
                     const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
                     const int pair_to = pair_match[pair_from];
 
-                    const int original_parent = translate_back(first_pair_parent);
-                    canonical_recovery_string[original_parent].push_back(translate_back(pair_to));
+                    const int original_parent  = translate_back(first_pair_parent);
+                    const int original_pair_to = translate_back(pair_to);
+                    canonical_recovery_string[original_parent].push_back(original_pair_to);
+                    for(int s = 0; s < canonical_recovery_string[original_pair_to].size(); ++s)
+                        canonical_recovery_string[original_parent].push_back(canonical_recovery_string[original_pair_to][s]);
+
+                    // also write stack of original_pair_to to canonical recovery string of original_parent, since
+                    // canonical_recovery_string has not been updated with progress made in this routine
+                    stack1.reset();
+                    stack1.push_back(std::pair<int, int>(g->v[pair_to], g->v[pair_to] + childcount[pair_to]));
+                    while(!stack1.empty()) {
+                        std::pair<int, int> from_to = stack1.pop_back();
+                        int from       = from_to.first;
+                        const int to   = from_to.second;
+                        for(int f = from; f < to; ++f) {
+                            const int next = edge_scratch[f];
+                            //const int next = g->e[f];
+                            const int from_next = g->v[next];
+                            const int to_next = g->v[next] + childcount[next];
+                            const int orig_next = translate_back(next);
+                            canonical_recovery_string[original_parent].push_back(orig_next);
+                            for(int s = 0; s < canonical_recovery_string[orig_next].size(); ++s)
+                                canonical_recovery_string[original_parent].push_back(canonical_recovery_string[orig_next][s]);
+                            if (from_next != to_next)
+                                stack1.push_back(std::pair<int, int>(from_next, to_next));
+                        }
+                    }
                 }
 
                 permute_parents_instead = true;
@@ -872,6 +908,7 @@ private:
                     int pos = 0;
 
                     automorphism_supp.reset();
+
                     // descending tree of child_to while writing automorphism
                     stack1.reset();
                     assert(map[pos] != child_to);
@@ -3003,7 +3040,7 @@ private:
                                     while (f < c1.ptn[_c] + 1) {
                                         const int i = _c + f;
                                         ++f;
-                                        if (c1.lab[i] != c2.lab[i]) {
+                                        if (c1.lab[i] != c2.lab[i] && _automorphism[c1.lab[i]] == c1.lab[i]) {
                                             _automorphism[c1.lab[i]] = c2.lab[i];
                                             _automorphism_supp.push_back(c1.lab[i]);
                                         }
@@ -3046,6 +3083,7 @@ private:
                                         const int i = _c + f;
                                         ++f;
                                         if (c1.lab[i] != c2.lab[i]) {
+                                            assert(_automorphism[c1.lab[i]] == c1.lab[i]);
                                             _automorphism[c1.lab[i]] = c2.lab[i];
                                             _automorphism_supp.push_back(c1.lab[i]);
                                         }
@@ -3607,8 +3645,23 @@ public:
 
         // could do multiple calls for now obviously independent components -- could use "buffer consumer" to translate domains
     }
+
+    // bliss usage:
+    // TODO
+    void bliss_save_my_hook(dejavu_hook* hook) {
+        saved_hook = hook;
+    }
+
+    static void bliss_hook(void* user_param, unsigned int n, const unsigned int* aut) {
+        auto p = (gprep*) user_param;
+        p->pre_consumer(n, (int*) aut, -1, nullptr, p->saved_hook);
+    }
+
+    // nauty/Traces usage:
+
+    // saucy usage:
 };
 
 
 
-#endif //DEJAVU_SP_H
+#endif //DEJAVU_GPREP_H

@@ -150,12 +150,24 @@ void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_ti
     finished = true;
 }
 
+sgraph* test_g;
+int*    test_colmap;
+refinement<int, int, int> test_R;
+bool all_certified = true;
+
+void certifying_consumer_dense(int n, const int * p, int support, const int *) {
+    assert(test_auto);
+    return;
+}
+
+void certifying_consumer_sparse(int n, const int * p, int support, const int* support_arr) {
+    const bool test_auto = test_R.certify_automorphism_sparse(test_g, test_colmap, p, support, support_arr);
+    all_certified = all_certified && test_auto;
+    assert(test_auto);
+    return;
+}
+
 void empty_consumer(int n, const int * p, int support, const int *) {
-    /*bijection<int> test_p;
-    test_p.read_from_array(p, n);
-    const bool test_auto = test_R.certify_automorphism(&test_graph, &test_p); // TODO: sparse automorphism certification?
-    assert(test_auto);*/
-    //std::cout << "automorphism support " << support << std::endl;
     return;
 }
 
@@ -178,6 +190,39 @@ int bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_t
     Clock::time_point timer = Clock::now();
     config.CONFIG_IR_WRITE_GROUPORDER = true;
     dejavu_automorphisms(g, colmap, empty_consumer);
+    *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    finished = true;
+
+    return acc;
+}
+
+int bench_dejavu_certify(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_time) {
+    // touch the graph (mitigate cache variance)
+    int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += g->v[i] + g->d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += g->e[i];
+    }
+
+    if(colmap != nullptr) {
+        for(int i = 0; i < g->v_size; ++i) {
+            acc += colmap[i];
+        }
+    }
+
+    Clock::time_point timer = Clock::now();
+    config.CONFIG_IR_WRITE_GROUPORDER = true;
+    sgraph _test_g;
+    _test_g.copy_graph(g);
+    test_g = &_test_g;
+    test_colmap = new int[g->v_size];
+    test_R = refinement<int, int, int>();
+    for(int j = 0; j < g->v_size; ++j)
+        test_colmap[j] = colmap[j];
+
+    dejavu_automorphisms(g, colmap, certifying_consumer_sparse);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 
@@ -209,11 +254,14 @@ int bench_bliss(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_ti
     }
 
     Clock::time_point timer = Clock::now();
-    BlissStats s;
-    bliss_find_automorphisms(bgraph, &blissHook, nullptr, &s);
+    BlissStats stats;
+    bliss_find_automorphisms(bgraph, &blissHook, nullptr, &stats);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    finished = true;
 
+    std::cout << "Group size: ";
+    std::cout << stats.group_size_approx << std::endl;
+
+    finished = true;
     return true;
 }
 
@@ -449,6 +497,10 @@ int commandline_mode(int argc, char **argv) {
             preprocess = true;
         }
 
+        if (arg == "__DEJAVU_NOPREP") {
+            config.CONFIG_PREPROCESS = false;
+        }
+
         if (arg == "__NAUTY") {
             comp_nauty = true;
         }
@@ -545,11 +597,11 @@ int commandline_mode(int argc, char **argv) {
     double prep_time;
     if(preprocess) {
         std::cout << "------------------------------------------------------------------" << std::endl;
-        std::cout << "sp" << std::endl;
+        std::cout << "gprep" << std::endl;
         std::cout << "------------------------------------------------------------------" << std::endl;
 
         Clock::time_point timer = Clock::now();
-        sp preprocessor;
+        gprep preprocessor;
         preprocessor.reduce(g, colmap, empty_consumer);
         prep_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
 
