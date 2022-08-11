@@ -143,6 +143,13 @@ public:
         vec_selections.reserve(prealloc + 16);
     }
 
+    void reset() {
+        vec_cells.clear();
+        vec_protocol.clear();
+        vec_invariant.clear();
+        vec_selections.clear();
+    }
+
     void purge() {
         if(created != nullptr) {
             //delete vec_cells;

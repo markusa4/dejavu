@@ -30,6 +30,14 @@ struct configstruct {
 
     bool CONFIG_BULK_ALLOCATOR = true;
 
+
+
+    bool CONFIG_PREP_DEACT_PROBE    = false;
+    bool CONFIG_PREP_DEACT_DEG01    = false;
+    bool CONFIG_PREP_DEACT_DEG2     = false;
+    bool CONFIG_PREP_DEACT_DISCRETE = false;
+    bool CONFIG_PREP_ALT_SCHEDULE   = false;
+
     bool CONFIG_IR_WRITE_GROUPORDER      = false;
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;

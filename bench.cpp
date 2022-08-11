@@ -59,13 +59,14 @@ void make_lab_ptn_from_colmap(int* lab, int* ptn, int* colmap, int colmap_sz) {
             ptn[i] = 0;
             break;
         }
-        if (colmap[lab[i]] < colmap[lab[i + 1]]) {
+        if (colmap[lab[i]] != colmap[lab[i + 1]]) {
             ptn[i] = 0;
             ptn[last_new_cell] = (i - last_new_cell) > 0;
             last_new_cell = i + 1;
             continue;
         }
     }
+    std::cout << last_new_cell << std::endl;
 }
 
 void make_small_colmap(int* lab, int* smallcolmap, int* colmap, int colmap_sz) {
@@ -86,7 +87,6 @@ void make_small_colmap(int* lab, int* smallcolmap, int* colmap, int colmap_sz) {
         }
         smallcolmap[lab[i]] = col_small;
     }
-
 }
 
 void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_time) {
@@ -122,7 +122,8 @@ void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_ti
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
-    ptn[g->v_size - 1] = 0;
+    if(g->v_size > 0)
+        ptn[g->v_size - 1] = 0;
     if(colmap != nullptr) {
         make_lab_ptn_from_colmap(lab, ptn, colmap, g->v_size);
     }
@@ -141,7 +142,10 @@ void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_ti
     }
     Clock::time_point timer = Clock::now();
 
-    sparsenauty(&sg, lab, ptn, orbits, &options, &stats, NULL);
+    if(g->v_size > 0) {
+        sparsenauty(&sg, lab, ptn, orbits, &options, &stats, NULL);
+    }
+
     std::cout << "Group size: ";
     writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
     std::cout << std::endl;
@@ -156,18 +160,18 @@ refinement<int, int, int> test_R;
 bool all_certified = true;
 
 void certifying_consumer_dense(int n, const int * p, int support, const int *) {
-    assert(test_auto);
+    //assert(test_auto);
     return;
 }
 
-void certifying_consumer_sparse(int n, const int * p, int support, const int* support_arr) {
+void certifying_hook_sparse(int n, const int * p, int support, const int* support_arr) {
     const bool test_auto = test_R.certify_automorphism_sparse(test_g, test_colmap, p, support, support_arr);
     all_certified = all_certified && test_auto;
     assert(test_auto);
     return;
 }
 
-void empty_consumer(int n, const int * p, int support, const int *) {
+void empty_hook(int n, const int * p, int support, const int *) {
     return;
 }
 
@@ -189,7 +193,7 @@ int bench_dejavu(sgraph_t<int, int, int> *g, int* colmap, double* dejavu_solve_t
 
     Clock::time_point timer = Clock::now();
     config.CONFIG_IR_WRITE_GROUPORDER = true;
-    dejavu_automorphisms(g, colmap, empty_consumer);
+    dejavu_automorphisms(g, colmap, empty_hook);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 
@@ -222,7 +226,7 @@ int bench_dejavu_certify(sgraph_t<int, int, int> *g, int* colmap, double* dejavu
     for(int j = 0; j < g->v_size; ++j)
         test_colmap[j] = colmap[j];
 
-    dejavu_automorphisms(g, colmap, certifying_consumer_sparse);
+    dejavu_automorphisms(g, colmap, certifying_hook_sparse);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 
@@ -321,10 +325,12 @@ void bench_saucy(sgraph_t<int, int, int> *g, int* colmap, double* saucy_solve_ti
 
     Clock::time_point timer = Clock::now();
     // automorphisms
-    struct saucy *s = saucy_alloc(sg.n); // 100000
     struct saucy_stats stats;
-    saucy_search(s, &sg, 0, small_colmap, saucyConsume, 0, &stats);
-    saucy_free(s);
+    if(g->v_size > 0) {
+        struct saucy *s = saucy_alloc(sg.n); // 100000
+        saucy_search(s, &sg, 0, small_colmap, saucyConsume, 0, &stats);
+        saucy_free(s);
+    }
     *saucy_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     std::cout << "Group size: ";
     std::cout << stats.grpsize_base << "*10^" << stats.grpsize_exp << std::endl;
@@ -374,7 +380,8 @@ void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_
         sg.v[i] = g->v[i];
         sg.d[i] = g->d[i];
     }
-    ptn[g->v_size - 1] = 0;
+    if(g->v_size > 0)
+        ptn[g->v_size - 1] = 0;
     if(colmap != nullptr) {
         make_lab_ptn_from_colmap(lab, ptn, colmap, g->v_size);
     }
@@ -393,8 +400,10 @@ void bench_traces(sgraph_t<int, int, int> *g, int* colmap, double* traces_solve_
     }
     Clock::time_point timer = Clock::now();
 
-    //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
-    Traces(&sg, lab, ptn, orbits, &options, &stats, NULL);
+    if(g->v_size > 0) {
+        //sparsenauty(&sg,lab,ptn,orbits,&options,&stats,NULL);
+        Traces(&sg, lab, ptn, orbits, &options, &stats, NULL);
+    }
     std::cout << "Group size: ";
     writegroupsize(stdout, stats.grpsize1, stats.grpsize2);
     std::cout << "Gens: " << stats.numgenerators << std::endl;
@@ -461,6 +470,20 @@ int commandline_mode(int argc, char **argv) {
         if (arg == "__COMPRESS") {
             config.CONFIG_PREPROCESS_COMPRESS      = true;
             config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
+        }
+
+        if (arg == "__PREP_DEACT_DEG01") {
+            config.CONFIG_PREP_DEACT_DEG01 = true;
+        }
+        if (arg == "__PREP_DEACT_DEG2") {
+            config.CONFIG_PREP_DEACT_DEG2 = true;
+        }
+        if (arg == "__PREP_DEACT_PROBE") {
+            config.CONFIG_PREP_DEACT_PROBE = true;
+        }
+
+        if (arg == "__PREP_ALT_SCHEDULE") {
+            config.CONFIG_PREP_ALT_SCHEDULE = true;
         }
 
         if (arg == "__KDEVIATION") {
@@ -602,10 +625,12 @@ int commandline_mode(int argc, char **argv) {
 
         Clock::time_point timer = Clock::now();
         gprep preprocessor;
-        preprocessor.reduce(g, colmap, empty_consumer);
+        preprocessor.reduce(_g, colmap, empty_hook);
         prep_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
 
         std::cout << "Prep time: " << prep_time / 1000000.0 << "ms" << std::endl;
+        std::cout << "graph sz: " << g->v_size << ", " << g->e_size << std::endl;
+        std::cout << "(partial) group sz: " << preprocessor.base << "*10^" << preprocessor.exp << std::endl;
     }
 
     if(comp_nauty) {

@@ -29,7 +29,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 
 refinement<int, int, int> test_R;
 
-void empty_consumer(int n, const int * p, int support, const int *) {
+void empty_hook(int n, const int * p, int support, const int *) {
     /*bijection<int> test_p;
     test_p.read_from_array(p, n);
     const bool test_auto = test_R.certify_automorphism(&test_graph, &test_p); // TODO: sparse automorphism certification?
@@ -43,7 +43,7 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
 
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    dejavu_automorphisms(g, colmap, empty_consumer);
+    dejavu_automorphisms(g, colmap, empty_hook);
     //dejavu d;
     //d.automorphisms(g, nullptr);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());

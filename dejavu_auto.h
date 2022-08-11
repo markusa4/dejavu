@@ -1625,7 +1625,7 @@ private:
         bool comp;
 
         // first* individualization (*except for random blueprint individualization during refinement)
-        {
+        if(elem->c->cells != g->v_size) {
             const int col = elem->target_color;
             const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[col] + 1));
             const int v = c->lab[rpos];
@@ -1757,20 +1757,25 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 
 // TODO: add automorphism consumer
 
-dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook consume) {
+dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook hook) {
     g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
     gprep p;
+    int* gen_colmap = nullptr;
     if(colmap == nullptr) {
-        colmap = new int[g->v_size]; // TODO: memory leak
+        gen_colmap = new int[g->v_size]; // TODO: memory leak
         for(int i = 0; i < g->v_size; ++i)
             colmap[i] = 0;
+        colmap = gen_colmap;
     }
     config.CONFIG_BULK_ALLOCATOR = false;
-    if(config.CONFIG_PREPROCESS)
-        p.reduce(g, colmap, consume);
+    if(config.CONFIG_PREPROCESS) {
+        p.reduce(g, colmap, hook);
+        config.config_IR_SKIP_FIRST_REFINEMENT = true;
+    } else {
+        config.config_IR_SKIP_FIRST_REFINEMENT = false;
+    }
     config.CONFIG_BULK_ALLOCATOR = true;
-    config.config_IR_SKIP_FIRST_REFINEMENT = true;
     double prep_red_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer1).count());
     Clock::time_point timer2 = Clock::now();
     dejavu_stats a;
@@ -1793,9 +1798,9 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
                     }
                     //std::cout << automorphism_supp.cur_pos << std::endl;
                     p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(),
-                                   consume);
+                                   hook);
                 } else {
-                    consume(g->v_size, gen_next->p, g->v_size, gen_next->p);
+                    hook(g->v_size, gen_next->p, g->v_size, gen_next->p);
                 }
                 gen_next = gen_next->next;
             } while (gen_next != gens);
@@ -1813,6 +1818,10 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
     p.exp += a.grp_sz_exp;
     p.multiply_to_group_size(a.grp_sz_man);
     std::cout << "Group size: " << p.base << "*10^" << p.exp << std::endl;
+
+    if(gen_colmap != nullptr)
+        delete[] gen_colmap;
+
     return a;
 }
 
