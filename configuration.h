@@ -38,6 +38,7 @@ struct configstruct {
     bool CONFIG_PREP_DEACT_DISCRETE = false;
     bool CONFIG_PREP_ALT_SCHEDULE   = false;
 
+    bool CONFIG_IR_REFINE_EARLYOUT_LATE  = false;
     bool CONFIG_IR_WRITE_GROUPORDER      = false;
     bool CONFIG_WRITE_AUTOMORPHISMS      = false;
     bool CONFIG_PREPROCESS_COMPRESS      = false;

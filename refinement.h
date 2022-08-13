@@ -609,10 +609,12 @@ public:
                 }
 
                 // partition is as large as the one of target invariant, can skip to the end of the entire refinement
-                if(c->cells == cell_early && comp) {
-                    I->fast_forward(INV_MARK_ENDREF);
-                    if(I->no_write)
-                        I->protocol_skip_to_mark();
+                if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+                    if(!I->only_acc) {
+                        I->fast_forward(INV_MARK_ENDREF);
+                        if (I->no_write)
+                            I->protocol_skip_to_mark();
+                    }
                     color_class_splits.reset();
                     cell_todo.reset(&queue_pointer);
                     return comp;
