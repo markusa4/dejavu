@@ -12,48 +12,43 @@
 typedef void dejavu_hook(int, const int *, int, const int *);
 
 struct configstruct {
-    int  CONFIG_IR_CELL_SELECTOR  = 3;     // selector type, if CONFIG_IR_FORCE_SELECTOR is set
-    int  CONFIG_IR_SIZE_FACTOR    = 10;    // tradeoff between restarts and allowed breadth-first width (default 10)
-    bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
-    bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search tree (maybe good for asymmetric)
     bool CONFIG_IR_FORCE_SELECTOR = false;
-    bool CONFIG_IR_IDLE_SKIP      = true;
-    bool CONFIG_IR_FAST_TOLERANCE_INC = true;
-    bool CONFIG_IR_INDIVIDUALIZE_EARLY = false;
-    int  CONFIG_IR_EXPAND_DEVIATION = 5;  // default 5
+    int  CONFIG_IR_CELL_SELECTOR  = 3;     // selector type, if CONFIG_IR_FORCE_SELECTOR is set
+    int  CONFIG_IR_SIZE_FACTOR    = 10;    // tradeoff between restarts and allowed breadth-first width
+    bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
+    bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search tree
+    bool CONFIG_IR_IDLE_SKIP      = true;  // blueprints
+    bool CONFIG_IR_FAST_TOLERANCE_INC  = true;  // tolerance of solver is raised more quickly if search tree appears difficult
+    bool CONFIG_IR_INDIVIDUALIZE_EARLY = false; // experimental feature, based on an idea by Adolfo Piperno
+    int  CONFIG_IR_EXPAND_DEVIATION = 5;   // additional cells processed after deviation is detected
     bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;
-    int  CONFIG_IR_LEAF_STORE_LIMIT = 64; // default 64
-    int  CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
+    int  CONFIG_IR_LEAF_STORE_LIMIT = 64;  // amount of leaf colorings stored in full at any given point
+    int  CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1; // selector may not select colors above this limit
     bool CONFIG_IR_SELECTOR_FILL_GRAPH = false;
     bool CONFIG_IR_ALWAYS_STORE = false;
-    bool config_IR_SKIP_FIRST_REFINEMENT = false; // use if initial coloring has already been refined using >=1-WL
-
-    bool CONFIG_BULK_ALLOCATOR = true;
-
-
-
-    bool CONFIG_PREP_DEACT_PROBE    = false;
-    bool CONFIG_PREP_DEACT_DEG01    = false;
-    bool CONFIG_PREP_DEACT_DEG2     = false;
-    bool CONFIG_PREP_DEACT_DISCRETE = false;
+    bool CONFIG_IR_SKIP_FIRST_REFINEMENT = false; // use if initial coloring has already been refined using >=1-WL
+    bool CONFIG_BULK_ALLOCATOR      = true; // bulk allocation of multiple colorings, use to relief heap allocator
+    bool CONFIG_PREPROCESS          = true;  // enable sassy
+    bool CONFIG_PREP_DEACT_PROBE    = false; // sassy: no probing
+    bool CONFIG_PREP_DEACT_DEG01    = false; // sassy: no degree 0,1 processing
+    bool CONFIG_PREP_DEACT_DEG2     = false; // sassy: no degree 2   processing
     bool CONFIG_PREP_ALT_SCHEDULE   = false;
-
     bool CONFIG_IR_REFINE_EARLYOUT_LATE  = false;
-    bool CONFIG_IR_WRITE_GROUPORDER      = false;
-    bool CONFIG_WRITE_AUTOMORPHISMS      = false;
-    bool CONFIG_PREPROCESS_COMPRESS      = false;
-    bool CONFIG_PREPROCESS_EDGELIST_SORT = false;
-    bool CONFIG_PREPROCESS               = true;
+    bool CONFIG_IR_WRITE_GROUPORDER      = false; // print grouporder
+    bool CONFIG_WRITE_AUTOMORPHISMS      = false; // print automorphisms
+    bool CONFIG_PREPROCESS_EDGELIST_SORT = false; // sort edgelists
     bool CONFIG_SOLVE_ISO                = false;
-
-    bool ONLY_COLOR_REF_INVARIANT       = false;
-
-    int CONFIG_RAND_ABORT = 8;             // determines error probability (higher value means lower error probability)
-                                           // error is at most (1 / 2)^(i-1), where i is the given value
+    bool CONFIG_ONLY_COLOR_REF_INVARIANT = false;
+    int  CONFIG_RAND_ABORT = 8;            // error probability (higher value means lower error probability)
+                                           // error is <(1/2)^(i-1), where i is the given value
                                            // 6 equals an error of roughly 3.2%
                                            // 8 lower than 0.78%
-
-    int CONFIG_THREADS_REFINEMENT_WORKERS = 0; // number of (additional) threads to use
+                                           // error is one-sided, probability 0.78% means a generator is missed with
+                                           // probability at most 0.78%
+                                           // when multiple threads are used, error probability only valid under
+                                           // assumption that there is no bias in finding already found automorphisms
+                                           // more quickly than other automorphisms
+    int CONFIG_THREADS_REFINEMENT_WORKERS = 0; // max number of (additional) threads
 };
 
 extern configstruct config;

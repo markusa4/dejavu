@@ -6,7 +6,6 @@
 #include "sgraph.h"
 #include "configuration.h"
 #include "refinement.h"
-#include <list>
 
 enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM};
 

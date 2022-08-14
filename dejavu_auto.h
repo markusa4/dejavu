@@ -6,7 +6,7 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
-#include "gprep.h"
+#include "sassy.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_shared.h"
@@ -213,7 +213,7 @@ private:
             // first color refinement
             canon_strategy = &_canon_strategy;
 
-            if(config.ONLY_COLOR_REF_INVARIANT) {
+            if(config.CONFIG_ONLY_COLOR_REF_INVARIANT) {
                 strategy_metrics m;
                 invariant my_canon_I;
                 my_canon_I.has_compare = false;
@@ -246,7 +246,7 @@ private:
                     return dejavu_stats();
             }
 
-            if(!config.config_IR_SKIP_FIRST_REFINEMENT)
+            if(!config.CONFIG_IR_SKIP_FIRST_REFINEMENT)
                 W.R.refine_coloring_first(g, start_c, -1);
             PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 
@@ -1071,7 +1071,7 @@ private:
                 automorphism->inverse();
                 automorphism->compose(canon_leaf);
                 automorphism->non_uniform = (skipped_level && !w->skiplevel_is_uniform);
-
+                automorphism->non_uniform = true;
                 if(full_orbit_check && base_aligned && w->skiplevel_is_uniform && !w->is_foreign_base
                    && switches->current_mode != MODE_AUTO_TOURNAMENT) {
                     PRINT("[BA] Orbit equals cell abort");
@@ -1760,7 +1760,7 @@ typedef dejavu_auto_t<int, int, int> dejavu_auto;
 dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejavu_hook hook) {
     g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
-    gprep p;
+    sassy p;
     int* gen_colmap = nullptr;
     if(colmap == nullptr) {
         gen_colmap = new int[g->v_size]; // TODO: memory leak
@@ -1771,9 +1771,9 @@ dejavu_stats dejavu_automorphisms(sgraph_t<int, int, int> *g, int* colmap, dejav
     config.CONFIG_BULK_ALLOCATOR = false;
     if(config.CONFIG_PREPROCESS) {
         p.reduce(g, colmap, hook);
-        config.config_IR_SKIP_FIRST_REFINEMENT = true;
+        config.CONFIG_IR_SKIP_FIRST_REFINEMENT = true;
     } else {
-        config.config_IR_SKIP_FIRST_REFINEMENT = false;
+        config.CONFIG_IR_SKIP_FIRST_REFINEMENT = false;
     }
     config.CONFIG_BULK_ALLOCATOR = true;
     double prep_red_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer1).count());

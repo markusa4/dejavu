@@ -17,8 +17,6 @@ extern "C" {
 
 typedef std::chrono::high_resolution_clock Clock;
 
-class time_point;
-
 configstruct config;
 volatile int dejavu_kill_request = 0;
 thread_local int numnodes;
@@ -467,11 +465,6 @@ int commandline_mode(int argc, char **argv) {
             }
         }
 
-        if (arg == "__COMPRESS") {
-            config.CONFIG_PREPROCESS_COMPRESS      = true;
-            config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
-        }
-
         if (arg == "__PREP_DEACT_DEG01") {
             config.CONFIG_PREP_DEACT_DEG01 = true;
         }
@@ -620,17 +613,18 @@ int commandline_mode(int argc, char **argv) {
     double prep_time;
     if(preprocess) {
         std::cout << "------------------------------------------------------------------" << std::endl;
-        std::cout << "gprep" << std::endl;
+        std::cout << "sassy" << std::endl;
         std::cout << "------------------------------------------------------------------" << std::endl;
 
         Clock::time_point timer = Clock::now();
-        gprep preprocessor;
+        sassy preprocessor;
         preprocessor.reduce(_g, colmap, empty_hook);
         prep_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
 
         std::cout << "Prep time: " << prep_time / 1000000.0 << "ms" << std::endl;
         std::cout << "graph sz: " << g->v_size << ", " << g->e_size << std::endl;
         std::cout << "(partial) group sz: " << preprocessor.base << "*10^" << preprocessor.exp << std::endl;
+        std::cout << "(reported group sizes below must be multiplied with group size above)" << std::endl;
     }
 
     if(comp_nauty) {
@@ -652,6 +646,7 @@ int commandline_mode(int argc, char **argv) {
     if(comp_nauty) {
         std::cout << "Solve time: " << (nauty_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
     }
+
     if(comp_traces) {
         std::cout << "------------------------------------------------------------------" << std::endl;
         std::cout << "Traces" << std::endl;
@@ -717,7 +712,6 @@ int commandline_mode(int argc, char **argv) {
         std::cout << "dejavu" << std::endl;
         std::cout << "------------------------------------------------------------------" << std::endl;
     }
-
     double dejavu_solve_time;
     if(comp_dejavu) {
         finished = false;
@@ -730,26 +724,6 @@ int commandline_mode(int argc, char **argv) {
     }
     if(comp_dejavu) {
         std::cout << "Solve time: " << (dejavu_solve_time + prep_time) / 1000000.0 << "ms" << std::endl;
-    }
-
-    // std::cout << "Compare (nauty): " << nauty_solve_time / dejavu_solve_time << std::endl;
-    // std::cout << "Compare (Traces): " << traces_solve_time / dejavu_solve_time << std::endl;
-
-    if (entered_stat_file) {
-        stat_file.open(stat_filename, std::fstream::in | std::fstream::out | std::fstream::app);
-
-        std::cout << "Appending to " << stat_filename << ".\n";
-        stat_file << filename << " " << _g->v_size << " ";
-        if(comp_dejavu)
-            stat_file << dejavu_solve_time / 1000000.0 << " ";
-        if(comp_nauty)
-            stat_file << nauty_solve_time  / 1000000.0 << " ";
-        if(comp_traces)
-            stat_file << traces_solve_time / 1000000.0 << " ";
-        if(comp_saucy)
-            stat_file << saucy_solve_time / 1000000.0 << " ";
-        stat_file << "\n";
-        stat_file.close();
     }
 
     delete _g;

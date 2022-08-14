@@ -134,7 +134,7 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
-                config.ONLY_COLOR_REF_INVARIANT = true;
+                config.CONFIG_ONLY_COLOR_REF_INVARIANT = true;
         }  else if (arg == "__FORCE_SELECTOR") {
             if (i + 1 < argc) {
                 i++;

@@ -1,5 +1,5 @@
-#ifndef DEJAVU_GPREP_H
-#define DEJAVU_GPREP_H
+#ifndef DEJAVU_SASSY_H
+#define DEJAVU_SASSY_H
 
 #include "sgraph.h"
 #include "refinement.h"
@@ -7,16 +7,15 @@
 #include <vector>
 
 enum preop { deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop};
-std::vector<preop> default_schedule = {preop::deg01, preop::qcedgeflip, preop::deg2ma, preop::deg2ue, preop::probe2qc,
-                                       preop::deg2ma, preop::probeqc, redloop};
-std::vector<preop> alt_schedule    = {preop::deg01, preop::qcedgeflip, preop::deg2ma, preop::deg2ue,
-                                      preop::probe2qc, preop::probeflat, preop::deg2ma};
+
+std::vector<preop> default_schedule = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, redloop};
+std::vector<preop> alt_schedule    = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, probeflat, deg2ma};
 
 // preprocessor for symmetry detection
 // Example usage:
-// gprep p;
+// sassy p;
 // p.reduce(&g, col, hook);
-class gprep {
+class sassy {
 public:
     double base = 1;
     int    exp  = 0;
@@ -76,26 +75,18 @@ private:
     mark_set seen_color;
     bool init_quotient_arrays = false;
     std::vector<int> worklist;
-public:
-    // combine translation layers
-    void meld_translation_layers() {
-        if(layers_melded)
-            return;
-        const int layers = translation_layers.size();
-        backward_translation.reserve(layers - 1);
-        const int reduced_size = backward_translation_layers[layers - 1].size();
-        for(int i = 0; i < reduced_size; ++i)
-            backward_translation.push_back(i);
-        for(int i = 0; i < reduced_size; ++i) {
-            int next_v = i;
-            for(int l = layers - 1; l >= 0; --l) {
-                next_v = backward_translation_layers[l][next_v];
-            }
-            backward_translation[i] = next_v;
-        }
-        layers_melded = true;
-    }
 
+    work_list_t<int> _automorphism;
+    work_list_t<int> _automorphism_supp;
+    std::vector<int> save_colmap;
+    mark_set touched_color;
+    work_list_t<int> touched_color_list;
+    bool ir_quotient_component_init = false;
+
+    std::vector<int> save_colmap_v_to_col;
+    std::vector<int> save_colmap_v_to_lab;
+    std::vector<int> save_colmap_ptn;
+public:
     // for a vertex v of reduced graph, return corresponding vertex of the original graph
     int translate_back(int v) {
         const int layers = translation_layers.size();
@@ -115,6 +106,25 @@ public:
     }
 
 private:
+    // combine translation layers
+    void meld_translation_layers() {
+        if(layers_melded)
+            return;
+        const int layers = translation_layers.size();
+        backward_translation.reserve(layers - 1);
+        const int reduced_size = backward_translation_layers[layers - 1].size();
+        for(int i = 0; i < reduced_size; ++i)
+            backward_translation.push_back(i);
+        for(int i = 0; i < reduced_size; ++i) {
+            int next_v = i;
+            for(int l = layers - 1; l >= 0; --l) {
+                next_v = backward_translation_layers[l][next_v];
+            }
+            backward_translation[i] = next_v;
+        }
+        layers_melded = true;
+    }
+
     // reset internal automorphism structure to the identity
     static void reset_automorphism(int* rautomorphism, int nsupp, const int* supp) {
         for(int i = 0; i < nsupp; ++i) {
@@ -657,6 +667,7 @@ private:
         return;
     }
 
+    // reduce vertices of degree 1 and 0, outputs corresponding automorphisms
     void red_deg10_assume_cref(sgraph* g, int* colmap, dejavu_hook consume) {
         g->initialize_coloring(&c, colmap);
         if(config.CONFIG_PREP_DEACT_DEG01)
@@ -707,7 +718,6 @@ private:
                 case 1:
                     if(c.ptn[c.vertex_to_col[v]] > 0)
                         worklist_deg1.push_back(v);
-                    // TODO: should early-out with less overhead!
                     break;
                 default:
                     break;
@@ -770,7 +780,7 @@ private:
                     del.set(child);
 
                     // save canonical info for parent
-                    edge_scratch[g->v[parent] + childcount[parent]] = child; // TODO: swap this into g->e?
+                    edge_scratch[g->v[parent] + childcount[parent]] = child;
 
                     ++childcount[parent];
 
@@ -1126,7 +1136,8 @@ private:
         }
     }
 
-    void red_quotient_components(sgraph* g, int* colmap, dejavu_hook consume) { // TODO optimize...
+    // perform edge flips according to quotient graph
+    void red_quotient_edge_flip(sgraph* g, int* colmap, dejavu_hook consume) { // TODO could still optimize further ...
         if(g->v_size <= 1)
             return;
 
@@ -1214,6 +1225,7 @@ private:
         }
     }
 
+    // deletes vertices marked in 'del'
     // assumes that g->v points to g->e in ascending order
     void perform_del(sgraph*g, int* colmap) {
         // copy some stuff
@@ -1313,6 +1325,7 @@ private:
         del.reset();
     }
 
+    // deletes vertices marked in 'del'
     // assumes that g->v points to g->e in ascending order
     void perform_del_edge(sgraph*g, int* colmap) {
         if(g->v_size <= 1)
@@ -1361,6 +1374,8 @@ private:
         g->d_size = new_vsize;
     }
 
+    // deletes vertices marked in 'del'
+    // for vertices v where add_edge_buff_act[v] is set, in turn adds edges add_edge_buff_act[v]
     // assumes that g->v points to g->e in ascending order
     // assumes that degree of a vertex stays the same or gets smaller
     void perform_del_add_edge(sgraph*g, int* colmap) {
@@ -1493,6 +1508,7 @@ private:
         del.reset();
     }
 
+    // marks all discrete vertices in 'del'
     void mark_discrete_for_deletion(sgraph*g, int* colmap) {
         int discrete_cnt = 0;
         worklist_deg0.reset();
@@ -1510,6 +1526,7 @@ private:
         worklist_deg0.reset();
     }
 
+    // deletes all discrete vertices
     void perform_del_discrete(sgraph*g, int* colmap) {
         if(g->v_size <= 1)
             return;
@@ -1625,6 +1642,7 @@ private:
     }
 
     // select a color class in a quotient component
+    // assumes internal state of quotient component is up-to-date
     std::pair<int, int> select_color_component(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint) {
         int cell = -1;
         bool only_discrete_prev = true;
@@ -1658,6 +1676,7 @@ private:
     }
 
     // select a color class in a quotient component
+    // assumes internal state of quotient component is up-to-date
     std::pair<int, int> select_color_component_large(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint) {
         int cell = -1;
         bool only_discrete_prev = true;
@@ -1696,7 +1715,8 @@ private:
     }
 
     // select a color class in a quotient component
-    std::pair<int, int> __attribute__ ((noinline)) select_color_component_large_touched(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint, mark_set* touched_set) {
+    // assumes internal state of quotient component is up-to-date
+    std::pair<int, int> select_color_component_large_touched(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint, mark_set* touched_set) {
         int cell = -1;
         bool only_discrete_prev = true;
         int _i = component_start_pos;
@@ -1751,13 +1771,6 @@ private:
         }
         return {cell, hint};
     }
-
-    work_list_t<int> _automorphism;
-    work_list_t<int> _automorphism_supp;
-    std::vector<int> save_colmap;
-    mark_set touched_color;
-    work_list_t<int> touched_color_list;
-    bool ir_quotient_component_init = false;
 
     // performs sparse probing for all color classes, but only for 1 individualization
     void sparse_ir_probe(sgraph*g, int* colmap, dejavu_hook consume, selector_type sel_type) {
@@ -2055,7 +2068,6 @@ private:
 
 public:
     // given automorphism of reduced graph, reconstructs automorphism of the original graph
-    // optimizes for consecutive calls (ought to be used after preprocessing is done)
     void pre_consumer(int _n, const int* _automorphism, int _supp, const int* _automorphism_supp, dejavu_hook hook) {
         meld_translation_layers();
         automorphism_supp.reset();
@@ -2322,10 +2334,6 @@ private:
         }
     }
 
-    std::vector<int> save_colmap_v_to_col;
-    std::vector<int> save_colmap_v_to_lab;
-    std::vector<int> save_colmap_ptn;
-
     // perform sparse probing for color classes of size 2, num_paths number of times
     int sparse_ir_probe_sz2_quotient_components(sgraph* g, int* colmap, dejavu_hook consume, int num_paths) {
         if(g->v_size <= 1 || config.CONFIG_PREP_DEACT_PROBE)
@@ -2367,12 +2375,8 @@ private:
                 break;
             }
 
-            //if(touched_support*1.0 >= (g->v_size*1.0)/10) {
-                //std::cout << "recompute quotient components " << touched_support << std::endl;
-                compute_quotient_graph_components_update(g, &c1, consume);
-                touched_support = 0;
-
-            //}
+            compute_quotient_graph_components_update(g, &c1, consume);
+            touched_support = 0;
 
             int automorphisms_found = 0;
 
@@ -2383,8 +2387,6 @@ private:
                 for(int i = 0; i < quotient_component_worklist_boundary.size(); ++i)
                     quotient_component_touched_swap.push_back(i);
             }
-
-           // std::cout << "it: " << x << ", " << quotient_component_touched_swap.size() << ", " << quotient_component_touched.size() << std::endl;
 
             if(quotient_component_touched_swap.size() < 2)
                 ++penalty;
@@ -2426,9 +2428,6 @@ private:
 
             assert(quotient_component_end_pos_v - 1 < quotient_component_worklist_v.size());
 
-
-            //std::cout << quotient_component_start_pos_v << "--" << quotient_component_end_pos_v << std::endl;
-
             while (quotient_component_start_pos < quotient_component_worklist_col.size()) {
                 assert(quotient_component_start_pos_v < quotient_component_worklist_v.size());
                 int start_search_here = quotient_component_start_pos;
@@ -2438,7 +2437,7 @@ private:
                 certify = true;
                 bool touched_current_component = false;
 
-                while (certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
+                while (certify) {
                     // select a color class of size 2
                     bool only_discrete_prev = true;
                     int cell = -1;
@@ -3053,26 +3052,9 @@ private:
                     // select a color class of size 2
                     int cell = select_color_component_min_cost(g, &c1, quotient_component_start_pos,
                                                                quotient_component_end_pos, max_col_size);
-
                     orbit.reset();
 
                     if (cell == -1) break;
-
-                    /*for(int ts = 0; ts < g->v_size; ++ts) {
-                        assert(c2.vertex_to_col[ts] == c3.vertex_to_col[ts]);
-                        assert(c2.vertex_to_lab[ts] == c3.vertex_to_lab[ts]);
-                        assert(c2.ptn[ts] == c3.ptn[ts]);
-                        assert(c2.lab[ts] == c3.lab[ts]);
-                    }
-
-                    for(int ts = 0; ts < g->v_size; ++ts) {
-                        assert(c1.vertex_to_col[ts] == c3.vertex_to_col[ts]);
-                        assert(c1.vertex_to_lab[ts] == c3.vertex_to_lab[ts]);
-                        assert(c1.ptn[ts] == c3.ptn[ts]);
-                        assert(c1.lab[ts] == c3.lab[ts]);
-                    }*/
-
-
                     const int cell_sz = c1.ptn[cell];
 
                     touched_color.reset();
@@ -3255,12 +3237,6 @@ private:
                         assert(touched_color_list.cur_pos <= quotient_component_end_pos_v - quotient_component_start_pos_v);
                         reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
                                                            quotient_component_end_pos_v);
-                        /*for(int ts = 0; ts < g->v_size; ++ts) {
-                            assert(c2.vertex_to_col[ts] == c3.vertex_to_col[ts]);
-                            assert(c2.vertex_to_lab[ts] == c3.vertex_to_lab[ts]);
-                            assert(c2.ptn[ts] == c3.ptn[ts]);
-                            assert(c2.lab[ts] == c3.lab[ts]);
-                        }*/
 
                         I2.acc = 0;
                         const int init_c2 = R1.individualize_vertex(&c2, ind_v2);
@@ -3707,8 +3683,6 @@ private:
         if(avg_support_sparse_ir > 0 && avg_support_sparse_ir_num > 0) {
             avg_support_sparse_ir = avg_support_sparse_ir / avg_support_sparse_ir_num;
         }
-        //std::cout << avg_support_sparse_ir << "/" << g->v_size << std::endl;
-        //std::cout << (1.0*avg_reached_end_of_component) / (avg_support_sparse_ir_num2*1.0) << std::endl;
         if(avg_support_sparse_ir_num2 > 0) {
             avg_end_of_comp = (1.0 * avg_reached_end_of_component) / (avg_support_sparse_ir_num2 * 1.0);
         } else {
@@ -3983,12 +3957,10 @@ public:
                                 red_deg2_unique_endpoint(g, colmap, hook);
                                 perform_del_add_edge(g, colmap);
 
-                                //std::cout << g->v_size << ", " << prev_size << std::endl;
                                 prev_size = g->v_size;
                                 count_graph_deg(g, &deg0, &deg1, &deg2);
 
                                 if(((g->v_size * 1.0) / prev_size) > 0.75) {
-                                    //std::cout << "break " << deg2 << std::endl;
                                     break;
                                 }
                             }
@@ -3996,7 +3968,7 @@ public:
                         break;
                     }
                     case preop::qcedgeflip: {
-                        red_quotient_components(g, colmap, hook);
+                        red_quotient_edge_flip(g, colmap, hook);
                         perform_del_edge(g, colmap);
                         break;
                     }
@@ -4017,7 +3989,7 @@ public:
     }
 
     static void bliss_hook(void* user_param, unsigned int n, const unsigned int* aut) {
-        auto p = (gprep*) user_param;
+        auto p = (sassy*) user_param;
         p->pre_consumer(n, (int*) aut, -1, nullptr, p->saved_hook);
     }
 
@@ -4028,4 +4000,4 @@ public:
 
 
 
-#endif //DEJAVU_GPREP_H
+#endif //DEJAVU_SASSY_H
