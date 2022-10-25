@@ -204,7 +204,7 @@ public:
     }
 
     // certify that a permutation is an automorphism of the sgraph
-    bool certify_automorphism(bijection<vertex_t> p) {
+    bool certify_automorphism(bijection p) {
         assert(p.map_sz == v_size);
 
         std::set<int> image_neighbours_of_i;
@@ -235,14 +235,14 @@ public:
         return true;
     }
 
-    void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection<vertex_t>* p) {
+    void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection* p) {
         ng->initialize(v_size, e_size);
         ng->v_size = v_size;
         ng->d_size = d_size;
         ng->e_size = e_size;
         ng->max_degree = max_degree;
 
-        bijection<vertex_t> p_inv;
+        bijection p_inv;
         p_inv.initialize_empty(p->map_sz);
         p_inv.copy(p);
         p_inv.inverse();

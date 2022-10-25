@@ -8,10 +8,8 @@
 #include "utility.h"
 #include "configuration.h"
 
-template <class vertex_t, class degree_t, class edge_t>
 struct dejavu_workspace;
 
-template <class vertex_t>
 class group_shared {
 public:
     // input and pipeline management
@@ -43,7 +41,7 @@ public:
     group_shared(int domain_size) {
         this->domain_size = domain_size;
     }
-    void initialize(int domain_size, bijection<vertex_t> *base_points) {
+    void initialize(int domain_size, bijection *base_points) {
         shared_schreier_fails(-1);
         added = 0;
 
@@ -72,7 +70,7 @@ public:
         }
     }
 
-    bool add_permutation(bijection<vertex_t>* p, int* idle_ms, bool* done) {
+    bool add_permutation(bijection* p, int* idle_ms, bool* done) {
         int support = 0;
         //for(int i = 0; i < domain_size; ++i) {
         //    support += (p->map[i] != i);
@@ -123,7 +121,7 @@ public:
         shared_grouporder(b, base_size, gp, &gens, grpsize1, grpsize2, domain_size);
     }
 
-    void manage_results(shared_workspace_auto<vertex_t>* switches) {
+    void manage_results(shared_workspace_auto* switches) {
         int num = sift_results.try_dequeue_bulk(dequeue_space, dequeue_space_sz);
         for(int j = 0; j < num; ++j) {
             switch(dequeue_space[j].first) {

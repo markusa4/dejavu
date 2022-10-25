@@ -9,9 +9,8 @@
 
 enum selector_type {SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM};
 
-template<class vertex_t>
 struct strategy {
-    bijection<vertex_t>* leaf = nullptr;
+    bijection* leaf = nullptr;
     invariant* I    = nullptr;
     selector_type cell_selector_type = SELECTOR_FIRST;
     int           cell_selector_seed = 0;
@@ -24,19 +23,19 @@ struct strategy {
             delete I;
         }
     }
-    strategy(bijection<vertex_t>* leaf, invariant* I, selector_type cell_selector_type, int seed) {
+    strategy(bijection* leaf, invariant* I, selector_type cell_selector_type, int seed) {
         this->leaf = leaf;
         this->I    = I;
         this->cell_selector_type = cell_selector_type;
         this->cell_selector_seed = seed;
     }
 
-    void replace(strategy<vertex_t>* s) {
+    void replace(strategy* s) {
         if(init) {
             delete leaf;
             delete I;
         }
-        leaf = new bijection<vertex_t>();
+        leaf = new bijection();
         I    = new invariant();
         init = true;
 
@@ -49,7 +48,6 @@ struct strategy {
     }
 };
 
-template<class vertex_t, class degree_t, class edge_t>
 class selector {
     int skipstart = 0;
     int hint      = -1;
@@ -165,7 +163,7 @@ public:
         largest_cache.reset();
     }
 
-    int select_color(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring *c, int seed) {
+    int select_color(sgraph *g, coloring *c, int seed) {
         if(c->cells == g->v_size)
             return -1;
         switch(config.CONFIG_IR_CELL_SELECTOR) {
@@ -181,7 +179,7 @@ public:
         }
     }
 
-    int select_color_dynamic(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring  *c, strategy<vertex_t> *s) {
+    int select_color_dynamic(sgraph *g, coloring  *c, strategy *s) {
         if(c->cells == g->v_size)
             return -1;
         switch(s->cell_selector_type) {

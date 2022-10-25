@@ -824,7 +824,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism(sgraph  *g, bijection<int> *p) {
+    bool certify_automorphism(sgraph  *g, bijection *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -1075,7 +1075,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism_iso(sgraph *g, bijection<int> *p) {
+    bool certify_automorphism_iso(sgraph *g, bijection *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -1110,8 +1110,7 @@ public:
     }
 
     // certify a graph isomorphism
-    bool certify_isomorphism(sgraph  *g1, sgraph  *g2,
-                             bijection<int> *p) {
+    bool certify_isomorphism(sgraph  *g1, sgraph  *g2, bijection* p) {
         if(g1 == g2) {
             PRINT("g1 == g2, no need to test isomorphism");
         }

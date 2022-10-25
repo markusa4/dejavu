@@ -9,13 +9,12 @@
 #include <assert.h>
 
 
-template<class vertex_t>
 class bijection {
     bool init = false;
 
     void alloc(int n) {
         dealloc();
-        map  = new vertex_t[n];
+        map  = new int[n];
         init = true;
     }
 
@@ -26,7 +25,7 @@ class bijection {
         }
     };
 public:
-    vertex_t* map = nullptr;
+    int* map = nullptr;
     bool mark = false;
     int res_sz;
     int map_sz;
@@ -62,12 +61,12 @@ public:
         non_uniform = p->non_uniform;
         foreign_base = p->foreign_base;
         certified = p->certified;
-        memcpy(map, p->map, p->map_sz * sizeof(vertex_t));
+        memcpy(map, p->map, p->map_sz * sizeof(int));
     }
 
     void swap(bijection* p) {
         bool s_init = p->init;
-        vertex_t* s_map = p->map;
+        int* s_map = p->map;
         int s_map_sz = p->map_sz;
 
         p->init = init;
@@ -90,7 +89,7 @@ public:
         assert(init);
         assert(map != nullptr);
         assert(b != nullptr);
-        memcpy(b, map, map_sz * sizeof(vertex_t));
+        memcpy(b, map, map_sz * sizeof(int));
     }
 
     void print() {
@@ -99,7 +98,7 @@ public:
         std::cout << std::endl;
     }
 
-    void read_from_array(const vertex_t* _map, int _map_sz) {
+    void read_from_array(const int* _map, int _map_sz) {
         alloc(_map_sz);
         res_sz = _map_sz;
         init = true;
@@ -123,16 +122,16 @@ public:
         assert(init);
         // ToDo: buffer this map
         // thread local with unique_ptr?
-        vertex_t* switch_map;
+        int* switch_map;
         bool      switch_map_init = false;
 
         if(!switch_map_init) {
             switch_map_init = true;
-            switch_map      = new vertex_t[map_sz];
+            switch_map      = new int[map_sz];
 
         }
 
-        vertex_t* swap = map;
+        int* swap = map;
         map = switch_map;
         switch_map = swap;
 
@@ -146,7 +145,7 @@ public:
         }
     }
 
-    void compose(bijection<vertex_t>* p) {
+    void compose(bijection* p) {
         assert(p->init);
         assert(init);
         for(int i = 0; i < map_sz; ++i) {
@@ -162,11 +161,11 @@ public:
         dealloc();
     }
 
-    static void random_bijection(bijection<vertex_t>* p, int n, unsigned seed) {
+    static void random_bijection(bijection* p, int n, unsigned seed) {
         if(p->init)
             delete[] p->map;
 
-        p->map = new vertex_t[n];
+        p->map = new int[n];
         p->init = true;
         p->map_sz = n;
         for(int i = 0; i < n; ++i) {

@@ -1805,8 +1805,8 @@ private:
         coloring color_cache;
         color_cache.copy(&c1);
 
-        selector<int, int, int> S;
-        strategy<int> m;
+        selector S;
+        strategy m;
         m.cell_selector_type = sel_type;
 
         work_list_t<int> _automorphism;

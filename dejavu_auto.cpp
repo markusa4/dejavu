@@ -176,8 +176,8 @@ int commandline_mode(int argc, char **argv) {
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;
-        bijection<int> pr;
-        bijection<int>::random_bijection(&pr, g->v_size, seed);
+        bijection pr;
+        bijection::random_bijection(&pr, g->v_size, seed);
         g->permute_graph(_g, &pr); // permute graph
         int* rmap = pr.extract_map();
         if(colmap != nullptr)

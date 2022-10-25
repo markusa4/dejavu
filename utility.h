@@ -49,23 +49,20 @@ struct strategy_metrics {
     int    color_refinement_cost = 0;
 };
 
-template<class vertex_t>
 struct bfs_element;
 
-template<class vertex_t>
 struct stored_leaf {
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bool look_close) :
+    stored_leaf(int* map, int map_sz, bool explicit_leaf, bool look_close) :
                 map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), look_close(look_close) {};
-    stored_leaf(vertex_t* map, int map_sz, bool explicit_leaf, bool look_close, bfs_element<vertex_t>* start_elem) :
+    stored_leaf(int* map, int map_sz, bool explicit_leaf, bool look_close, bfs_element* start_elem) :
                 map(map), map_sz(map_sz), explicit_leaf(explicit_leaf), look_close(look_close), start_elem(start_elem) {};
     bool      explicit_leaf;
     bool      look_close;
     int       map_sz;
-    vertex_t* map;
-    bfs_element<vertex_t>* start_elem;
+    int* map;
+    bfs_element* start_elem;
 };
 
-template<class vertex_t>
 class shared_workspace_auto {
 public:
     shared_workspace_auto() {
@@ -114,7 +111,7 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, stored_leaf<vertex_t>> leaf_store;
+    std::unordered_multimap<long, stored_leaf> leaf_store;
     std::atomic_int    leaf_store_explicit;
     std::mutex leaf_store_mutex;
 
@@ -166,7 +163,6 @@ public:
     }
 };
 
-template<class vertex_t>
 class shared_workspace_iso {
 public:
     ~shared_workspace_iso() {
@@ -189,8 +185,8 @@ public:
         exit_counter.store(0);
         experimental_paths.store(0);
         experimental_deviation.store(0);
-        leaf_store[0] = std::unordered_multimap<long, stored_leaf<vertex_t>>();
-        leaf_store[1] = std::unordered_multimap<long, stored_leaf<vertex_t>>();
+        leaf_store[0] = std::unordered_multimap<long, stored_leaf>();
+        leaf_store[1] = std::unordered_multimap<long, stored_leaf>();
         leaf_store_explicit.store(0);
         deviation_store[0] = std::unordered_set<long>();
         deviation_store[1] = std::unordered_set<long>();
@@ -219,7 +215,7 @@ public:
     std::atomic_int    experimental_paths;
     std::atomic_int    experimental_deviation;
     std::atomic_bool   experimental_look_close;
-    std::unordered_multimap<long, stored_leaf<vertex_t>> leaf_store[2];
+    std::unordered_multimap<long, stored_leaf> leaf_store[2];
     std::mutex leaf_store_mutex[2];
     std::atomic_int    leaf_store_explicit;
 
