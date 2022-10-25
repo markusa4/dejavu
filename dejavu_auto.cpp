@@ -27,7 +27,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-refinement<int, int, int> test_R;
+refinement test_R;
 
 void empty_hook(int n, const int * p, int support, const int *) {
     /*bijection<int> test_p;

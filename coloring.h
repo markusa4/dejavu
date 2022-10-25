@@ -69,21 +69,20 @@ public:
     }
 };
 
-template <class vertex_t>
 class coloring {
 public:
-    vertex_t* bulk_alloc;
-    vertex_t* bulk_pt;
+    int* bulk_alloc;
+    int* bulk_pt;
 
-    vertex_t* lab;
-    vertex_t* ptn;
+    int* lab;
+    int* ptn;
 
     int lab_sz;
     int ptn_sz;
     bool init = false;
     bool efficient_alloc = false;
-    vertex_t* vertex_to_col;
-    vertex_t* vertex_to_lab;
+    int* vertex_to_col;
+    int* vertex_to_lab;
 
     int cells = 1;
     int smallest_cell_lower_bound = INT32_MAX;
@@ -97,7 +96,7 @@ public:
     void alloc(int sz) {
         if(config.CONFIG_BULK_ALLOCATOR) {
             if (!init) {
-                std::pair<vertex_t *, vertex_t *> alloc = coloring_allocator<vertex_t>::coloring_bulk_allocator(sz * 4);
+                std::pair<int *, int *> alloc = coloring_allocator<int>::coloring_bulk_allocator(sz * 4);
                 bulk_alloc = alloc.first;
                 bulk_pt = alloc.second;
 
@@ -113,10 +112,10 @@ public:
             }
         } else {
             if (!init) {
-                lab = new vertex_t[sz];
-                ptn = new vertex_t[sz];
-                vertex_to_col = new vertex_t[sz];
-                vertex_to_lab = new vertex_t[sz];
+                lab = new int[sz];
+                ptn = new int[sz];
+                vertex_to_col = new int[sz];
+                vertex_to_lab = new int[sz];
                 efficient_alloc = false;
                 init = true;
 
@@ -133,17 +132,17 @@ public:
             delete[] vertex_to_lab;
             delete[] vertex_to_col;
         } else {
-            coloring_allocator<vertex_t>::coloring_bulk_deallocator(bulk_alloc);
+            coloring_allocator<int>::coloring_bulk_deallocator(bulk_alloc);
         }
     };
 
-    void copy_ptn(coloring<vertex_t> *c) {
+    void copy_ptn(coloring *c) {
         assert(init);
         assert(c->init);
-        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(vertex_t));
+        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
     }
 
-    void copy(coloring<vertex_t> *c) {
+    void copy(coloring *c) {
         if(init) {
             if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
                 dealloc();
@@ -152,18 +151,18 @@ public:
                 cells = c->cells;
                 if(!efficient_alloc || !c->efficient_alloc) {
                     for(int i = 0; i < c->ptn_sz;) {
-                        const vertex_t rd = c->ptn[i];
+                        const int rd = c->ptn[i];
                         ptn[i] = rd;
                         i += rd +1;
                     }
-                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
+                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(int));
                 } else {
                     for(int i = 0; i < c->ptn_sz;) {
-                        const vertex_t rd = c->ptn[i];
+                        const int rd = c->ptn[i];
                         ptn[i] = rd;
                         i += rd +1;
                     }
-                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(vertex_t));
+                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(int));
                 }
                 return;
             }
@@ -174,17 +173,17 @@ public:
         }
 
         if(c->cells > c->ptn_sz / 4) {
-            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_t));
+            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(int));
         } else {
             for (int i = 0; i < c->ptn_sz;) {
-                const vertex_t rd = c->ptn[i];
+                const int rd = c->ptn[i];
                 ptn[i] = rd;
                 i += rd + 1;
             }
         }
-        memcpy(lab, c->lab, c->lab_sz*sizeof(vertex_t));
-        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(vertex_t));
-        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(vertex_t));
+        memcpy(lab, c->lab, c->lab_sz*sizeof(int));
+        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
+        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
 
         lab_sz = c->lab_sz;
         ptn_sz = c->ptn_sz;
@@ -194,7 +193,7 @@ public:
         init = true;
     }
 
-    void copy_force(coloring<vertex_t> *c) {
+    void copy_force(coloring *c) {
         if(init) {
             if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
                 dealloc();
@@ -207,17 +206,17 @@ public:
         }
 
         if(c->cells > c->ptn_sz / 4) {
-            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(vertex_t));
+            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(int));
         } else {
             for (int i = 0; i < c->ptn_sz;) {
-                const vertex_t rd = c->ptn[i];
+                const int rd = c->ptn[i];
                 ptn[i] = rd;
                 i += rd + 1;
             }
         }
-        memcpy(lab, c->lab, c->lab_sz*sizeof(vertex_t));
-        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(vertex_t));
-        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(vertex_t));
+        memcpy(lab, c->lab, c->lab_sz*sizeof(int));
+        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
+        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
 
         lab_sz = c->lab_sz;
         ptn_sz = c->ptn_sz;

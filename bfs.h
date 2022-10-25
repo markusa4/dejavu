@@ -20,10 +20,10 @@ struct pair_hash {
 template<class vertex_t>
 class bfs_element {
 public:
-    static bfs_element<vertex_t>* root_element(coloring<vertex_t>* start_c, invariant* start_I) {
+    static bfs_element<vertex_t>* root_element(coloring* start_c, invariant* start_I) {
         bfs_element<vertex_t> *root_elem = new bfs_element<vertex_t>;
         root_elem->id = 0;
-        root_elem->c = new coloring<vertex_t>;
+        root_elem->c = new coloring;
         root_elem->I = new invariant;
         root_elem->c->copy_force(start_c);
         root_elem->base_sz = 0;
@@ -38,7 +38,7 @@ public:
     bfs_element() {};
     // coloring and invariant for the specified path / base
     bfs_element<vertex_t>* parent = nullptr;
-    coloring<vertex_t>*    c      = nullptr;
+    coloring*    c      = nullptr;
     invariant* I = nullptr;
     int* base    = nullptr;
     int  base_sz = -1;

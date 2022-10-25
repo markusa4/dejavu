@@ -12,6 +12,7 @@
 typedef void dejavu_hook(int, const int *, int, const int *);
 
 struct configstruct {
+    bool CONFIG_PREPROCESS_COMPRESS = true;
     bool CONFIG_IR_FORCE_SELECTOR = false;
     int  CONFIG_IR_CELL_SELECTOR  = 3;     // selector type, if CONFIG_IR_FORCE_SELECTOR is set
     int  CONFIG_IR_SIZE_FACTOR    = 10;    // tradeoff between restarts and allowed breadth-first width

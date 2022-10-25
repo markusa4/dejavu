@@ -24,20 +24,20 @@ struct abort_code {
 template <class vertex_t, class degree_t, class edge_t>
 struct dejavu_workspace {
     // workspace for normal search
-    refinement<vertex_t, degree_t, edge_t> R;
+    refinement R;
     selector<vertex_t, degree_t, edge_t>   S;
-    coloring<vertex_t> c;
+    coloring c;
     invariant  I;
 
     // workspace for bfs_workspace
-    coloring<vertex_t>*  work_c;
+    coloring*  work_c;
     invariant* work_I;
 
     // workspace for base aligned search
     int base_size = 0;
     int skiplevels = 1;
     int first_skiplevel = 1;
-    coloring<vertex_t> skip_c;
+    coloring           skip_c;
     invariant          skip_I;
     shared_schreier*   skip_schreier_level;
     bool               skiplevel_is_uniform = false;
@@ -47,8 +47,8 @@ struct dejavu_workspace {
 
     group_shared<vertex_t>* G;
 
-    coloring<vertex_t> start_c1;
-    coloring<vertex_t> start_c2;
+    coloring start_c1;
+    coloring start_c2;
     invariant start_I;
 
     // indicates which thread this is
@@ -89,7 +89,7 @@ struct dejavu_workspace {
     int _collect_base_sz;
 
     dejavu_workspace() {
-        work_c = new coloring<vertex_t>;
+        work_c = new coloring;
         work_I = new invariant;
     }
     ~dejavu_workspace() {
@@ -137,7 +137,7 @@ public:
             }
         }
 
-        coloring<vertex_t> start_c;
+        coloring start_c;
         start_c.vertex_to_col = colmap;
         start_c.init = false;
         shared_workspace_auto<vertex_t> switches;
@@ -150,7 +150,7 @@ public:
 private:
     dejavu_stats worker_thread(sgraph_t<vertex_t, degree_t, edge_t> *g_, bool master,
                                shared_workspace_auto<vertex_t> *switches, group_shared<vertex_t> *G,
-                               coloring<vertex_t> *start_c, strategy<vertex_t>* canon_strategy,
+                               coloring *start_c, strategy<vertex_t>* canon_strategy,
                                int communicator_id, int **shared_orbit, int** shared_orbit_weights,
                                bfs_workspace<vertex_t> *bwork, shared_permnode **gens, int *shared_group_size) {
 
@@ -175,7 +175,7 @@ private:
 
         numnodes  = 0;
         colorcost = 0;
-	    coloring<vertex_t>* init_c;
+	    coloring* init_c;
         // preprocessing
         if(master) {
             init_c  = start_c;
@@ -904,11 +904,11 @@ private:
         const bool* done = &switches->done;
 
         // workspace
-        refinement<vertex_t, degree_t, edge_t> *R = &w->R;
+        refinement *R = &w->R;
         selector<vertex_t, degree_t, edge_t> *S   = &w->S;
-        coloring<vertex_t> *c        = &w->c;
+        coloring *c        = &w->c;
         invariant *I                 = &w->I;
-        coloring<vertex_t> *start_c  = &w->start_c1;
+        coloring *start_c  = &w->start_c1;
         invariant *start_I           = &w->start_I;
 
         S->empty_cache();
@@ -961,12 +961,12 @@ private:
         bool full_orbit_check = false;
 
         // workspace
-        refinement<vertex_t, degree_t, edge_t> *R = &w->R;
+        refinement *R = &w->R;
         selector<vertex_t, degree_t, edge_t>   *S = &w->S;
-        coloring<vertex_t> *c                     = &w->c;
+        coloring *c                     = &w->c;
         invariant *I                              = &w->I;
 
-        coloring<vertex_t> *start_c  = &w->skip_c;
+        coloring *start_c  = &w->skip_c;
         invariant *start_I           = &w->skip_I;
         shared_schreier *group_level = w->skip_schreier_level;
 
@@ -1153,9 +1153,9 @@ private:
         bool backtrack = false;
         bool* done = &switches->done;
 
-        refinement<vertex_t, degree_t, edge_t>  *R = &w->R;
+        refinement *R = &w->R;
         selector<vertex_t,   degree_t, edge_t>  *S = &w->S;
-        coloring<vertex_t> *c                      = &w->c;
+        coloring *c                      = &w->c;
         invariant *I                               = &w->I;
         invariant* canon_I                         = canon_strategy->I;
         bijection<vertex_t>* canon_leaf            = canon_strategy->leaf;
@@ -1278,7 +1278,7 @@ private:
 
     // Performs one individualization followed by one refinement on the given coloring with the given settings.
     bool proceed_state(dejavu_workspace<vertex_t, degree_t, edge_t>* w,
-                       sgraph_t<vertex_t, degree_t, edge_t> * g, coloring<vertex_t>* c,
+                       sgraph_t<vertex_t, degree_t, edge_t> * g, coloring* c,
                        invariant* I, int v, strategy_metrics* m, int cell_early, int individualize_early,
                        std::vector<vertex_t>* early_individualized) {
         if(!config.CONFIG_IR_IDLE_SKIP)
@@ -1516,7 +1516,7 @@ private:
 
             w->finished_elements[finished_elements_sz] = std::pair<bfs_element<vertex_t> *, int>(next_elem, sz);
             finished_elements_sz += 1;
-            w->work_c = new coloring<vertex_t>;
+            w->work_c = new coloring;
             w->work_I = new invariant;
         }
 
@@ -1590,9 +1590,9 @@ private:
 
     // Computes a leaf of the tree by following the path given in base.
     void reconstruct_leaf(dejavu_workspace<vertex_t, degree_t, edge_t> *w,
-                          sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t>* start_c, vertex_t* base,
+                          sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring* start_c, vertex_t* base,
                           int base_sz, bijection<vertex_t> *leaf) {
-        coloring<vertex_t>* c = &w->c;
+        coloring* c = &w->c;
         invariant* I = &w->I;
         c->copy_force(start_c);
         I->never_fail = true;
@@ -1616,7 +1616,7 @@ private:
         w->_collect_early_individualized.clear();
         w->_collect_base_sz = 0;
 
-        coloring<vertex_t>* c = &w->c;
+        coloring* c = &w->c;
         invariant* I = &w->I;
         c->copy_force(elem->c);
         *I = *elem->I;

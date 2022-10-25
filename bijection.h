@@ -109,7 +109,7 @@ public:
         }
     }
 
-    void read_from_coloring(coloring<vertex_t> *c) {
+    void read_from_coloring(coloring *c) {
         alloc(c->lab_sz);
         init = true;
         map_sz = c->lab_sz;

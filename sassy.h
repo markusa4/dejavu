@@ -21,7 +21,7 @@ public:
     int    exp  = 0;
     int domain_size;
 
-    coloring<int> c;
+    coloring c;
     work_list_t<int> automorphism;
     work_list_t<int> automorphism_supp;
     bool layers_melded = false;
@@ -50,7 +50,7 @@ private:
     work_list_t<int> worklist_deg0;
     work_list_t<int> worklist_deg1;
     mark_set add_edge_buff_act;
-    refinement<int, int, int> R1;
+    refinement R1;
 
     mark_set touched_color_cache;
     work_list_t<int> touched_color_list_cache;
@@ -140,7 +140,7 @@ private:
         del.reset();
         int found_match = 0;
 
-        coloring<int> test_col;
+        coloring test_col;
         g->initialize_coloring(&test_col, colmap);
 
         assure_ir_quotient_init(g);
@@ -638,7 +638,7 @@ private:
         }
 
         if(redo_colmap) {
-            coloring<int> d;
+            coloring d;
             g->initialize_coloring(&d, colmap);
             for(int i = 0; i < g->v_size; ++i) {
                 colmap[i] = d.vertex_to_col[i];
@@ -1153,7 +1153,7 @@ private:
 
         int v_has_matching_color = 0;
 
-        coloring<int> test_col;
+        coloring test_col;
         g->initialize_coloring(&test_col, colmap);
 
         int cnt = 0;
@@ -1219,7 +1219,7 @@ private:
         }
     }
 
-    void copy_coloring_to_colmap(const coloring<int>* c, int* colmap) {
+    void copy_coloring_to_colmap(const coloring* c, int* colmap) {
         for(int i = 0; i < c->lab_sz; ++i) {
             colmap[i] = c->vertex_to_col[i];
         }
@@ -1643,7 +1643,7 @@ private:
 
     // select a color class in a quotient component
     // assumes internal state of quotient component is up-to-date
-    std::pair<int, int> select_color_component(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint) {
+    std::pair<int, int> select_color_component(sgraph*g, coloring* c1, int component_start_pos, int component_end_pos, int hint) {
         int cell = -1;
         bool only_discrete_prev = true;
         int _i = component_start_pos;
@@ -1677,7 +1677,7 @@ private:
 
     // select a color class in a quotient component
     // assumes internal state of quotient component is up-to-date
-    std::pair<int, int> select_color_component_large(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint) {
+    std::pair<int, int> select_color_component_large(sgraph*g, coloring* c1, int component_start_pos, int component_end_pos, int hint) {
         int cell = -1;
         bool only_discrete_prev = true;
         int _i = component_start_pos;
@@ -1716,7 +1716,7 @@ private:
 
     // select a color class in a quotient component
     // assumes internal state of quotient component is up-to-date
-    std::pair<int, int> select_color_component_large_touched(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int hint, mark_set* touched_set) {
+    std::pair<int, int> select_color_component_large_touched(sgraph*g, coloring* c1, int component_start_pos, int component_end_pos, int hint, mark_set* touched_set) {
         int cell = -1;
         bool only_discrete_prev = true;
         int _i = component_start_pos;
@@ -1782,12 +1782,12 @@ private:
 
         std::vector<int> individualize_later;
 
-        coloring<int> c1;
+        coloring c1;
         g->initialize_coloring(&c1, colmap); // could re-order to reduce overhead when not applicable
         for(int i = 0; i < g->v_size; ++i)
             colmap[i] = c1.vertex_to_col[i];
 
-        coloring<int> c2;
+        coloring c2;
         c2.copy(&c1);
         c2.copy_ptn(&c1);
 
@@ -1798,11 +1798,11 @@ private:
             assert(c2.ptn[i] == c1.ptn[i]);
         }
 
-        coloring<int> original_c;
+        coloring original_c;
         original_c.copy(&c1);
         original_c.copy_ptn(&c1);
 
-        coloring<int> color_cache;
+        coloring color_cache;
         color_cache.copy(&c1);
 
         selector<int, int, int> S;
@@ -2108,7 +2108,7 @@ public:
 
 private:
     // compute or update quotient components
-    void compute_quotient_graph_components_update(sgraph* g, coloring<int>* c1, dejavu_hook consume) {
+    void compute_quotient_graph_components_update(sgraph* g, coloring* c1, dejavu_hook consume) {
         if(!init_quotient_arrays) {
             seen_vertex.initialize(g->v_size);
             seen_color.initialize(g->v_size);
@@ -2350,7 +2350,7 @@ private:
         save_colmap_v_to_lab.reserve(g->v_size);
         save_colmap_ptn.reserve(g->v_size);
 
-        coloring<int> c1;
+        coloring c1;
         g->initialize_coloring(&c1, colmap);
 
         for (int i = 0; i < g->v_size; ++i)
@@ -2361,10 +2361,10 @@ private:
 
         assure_ir_quotient_init(g);
 
-        coloring<int> c2;
+        coloring c2;
         c2.copy(&c1);
 
-        coloring<int> c3;
+        coloring c3;
         c3.copy(&c1);
 
         int penalty = 0;
@@ -2865,7 +2865,7 @@ private:
     }
 
     // select a non-trivial color class within a given component
-    int select_color_component_min_cost(sgraph*g, coloring<int>* c1, int component_start_pos, int component_end_pos, int max_cell_size) {
+    int select_color_component_min_cost(sgraph*g, coloring* c1, int component_start_pos, int component_end_pos, int max_cell_size) {
         bool only_discrete_prev = true;
         int cell = -1;
         int cell_d = 1;
@@ -2909,7 +2909,7 @@ private:
         return cell;
     }
 
-    void reset_coloring_to_coloring_touched(sgraph* g, coloring<int>* c_to, coloring<int>* c_from, int quotient_component_start_pos_v, int quotient_component_end_pos_v) {
+    void reset_coloring_to_coloring_touched(sgraph* g, coloring* c_to, coloring* c_from, int quotient_component_start_pos_v, int quotient_component_end_pos_v) {
         worklist_deg0.reset();
 
         if(g->v_size == c_to->cells || touched_color_list.cur_pos >= (0.25*(quotient_component_end_pos_v - quotient_component_start_pos_v))) {
@@ -2963,7 +2963,7 @@ private:
         quotient_component_touched.clear();
         quotient_component_touched_swap.clear();
 
-        coloring<int> c1;
+        coloring c1;
         g->initialize_coloring(&c1, colmap);
 
         for (int i = 0; i < g->v_size; ++i)
@@ -2976,11 +2976,11 @@ private:
         reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array());
         _automorphism_supp.reset();
 
-        coloring<int> c2;
+        coloring c2;
         c2.copy(&c1);
         c2.copy_ptn(&c1);
 
-        coloring<int> c3;
+        coloring c3;
         c3.copy(&c1);
         c3.copy_ptn(&c1);
 
@@ -3692,7 +3692,7 @@ private:
     }
 
     // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later
-    void del_discrete_edges_inplace(sgraph* g, coloring<int>*c) {
+    void del_discrete_edges_inplace(sgraph* g, coloring*c) {
         int rem_edges = 0;
         int discrete_vert = 0;
         del.reset();
@@ -3729,7 +3729,7 @@ private:
     }
 
     // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later, component-wise
-    void del_discrete_edges_inplace_component(sgraph* g, coloring<int>*c, int component_start_pos) {
+    void del_discrete_edges_inplace_component(sgraph* g, coloring*c, int component_start_pos) {
         int rem_edges = 0;
         int discrete_vert = 0;
         for (int _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {

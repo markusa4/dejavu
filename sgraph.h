@@ -53,7 +53,7 @@ public:
     }
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
-    void initialize_coloring(coloring<vertex_t> *c, vertex_t* vertex_to_col) {
+    void initialize_coloring(coloring *c, vertex_t* vertex_to_col) {
         c->alloc(this->v_size);
         std::memset(c->ptn, 1, sizeof(int) * v_size);
 
@@ -189,7 +189,7 @@ public:
         c->cells = cells;
     }
 
-    void initialize_coloring_raw(coloring<vertex_t> *c) {
+    void initialize_coloring_raw(coloring *c) {
         c->alloc(this->v_size);
 
         for(int i = 0; i < v_size; i++) {

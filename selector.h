@@ -60,7 +60,7 @@ class selector {
     int init = false;
 
 public:
-    int seeded_select_color(coloring<vertex_t> *c, int seed) {
+    int seeded_select_color(coloring* c, int seed) {
         std::vector<int> cells;
         for(int i = 0; i < c->ptn_sz;){
             if(c->ptn[i] > 0) {
@@ -76,7 +76,7 @@ public:
         }
     }
 
-    int select_color_largest(coloring<vertex_t> *c) {
+    int select_color_largest(coloring *c) {
         if(!init) {
             largest_cache.initialize(c->lab_sz);
             non_trivial_list.initialize(c->lab_sz);
@@ -119,7 +119,7 @@ public:
         return largest_cell;
     }
 
-    int select_color_smallest(coloring<vertex_t> *c) {
+    int select_color_smallest(coloring *c) {
         int smallest_cell    = -1;
         int smallest_cell_sz = c->lab_sz + 1;
         bool only_trivial    = true;
@@ -144,7 +144,7 @@ public:
         return smallest_cell;
     }
 
-    int select_color_first(coloring<vertex_t> *c) {
+    int select_color_first(coloring *c) {
         int first_cell  = -1;
 
         for(int i = skipstart; i < c->ptn_sz;){
@@ -165,7 +165,7 @@ public:
         largest_cache.reset();
     }
 
-    int select_color(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, int seed) {
+    int select_color(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring *c, int seed) {
         if(c->cells == g->v_size)
             return -1;
         switch(config.CONFIG_IR_CELL_SELECTOR) {
@@ -181,7 +181,7 @@ public:
         }
     }
 
-    int select_color_dynamic(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t>  *c, strategy<vertex_t> *s) {
+    int select_color_dynamic(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring  *c, strategy<vertex_t> *s) {
         if(c->cells == g->v_size)
             return -1;
         switch(s->cell_selector_type) {

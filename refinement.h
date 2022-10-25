@@ -377,7 +377,7 @@ public:
         return 0;
     }
 
-    int next_cell(work_set_int* queue_pointer, coloring<vertex_t>* c) {
+    int next_cell(work_set_int* queue_pointer, coloring* c) {
         // look at first 12 positions and pick the (first) smallest cell within these entries
         int sm_j = cur_pos - 1;
         for(int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
@@ -398,7 +398,7 @@ public:
         return sm_col;
     }
 
-    int next_cell(work_set_int* queue_pointer, coloring<vertex_t>* c, work_list_t<int>* singleton_hint) {
+    int next_cell(work_set_int* queue_pointer, coloring* c, work_list_t<int>* singleton_hint) {
         // use singleton_hint
         int sm_j = -1;
         while(!singleton_hint->empty()) {
@@ -465,14 +465,13 @@ private:
 };
 
 // refinement manager, preserving the workspace between refinements
-template<class vertex_t, class degree_t, class edge_t>
 class refinement {
 public:
     // color refinement
     // includes several options for using invariants, blueprints and k-deviation
-    bool refine_coloring(sgraph_t<vertex_t, degree_t, edge_t> *g, coloring<vertex_t> *c, invariant *I,
+    bool refine_coloring(sgraph *g, coloring *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
-                         std::vector<vertex_t>* early_individualized, mark_set* touched_color,
+                         std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
         bool comp = true;
         singleton_hint.reset();
@@ -684,7 +683,7 @@ public:
     }
 
     // individualize a vertex in a coloring
-    int  individualize_vertex(coloring<vertex_t>* c, int v) {
+    int  individualize_vertex(coloring* c, int v) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -709,7 +708,7 @@ public:
 
     // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
     // techniques -- meant to be used as the first refinement in automorphism computation
-    bool refine_coloring_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_coloring_first(sgraph  *g, coloring *c,
                                int init_color_class) {
         assure_initialized(g);
         singleton_hint.reset();
@@ -825,7 +824,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
+    bool certify_automorphism(sgraph  *g, bijection<int> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -864,7 +863,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* p) {
+    bool certify_automorphism(sgraph  *g, const int* p) {
         int i, found;
 
         assure_initialized(g);
@@ -902,7 +901,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p) {
+    bool certify_automorphism(sgraph *g, const int* colmap, const int* p) {
         int i, found;
 
         assure_initialized(g);
@@ -942,7 +941,7 @@ public:
     }
 
     // certify an automorphism on a graph, sparse
-    bool certify_automorphism_sparse(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
+    bool certify_automorphism_sparse(const sgraph *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -989,7 +988,7 @@ public:
     }
 
     // certify an automorphism on a graph, sparse, report on which vertex failed
-    std::pair<bool, int> certify_automorphism_sparse_report_fail(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
+    std::pair<bool, int> certify_automorphism_sparse_report_fail(const sgraph  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -1034,7 +1033,7 @@ public:
     }
 
     // certify an automorphism, for a single vertex
-    bool check_single_failure(const sgraph_t<vertex_t, degree_t, edge_t>  *g, const int* colmap, const int* p, int failure) {
+    bool check_single_failure(const sgraph  *g, const int* colmap, const int* p, int failure) {
         int i, found;
 
         assure_initialized(g);
@@ -1076,7 +1075,7 @@ public:
     }
 
     // certify an automorphism on a graph
-    bool certify_automorphism_iso(sgraph_t<vertex_t, degree_t, edge_t>  *g, bijection<vertex_t> *p) {
+    bool certify_automorphism_iso(sgraph *g, bijection<int> *p) {
         assert(p->map_sz == g->v_size);
         int i, found;
 
@@ -1111,8 +1110,8 @@ public:
     }
 
     // certify a graph isomorphism
-    bool certify_isomorphism(sgraph_t<vertex_t, degree_t, edge_t>  *g1, sgraph_t<vertex_t, degree_t, edge_t>  *g2,
-                             bijection<vertex_t> *p) {
+    bool certify_isomorphism(sgraph  *g1, sgraph  *g2,
+                             bijection<int> *p) {
         if(g1 == g2) {
             PRINT("g1 == g2, no need to test isomorphism");
         }
@@ -1157,21 +1156,21 @@ public:
 private:
     bool initialized = false;
     work_set_int           queue_pointer;
-    cell_worklist<vertex_t>cell_todo;
+    cell_worklist<int>cell_todo;
     mark_set               scratch_set;
-    work_list_t<vertex_t>  vertex_worklist;
-    work_set_t<vertex_t>   color_vertices_considered;
-    work_set_t<vertex_t>   neighbours; // degree type instead?
-    work_set_t<vertex_t>   neighbour_sizes;
+    work_list_t<int>  vertex_worklist;
+    work_set_t<int>   color_vertices_considered;
+    work_set_t<int>   neighbours; // degree type instead?
+    work_set_t<int>   neighbour_sizes;
     //work_list_t<vertex_t>  singletons;
-    work_list_t<vertex_t>  singleton_hint;
-    work_list_t<vertex_t>  old_color_classes;
+    work_list_t<int>  singleton_hint;
+    work_list_t<int>  old_color_classes;
     work_list_pair_bool    color_class_splits;
 
-    vertex_t* scratch;
+    int* scratch;
     int* workspace_int;
 
-    void assure_initialized(const sgraph_t<vertex_t, degree_t, edge_t>  *g) {
+    void assure_initialized(const sgraph  *g) {
         if(!initialized) {
             const int n = g->v_size;
 
@@ -1187,27 +1186,27 @@ private:
             queue_pointer.initialize(n);
             color_vertices_considered.initialize(n);
 
-            scratch = (vertex_t*) workspace_int;
+            scratch = (int*) workspace_int;
             scratch_set.initialize_from_array(workspace_int + n, n);
 
             color_class_splits.initialize(n);
             cell_todo.initialize(n*2);
 
-            memset(scratch, 0, n * sizeof(vertex_t));
+            memset(scratch, 0, n * sizeof(int));
             initialized = true;
         }
     }
 
-    bool refine_color_class_sparse(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_sparse(sgraph  *g, coloring *c,
                                    int color_class, int class_size,
                                    work_list_pair_bool* color_class_split_worklist, invariant* I) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
-        vertex_t* vertex_to_lab = c->vertex_to_lab;
-        vertex_t* lab           = c->lab;
-        vertex_t* ptn           = c->ptn;
-        vertex_t* vertex_to_col = c->vertex_to_col;
+        int* vertex_to_lab = c->vertex_to_lab;
+        int* lab           = c->lab;
+        int* ptn           = c->ptn;
+        int* vertex_to_col = c->vertex_to_col;
 
         cc = color_class; // iterate over color class
         comp = true;
@@ -1381,7 +1380,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_dense(sgraph  *g, coloring *c,
                                   int color_class, int class_size,
                                   work_list_pair_bool* color_class_split_worklist, invariant* I) {
         bool comp;
@@ -1492,7 +1491,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
             //vertex_worklist.cur_pos = col_sz;
             pos = col_sz;
 
@@ -1532,7 +1531,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense_dense(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_dense_dense(sgraph *g, coloring *c,
                                         int color_class, int class_size,
                                         work_list_pair_bool* color_class_split_worklist, invariant* I) {
         bool comp;
@@ -1623,7 +1622,7 @@ private:
             vertex_worklist.reset();
 
             // copy cell for rearranging
-            memcpy(vertex_worklist.get_array(), c->lab + col, col_sz * sizeof(vertex_t));
+            memcpy(vertex_worklist.get_array(), c->lab + col, col_sz * sizeof(int));
             vertex_worklist.cur_pos = col_sz;
 
             // determine colors and rearrange
@@ -1663,7 +1662,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_singleton(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_singleton(sgraph  *g, coloring *c,
                                       int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist, invariant *I) {
         bool comp;
@@ -1789,7 +1788,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_singleton_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_singleton_first(sgraph  *g, coloring *c,
                                             int color_class, int class_size,
                                             work_list_pair_bool *color_class_split_worklist) {
         bool comp;
@@ -1875,7 +1874,7 @@ private:
         return comp;
     }
 
-    bool refine_color_class_dense_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_dense_first(sgraph  *g, coloring *c,
                                         int color_class, int class_size,
                                         work_list_pair_bool *color_class_split_worklist) {
         int i, cc, acc, largest_color_class_size, pos;
@@ -1953,7 +1952,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
             pos = col_sz;
 
             // determine colors and rearrange
@@ -1992,7 +1991,7 @@ private:
         return true;
     }
 
-    bool refine_color_class_dense_dense_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_dense_dense_first(sgraph  *g, coloring *c,
                                               int color_class, int class_size,
                                               work_list_pair_bool *color_class_split_worklist) {
         // for all vertices of the color class...
@@ -2061,7 +2060,7 @@ private:
             }
 
             // copy cell for rearranging
-            memcpy(scratch, c->lab + col, col_sz * sizeof(vertex_t));
+            memcpy(scratch, c->lab + col, col_sz * sizeof(int));
             pos = col_sz;
 
             // determine colors and rearrange
@@ -2100,7 +2099,7 @@ private:
         return true;
     }
 
-    bool refine_color_class_sparse_first(sgraph_t<vertex_t, degree_t, edge_t>  *g, coloring<vertex_t> *c,
+    bool refine_color_class_sparse_first(sgraph  *g, coloring *c,
                                          int color_class, int class_size,
                                          work_list_pair_bool* color_class_split_worklist) {
         bool comp;

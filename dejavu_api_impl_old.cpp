@@ -1,37 +1,4 @@
 #include "dejavu_api.h"
-#ifndef DEJAVU_STANDALONE
-#include <Python.h>
-#endif
-
-#ifndef DEJAVU_STANDALONE
-static char module_docstring[] =
-    "This module provides an interface for dejavu.";
-static PyMethodDef module_methods[] = {
-    {"libdejavu-api"},
-    {NULL}
-};
-
-PyMODINIT_FUNC PyInit_libdejavu_api(void)
-{
-
-    PyObject *module;
-    static struct PyModuleDef moduledef = {
-        PyModuleDef_HEAD_INIT,
-        "libdejavu-api",
-        module_docstring,
-        -1,
-        module_methods,
-        NULL,
-        NULL,
-        NULL,
-        NULL
-    };
-    module = PyModule_Create(&moduledef);
-    if (!module) return NULL;
-
-    return module;
-}
-#endif
 
 configstruct config;
 volatile int dejavu_kill_request = 0;
@@ -130,8 +97,8 @@ void make_sgraph_from_graph_constr(sgraph* g, int** vertex_to_col, graph_constr*
     const int nv = graph->labels.size();
     int ne;
     if(directed_dimacs) {
-        PRINT("[api] Parsing with directed DIMACS option...")
-        assert(graph->edges.size() % 2 == 0);
+        //PRINT("[api] Parsing with directed DIMACS option...")
+        assert(edges.size() % 2 == 0);
         ne = graph->edges.size() / 2;
         g->initialize(nv, ne * 2);
     } else {
@@ -204,29 +171,7 @@ void graph_delete(int graph_handle) {
     }
 }
 
-void graph_write_dimacs_to_file(int graph_handle, std::string fname) {
-    graph_constr* graph = graphs[graph_handle];
-    assert(!graph->has_edge_labels);
-    std::ofstream _file;
-    _file.open (fname);
-    _file << "p edge " << graph->labels.size() << " " << graph->edges.size() << std::endl;
-    for(int i = 0; i < graph->labels.size(); ++i) {
-        _file << "n " << i + 1 << " " << graph->labels[i] << std::endl;
-    }
-
-    for(int i = 0; i < graph->edges.size(); ++i) {
-        const int v1 = graph->edges[i].first;
-        const int v2 = graph->edges[i].second;
-        _file << "e " << v1 + 1 << " " << v2 + 1 << std::endl;
-    }
-
-    _file.close();
-}
-
 void _graph_add_edge(graph_constr* graph, int v1, int v2) {
-    assert(v1 != v2);
-    assert(v1 < graph->labels.size());
-    assert(v2 < graph->labels.size());
     graph->edges.emplace_back(std::pair<int, int>(v1, v2));
 }
 
@@ -280,6 +225,12 @@ void make_sgraph_from_handle(sgraph* g, int** vertex_to_col, int graph_handle) {
             _graph_label(&subdivision_graph, edge_vertex_id, 1 + highest_label + graph->edge_labels[i]);
             ++edge_vertex_id;
         }
+        /*for(int i = 0; i < subdivision_graph.labels.size(); ++i) {
+            std::cout << "v" << i << " l: " << subdivision_graph.labels[i] << std::endl;
+        }
+        for(int i = 0; i < subdivision_graph.edges.size(); ++i) {
+            std::cout << "v" << subdivision_graph.edges[i].first << "--" << "v" << subdivision_graph.edges[i].second << std::endl;
+        }*/
         make_sgraph_from_graph_constr(g, vertex_to_col, &subdivision_graph, false);
     } else {
         make_sgraph_from_graph_constr(g, vertex_to_col, graph, graph->directed_dimacs);
@@ -325,25 +276,14 @@ int random_paths(int graph_handle, int max_length, int num, bool fill_paths) {
             path_vec.push_back(path[i]);
         }
         if(fill_paths) {
-            int* path_col_to_vertex = new int[g.v_size];
-            for(int i = 0; i < g.v_size; ++i)
-                path_col_to_vertex[i] = -1;
-            for(int i = 0; i < g.v_size; ++i) {
-                assert(path_col_to_vertex[path_vertex_to_col[i]] == -1);
-                path_col_to_vertex[path_vertex_to_col[i]] = i;
-            }
-            for(int i = 0; i < g.v_size; ++i) {
-                if (path_vec.size() >= max_length)
+            for(int i = 0; i < g.v_size && i < config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL; ++i) {
+                if(path_vec.size() >= max_length)
                     break;
-                if (!used_color.get(i)) {
-                    const int vertex = path_col_to_vertex[i];
-                    if(vertex < g.v_size && vertex < config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL) {
-                        used_color.set(i);
-                        path_vec.push_back(vertex);
-                    }
+                if(!used_color.get(path_vertex_to_col[i])) {
+                    used_color.set(path_vertex_to_col[i]);
+                    path_vec.push_back(i);
                 }
             }
-            delete[] path_col_to_vertex;
         }
 
         new_paths->paths.emplace_back(path_node());
@@ -395,10 +335,6 @@ int path_get_grpsz2(int path_handle) {
     return paths[path_handle]->grpsz2;
 }
 
-void set_threads(int threads) {
-    config.CONFIG_THREADS_REFINEMENT_WORKERS = threads + 1;
-}
-
 volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err) {
     sgraph g1;
     sgraph g2;
@@ -412,16 +348,15 @@ volatile bool are_isomorphic(int graph_handle1, int graph_handle2, int err) {
 }
 
 extern int get_automorphisms(int graph_handle, int err) {
-    config.CONFIG_IR_SELECTOR_FORBIDDEN_TAIL = INT32_MAX - 1;
     config.CONFIG_RAND_ABORT = err;
     dejavu_auto solver;
-    shared_permnode* permnode = nullptr;
+    shared_permnode* permnode;
 
     sgraph g;
     int** vertex_to_col = new int*;
     make_sgraph_from_handle(&g, vertex_to_col, graph_handle);
 
-    dejavu_stats a = solver.automorphisms(&g, *vertex_to_col, &permnode);
+    automorphism_info a = solver.automorphisms(&g, *vertex_to_col, &permnode);
     shared_permnode* itpermnode = permnode;
     path_constr* new_paths = new path_constr;
 
@@ -429,13 +364,11 @@ extern int get_automorphisms(int graph_handle, int err) {
     new_paths->grpsz2 = a.grp_sz_exp;
     new_paths->base.swap(a.base);
 
-    if(permnode != nullptr) {
-        do {
-            new_paths->paths.emplace_back(path_node());
-            new_paths->paths[new_paths->paths.size() - 1].set_vertex_to_col(itpermnode->p, g.v_size);
-            itpermnode = itpermnode->next;
-        } while (itpermnode != permnode);
-    }
+    do {
+        new_paths->paths.emplace_back(path_node());
+        new_paths->paths[new_paths->paths.size()-1].set_vertex_to_col(itpermnode->p, g.v_size);
+        itpermnode = itpermnode->next;
+    } while(itpermnode != permnode);
 
     shared_freeschreier(nullptr, &permnode);
     shared_schreier_freedyn();
