@@ -37,6 +37,7 @@ struct configstruct {
     bool CONFIG_IR_REFINE_EARLYOUT_LATE  = false;
     bool CONFIG_IR_WRITE_GROUPORDER      = false; // print grouporder
     bool CONFIG_WRITE_AUTOMORPHISMS      = false; // print automorphisms
+    bool CONFIG_WRITE_AUTOMORPHISMS_GAP  = false; // print automorphisms in GAP format
     bool CONFIG_PREPROCESS_EDGELIST_SORT = false; // sort edgelists
     bool CONFIG_SOLVE_ISO                = false;
     bool CONFIG_ONLY_COLOR_REF_INVARIANT = false;

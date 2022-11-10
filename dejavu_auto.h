@@ -12,6 +12,7 @@
 #include "schreier_shared.h"
 #include "group_shared.h"
 #include "schreier_sequential.h"
+#include "microdfs.h"
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -150,9 +151,6 @@ private:
                                coloring *start_c, strategy* canon_strategy,
                                int communicator_id, int **shared_orbit, int** shared_orbit_weights,
                                bfs_workspace *bwork, shared_permnode **gens, int *shared_group_size) {
-
-        dejavu_stats a = dejavu_stats();
-
         // first order of business: try to glue this thread to currently assigned core
         #ifndef OS_WINDOWS
         int master_sched;
@@ -165,6 +163,7 @@ private:
         }
         #endif
 
+        dejavu_stats a = dejavu_stats();
         sgraph *g = g_;
         dejavu_workspace W;
         strategy _canon_strategy;
@@ -209,46 +208,11 @@ private:
 
             // first color refinement
             canon_strategy = &_canon_strategy;
-
-            if(config.CONFIG_ONLY_COLOR_REF_INVARIANT) {
-                strategy_metrics m;
-                invariant my_canon_I;
-                my_canon_I.has_compare = false;
-                my_canon_I.compare_vec = nullptr;
-                my_canon_I.compareI    = nullptr;
-                my_canon_I.create_vector(g->v_size);
-                int __acc = 0;
-                std::vector<int> color_sequence;
-                for(int i = 0; i < g->v_size; ++i) {
-                	__acc += init_c->vertex_to_col[i];
-                	color_sequence.push_back(init_c->vertex_to_col[i]);
-                }
-                my_canon_I.write_top_and_compare(__acc, false);
-                std::sort(std::begin(color_sequence), std::end(color_sequence));
-                for(std::vector<int>::iterator it = color_sequence.begin(); it != color_sequence.end(); ++it) {
-                    my_canon_I.write_top_and_compare(*it, false);
-                }
-                for(int i = 0; i < start_c->ptn_sz;) {
-                    const int rd = start_c->ptn[i];
-                    my_canon_I.write_top_and_compare(i, false);
-                    my_canon_I.write_top_and_compare(rd, false);
-                    //const vertex_t some_vertex = start_c->lab[i];
-                    //my_canon_I.write_top_and_compare(init_c->vertex_to_col[some_vertex], false);
-                    i += rd +1;
-                }
-                    W.R.refine_coloring(g, start_c, &my_canon_I, -1, &m, -1, -1, nullptr, nullptr, nullptr);
-                    int init_c = W.S.select_color(g, start_c, selector_seed);
-                    std::cout << init_c << std::endl;
-                    std::cout << my_canon_I.acc << std::endl;
-                    return dejavu_stats();
-            }
-
             if(!config.CONFIG_IR_SKIP_FIRST_REFINEMENT)
                 W.R.refine_coloring_first(g, start_c, -1);
             PRINT("[Dej] First refinement: " << cref / 1000000.0 << "ms");
 
-            int init_c = W.S.select_color(g, start_c, selector_seed);
-            if(init_c == -1) {
+            if(start_c->cells == g->v_size) {
                 *done = true;
                 std::cout << "First coloring discrete." << std::endl;
                 std::cout << "Base size: 0" << std::endl;
@@ -258,6 +222,10 @@ private:
                 a.grp_sz_man = 1;
                 return a;
             }
+
+            dejavu::microdfs D;
+            D.setup(0, 0, &W.R, nullptr, nullptr);
+            D.dfs(g, start_c);
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
                 if (start_c->cells == 1) {
@@ -465,7 +433,44 @@ private:
                                 } while (it != G->gens);
                             }
                         }
+                        if(config.CONFIG_WRITE_AUTOMORPHISMS_GAP) {
+                            std::cout << "g := Group(";
+                            shared_permnode *it = G->gens;
+                            mark_set touched;
+                            touched.initialize(g->v_size);
 
+                            if(it != nullptr) {
+                                do {
+                                    touched.reset();
+                                    for (int i = 0; i < g->v_size; ++i) {
+                                        if(it->p[i] == i)
+                                            continue;
+                                        if(touched.get(i))
+                                            continue;
+                                        std::cout << "(";
+                                        int j = i;
+                                        int length = 0;
+                                        do {
+                                            touched.set(j);
+                                            std::cout << j+1;
+                                            j = it->p[j];
+                                            ++length;
+                                            if(j != i)
+                                                std::cout << ",";
+                                        } while(j != i);
+                                        std::cout << ")";
+                                        if(length < 2)
+                                            std::cout << "error" << std::endl;
+                                    }
+
+                                    it = it->next;
+                                    if(it != G->gens) {
+                                        std::cout << ", " << std::endl;
+                                    }
+                                } while (it != G->gens);
+                            }
+                            std::cout << ");" << std::endl;
+                        }
                         a.gens = gens;
                         a.base = std::vector<int>(G->b, G->b+G->base_size);
                         G->compute_group_size(&a.grp_sz_man, &a.grp_sz_exp);
@@ -1762,7 +1767,7 @@ dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
     if(colmap == nullptr) {
         gen_colmap = new int[g->v_size]; // TODO: memory leak
         for(int i = 0; i < g->v_size; ++i)
-            colmap[i] = 0;
+            gen_colmap[i] = 0;
         colmap = gen_colmap;
     }
     config.CONFIG_BULK_ALLOCATOR = false;

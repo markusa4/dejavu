@@ -3828,6 +3828,7 @@ public:
             return;
         }
 
+        domain_size = g->v_size;
 
         add_edge_buff.initialize(domain_size);
         for(int i = 0; i < domain_size; ++i)
@@ -3850,10 +3851,10 @@ public:
         translation_layers.emplace_back(std::vector<int>());
         const int fwd_ind = translation_layers.size()-1;
         backward_translation_layers[back_ind].reserve(g->v_size);
-        for(int i = 0; i < g->v_size; ++i)
+        for(int i = 0; i < g->v_size; ++i) {
             backward_translation_layers[back_ind].push_back(i);
+        }
 
-        domain_size = g->v_size;
 
         // assumes colmap is array of length g->v_size
         del = mark_set();

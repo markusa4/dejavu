@@ -74,6 +74,10 @@ void sort_t(T* arr, int sz) {
 template<class T>
 class work_list_t {
 public:
+    work_list_t() {};
+    work_list_t(int size) {
+        initialize(size);
+    }
     void initialize(int size) {
         arr     = new T[size];
         arr_sz  = size;
@@ -473,6 +477,13 @@ public:
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
+        refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
+                        touched_color_list, nullptr);
+    }
+    bool refine_coloring(sgraph *g, coloring *c, invariant *I,
+                         int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
+                         std::vector<int>* early_individualized, mark_set* touched_color,
+                         work_list* touched_color_list, work_list* prev_color_list) {
         bool comp = true;
         singleton_hint.reset();
         int individualize_pos = individualize_early;
@@ -570,6 +581,8 @@ public:
                 if(touched_color) {
                     if(!touched_color->get(new_class)) {
                         touched_color->set(new_class);
+                        if(prev_color_list!=nullptr)
+                            prev_color_list->push_back(old_class);
                         touched_color_list->push_back(new_class);
                     }
                 }

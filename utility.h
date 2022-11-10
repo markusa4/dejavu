@@ -236,10 +236,15 @@ inline bool file_exists(const std::string& name) {
 // set specialized for quick resets
 class mark_set {
     int mark = 0;
-    int *s;
-    int sz;
+    int *s = nullptr;
+    int sz = -1;
     bool init = false;
 public:
+    mark_set() {};
+    mark_set(int size) {
+        initialize(size);
+    }
+
     void initialize(int size) {
         s = new int[size];
         sz = size;

@@ -27,8 +27,6 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-refinement test_R;
-
 void empty_hook(int n, const int * p, int support, const int *) {
     /*bijection<int> test_p;
     test_p.read_from_array(p, n);
@@ -99,7 +97,9 @@ int commandline_mode(int argc, char **argv) {
             }
         } else if (arg == "__WRITE_AUTO") {
             config.CONFIG_WRITE_AUTOMORPHISMS = true;
-        } else if (arg == "__THREADS") {
+        } else if (arg == "__WRITE_AUTO_GAP") {
+            config.CONFIG_WRITE_AUTOMORPHISMS_GAP = true;
+        }  else if (arg == "__THREADS") {
             if (i + 1 < argc) {
                 i++;
                 config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
@@ -189,7 +189,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu-auto" << std::endl;
+    std::cout << "dejavu" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 
