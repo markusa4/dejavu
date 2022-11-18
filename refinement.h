@@ -99,6 +99,7 @@ public:
     }
 
     T pop_back() {
+        assert(cur_pos > 0);
         return arr[--cur_pos];
     }
 
@@ -477,8 +478,8 @@ public:
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
-        refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
-                        touched_color_list, nullptr);
+        return refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
+                               touched_color_list, nullptr);
     }
     bool refine_coloring(sgraph *g, coloring *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
@@ -696,7 +697,8 @@ public:
     }
 
     // individualize a vertex in a coloring
-    int  individualize_vertex(coloring* c, int v) {
+    int  individualize_vertex(coloring* c, int v, mark_set* touched_color = nullptr,
+                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -716,6 +718,13 @@ public:
         c->ptn[color + color_class_size] = 0;
         c->ptn[color + color_class_size - 1] = 0;
         c->cells += 1;
+
+        if(touched_color) {
+            touched_color->set(color + color_class_size);
+            touched_color_list->push_back(color + color_class_size);
+            prev_color_list->push_back(color);
+        }
+
         return color + color_class_size;
     }
 

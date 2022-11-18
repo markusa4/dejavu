@@ -937,7 +937,11 @@ private:
 
             // choose random vertex of class
             const int rpos = s + (intRand(0, INT32_MAX, selector_seed) % (c->ptn[s] + 1));
+            assert(rpos >= 0);
+            assert(rpos < g->v_size);
             const int v = c->lab[rpos];
+            assert(v >= 0);
+            assert(v < g->v_size);
 
             // individualize and refine
             assert(c->vertex_to_col[c->lab[s]] == s);
@@ -1287,6 +1291,10 @@ private:
             cell_early = -1;
 
         // protocol of selector choice
+        assert(v >= 0);
+        assert(v < g->v_size);
+        assert(c->vertex_to_col[v] >= 0);
+        assert(c->vertex_to_col[v] < g->v_size);
         I->selection_write(c->vertex_to_col[v], c->ptn[c->vertex_to_col[v]]);
         const int init_color_class = w->R.individualize_vertex(c, v); // TODO: should allow vector of vertices to be individualized
         bool comp = true;
