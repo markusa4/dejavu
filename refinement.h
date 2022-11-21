@@ -695,6 +695,189 @@ public:
         return comp;
     }
 
+    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
+                         std::vector<int>* early_individualized, mark_set* touched_color,
+                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace) {
+        bool comp = true;
+
+        invariant trash_I;
+        trash_I.only_acc = true;
+
+        if(trace)
+            trace->op_refine_start();
+
+        singleton_hint.reset();
+        int individualize_pos = individualize_early;
+        assure_initialized(g);
+        int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
+        if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
+
+        cell_todo.reset(&queue_pointer);
+
+        if(init_color_class < 0) {
+            // initialize queue with all classes (except for largest one)
+            for (int i = 0; i < c->ptn_sz;) {
+                cell_todo.add_cell(&queue_pointer, i);
+                const int col_sz = c->ptn[i];
+                if(col_sz == 0) {
+                    //singleton_hint.push_back(i);
+                }
+                i += col_sz + 1;
+
+            }
+        } else {
+            const int col_sz = c->ptn[init_color_class];
+            assert(c->vertex_to_col[c->lab[init_color_class]] == init_color_class);
+            cell_todo.add_cell(&queue_pointer, init_color_class);
+            if(col_sz == 0) {
+                //singleton_hint.push_back(init_color_class);
+            }
+        }
+        int its = 0;
+
+        while(!cell_todo.empty()) {
+            its += 1;
+            color_class_splits.reset();
+            const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
+            const int next_color_class_sz = c->ptn[next_color_class] + 1;
+            if(m)
+                m->color_refinement_cost += next_color_class_sz;
+
+            if(trace)
+                trace->op_refine_cell_start(next_color_class);
+
+            colorcost += next_color_class_sz;
+
+            bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+
+            const bool pre_comp = comp;
+
+            if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
+                // singleton
+                comp = refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
+                                                    &color_class_splits, &trash_I);
+            } else if(g->dense) {
+                if(dense_dense) { // dense-dense
+                    comp = refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
+                                                          &color_class_splits, &trash_I);
+                } else { // dense-sparse
+                    comp = refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
+                                                    &color_class_splits, &trash_I);
+                }
+            } else { // sparse
+                comp = refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
+                                                 &color_class_splits, &trash_I);
+            }
+
+            comp = comp && pre_comp;
+
+            deviation_expander -= (!comp);
+            if(!comp && deviation_expander <= 0) {
+                break;
+            }
+
+            // add all new classes except for the first, largest one
+            int skip = 0;
+
+            int  latest_old_class = -1;
+            bool skipped_largest  = false;
+            const int pre_cells   = c->cells;
+
+            // color class splits are sorted in reverse
+            // the old color class will always come last
+            while(!color_class_splits.empty()) {
+                int  old_class  = color_class_splits.last()->first.first;
+                int  new_class  = color_class_splits.last()->first.second;
+                bool is_largest = color_class_splits.last()->second;
+
+                // record colors that were changed
+                if(touched_color) {
+                    if(!touched_color->get(new_class)) {
+                        touched_color->set(new_class);
+                        if(prev_color_list!=nullptr)
+                            prev_color_list->push_back(old_class);
+                        touched_color_list->push_back(new_class);
+                    }
+                }
+
+                c->cells += (old_class != new_class);
+                int class_size = c->ptn[new_class];
+
+                if(trace) {
+                    trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
+                }
+
+                c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
+                                               class_size:c->smallest_cell_lower_bound;
+
+#ifndef NDEBUG // debug code
+                if(color_class_splits.empty()) {
+                    int actual_cells = 0;
+                    for (int i = 0; i < c->ptn_sz;) {
+                        actual_cells += 1;
+                        i += c->ptn[i] + 1;
+                    }
+
+                    assert(c->cells == actual_cells);
+                }
+#endif
+
+                if(latest_old_class != old_class) {
+                    latest_old_class = old_class;
+                    skipped_largest = false;
+                }
+
+                // management code for skipping largest class resulting from old_class
+                color_class_splits.pop_back();
+                int new_class_sz = c->ptn[new_class] + 1;
+
+                if(skipped_largest || !is_largest) {
+                    cell_todo.add_cell(&queue_pointer, new_class);
+                    //if(new_class_sz == 1)
+                    //singleton_hint.push_back(new_class);
+                } else {
+                    skipped_largest = true;
+                    skip += 1;
+
+                    // since old color class will always appear last, the queue pointer of old color class is still valid!
+                    int i = queue_pointer.get(old_class);
+                    if(i >= 0) {
+                        cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                        //if(new_class_sz == 1)
+                        //    singleton_hint.push_back(new_class);
+                    }
+                }
+            }
+            const int new_cells = c->cells - pre_cells;
+
+            if(trace)
+                trace->op_refine_cell_end();
+
+            // detection if coloring is discrete
+            if(c->cells == g->v_size) {
+                //const int new_cells = c->cells - pre_cells;
+                color_class_splits.reset();
+                cell_todo.reset(&queue_pointer);
+                break;
+                //return comp;
+            }
+
+            // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
+            if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+                color_class_splits.reset();
+                cell_todo.reset(&queue_pointer);
+                return comp;
+            }
+
+            // mark end of cell and denote whether this cell was splitting or non-splitting
+            if(!comp && deviation_expander <= 0) break;
+        }
+
+        if(trace)
+            trace->op_refine_end();
+        return comp;
+    }
+
     // individualize a vertex in a coloring
     int  individualize_vertex(coloring* c, int v, mark_set* touched_color = nullptr,
                               work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
@@ -723,6 +906,41 @@ public:
             touched_color_list->push_back(color + color_class_size);
             prev_color_list->push_back(color);
         }
+
+        return color + color_class_size;
+    }
+
+    // individualize a vertex in a coloring
+    int  individualize_vertex(coloring* c, int v, dejavu::trace* trace, mark_set* touched_color = nullptr,
+                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
+        const int color = c->vertex_to_col[v];
+        const int pos   = c->vertex_to_lab[v];
+
+        int color_class_size = c->ptn[color];
+
+        assert(color_class_size > 0);
+
+        const int vertex_at_pos = c->lab[color + color_class_size];
+        c->lab[pos] = vertex_at_pos;
+        c->vertex_to_lab[vertex_at_pos] = pos;
+
+        c->lab[color + color_class_size] = v;
+        c->vertex_to_lab[v] = color + color_class_size;
+        c->vertex_to_col[v] = color + color_class_size;
+
+        c->ptn[color] -= 1;
+        c->ptn[color + color_class_size] = 0;
+        c->ptn[color + color_class_size - 1] = 0;
+        c->cells += 1;
+
+        if(touched_color) {
+            touched_color->set(color + color_class_size);
+            touched_color_list->push_back(color + color_class_size);
+            prev_color_list->push_back(color);
+        }
+
+        if(trace)
+            trace->op_individualize(color);
 
         return color + color_class_size;
     }

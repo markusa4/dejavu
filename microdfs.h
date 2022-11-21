@@ -29,7 +29,6 @@ namespace dejavu {
 
     struct ir_state {
         coloring*    c;
-        invariant*   I;
         trace*       T;
         mark_set*    touched_color;
         work_list*   touched_color_list;
@@ -66,20 +65,20 @@ namespace dejavu {
                 return;
             }
             ++state->base_pos;
-            const int color_class = S->select_color_largest(state->c);
+            const int color_class = S->select_color_first(state->c);
             const int ind_v = state->c->lab[color_class];
             state->base_vertex.push_back(ind_v);
             state->base_color.push_back(color_class);
             state->base_touched_color_list_pt.push_back(state->touched_color_list->cur_pos);
-            const int init_color_class = R->individualize_vertex(state->c, ind_v, state->touched_color,
+            const int init_color_class = R->individualize_vertex(state->c, ind_v, state->T, state->touched_color,
                                                                  state->touched_color_list, state->prev_color_list);
-            R->refine_coloring(g, state->c, state->I, init_color_class, nullptr, -1, -1,
-                               nullptr, state->touched_color, state->touched_color_list, state->prev_color_list,
-                               state->T);
+            R->refine_coloring(g, state->c, init_color_class, nullptr, -1, -1,nullptr,
+                               state->touched_color, state->touched_color_list, state->prev_color_list,state->T);
         }
 
         void move_to_parent(ir_state* state) {
             // TODO: also need to unwind invariant!
+            state->T->rewind_to_individualization();
 
             --state->base_pos;
             while(state->prev_color_list->cur_pos > state->base_touched_color_list_pt[state->base_pos]) {
@@ -113,7 +112,11 @@ namespace dejavu {
             }
         }
 
-        void dfs(sgraph* g, coloring* c) {
+        bool recurse_to_equal_leaf(sgraph* g, ir_state* state, int fails) {
+
+        }
+
+        void do_dfs(sgraph* g, coloring* c) {
             tiny_orbit orbs;
             orbs.initialize(g->v_size);
 
@@ -121,38 +124,78 @@ namespace dejavu {
             Se.empty_cache();
             S = &Se;
 
-            invariant I;
             mark_set  touched_color(g->v_size);
             work_list touched_color_list(g->v_size);
             work_list prev_color_list(g->v_size);
 
             trace T;
+            T.set_compare(false);
+            T.set_record(true);
 
             ir_state local_state;
             local_state.c = c;
-            local_state.I = &I;
             local_state.T = &T;
             local_state.touched_color = &touched_color;
             local_state.touched_color_list = &touched_color_list;
             local_state.prev_color_list = &prev_color_list;
             touch_initial_colors(c, &touched_color);
 
-            //move_to_leaf(g, &local_state);
+            // start DFS from a leaf!
+            move_to_leaf(g, &local_state);
 
+            std::cout << "trace length: " << T.get_position() << std::endl;
 
-            // TODO: make a snapshot of the leaf to compare to!
+            // make a snapshot of the leaf to compare to!
+            trace compare_T;
+            compare_T.set_compare(true);
+            compare_T.set_record(false);
+            compare_T.set_compare_trace(&T);
+            compare_T.set_position(T.get_position());
+            local_state.T = &compare_T;
 
-            //move_to_parent(&local_state);
-            //move_to_parent(&local_state);
-            //move_to_parent(&local_state);
+            coloring leaf_color;
+            leaf_color.copy(c);
 
-            //std::cout << local_state.c->cells << std::endl;
+            std::vector<int> individualize;
 
+            // loop that serves to optimize Tinhofer graphs
+            while(local_state.base_pos > 0) {
+                move_to_parent(&local_state);
+                orbs.reset();
+                const int col    = local_state.base_color[local_state.base_pos];
+                const int col_sz = local_state.c->ptn[col] + 1;
+                const int vert   = local_state.base_vertex[local_state.base_pos];
+                std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << std::endl;
 
-            for(int i = 0; i < local_state.base_color.size(); ++i) {
-                std::cout << local_state.base_color[i] << " ";
+                individualize.clear();
+                for(int i = 0; i < col_sz; ++i) {
+                    individualize.push_back(local_state.c->lab[col + i]);
+                }
+
+                for(auto ind_v : individualize) {
+                    if(ind_v == vert) {
+                        std::cout << ind_v << "(id) ";
+                        continue;
+                    }
+
+                    if(orbs.are_in_same_orbit(ind_v, vert)) {
+                        std::cout << ind_v << "(ob) ";
+                        continue;
+                    }
+
+                    // call actual DFS with limited fails
+                    // Tinhofer graphs will never fail, or have recursion width > 1
+                    bool succeeded = recurse_to_equal_leaf(g, &local_state, -1);
+
+                    if(succeeded) {
+
+                    } else {
+
+                    }
+                    std::cout << ind_v << "(lf) ";
+                }
+                std::cout << std::endl;
             }
-            std::cout << std::endl;
         }
     };
 }

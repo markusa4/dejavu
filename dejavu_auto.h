@@ -225,7 +225,7 @@ private:
 
             dejavu::microdfs D;
             D.setup(0, 0, &W.R, nullptr, nullptr);
-            D.dfs(g, start_c);
+            D.do_dfs(g, start_c);
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
                 if (start_c->cells == 1) {

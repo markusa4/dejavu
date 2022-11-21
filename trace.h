@@ -71,7 +71,7 @@ namespace dejavu {
             assert(assert_cell_act);
             write_compare(new_color);
             write_compare(new_color_size);
-            write_compare(new_color_deg);
+            //write_compare(new_color_deg);
             if (new_color != cell_old_color && record)
                 data[cell_act_spot] = true;
         }
@@ -119,7 +119,7 @@ namespace dejavu {
                 data.resize(read_pt);
             }
             if(compare) {
-                int read_pt = position;
+                int read_pt = position - 1;
                 while(read_pt >= 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                     --read_pt;
                 }
@@ -134,7 +134,7 @@ namespace dejavu {
         }
 
         void set_compare(bool compare) {
-            this->record = compare;
+            this->compare = compare;
         }
 
         // does this deviate from compare trace yet?
