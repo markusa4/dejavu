@@ -4,6 +4,7 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "invariant.h"
+#include "trace.h"
 #include "configuration.h"
 #include "utility.h"
 #include <list>
@@ -479,13 +480,17 @@ public:
                          std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
         return refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
-                               touched_color_list, nullptr);
+                               touched_color_list, nullptr, nullptr);
     }
     bool refine_coloring(sgraph *g, coloring *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
-                         work_list* touched_color_list, work_list* prev_color_list) {
+                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace) {
         bool comp = true;
+
+        if(trace)
+            trace->op_refine_start();
+
         singleton_hint.reset();
         int individualize_pos = individualize_early;
         assure_initialized(g);
@@ -523,6 +528,9 @@ public:
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
             comp = I->write_top_and_compare(INV_MARK_STARTCELL, true) && comp;
+
+            if(trace)
+                trace->op_refine_cell_start(next_color_class);
 
             // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
@@ -577,7 +585,6 @@ public:
                 int  new_class  = color_class_splits.last()->first.second;
                 bool is_largest = color_class_splits.last()->second;
 
-
                 // record colors that were changed
                 if(touched_color) {
                     if(!touched_color->get(new_class)) {
@@ -590,6 +597,11 @@ public:
 
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
+
+                if(trace) {
+                    trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
+                }
+
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
 
@@ -604,52 +616,6 @@ public:
                 assert(c->cells == actual_cells);
             }
 #endif
-
-                // detection if coloring is discrete
-                if(c->cells == g->v_size) {
-                    const int new_cells = c->cells - pre_cells;
-
-                    color_class_splits.reset();
-                    cell_todo.reset(&queue_pointer);
-                    I->write_cells(c->cells);
-                    I->protocol_write(true, next_color_class);
-                    I->protocol_mark();
-                    if(I->no_write)
-                        I->protocol_skip_to_mark();
-                    comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
-                    comp = I->write_top_and_compare(INV_MARK_ENDREF, true)  && comp;
-                    return comp;
-                }
-
-                // partition is as large as the one of target invariant, can skip to the end of the entire refinement
-                if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
-                    if(!I->only_acc) {
-                        I->fast_forward(INV_MARK_ENDREF);
-                        if (I->no_write)
-                            I->protocol_skip_to_mark();
-                    }
-                    color_class_splits.reset();
-                    cell_todo.reset(&queue_pointer);
-                    return comp;
-                }
-
-                // random blueprint individualization during color refinement
-                if(config.CONFIG_IR_INDIVIDUALIZE_EARLY) {
-                    if (individualize_early >= 0 && individualize_pos < I->vec_selections.size() &&
-                        (I->vec_selections)[individualize_pos].first == new_class &&
-                        (I->vec_selections)[individualize_pos].second == class_size) {
-                        //PRINT("FOUND CLASS" << individualize_pos);
-                        const int col = new_class;
-                        const int rpos = col + (intRand(0, INT32_MAX, 0) % (c->ptn[col] + 1));
-                        const int v = c->lab[rpos];
-                        early_individualized->push_back(v);
-                        const int resulting_color = individualize_vertex(c, v);
-                        new_class = resulting_color;
-                        class_size = c->ptn[new_class];
-                        is_largest = false;
-                        individualize_pos += 1;
-                    }
-                }
 
                 if(latest_old_class != old_class) {
                     latest_old_class = old_class;
@@ -679,6 +645,37 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
+            if(trace)
+                trace->op_refine_cell_end();
+
+            // detection if coloring is discrete
+            if(c->cells == g->v_size) {
+                //const int new_cells = c->cells - pre_cells;
+                color_class_splits.reset();
+                cell_todo.reset(&queue_pointer);
+                I->write_cells(c->cells);
+                I->protocol_write(true, next_color_class);
+                I->protocol_mark();
+                if(I->no_write)
+                    I->protocol_skip_to_mark();
+                comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
+                comp = I->write_top_and_compare(INV_MARK_ENDREF, true)  && comp;
+                break;
+                //return comp;
+            }
+
+            // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
+            if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+                if(!I->only_acc) {
+                    I->fast_forward(INV_MARK_ENDREF);
+                    if (I->no_write)
+                        I->protocol_skip_to_mark();
+                }
+                color_class_splits.reset();
+                cell_todo.reset(&queue_pointer);
+                return comp;
+            }
+
             // mark end of cell and denote whether this cell was splitting or non-splitting
             I->protocol_write(new_cells > 0, next_color_class);
             comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
@@ -693,6 +690,8 @@ public:
             comp = I->write_top_and_compare(INV_MARK_ENDREF, true) && comp;
         }
 
+        if(trace)
+            trace->op_refine_end();
         return comp;
     }
 

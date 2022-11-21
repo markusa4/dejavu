@@ -30,6 +30,7 @@ namespace dejavu {
     struct ir_state {
         coloring*    c;
         invariant*   I;
+        trace*       T;
         mark_set*    touched_color;
         work_list*   touched_color_list;
         work_list*   prev_color_list;
@@ -73,10 +74,13 @@ namespace dejavu {
             const int init_color_class = R->individualize_vertex(state->c, ind_v, state->touched_color,
                                                                  state->touched_color_list, state->prev_color_list);
             R->refine_coloring(g, state->c, state->I, init_color_class, nullptr, -1, -1,
-                               nullptr, state->touched_color, state->touched_color_list, state->prev_color_list);
+                               nullptr, state->touched_color, state->touched_color_list, state->prev_color_list,
+                               state->T);
         }
 
         void move_to_parent(ir_state* state) {
+            // TODO: also need to unwind invariant!
+
             --state->base_pos;
             while(state->prev_color_list->cur_pos > state->base_touched_color_list_pt[state->base_pos]) {
                 const int old_color = state->prev_color_list->pop_back();
@@ -122,15 +126,25 @@ namespace dejavu {
             work_list touched_color_list(g->v_size);
             work_list prev_color_list(g->v_size);
 
+            trace T;
+
             ir_state local_state;
             local_state.c = c;
             local_state.I = &I;
+            local_state.T = &T;
             local_state.touched_color = &touched_color;
             local_state.touched_color_list = &touched_color_list;
             local_state.prev_color_list = &prev_color_list;
             touch_initial_colors(c, &touched_color);
-            
+
             //move_to_leaf(g, &local_state);
+
+
+            // TODO: make a snapshot of the leaf to compare to!
+
+            //move_to_parent(&local_state);
+            //move_to_parent(&local_state);
+            //move_to_parent(&local_state);
 
             //std::cout << local_state.c->cells << std::endl;
 
