@@ -166,7 +166,7 @@ class tiny_orbit {
     work_list_t<int>  reset_arr;
     work_list_t<int>  map_arr;
 public:
-    int find_and_cut_orbit(const int v1) {
+    int __attribute__ ((noinline)) find_and_cut_orbit(const int v1) {
         assert(v1 >= 0);
         assert(v1 < sz);
         int orbit1 = map_arr[v1];
@@ -176,7 +176,7 @@ public:
         return orbit1;
     }
 
-    void combine_orbits(const int v1, const int v2) {
+    void __attribute__ ((noinline)) combine_orbits(const int v1, const int v2) {
         assert(v1 >= 0);
         assert(v2 >= 0);
         assert(v1 < sz);
@@ -198,7 +198,7 @@ public:
         }
     }
 
-    bool are_in_same_orbit(const int v1, const int v2) {
+    bool __attribute__ ((noinline)) are_in_same_orbit(const int v1, const int v2) {
         assert(v1 >= 0);
         assert(v2 >= 0);
         assert(v1 < sz);
@@ -743,8 +743,18 @@ public:
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
 
+            if(trace) {
+                if(!trace->blueprint_is_next_cell_active()) {
+                    if(config.CONFIG_IR_IDLE_SKIP) {
+                        trace->blueprint_skip_to_next_cell();
+                        continue;
+                    }
+                }
+            }
+
             if(trace)
                 trace->op_refine_cell_start(next_color_class);
+
 
             colorcost += next_color_class_sz;
 
@@ -866,6 +876,9 @@ public:
             if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
+                if(trace) {
+                    trace->skip_to_individualization();
+                }
                 return comp;
             }
 

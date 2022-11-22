@@ -44,6 +44,14 @@ namespace dejavu {
             }
             ++position;
         }
+        void write_skip_compare(int d) {
+            if (record)
+                data.push_back(d);
+            if (compare) {
+                assert(compare_trace->data.size() > position);
+            }
+            ++position;
+        }
     public:
         // recording & comparing
         void op_individualize(int color) {
@@ -60,17 +68,17 @@ namespace dejavu {
 
         void op_refine_cell_start(int old_color) {
             assert(!assert_cell_act);
-            write_compare(TRACE_MARKER_REFINE_CELL_END);
+            write_compare(TRACE_MARKER_REFINE_CELL_START);
             cell_old_color = old_color;
             cell_act_spot = data.size();
-            write_compare(false);
+            write_skip_compare(false);
             assert_cell_act = true;
         }
 
         void op_refine_cell_record(int new_color, int new_color_size, int new_color_deg) {
             assert(assert_cell_act);
             write_compare(new_color);
-            write_compare(new_color_size);
+            //write_compare(new_color_size);
             //write_compare(new_color_deg);
             if (new_color != cell_old_color && record)
                 data[cell_act_spot] = true;
@@ -90,6 +98,9 @@ namespace dejavu {
 
         // blueprint usage
         bool blueprint_is_next_cell_active() {
+            if(!compare)
+                return true;
+
             assert(compare_trace);
             size_t read_pt = position;
             assert(compare_trace->data.size() > read_pt);
@@ -122,6 +133,18 @@ namespace dejavu {
                 int read_pt = position - 1;
                 while(read_pt >= 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                     --read_pt;
+                }
+                position = read_pt;
+            }
+        }
+
+        // skip the invariant to next individualization
+        void skip_to_individualization() {
+            assert_refine_act = false;
+            if(compare) {
+                int read_pt = position - 1;
+                while((size_t) read_pt < compare_trace->data.size() && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                    ++read_pt;
                 }
                 position = read_pt;
             }

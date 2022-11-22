@@ -154,7 +154,7 @@ void bench_nauty(sgraph_t<int, int, int> *g, int* colmap, double* nauty_solve_ti
 
 sgraph* test_g;
 int*    test_colmap;
-refinement<int, int, int> test_R;
+refinement test_R;
 bool all_certified = true;
 
 void certifying_consumer_dense(int n, const int * p, int support, const int *) {
@@ -220,7 +220,7 @@ int bench_dejavu_certify(sgraph_t<int, int, int> *g, int* colmap, double* dejavu
     _test_g.copy_graph(g);
     test_g = &_test_g;
     test_colmap = new int[g->v_size];
-    test_R = refinement<int, int, int>();
+    test_R = refinement();
     for(int j = 0; j < g->v_size; ++j)
         test_colmap[j] = colmap[j];
 
@@ -591,9 +591,9 @@ int commandline_mode(int argc, char **argv) {
     p.parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
-        bijection<int> pr;
+        bijection pr;
         std::cout << "Generating random bijection (seed " << seed << ")..." << std::endl;
-        bijection<int>::random_bijection(&pr, g->v_size, seed);
+        bijection::random_bijection(&pr, g->v_size, seed);
         std::cout << "Permuting graph..." << std::endl;
         g->permute_graph(_g, &pr); // permute graph
         if(colmap != nullptr)
