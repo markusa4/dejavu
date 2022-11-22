@@ -27,6 +27,8 @@ namespace dejavu {
         }
     };
 
+    enum ir_mode { IR_MODE_COMPARE, IR_MODE_RECORD};
+
     struct ir_state {
         coloring*    c;
         trace*       T;
@@ -36,10 +38,16 @@ namespace dejavu {
         std::vector<int>  base_vertex;
         std::vector<int>  base_color;
         std::vector<int>  base_touched_color_list_pt;
+
+        std::vector<int>  compare_base_color;
+
+        ir_mode mode = IR_MODE_RECORD;
+
         int base_pos = 0;
     };
 
-    // minmal DFS IR-solver with limited failure, parallelizes according to given split-map
+    // small DFS IR-solver with limited failure, parallelizes according to given split-map
+    // good at solving Tinhofer graphs, not good at pruning difficult combinatorial graphs
     class microdfs {
         int         fail_cnt = 0;
         int         fail_lim = 0;
@@ -65,19 +73,27 @@ namespace dejavu {
                 return;
             }
             ++state->base_pos;
-            const int color_class = S->select_color_first(state->c);
-            const int ind_v = state->c->lab[color_class];
-            state->base_vertex.push_back(ind_v);
-            state->base_color.push_back(color_class);
+            if(v == -1) {
+                const int color_class = S->select_color_largest(state->c);
+                v = state->c->lab[color_class];
+            }
+            state->base_vertex.push_back(v);
+            state->base_color.push_back(state->c->vertex_to_col[v]);
             state->base_touched_color_list_pt.push_back(state->touched_color_list->cur_pos);
-            const int init_color_class = R->individualize_vertex(state->c, ind_v, state->T, state->touched_color,
+            const int init_color_class = R->individualize_vertex(state->c, v, state->T, state->touched_color,
                                                                  state->touched_color_list, state->prev_color_list);
-            R->refine_coloring(g, state->c, init_color_class, nullptr, -1, -1,nullptr,
-                               state->touched_color, state->touched_color_list, state->prev_color_list,state->T);
+
+            if(state->mode == IR_MODE_RECORD) {
+                R->refine_coloring(g, state->c, init_color_class, nullptr, -1, -1, nullptr,
+                                   state->touched_color, state->touched_color_list, state->prev_color_list, state->T);
+            } else {
+                R->refine_coloring(g, state->c, init_color_class, nullptr, -1, -1, nullptr,
+                                   state->touched_color, state->touched_color_list, state->prev_color_list, state->T);
+            }
         }
 
         void move_to_parent(ir_state* state) {
-            // TODO: also need to unwind invariant!
+            // unwind invariant
             state->T->rewind_to_individualization();
 
             --state->base_pos;
@@ -113,19 +129,95 @@ namespace dejavu {
         }
 
         bool recurse_to_equal_leaf(sgraph* g, ir_state* state, int fails) {
+            if(fails == 0) {
+                while((size_t) state->base_pos < state->compare_base_color.size()) {
+                    const int col = state->compare_base_color[state->base_pos];
+                    const int col_sz = state->c->ptn[col] + 1;
+                    if(col_sz < 2)
+                        return false;
+                    const int ind_v = state->c->lab[col];
+                    move_to_child(g, state, ind_v);
+                }
+                if(state->c->cells == g->v_size)
+                    return true;
+                else
+                    return false;
+            }
 
+            if((size_t) state->base_pos == state->compare_base_color.size()) {
+                // at leaf?
+                if(state->c->cells == g->v_size) {
+                    return true; // check leaf first?
+                } else {
+                    return false;
+                }
+            }
+
+            const int col    = state->compare_base_color[state->base_pos];
+            const int col_sz = state->c->ptn[col] + 1;
+            if(col_sz < 2) {
+                return false;
+            }
+
+            for(int i = 0; i < col_sz; ++i) {
+                const int ind_v = state->c->lab[col + i];
+                move_to_child(g, state, ind_v);
+                const bool res = recurse_to_equal_leaf(g, state, fails);
+                if(res)
+                    return true;
+                move_to_parent(state);
+            }
+
+            return false;
         }
 
-        void do_dfs(sgraph* g, coloring* c) {
+        void color_diff_automorphism(int n, int* vertex_to_col, int* col_to_vertex, int* automorphism_map, work_list* automorphism_supp) {
+            for(int v1 = 0; v1 < n; ++v1) {
+                const int col = vertex_to_col[v1];
+                const int v2  = col_to_vertex[col];
+                automorphism_map[v1] = v2;
+                automorphism_supp->push_back(v1);
+            }
+        }
+
+        // reset internal automorphism structure to the identity
+        static void reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
+            for(int i = 0; i < automorphism_supp->cur_pos; ++i) {
+                rautomorphism[(*automorphism_supp)[i]] = (*automorphism_supp)[i];
+            }
+            automorphism_supp->reset();
+        };
+
+        // adds a given automorphism to the tiny_orbit structure
+        void add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
+            for(int i = 0; i < nsupp; ++i) {
+                orbit->combine_orbits(automorphism[supp[i]], supp[i]);
+            }
+        }
+
+        // returns base-level reached (from leaf)
+        int do_dfs(sgraph* g, coloring* c) {
+            int gens = 0;
+            work_list initial_colors(g->v_size);
+            for(int i = 0; i < g->v_size; ++i) {
+                initial_colors[i] = c->vertex_to_col[i];
+            }
+
             tiny_orbit orbs;
             orbs.initialize(g->v_size);
 
+            work_list automorphism(g->v_size);
+            work_list automorphism_supp(g->v_size);
+
+            for(int i = 0; i < g->v_size; ++i)
+                automorphism[i] = i;
+
             selector Se;
-            Se.empty_cache();
-            S = &Se;
 
             mark_set  touched_color(g->v_size);
             work_list touched_color_list(g->v_size);
+            Se.empty_cache();
+            S = &Se;
             work_list prev_color_list(g->v_size);
 
             trace T;
@@ -152,50 +244,83 @@ namespace dejavu {
             compare_T.set_compare_trace(&T);
             compare_T.set_position(T.get_position());
             local_state.T = &compare_T;
+            local_state.compare_base_color.resize(local_state.base_color.size());
+            std::copy(local_state.base_color.begin(), local_state.base_color.end(), local_state.compare_base_color.begin());
 
             coloring leaf_color;
             leaf_color.copy(c);
 
             std::vector<int> individualize;
 
+            bool fail = false;
+
             // loop that serves to optimize Tinhofer graphs
-            while(local_state.base_pos > 0) {
+            while(local_state.base_pos > 0 && !fail) {
                 move_to_parent(&local_state);
                 orbs.reset();
                 const int col    = local_state.base_color[local_state.base_pos];
                 const int col_sz = local_state.c->ptn[col] + 1;
                 const int vert   = local_state.base_vertex[local_state.base_pos];
-                std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << std::endl;
+                //std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << std::endl;
 
                 individualize.clear();
                 for(int i = 0; i < col_sz; ++i) {
                     individualize.push_back(local_state.c->lab[col + i]);
                 }
 
+                int count_leaf = 0;
+                int count_orb  = 0;
+
                 for(auto ind_v : individualize) {
                     if(ind_v == vert) {
-                        std::cout << ind_v << "(id) ";
+                        //std::cout << ind_v << "(id) ";
+                        ++count_orb;
                         continue;
                     }
-
                     if(orbs.are_in_same_orbit(ind_v, vert)) {
-                        std::cout << ind_v << "(ob) ";
+                        //std::cout << ind_v << "(ob) ";
+                        ++count_orb;
                         continue;
                     }
 
+                    ++count_leaf;
                     // call actual DFS with limited fails
-                    // Tinhofer graphs will never fail, or have recursion width > 1
-                    bool succeeded = recurse_to_equal_leaf(g, &local_state, -1);
+                    // Tinhofer graphs will never fail, and have recursion width = 1
+                    const int prev_base_pos = local_state.base_pos;
+                    move_to_child(g, &local_state, ind_v);
+                    bool succeeded = recurse_to_equal_leaf(g, &local_state, 0);
 
                     if(succeeded) {
+                        color_diff_automorphism(g->v_size, local_state.c->vertex_to_col, leaf_color.lab,
+                                                automorphism.get_array(), &automorphism_supp);
+                        bool certify = R->certify_automorphism_sparse(g, initial_colors.get_array(), automorphism.get_array(),
+                                                       automorphism_supp.cur_pos, automorphism_supp.get_array());
+                        succeeded = certify;
 
-                    } else {
+                        if(certify) {
+                            ++gens;
+                            add_automorphism_to_orbit(&orbs, automorphism.get_array(), automorphism_supp.cur_pos, automorphism_supp.get_array());
+                        }
 
+                        // purge automorphism
+                        reset_automorphism(automorphism.get_array(), &automorphism_supp);
                     }
-                    std::cout << ind_v << "(lf) ";
+
+                    while(prev_base_pos < local_state.base_pos) {
+                        move_to_parent(&local_state);
+                    }
+
+                    if(!succeeded) {
+                        std::cout << ind_v << "(F) " << std::endl;
+                        fail = true;
+                        break;
+                    }
                 }
-                std::cout << std::endl;
+                //std::cout << "leaf/orb: " << count_leaf << "/" << count_orb << std::endl;
             }
+
+            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << std::endl;
+            return local_state.base_pos;
         }
     };
 }

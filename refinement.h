@@ -205,8 +205,8 @@ public:
         assert(v2 < sz);
         if(v1 == v2)
             return true;
-        int orbit1 = find_and_cut_orbit(v1);
-        int orbit2 = find_and_cut_orbit(v2);
+        const int orbit1 = find_and_cut_orbit(v1);
+        const int orbit2 = find_and_cut_orbit(v2);
         return (orbit1 == orbit2);
     }
 

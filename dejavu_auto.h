@@ -225,7 +225,12 @@ private:
 
             dejavu::microdfs D;
             D.setup(0, 0, &W.R, nullptr, nullptr);
-            D.do_dfs(g, start_c);
+            const int dfs_reached_level = D.do_dfs(g, start_c);
+            if(dfs_reached_level == 0) {
+                std::cout << "DFS finished graph" << std::endl;
+                return a;
+            }
+
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {
                 if (start_c->cells == 1) {
