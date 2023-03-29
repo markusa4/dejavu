@@ -697,7 +697,8 @@ public:
 
     bool refine_coloring(sgraph *g, coloring *c, int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
-                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace) {
+                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace,
+                         std::vector<int>* singletons) {
         bool comp = true;
 
         invariant trash_I;
@@ -817,6 +818,12 @@ public:
                     trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
                 }
 
+                if(singletons) {
+                    if(c->ptn[new_class] == 0) {
+                        singletons->push_back(c->lab[new_class]);
+                    }
+                }
+
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
 
@@ -925,7 +932,8 @@ public:
 
     // individualize a vertex in a coloring
     int  individualize_vertex(coloring* c, int v, dejavu::trace* trace, mark_set* touched_color = nullptr,
-                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
+                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr,
+                              std::vector<int>* singletons = nullptr) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -954,6 +962,12 @@ public:
 
         if(trace)
             trace->op_individualize(color);
+
+        if(singletons) {
+            if(c->ptn[color] == 0)
+                singletons->push_back(c->lab[color]);
+            singletons->push_back(v);
+        }
 
         return color + color_class_size;
     }
@@ -1193,7 +1207,7 @@ public:
     }
 
     // certify an automorphism on a graph, sparse
-    bool certify_automorphism_sparse(const sgraph *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
+    bool __attribute__ ((noinline)) certify_automorphism_sparse(const sgraph *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -1240,7 +1254,7 @@ public:
     }
 
     // certify an automorphism on a graph, sparse, report on which vertex failed
-    std::pair<bool, int> certify_automorphism_sparse_report_fail(const sgraph  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
+    std::pair<bool, int>  __attribute__ ((noinline)) certify_automorphism_sparse_report_fail(const sgraph  *g, const int* colmap, const int* p, int supp, const int* supp_arr) {
         int i, found;
 
         assure_initialized(g);
@@ -1284,8 +1298,53 @@ public:
         return std::pair<bool, int>(true, -1);
     }
 
+    // certify an automorphism on a graph, sparse, report on which vertex failed
+    std::tuple<bool, int, int>  __attribute__ ((noinline)) certify_automorphism_sparse_report_fail_resume(const sgraph  *g, const int* colmap, const int* p, int supp, const int* supp_arr, int pos_start) {
+        int i, found;
+
+        assure_initialized(g);
+
+        //for(i = 0; i < g->v_size; ++i) {
+        for(int f = pos_start; f < supp; ++f) {
+            i = supp_arr[f];
+            const int image_i = p[i];
+            if(image_i == i)
+                continue;
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return {false, -1, f};
+            if(colmap[i] != colmap[image_i]) // colors must be equal
+                return {false, -1, f};
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p[vertex_j];
+                if(colmap[vertex_j] != colmap[image_j])
+                    return {false, i, f};
+                scratch_set.set(image_j);
+                //scratch[image_j] = vertex_j;
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return {false, i, f};
+                }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return {false, i, f};
+            }
+        }
+
+        return {true, i, supp};
+    }
+
     // certify an automorphism, for a single vertex
-    bool check_single_failure(const sgraph  *g, const int* colmap, const int* p, int failure) {
+    bool  __attribute__ ((noinline)) check_single_failure(const sgraph  *g, const int* colmap, const int* p, int failure) {
         int i, found;
 
         assure_initialized(g);

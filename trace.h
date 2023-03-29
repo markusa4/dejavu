@@ -128,6 +128,7 @@ namespace dejavu {
                     --read_pt;
                 }
                 data.resize(read_pt);
+                position = read_pt;
             }
             if(compare) {
                 int read_pt = position - 1;
