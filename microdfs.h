@@ -116,60 +116,94 @@ namespace dejavu {
             std::vector<int> candidates;
             test_set.initialize(g->v_size);
             candidates.reserve(locked_lim);
+            int prev_color = -1;
+
+            mark_set neighbour_color;
+            neighbour_color.initialize(g->v_size);
+
             while(state->get_coloring()->cells != g->v_size) {
-                candidates.clear();
                 int best_color = -1;
-                int best_score = -1;
 
-                int alt_best_color = -1;
-                int alt_best_score = -1;
-
-                for(int i = 0; i < state->get_coloring()->ptn_sz;) {
-                    if(state->get_coloring()->ptn[i] > 0) {
-                        candidates.push_back(i);
-                    }
-
-                    //if(candidates.size() >= (size_t) locked_lim)
-                    //    break;
-
-                    i += state->get_coloring()->ptn[i] + 1;
-                }
-
-                const int num_tested = candidates.size();
-
-                while(!candidates.empty()) {
-                    const int test_color = candidates.back();
-                    candidates.pop_back();
-
-                    const int test_score = color_score(g, state, test_color);
-                    if(test_score > best_score) {
-                        best_color = test_color;
-                        best_score = test_score;
-                    }
-
-                    const int alt_test_score = alt_score(g, state, test_color);
-                    if(alt_test_score > alt_best_score) {
-                        alt_best_color = test_color;
-                        alt_best_score = test_score;
+                // pick previous color if possible
+                if(prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
+                    //std::cout << "previous color" << std::endl;
+                    best_color = prev_color;
+                } else if(prev_color >= 0) { // pick neighbour of previous color if possible
+                    const int test_vertex = state->get_coloring()->lab[prev_color];
+                    for(int i = 0; i < g->d[test_vertex]; ++i) {
+                        const int other_vertex = g->e[g->v[test_vertex] + i];
+                        const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
+                        if(state->get_coloring()->ptn[other_color] > 0) {
+                            //std::cout << "neighbour color" << std::endl;
+                            neighbour_color.set(other_color);
+                            best_color = other_color;
+                            //break;
+                        }
                     }
                 }
 
-                if(best_color != alt_best_color) {
-                    //std::cout << best_color << " vs. " << alt_best_color << std::endl;
-                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
-                    const int score1 = state_score(g, state);
-                    state->move_to_parent();
-                    state->move_to_child(R, g, state->get_coloring()->lab[alt_best_color]);
-                    const int score2 = state_score(g, state);
-                    state->move_to_parent();
+                // heuristic, try to pick "good" color
+                if(best_color == -1) {
+                    //std::cout << "heuristic color" << std::endl;
+                    candidates.clear();
+                    int best_score = -1;
 
-                    //std::cout << score1 << ":" << score2 << std::endl;
-                    if(score2 > score1) {
-                        best_color = alt_best_color;
+                    int alt_best_color = -1;
+                    int alt_best_score = -1;
+
+                    for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                        if (state->get_coloring()->ptn[i] > 0) {
+                            candidates.push_back(i);
+                        }
+
+                        //if(candidates.size() >= (size_t) locked_lim)
+                        //    break;
+
+                        i += state->get_coloring()->ptn[i] + 1;
+                    }
+
+                    const int num_tested = candidates.size();
+
+                    while (!candidates.empty()) {
+                        const int test_color = candidates.back();
+                        candidates.pop_back();
+
+                        int test_score = color_score(g, state, test_color);
+                        if(neighbour_color.get(test_color)) {
+                            test_score *= 10;
+                        }
+                        if (test_score > best_score) {
+                            best_color = test_color;
+                            best_score = test_score;
+                        }
+
+                        int alt_test_score = alt_score(g, state, test_color);
+                        if(neighbour_color.get(test_color)) {
+                            alt_test_score *= 10;
+                        }
+                        if (alt_test_score > alt_best_score) {
+                            alt_best_color = test_color;
+                            alt_best_score = test_score;
+                        }
+                    }
+
+                    if (best_color != alt_best_color) {
+                        //std::cout << best_color << " vs. " << alt_best_color << std::endl;
+                        state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                        const int score1 = state_score(g, state);
+                        state->move_to_parent();
+                        state->move_to_child(R, g, state->get_coloring()->lab[alt_best_color]);
+                        const int score2 = state_score(g, state);
+                        state->move_to_parent();
+
+                        //std::cout << score1 << ":" << score2 << std::endl;
+                        if (score2 > score1) {
+                            best_color = alt_best_color;
+                        }
                     }
                 }
 
-
+                prev_color = best_color;
                 state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
                 //std::cout << "picked color " << best_color << " score " << best_score << " among " << num_tested << " colors" << ", cells: " << state->c->cells << "/" << g->v_size << std::endl;
             }
@@ -229,6 +263,8 @@ namespace dejavu {
         selector*   S        = nullptr;
         splitmap*   SM       = nullptr;
     public:
+        long double grp_sz   = 1.0;
+
         void setup(int fail_lim, int threads, refinement* R, selector* S, splitmap* SM) {
             this->R        = R;
             this->fail_lim = fail_lim;
@@ -263,29 +299,29 @@ namespace dejavu {
                     //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
                     //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
-                    /*bool prev_cert = true;
+                    bool prev_cert = true;
 
                     if(prev_fail) {
                         prev_cert = R->check_single_failure(g, initial_colors->get_array(), automorphism->get_array(), prev_fail_pos);
-                    }*/
+                    }
 
-                    if(state->c->cells == g->v_size) {
-                    // if(prev_cert) {
-                        /*auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                    //if(state->c->cells == g->v_size) {
+                    if(prev_cert) {
+                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
                                                                               automorphism->get_array(),
                                                                               automorphism_supp->cur_pos,
                                                                               automorphism_supp->get_array(), cert_pos);
                         cert_pos = std::get<2>(cert_res);
-                        if (std::get<0>(cert_res)) {*/
-                            auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                        if (std::get<0>(cert_res)) {
+                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
                                                                                          automorphism->get_array(),
                                                                                          automorphism_supp->cur_pos,
                                                                                          automorphism_supp->get_array(),
                                                                                          0);
-                        //}
+                        }
 
                         if (std::get<0>(cert_res)) {
-                            //std::cout << "success" << "@" << state->base_pos << "/" << state->compare_base_color.size() << std::endl;
+                            //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
                             return {true, true};
                         } else {
                             prev_fail = true;
@@ -348,9 +384,8 @@ namespace dejavu {
         };
 
         // adds a given automorphism to the tiny_orbit structure
-        void  __attribute__ ((noinline)) add_automorphism_to_orbit(tiny_orbit* orbit, mark_set* interest, int* automorphism, int nsupp, int* supp) {
+        void  __attribute__ ((noinline)) add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
             for(int i = 0; i < nsupp; ++i) {
-                //if(interest->get(supp[i]))
                 orbit->combine_orbits(automorphism[supp[i]], supp[i]);
             }
         }
@@ -445,25 +480,29 @@ namespace dejavu {
             // loop that serves to optimize Tinhofer graphs
             while(local_state.base_pos > 0 && !fail) {
                 local_state.move_to_parent();
-                //orbs.reset(); // TODO no need to reset when going up in tree!
-                const int col    = local_state.base_color[local_state.base_pos];
+                const int col    = local_state.base_color[local_state.base_pos]; // TODO: detect stack of "same color"?
                 const int col_sz = local_state.c->ptn[col] + 1;
                 const int vert   = local_state.base_vertex[local_state.base_pos];
-                //std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << std::endl;
 
-                color_class.reset();
-                individualize.clear();
-                for(int i = 0; i < col_sz; ++i) {
+                /*individualize.clear();
+                for(int i = 0; i < col_sz; ++i) { // TODO: this is quadratic when it shouldn't be!
+                    // TODO: do left-most, right-most, check sizes, stuff?
+                    // TODO: I can save col and col_sz, and use compare snapshot leaf_color
                     const int v = local_state.c->lab[col + i];
-                    color_class.set(v);
-                    individualize.push_back(v);
-                }
+                    if(v != vert && orbs.represents_orbit(v))
+                        individualize.push_back(v);
+                }*/
+
+                //std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << " con " << individualize.size() << std::endl;
 
                 int count_leaf = 0;
                 int count_orb  = 0;
 
-                for(auto ind_v : individualize) {
-                    if(orbs.are_in_same_orbit(ind_v, vert)) {
+                for(int i = col_sz - 1; i >= 0; --i) {
+                    const int ind_v = leaf_color.lab[col + i];
+                    if(ind_v == vert || !orbs.represents_orbit(ind_v))
+                        continue;
+                    if(orbs.are_in_same_orbit(ind_v, vert)) { // TODO somehow skip to ones not in same orbit?
                         ++count_orb;
                         continue;
                     }
@@ -501,10 +540,9 @@ namespace dejavu {
                     if (found_auto) {
                         assert(automorphism[vert] == ind_v);
                         ++gens;
-                        add_automorphism_to_orbit(&orbs, &color_class, automorphism.get_array(),
+                        add_automorphism_to_orbit(&orbs, automorphism.get_array(),
                                                   automorphism_supp.cur_pos, automorphism_supp.get_array());
                     }
-
                     reset_automorphism(automorphism.get_array(), &automorphism_supp);
 
                     while(prev_base_pos < local_state.base_pos) {
@@ -516,11 +554,21 @@ namespace dejavu {
                         fail = true;
                         break;
                     }
+
+                    if(orbs.orbit_size(vert) == col_sz) {
+                        break;
+                    }
                 }
+
+                if(!fail) {
+                    grp_sz *= col_sz;
+                }
+
                 //std::cout << "leaf/orb: " << count_leaf << "/" << count_orb << std::endl;
             }
 
-            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << std::endl;
+            //grp_sz = 10;
+            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz << std::endl;
             return local_state.base_pos;
         }
     };

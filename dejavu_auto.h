@@ -227,6 +227,13 @@ private:
             D.setup(0, 0, &W.R, nullptr, nullptr);
             const int dfs_reached_level = D.do_dfs(g, start_c);
             if(dfs_reached_level == 0) {
+                long double add_grp_sz = D.grp_sz;
+                while(add_grp_sz > 10) {
+                    a.grp_sz_exp += 1;
+                    add_grp_sz = add_grp_sz / 10;
+                }
+
+                a.grp_sz_man *= add_grp_sz;
                 std::cout << "DFS finished graph" << std::endl;
                 return a;
             }
@@ -1785,7 +1792,9 @@ dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
     }
     config.CONFIG_BULK_ALLOCATOR = false;
     if(config.CONFIG_PREPROCESS) {
-        //config.CONFIG_PREP_DEACT_PROBE = true;
+        config.CONFIG_PREP_DEACT_PROBE = true;
+        //config.CONFIG_PREP_DEACT_DEG2  = true;
+        //config.CONFIG_PREP_DEACT_DEG01  = true;
         p.reduce(g, colmap, hook);
         config.CONFIG_IR_SKIP_FIRST_REFINEMENT = true;
     } else {

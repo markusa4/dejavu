@@ -174,8 +174,9 @@ class tiny_orbit {
     mark_set          touched;
     work_list_t<int>  reset_arr;
     work_list_t<int>  map_arr;
+    work_list_t<int>  orb_sz;
 public:
-    int __attribute__ ((noinline)) find_and_cut_orbit(const int v1) {
+    int find_and_cut_orbit(const int v1) {
         assert(v1 >= 0);
         assert(v1 < sz);
         int orbit1 = map_arr[v1];
@@ -185,7 +186,17 @@ public:
         return orbit1;
     }
 
-    void __attribute__ ((noinline)) combine_orbits(const int v1, const int v2) {
+    int orbit_size(const int v1) {
+        assert(v1 >= 0);
+        assert(v1 < sz);
+        return orb_sz[find_and_cut_orbit(v1)];
+    }
+
+    bool represents_orbit(const int v1) {
+        return v1 == map_arr[v1];
+    }
+
+    void combine_orbits(const int v1, const int v2) {
         assert(v1 >= 0);
         assert(v2 >= 0);
         assert(v1 < sz);
@@ -199,15 +210,19 @@ public:
             touched.set(v2);
             int orbit1 = find_and_cut_orbit(v1);
             int orbit2 = find_and_cut_orbit(v2);
+            if(orbit1 == orbit2)
+                return;
             if(orbit1 < orbit2) {
                 map_arr[orbit2] = orbit1;
+                orb_sz[orbit1] += orb_sz[orbit2];
             } else {
                 map_arr[orbit1] = orbit2;
+                orb_sz[orbit2] += orb_sz[orbit1];
             }
         }
     }
 
-    bool __attribute__ ((noinline)) are_in_same_orbit(const int v1, const int v2) {
+    bool are_in_same_orbit(const int v1, const int v2) {
         assert(v1 >= 0);
         assert(v2 >= 0);
         assert(v1 < sz);
@@ -223,6 +238,7 @@ public:
         while(!reset_arr.empty()) {
             const int v = reset_arr.pop_back();
             map_arr[v] = v;
+            orb_sz[v]  = 1;
         }
         touched.reset();
     }
@@ -232,8 +248,10 @@ public:
         touched.initialize(domain_size);
         reset_arr.initialize(domain_size);
         map_arr.initialize(domain_size);
+        orb_sz.initialize(domain_size);
         for(int i = 0; i < domain_size; ++i) {
             map_arr.push_back(i);
+            orb_sz.push_back(1);
         }
     }
 };
