@@ -1785,6 +1785,7 @@ dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
     }
     config.CONFIG_BULK_ALLOCATOR = false;
     if(config.CONFIG_PREPROCESS) {
+        //config.CONFIG_PREP_DEACT_PROBE = true;
         p.reduce(g, colmap, hook);
         config.CONFIG_IR_SKIP_FIRST_REFINEMENT = true;
     } else {

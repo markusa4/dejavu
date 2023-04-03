@@ -10,6 +10,15 @@
 #include <list>
 #include <iostream>
 #include <cstring>
+#include <functional>
+
+// return whether to continue color refinement
+// bool split_color_hook(int color_initial, int new_color, int new_color_sz);
+typedef bool type_split_color_hook(const int, const int, const int);
+
+// return whether to continue color refinement
+// bool worklist_color_hook(int color, int color_sz);
+typedef bool type_worklist_color_hook(const int, const int);
 
 // sorting utilizing minimal sorting networks for n <= 6
 template<class T>
@@ -480,12 +489,13 @@ public:
                          std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
         return refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
-                               touched_color_list, nullptr, nullptr);
+                               touched_color_list, nullptr, nullptr, nullptr, nullptr);
     }
     bool refine_coloring(sgraph *g, coloring *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
-                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace) {
+                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace,
+                         std::function<type_split_color_hook> split_hook, std::function<type_worklist_color_hook> worklist_hook) {
         bool comp = true;
 
         if(trace)
@@ -531,6 +541,9 @@ public:
 
             if(trace)
                 trace->op_refine_cell_start(next_color_class);
+
+            if(worklist_hook && !worklist_hook(next_color_class, next_color_class_sz))
+                continue;
 
             // if cell did not split anything in the target invariant, skip refinement until the end of this cell
             if(I->no_write && !I->never_fail && comp) {
@@ -601,6 +614,9 @@ public:
                 if(trace) {
                     trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
                 }
+
+                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]))
+                    return false;
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
@@ -695,10 +711,10 @@ public:
         return comp;
     }
 
-    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
-                         std::vector<int>* early_individualized, mark_set* touched_color,
+    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, int cell_early, mark_set* touched_color,
                          work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace,
-                         std::vector<int>* singletons) {
+                         std::vector<int>* singletons, std::function<type_split_color_hook> split_hook,
+                         std::function<type_worklist_color_hook> worklist_hook) {
         bool comp = true;
 
         invariant trash_I;
@@ -708,7 +724,6 @@ public:
             trace->op_refine_start();
 
         singleton_hint.reset();
-        int individualize_pos = individualize_early;
         assure_initialized(g);
         int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
         if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
@@ -741,8 +756,6 @@ public:
             color_class_splits.reset();
             const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
             const int next_color_class_sz = c->ptn[next_color_class] + 1;
-            if(m)
-                m->color_refinement_cost += next_color_class_sz;
 
             if(trace) {
                 if(!trace->blueprint_is_next_cell_active()) {
@@ -752,6 +765,9 @@ public:
                     }
                 }
             }
+
+            if(worklist_hook && !worklist_hook(next_color_class, next_color_class_sz))
+                continue;
 
             if(trace)
                 trace->op_refine_cell_start(next_color_class);
@@ -817,6 +833,9 @@ public:
                 if(trace) {
                     trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
                 }
+
+                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]))
+                    return false;
 
                 if(singletons) {
                     if(c->ptn[new_class] == 0) {
