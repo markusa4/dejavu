@@ -633,8 +633,12 @@ public:
                     trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
                 }
 
-                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]))
-                    return false;
+                if(split_hook) {
+                    const bool res = split_hook(old_class, new_class, c->ptn[new_class]+1);
+                    if(!res) {
+                        return false;
+                    }
+                }
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
@@ -729,10 +733,10 @@ public:
         return comp;
     }
 
-    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, int cell_early, mark_set* touched_color,
-                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace,
-                         std::vector<int>* singletons, std::function<type_split_color_hook> split_hook,
-                         std::function<type_worklist_color_hook> worklist_hook) {
+    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, int cell_limit,
+                         dejavu::trace* trace,
+                         const std::function<type_split_color_hook>& split_hook,
+                         const std::function<type_worklist_color_hook>& worklist_hook) {
         bool comp = true;
 
         invariant trash_I;
@@ -743,7 +747,7 @@ public:
 
         singleton_hint.reset();
         assure_initialized(g);
-        int deviation_expander = (cell_early == g->v_size)?config.CONFIG_IR_EXPAND_DEVIATION:0;
+        int deviation_expander = (cell_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
         if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
 
         cell_todo.reset(&queue_pointer);
@@ -835,16 +839,6 @@ public:
                 int  new_class  = color_class_splits.last()->first.second;
                 bool is_largest = color_class_splits.last()->second;
 
-                // record colors that were changed
-                if(touched_color) {
-                    if(!touched_color->get(new_class)) {
-                        touched_color->set(new_class);
-                        if(prev_color_list!=nullptr)
-                            prev_color_list->push_back(old_class);
-                        touched_color_list->push_back(new_class);
-                    }
-                }
-
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
 
@@ -852,14 +846,8 @@ public:
                     trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
                 }
 
-                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]))
+                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]+1))
                     return false;
-
-                if(singletons) {
-                    if(c->ptn[new_class] == 0) {
-                        singletons->push_back(c->lab[new_class]);
-                    }
-                }
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
@@ -917,7 +905,7 @@ public:
             }
 
             // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
-            if(c->cells == cell_early && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+            if(c->cells == cell_limit && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
                 if(trace) {
@@ -968,9 +956,7 @@ public:
     }
 
     // individualize a vertex in a coloring
-    int  individualize_vertex(coloring* c, int v, dejavu::trace* trace, mark_set* touched_color = nullptr,
-                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr,
-                              std::vector<int>* singletons = nullptr) {
+    int  individualize_vertex(coloring* c, int v, dejavu::trace* trace, std::function<type_split_color_hook> split_hook) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -991,19 +977,12 @@ public:
         c->ptn[color + color_class_size - 1] = 0;
         c->cells += 1;
 
-        if(touched_color) {
-            touched_color->set(color + color_class_size);
-            touched_color_list->push_back(color + color_class_size);
-            prev_color_list->push_back(color);
-        }
-
         if(trace)
             trace->op_individualize(color);
 
-        if(singletons) {
-            if(c->ptn[color] == 0)
-                singletons->push_back(c->lab[color]);
-            singletons->push_back(v);
+        if(split_hook) {
+            split_hook(color, color + color_class_size, 1);
+            split_hook(color, color, c->ptn[color]+1);
         }
 
         return color + color_class_size;

@@ -15,13 +15,12 @@ namespace dejavu {
     enum ir_mode { IR_MODE_COMPARE, IR_MODE_RECORD};
 
     struct ir_state {
-        coloring*    c;
-        trace*       T;
-        mark_set*    touched_color;
-        work_list*   touched_color_list;
-        work_list*   prev_color_list;
-        std::vector<int> singletons;
-
+        coloring*    c = nullptr;
+        trace*       T = nullptr;
+        mark_set     touched_color;
+        work_list    touched_color_list;
+        work_list    prev_color_list;
+        std::vector<int>  singletons;
         std::vector<int>  base_vertex;
         std::vector<int>  base_color;
         std::vector<int>  base_touched_color_list_pt;
@@ -32,13 +31,66 @@ namespace dejavu {
         std::vector<int>  compare_base_cells;
         std::vector<int>  compare_singletons;
 
+        bool h_last_refinement_singleton_only = true;
+        int  h_hint_color                     = -1;
+        bool h_hint_color_is_singleton_now    = true;
+
         ir_mode mode = IR_MODE_RECORD;
 
         int base_pos = 0;
+    private:
+        void touch_initial_colors() {
+            int i = 0;
+            while(i < c->lab_sz) {
+                touched_color.set(i);
+                i += c->ptn[i] + 1;
+            }
+        }
 
     public:
         coloring* get_coloring() {
             return c;
+        }
+
+        ir_state(coloring* c, trace* T) {
+            this->c = c;
+            this->T = T;
+
+            touched_color.initialize(c->lab_sz);
+            touched_color_list.initialize(c->lab_sz);
+            prev_color_list.initialize(c->lab_sz);
+
+            touch_initial_colors();
+        }
+
+        bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
+            // update some heuristic values
+            if(new_color_sz > 1) {
+                h_last_refinement_singleton_only = false;
+                h_hint_color = new_color;
+                h_hint_color_is_singleton_now = false;
+            }
+            if(new_color == h_hint_color && new_color_sz == 1) {
+                h_hint_color_is_singleton_now = true;
+            }
+
+            // write singletons to singleton list
+            if(new_color_sz == 1) {
+                singletons.push_back(c->lab[new_color]);
+            }
+
+            // record colors that were changed
+            if(!touched_color.get(new_color)) {
+                touched_color.set(new_color);
+                prev_color_list.push_back(old_color);
+                touched_color_list.push_back(new_color);
+            }
+
+            return true;
+        }
+
+        std::function<type_split_color_hook> self_split_hook() {
+            return std::bind(&ir_state::split_hook, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         }
 
         // move this to static functions
@@ -51,17 +103,14 @@ namespace dejavu {
             base_singleton_pt.push_back(singletons.size());
             base_vertex.push_back(v);
             base_color.push_back(c->vertex_to_col[v]);
-            base_touched_color_list_pt.push_back(touched_color_list->cur_pos);
-            const int init_color_class = R->individualize_vertex(c, v, T, touched_color,
-                                                                 touched_color_list, prev_color_list, &singletons);
+            base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
+            const int init_color_class = R->individualize_vertex(c, v, T, self_split_hook());
 
-
+            h_last_refinement_singleton_only = true;
             if(mode == IR_MODE_RECORD) {
-                R->refine_coloring(g, c, init_color_class, -1, touched_color,
-                                   touched_color_list, prev_color_list, T, &singletons, nullptr, nullptr);
+                R->refine_coloring(g, c, init_color_class, -1, T, self_split_hook(), nullptr);
             } else {
-                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1],
-                                   touched_color, touched_color_list, prev_color_list, T, &singletons, nullptr, nullptr);
+                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], T, self_split_hook(), nullptr);
             }
 
             base_cells.push_back(c->cells);
@@ -71,20 +120,25 @@ namespace dejavu {
             T->rewind_to_individualization();
 
             --base_pos;
-            while(prev_color_list->cur_pos > base_touched_color_list_pt[base_pos]) {
-                const int old_color = prev_color_list->pop_back();
-                const int new_color = touched_color_list->pop_back();
+            while(prev_color_list.cur_pos > base_touched_color_list_pt[base_pos]) {
+                const int old_color = prev_color_list.pop_back();
+                const int new_color = touched_color_list.pop_back();
 
-                touched_color->unset(new_color);
+                touched_color.unset(new_color);
 
                 const int new_color_sz = c->ptn[new_color] + 1;
                 c->ptn[old_color] += new_color_sz;
                 c->ptn[new_color]  = 1;
 
+                if(c->ptn[old_color] > 0) {
+                    h_hint_color = old_color;
+                    h_hint_color_is_singleton_now = false;
+                }
+
                 for(int j = 0; j < new_color_sz; ++j) {
                     const int v = c->lab[new_color + j];
                     c->vertex_to_col[v] = old_color;
-                    assert(state->c->vertex_to_lab[v] == new_color + j);
+                    assert(c->vertex_to_lab[v] == new_color + j);
                 }
 
                 --c->cells;
@@ -203,6 +257,12 @@ namespace dejavu {
                     }
                 }
 
+                if(best_color == -1) {
+                    std::cout << state->get_coloring()->cells << "/" << g->v_size << std::endl;
+                 }
+
+                assert(best_color >= 0);
+                assert(best_color < g->v_size);
                 prev_color = best_color;
                 state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
                 //std::cout << "picked color " << best_color << " score " << best_score << " among " << num_tested << " colors" << ", cells: " << state->c->cells << "/" << g->v_size << std::endl;
@@ -271,14 +331,6 @@ namespace dejavu {
             this->threads  = threads;
         }
 
-        void  __attribute__ ((noinline)) touch_initial_colors(coloring* c, mark_set* touched_color) {
-            int i = 0;
-            while(i < c->lab_sz) {
-                touched_color->set(i);
-                i += c->ptn[i] + 1;
-            }
-        }
-
         std::pair<bool, bool>  __attribute__ ((noinline)) recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_state* state, int fails, work_list* automorphism, work_list* automorphism_supp) {
             if(fails == 0) {
                 int depth = 0;
@@ -301,12 +353,15 @@ namespace dejavu {
 
                     bool prev_cert = true;
 
-                    if(prev_fail) {
+                    assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
+
+                    if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
                         prev_cert = R->check_single_failure(g, initial_colors->get_array(), automorphism->get_array(), prev_fail_pos);
                     }
 
                     //if(state->c->cells == g->v_size) {
-                    if(prev_cert) {
+                    if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                        // TODO: add heuristic to not always do this check, way too expensive!
                         auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
                                                                               automorphism->get_array(),
                                                                               automorphism_supp->cur_pos,
@@ -318,12 +373,15 @@ namespace dejavu {
                                                                                          automorphism_supp->cur_pos,
                                                                                          automorphism_supp->get_array(),
                                                                                          0);
+                        } else {
+                            std::cout << "unnecessary check" << std::endl;
                         }
 
                         if (std::get<0>(cert_res)) {
-                            //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
+                            std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
                             return {true, true};
                         } else {
+                            std::cout << "unnecessary check2" << std::endl;
                             prev_fail = true;
                             prev_fail_pos = std::get<1>(cert_res);
                         }
@@ -440,11 +498,8 @@ namespace dejavu {
 
             selector Se;
 
-            mark_set  touched_color(g->v_size);
-            work_list touched_color_list(g->v_size);
             Se.empty_cache();
             S = &Se;
-            work_list prev_color_list(g->v_size);
 
             trace T;
             T.set_compare(false);
@@ -452,13 +507,7 @@ namespace dejavu {
 
             mark_set color_class(g->v_size);
 
-            ir_state local_state;
-            local_state.c = c;
-            local_state.T = &T;
-            local_state.touched_color = &touched_color;
-            local_state.touched_color_list = &touched_color_list;
-            local_state.prev_color_list = &prev_color_list;
-            touch_initial_colors(c, &touched_color);
+            ir_state local_state(c, &T);
 
             // start DFS from a leaf!
             //move_to_leaf(g, &local_state);
