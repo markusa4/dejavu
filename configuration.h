@@ -1,6 +1,8 @@
 #ifndef DEJAVU_CONFIGURATION_H
 #define DEJAVU_CONFIGURATION_H
 
+#include <functional>
+
 // hook for automorphisms found in dejavu
 // void dejavu_hook(int n, const int *perm, int nsupp, const int *support)
 // int n:        domain size of the graph and automorphism group
@@ -9,7 +11,7 @@
 // int* support: vertices moved by the permutation
 // IMPORTANT NOTE: Try to avoid sequential reads of perm, rather use the support array to only access those parts of the
 // permutation that are non-trivial.
-typedef void dejavu_hook(int, const int *, int, const int *);
+typedef const std::function<void(int, const int *, int, const int *)> dejavu_hook;
 
 struct configstruct {
     bool CONFIG_PREPROCESS_COMPRESS = true;

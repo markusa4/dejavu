@@ -5,7 +5,6 @@
 #include <chrono>
 #include "sgraph.h"
 #include "invariant.h"
-#include "sassy.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_sequential.h"
@@ -30,6 +29,8 @@ namespace dejavu {
         std::vector<int>  compare_base_color;
         std::vector<int>  compare_base_cells;
         std::vector<int>  compare_singletons;
+
+        std::function<type_split_color_hook> my_split_hook;
 
         bool h_last_refinement_singleton_only = true;
         int  h_hint_color                     = -1;
@@ -61,6 +62,8 @@ namespace dejavu {
             prev_color_list.initialize(c->lab_sz);
 
             touch_initial_colors();
+
+            my_split_hook = self_split_hook();
         }
 
         bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
@@ -95,22 +98,18 @@ namespace dejavu {
 
         // move this to static functions
         void  move_to_child(refinement* R, sgraph* g, int v) {
-            if (c->cells == g->v_size) {
-                return;
-            }
-
             ++base_pos;
             base_singleton_pt.push_back(singletons.size());
             base_vertex.push_back(v);
             base_color.push_back(c->vertex_to_col[v]);
             base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
-            const int init_color_class = R->individualize_vertex(c, v, T, self_split_hook());
+            const int init_color_class = R->individualize_vertex(c, v, T, my_split_hook);
 
             h_last_refinement_singleton_only = true;
             if(mode == IR_MODE_RECORD) {
-                R->refine_coloring(g, c, init_color_class, -1, T, self_split_hook(), nullptr);
+                R->refine_coloring(g, c, init_color_class, -1, T, my_split_hook, nullptr);
             } else {
-                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], T, self_split_hook(), nullptr);
+                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], T, my_split_hook, nullptr);
             }
 
             base_cells.push_back(c->cells);
@@ -160,6 +159,8 @@ namespace dejavu {
     };
 
     // heuristics to attempt to find a good selector, as well as creating a split-map for microdfs
+    // TODO: enable different selector strategies for restarts
+    // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
     class cellmagic {
         int locked_lim = 512;
 
@@ -210,8 +211,8 @@ namespace dejavu {
                             candidates.push_back(i);
                         }
 
-                        //if(candidates.size() >= (size_t) locked_lim)
-                        //    break;
+                        if(candidates.size() >= (size_t) locked_lim)
+                            break;
 
                         i += state->get_coloring()->ptn[i] + 1;
                     }
@@ -231,17 +232,17 @@ namespace dejavu {
                             best_score = test_score;
                         }
 
-                        int alt_test_score = alt_score(g, state, test_color);
+                        /*int alt_test_score = alt_score(g, state, test_color);
                         if(neighbour_color.get(test_color)) {
                             alt_test_score *= 10;
                         }
                         if (alt_test_score > alt_best_score) {
                             alt_best_color = test_color;
                             alt_best_score = test_score;
-                        }
+                        }*/
                     }
 
-                    if (best_color != alt_best_color) {
+                    /*if (best_color != alt_best_color) {
                         //std::cout << best_color << " vs. " << alt_best_color << std::endl;
                         state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
                         const int score1 = state_score(g, state);
@@ -254,7 +255,7 @@ namespace dejavu {
                         if (score2 > score1) {
                             best_color = alt_best_color;
                         }
-                    }
+                    }*/
                 }
 
                 if(best_color == -1) {
@@ -271,6 +272,8 @@ namespace dejavu {
         }
 
         int color_score(sgraph* g, ir_state* state, int color) {
+            //return (state->c->ptn[color] +1)*100; //+ d + non_triv_col_d;
+
             test_set.reset();
             const int v     = state->get_coloring()->lab[color];
             const int d     = g->d[v];
@@ -313,113 +316,79 @@ namespace dejavu {
         }
     };
 
-    // small DFS IR-solver with limited failure, parallelizes according to given split-map
-    // good at solving Tinhofer graphs, not good at pruning difficult combinatorial graphs
+    // DFS IR which does not backtrack, parallelizes according to given split-map
+    // not able to solve difficult combinatorial graphs
     class microdfs {
         int         fail_cnt = 0;
-        int         fail_lim = 0;
         int         threads  = 1;
         refinement* R        = nullptr;
         selector*   S        = nullptr;
         splitmap*   SM       = nullptr;
     public:
-        long double grp_sz   = 1.0;
+        long double grp_sz_man   = 1.0;
+        int grp_sz_exp = 0;
 
-        void setup(int fail_lim, int threads, refinement* R, selector* S, splitmap* SM) {
+        void setup(int threads, refinement* R, selector* S, splitmap* SM) {
             this->R        = R;
-            this->fail_lim = fail_lim;
             this->threads  = threads;
         }
 
-        std::pair<bool, bool>  __attribute__ ((noinline)) recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_state* state, int fails, work_list* automorphism, work_list* automorphism_supp) {
-            if(fails == 0) {
-                int depth = 0;
-                bool prev_fail     = false;
-                int  prev_fail_pos = -1;
-                int cert_pos   = 0;
+        std::pair<bool, bool>  __attribute__ ((noinline)) recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_state* state, work_list* automorphism, work_list* automorphism_supp) {
+            bool prev_fail     = false;
+            int  prev_fail_pos = -1;
+            int cert_pos   = 0;
 
-                while((size_t) state->base_pos < state->compare_base_color.size()) {
-                    ++depth;
-                    const int col = state->compare_base_color[state->base_pos];
-                    const int col_sz = state->c->ptn[col] + 1;
-                    if(col_sz < 2)
-                        return {false, false};
-                    const int ind_v = state->c->lab[col];
-                    state->move_to_child(R, g, ind_v);
-                    write_singleton_automorphism(&state->compare_singletons, &state->singletons, state->base_singleton_pt[state->base_singleton_pt.size()-1], state->singletons.size(),
-                                                 automorphism->get_array(), automorphism_supp);
-                    //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
-                    //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
+            while((size_t) state->base_pos < state->compare_base_color.size()) {
+                const int col = state->compare_base_color[state->base_pos];
+                const int col_sz = state->c->ptn[col] + 1;
+                if(col_sz < 2)
+                    return {false, false};
+                const int ind_v = state->c->lab[col];
+                state->move_to_child(R, g, ind_v);
+                write_singleton_automorphism(&state->compare_singletons, &state->singletons, state->base_singleton_pt[state->base_singleton_pt.size()-1], state->singletons.size(),
+                                             automorphism->get_array(), automorphism_supp);
+                //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
+                //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
-                    bool prev_cert = true;
+                bool prev_cert = true;
 
-                    assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
+                assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
 
-                    if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                        prev_cert = R->check_single_failure(g, initial_colors->get_array(), automorphism->get_array(), prev_fail_pos);
+                if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                    prev_cert = R->check_single_failure(g, initial_colors->get_array(), automorphism->get_array(), prev_fail_pos);
+                }
+
+                //if(state->c->cells == g->v_size) {
+                if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                    // TODO: add better heuristic to not always do this check, too expensive!
+                    auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                                                                          automorphism->get_array(),
+                                                                          automorphism_supp->cur_pos,
+                                                                          automorphism_supp->get_array(), cert_pos);
+                    cert_pos = std::get<2>(cert_res);
+                    if (std::get<0>(cert_res)) {
+                        cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                                                                                     automorphism->get_array(),
+                                                                                     automorphism_supp->cur_pos,
+                                                                                     automorphism_supp->get_array(),
+                                                                                     0);
                     }
 
-                    //if(state->c->cells == g->v_size) {
-                    if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                        // TODO: add heuristic to not always do this check, way too expensive!
-                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
-                                                                              automorphism->get_array(),
-                                                                              automorphism_supp->cur_pos,
-                                                                              automorphism_supp->get_array(), cert_pos);
-                        cert_pos = std::get<2>(cert_res);
-                        if (std::get<0>(cert_res)) {
-                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
-                                                                                         automorphism->get_array(),
-                                                                                         automorphism_supp->cur_pos,
-                                                                                         automorphism_supp->get_array(),
-                                                                                         0);
-                        } else {
-                            std::cout << "unnecessary check" << std::endl;
-                        }
-
-                        if (std::get<0>(cert_res)) {
-                            std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
-                            return {true, true};
-                        } else {
-                            std::cout << "unnecessary check2" << std::endl;
-                            prev_fail = true;
-                            prev_fail_pos = std::get<1>(cert_res);
-                        }
+                    if (std::get<0>(cert_res)) {
+                        //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
+                        return {true, true};
+                    } else {
+                        prev_fail = true;
+                        prev_fail_pos = std::get<1>(cert_res);
                     }
                 }
-                if(state->c->cells == g->v_size) {
-                    //std::cout << "fail" << std::endl;
-                    return {true, false};
-                } else {
-                    return {false, false};
-                }
             }
-
-            if((size_t) state->base_pos == state->compare_base_color.size()) {
-                // at leaf?
-                if(state->c->cells == g->v_size) {
-                    return {true, false}; // check leaf first?
-                } else {
-                    return {false, false};
-                }
-            }
-
-            const int col    = state->compare_base_color[state->base_pos];
-            const int col_sz = state->c->ptn[col] + 1;
-            if(col_sz < 2) {
+            if(state->c->cells == g->v_size) {
+                //std::cout << "fail" << std::endl;
+                return {true, false};
+            } else {
                 return {false, false};
             }
-
-            for(int i = 0; i < col_sz; ++i) {
-                const int ind_v = state->c->lab[col + i];
-                state->move_to_child(R, g, ind_v);
-                const auto res = recurse_to_equal_leaf(g, initial_colors, state, fails, automorphism, automorphism_supp);
-                if(res.first)
-                    return res;
-                state->move_to_parent();
-            }
-
-            return {true, false};
         }
 
         void  color_diff_automorphism(int n, int* vertex_to_col, int* col_to_vertex, int* automorphism_map, work_list* automorphism_supp) {
@@ -533,17 +502,6 @@ namespace dejavu {
                 const int col_sz = local_state.c->ptn[col] + 1;
                 const int vert   = local_state.base_vertex[local_state.base_pos];
 
-                /*individualize.clear();
-                for(int i = 0; i < col_sz; ++i) { // TODO: this is quadratic when it shouldn't be!
-                    // TODO: do left-most, right-most, check sizes, stuff?
-                    // TODO: I can save col and col_sz, and use compare snapshot leaf_color
-                    const int v = local_state.c->lab[col + i];
-                    if(v != vert && orbs.represents_orbit(v))
-                        individualize.push_back(v);
-                }*/
-
-                //std::cout << "do_dfs@" << local_state.base_pos << ", col " <<  col << " sz " << col_sz << " con " << individualize.size() << std::endl;
-
                 int count_leaf = 0;
                 int count_orb  = 0;
 
@@ -563,17 +521,25 @@ namespace dejavu {
                     const int prev_base_pos = local_state.base_pos;
                     local_state.T->reset_trace_equal(); // probably need to re-adjust position?
                     local_state.move_to_child(R, g, ind_v);
-                    write_singleton_automorphism(&local_state.compare_singletons, &local_state.singletons, local_state.base_singleton_pt[local_state.base_singleton_pt.size()-1], local_state.singletons.size(),
+                    bool found_auto = false;
+                    //if(local_state.h_last_refinement_singleton_only) {
+                    write_singleton_automorphism(&local_state.compare_singletons, &local_state.singletons,
+                                                 local_state.base_singleton_pt[
+                                                         local_state.base_singleton_pt.size() - 1],
+                                                 local_state.singletons.size(),
                                                  automorphism.get_array(), &automorphism_supp);
-                    bool found_auto = R->certify_automorphism_sparse(g, initial_colors.get_array(), automorphism.get_array(),
-                                                                  automorphism_supp.cur_pos, automorphism_supp.get_array());
+                    found_auto = R->certify_automorphism_sparse(g, initial_colors.get_array(),
+                                                                     automorphism.get_array(),
+                                                                     automorphism_supp.cur_pos,
+                                                                     automorphism_supp.get_array());
                     assert(automorphism[vert] == ind_v);
+                    //}
                     //std::cout << found_auto << ", " << automorphism_supp.cur_pos << std::endl;
                     //reset_automorphism(automorphism.get_array(), &automorphism_supp);
 
                     // try proper recursion
                     if(!found_auto) {
-                        auto rec_succeeded = recurse_to_equal_leaf(g, &initial_colors, &local_state, 0, &automorphism, &automorphism_supp);
+                        auto rec_succeeded = recurse_to_equal_leaf(g, &initial_colors, &local_state, &automorphism, &automorphism_supp);
                         found_auto = (rec_succeeded.first && rec_succeeded.second);
                         if (rec_succeeded.first && !rec_succeeded.second) {
                             reset_automorphism(automorphism.get_array(), &automorphism_supp);
@@ -610,14 +576,18 @@ namespace dejavu {
                 }
 
                 if(!fail) {
-                    grp_sz *= col_sz;
+                    grp_sz_man *= col_sz;
+                    while(grp_sz_man > 10) {
+                        grp_sz_man /= 10;
+                        grp_sz_exp += 1;
+                    }
                 }
 
                 //std::cout << "leaf/orb: " << count_leaf << "/" << count_orb << std::endl;
             }
 
             //grp_sz = 10;
-            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz << std::endl;
+            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
             return local_state.base_pos;
         }
     };

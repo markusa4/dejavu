@@ -6,7 +6,7 @@
 #include "sgraph.h"
 #include "invariant.h"
 #include "concurrentqueue.h"
-#include "sassy.h"
+#include "sassy/preprocessor.h"
 #include "selector.h"
 #include "bfs.h"
 #include "schreier_shared.h"
@@ -224,15 +224,15 @@ private:
             }
 
             dejavu::microdfs D;
-            D.setup(0, 0, &W.R, nullptr, nullptr);
+            D.setup(0, &W.R, nullptr, nullptr);
             const int dfs_reached_level = D.do_dfs(g, start_c);
             if(dfs_reached_level == 0) {
-                long double add_grp_sz = D.grp_sz;
+                long double add_grp_sz = D.grp_sz_man;
                 while(add_grp_sz > 10) {
                     a.grp_sz_exp += 1;
                     add_grp_sz = add_grp_sz / 10;
                 }
-
+                a.grp_sz_exp += D.grp_sz_exp;
                 a.grp_sz_man *= add_grp_sz;
                 std::cout << "DFS finished graph" << std::endl;
                 return a;
@@ -1779,10 +1779,10 @@ typedef dejavu_auto_t dejavu_auto;
 
 // TODO: add automorphism consumer
 
-dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
+dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, sassy::sassy_hook* hook) {
     g->dense = !(g->e_size<g->v_size||g->e_size/g->v_size<g->v_size/(g->e_size/g->v_size));
     Clock::time_point timer1 = Clock::now();
-    sassy p;
+    sassy::preprocessor p;
     int* gen_colmap = nullptr;
     if(colmap == nullptr) {
         gen_colmap = new int[g->v_size]; // TODO: memory leak
@@ -1795,7 +1795,17 @@ dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
         //config.CONFIG_PREP_DEACT_PROBE = true;
         //config.CONFIG_PREP_DEACT_DEG2  = true;
         //config.CONFIG_PREP_DEACT_DEG01  = true;
-        p.reduce(g, colmap, hook);
+        sassy::sgraph gg;
+        gg.v = g->v;
+        gg.d = g->d;
+        gg.e = g->e;
+        gg.v_size = g->v_size;
+        gg.d_size = g->d_size;
+        gg.e_size = g->e_size;
+        p.reduce(&gg, colmap, hook);
+        g->v_size = gg.v_size;
+        g->d_size = gg.d_size;
+        g->e_size = gg.e_size;
         config.CONFIG_IR_SKIP_FIRST_REFINEMENT = true;
     } else {
         config.CONFIG_IR_SKIP_FIRST_REFINEMENT = false;
@@ -1822,10 +1832,9 @@ dejavu_stats dejavu_automorphisms(sgraph *g, int* colmap, dejavu_hook hook) {
                             automorphism_supp.push_back(i);
                     }
                     //std::cout << automorphism_supp.cur_pos << std::endl;
-                    p.pre_consumer(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(),
-                                   hook);
+                    p.pre_hook_buffered(g->v_size, gen_next->p, automorphism_supp.cur_pos, automorphism_supp.get_array(), hook);
                 } else {
-                    hook(g->v_size, gen_next->p, g->v_size, gen_next->p);
+                    (*hook)(g->v_size, gen_next->p, g->v_size, gen_next->p);
                 }
                 gen_next = gen_next->next;
             } while (gen_next != gens);
