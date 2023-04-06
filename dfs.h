@@ -13,6 +13,7 @@ namespace dejavu {
 
     enum ir_mode { IR_MODE_COMPARE, IR_MODE_RECORD};
 
+    // TODO: enable a "compressed state" only consisting of base
     struct ir_save {
         std::vector<int> base_color;
         coloring*        c = nullptr;
@@ -58,7 +59,6 @@ namespace dejavu {
         }
 
     public:
-
         ir_controller(coloring* c, trace* T) {
             this->c = c;
             this->T = T;
@@ -381,14 +381,6 @@ namespace dejavu {
         }
     };
 
-    // TODO high-level strategy
-    //  - full restarts, change selector, but make use previously computed automorphisms (maybe inprocess) -- goal:
-    //    stable performance
-    //  - exploit strengths of DFS, random walks, BFS, and their synergies
-    class dejavu2 {
-
-    };
-
     // TODO tree structure for BFS + random walk
     class ir_tree {
 
@@ -683,6 +675,27 @@ namespace dejavu {
 
             std::cout << "dfs_ir: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
             return local_state.base_pos;
+        }
+    };
+
+    // TODO high-level strategy
+    //  - full restarts, change selector, but make use previously computed automorphisms (maybe inprocess) -- goal:
+    //    stable performance
+    //  - exploit strengths of DFS, random walks, BFS, and their synergies
+    class dejavu2 {
+    private:
+        sassy::preprocessor _prep;
+        dfs_ir    _dfs;
+        bfs_ir    _bfs;
+        random_ir _rand;
+        schreier  _schreier;
+        ir_tree   _tree;
+
+        selector_factory _selectors;
+
+    public:
+        void automorphisms(sgraph* g, coloring* c, dejavu_hook hook) {
+
         }
     };
 }
