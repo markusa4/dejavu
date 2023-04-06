@@ -734,16 +734,12 @@ public:
     }
 
     bool refine_coloring(sgraph *g, coloring *c, int init_color_class, int cell_limit,
-                         dejavu::trace* trace,
                          const std::function<type_split_color_hook>& split_hook,
                          const std::function<type_worklist_color_hook>& worklist_hook) {
         bool comp = true;
 
         invariant trash_I;
         trash_I.only_acc = true;
-
-        if(trace)
-            trace->op_refine_start();
 
         singleton_hint.reset();
         assure_initialized(g);
@@ -779,21 +775,9 @@ public:
             const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
             const int next_color_class_sz = c->ptn[next_color_class] + 1;
 
-            if(trace) {
-                if(!trace->blueprint_is_next_cell_active()) {
-                    if(config.CONFIG_IR_IDLE_SKIP) {
-                        trace->blueprint_skip_to_next_cell();
-                        continue;
-                    }
-                }
-            }
-
-            if(worklist_hook && !worklist_hook(next_color_class, next_color_class_sz))
+            if(worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) {
                 continue;
-
-            if(trace)
-                trace->op_refine_cell_start(next_color_class);
-
+            }
 
             colorcost += next_color_class_sz;
 
@@ -842,27 +826,11 @@ public:
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
 
-                if(trace) {
-                    trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
-                }
-
                 if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]+1))
                     return false;
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
-
-#ifndef NDEBUG // debug code
-                if(color_class_splits.empty()) {
-                    int actual_cells = 0;
-                    for (int i = 0; i < c->ptn_sz;) {
-                        actual_cells += 1;
-                        i += c->ptn[i] + 1;
-                    }
-
-                    assert(c->cells == actual_cells);
-                }
-#endif
 
                 if(latest_old_class != old_class) {
                     latest_old_class = old_class;
@@ -892,9 +860,6 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
-            if(trace)
-                trace->op_refine_cell_end();
-
             // detection if coloring is discrete
             if(c->cells == g->v_size) {
                 //const int new_cells = c->cells - pre_cells;
@@ -908,9 +873,6 @@ public:
             if(c->cells == cell_limit && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
-                if(trace) {
-                    trace->skip_to_individualization();
-                }
                 return comp;
             }
 
@@ -918,8 +880,6 @@ public:
             if(!comp && deviation_expander <= 0) break;
         }
 
-        if(trace)
-            trace->op_refine_end();
         return comp;
     }
 
@@ -956,7 +916,7 @@ public:
     }
 
     // individualize a vertex in a coloring
-    int  individualize_vertex(coloring* c, int v, dejavu::trace* trace, const std::function<type_split_color_hook>& split_hook) {
+    int  individualize_vertex(coloring* c, int v, const std::function<type_split_color_hook>& split_hook) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
 
@@ -976,9 +936,6 @@ public:
         c->ptn[color + color_class_size] = 0;
         c->ptn[color + color_class_size - 1] = 0;
         c->cells += 1;
-
-        if(trace)
-            trace->op_individualize(color);
 
         if(split_hook) {
             split_hook(color, color + color_class_size, 1);

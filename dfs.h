@@ -1,5 +1,5 @@
-#ifndef DEJAVU_MICRODFS_H
-#define DEJAVU_MICRODFS_H
+#ifndef DEJAVU_DFS_H
+#define DEJAVU_DFS_H
 
 #include <random>
 #include <chrono>
@@ -30,11 +30,14 @@ namespace dejavu {
         std::vector<int>  compare_base_cells;
         std::vector<int>  compare_singletons;
 
-        std::function<type_split_color_hook> my_split_hook;
+        std::function<type_split_color_hook>    my_split_hook;
+        std::function<type_worklist_color_hook> my_worklist_hook;
 
         bool h_last_refinement_singleton_only = true;
         int  h_hint_color                     = -1;
         bool h_hint_color_is_singleton_now    = true;
+        bool h_cell_active                    = false;
+        bool h_individualize                  = false;
 
         ir_mode mode = IR_MODE_RECORD;
 
@@ -63,7 +66,8 @@ namespace dejavu {
 
             touch_initial_colors();
 
-            my_split_hook = self_split_hook();
+            my_split_hook    = self_split_hook();
+            my_worklist_hook = self_worklist_hook();
         }
 
         bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
@@ -89,11 +93,41 @@ namespace dejavu {
                 touched_color_list.push_back(new_color);
             }
 
+            // record split into trace invariant, unless we are individualizing
+            if(T && !h_individualize) T->op_refine_cell_record(new_color, new_color_sz, 1);
+
+            return true;
+        }
+
+        bool worklist_hook(const int color, const int color_sz) {
+            if(h_cell_active) {
+                if(T) T->op_refine_cell_end();
+                h_cell_active = false;
+            }
+
+            // update some heuristic values
+            if(T) {
+                if(!T->blueprint_is_next_cell_active()) {
+                    if(config.CONFIG_IR_IDLE_SKIP) {
+                        T->blueprint_skip_to_next_cell();
+                        return false;
+                    }
+                }
+            }
+
+            if(T) T->op_refine_cell_start(color);
+
+            h_cell_active = true;
+
             return true;
         }
 
         std::function<type_split_color_hook> self_split_hook() {
             return std::bind(&ir_state::split_hook, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+        }
+
+        std::function<type_worklist_color_hook> self_worklist_hook() {
+            return std::bind(&ir_state::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
         }
 
         // move this to static functions
@@ -103,20 +137,34 @@ namespace dejavu {
             base_vertex.push_back(v);
             base_color.push_back(c->vertex_to_col[v]);
             base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
-            const int init_color_class = R->individualize_vertex(c, v, T, my_split_hook);
+
+            assert(!h_cell_active);
+
+            h_individualize = true;
+            const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
+            T->op_individualize(c->vertex_to_col[v]);
+            h_individualize = false;
 
             h_last_refinement_singleton_only = true;
+
+            if(T) T->op_refine_start();
+
             if(mode == IR_MODE_RECORD) {
-                R->refine_coloring(g, c, init_color_class, -1, T, my_split_hook, nullptr);
+                R->refine_coloring(g, c, init_color_class, -1, my_split_hook, my_worklist_hook);
+                if(T && h_cell_active) T->op_refine_cell_end();
+                if(T) T->op_refine_end();
             } else {
-                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], T, my_split_hook, nullptr);
+                R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], my_split_hook, my_worklist_hook);
+                if(T) T->skip_to_individualization();
             }
+
+            h_cell_active = false;
 
             base_cells.push_back(c->cells);
         }
         void  move_to_parent() {
             // unwind invariant
-            T->rewind_to_individualization();
+            if(T) T->rewind_to_individualization();
 
             --base_pos;
             while(prev_color_list.cur_pos > base_touched_color_list_pt[base_pos]) {
@@ -158,10 +206,10 @@ namespace dejavu {
 
     };
 
-    // heuristics to attempt to find a good selector, as well as creating a split-map for microdfs
+    // heuristics to attempt to find a good selector, as well as creating a split-map for dfs
     // TODO: enable different selector strategies for restarts
     // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
-    class cellmagic {
+    class selector_factory {
         int locked_lim = 512;
 
     public:
@@ -318,7 +366,7 @@ namespace dejavu {
 
     // DFS IR which does not backtrack, parallelizes according to given split-map
     // not able to solve difficult combinatorial graphs
-    class microdfs {
+    class dfs {
         int         fail_cnt = 0;
         int         threads  = 1;
         refinement* R        = nullptr;
@@ -480,7 +528,7 @@ namespace dejavu {
 
             // start DFS from a leaf!
             //move_to_leaf(g, &local_state);
-            cellmagic wizard;
+            selector_factory wizard;
             wizard.find_base(R, g, &local_state);
 
             std::cout << "trace length: " << T.get_position() << std::endl;
@@ -593,4 +641,4 @@ namespace dejavu {
     };
 }
 
-#endif //DEJAVU_MICRODFS_H
+#endif //DEJAVU_DFS_H

@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="dejavu"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="gcc"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 all"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu-auto">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu-auto" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 dejavu-auto"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu-auto/fast">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu-auto" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 dejavu-auto/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="nauty_target">
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 nauty_target"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="bench">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/bench" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 bench"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="bench/fast">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/bench" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 bench/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu-api">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/libdejavu-api.so" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 dejavu-api"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="dejavu-api/fast">
+				<Option output="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/libdejavu-api.so" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option object_output="./"/>
+				<Option type="3"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add option="-DNDEBUG"/>
+					<Add option="-DDEJAVU_STANDALONE"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 dejavu-api/fast"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="/home/markus/Downloads/dejavu-1.0 (2)/dejavu"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -f &quot;/home/markus/Downloads/dejavu-1.0\ (2)/dejavu/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/bench.cpp">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/bfs.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/bijection.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/coloring.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/conauto/conauto.h">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/configuration.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu_api.h">
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu_api_impl.cpp">
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu_auto.cpp">
+			<Option target="dejavu-auto"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/dejavu_auto.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/invariant.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/invariant.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/naudefs.h">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/naurng.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/naurng.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/gtnauty.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/gtools.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/gutil1.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/gutil2.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/naugraph.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/naugroup.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/naurng.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/nausparse.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/nautil.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/nautinv.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/naututil.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/nauty.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/schreier.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/nauty/traces.o">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/parser.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/parser.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/refinement.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/refinement.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/saucy/saucy.c">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/saucy/saucy.h">
+			<Option target="bench"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/schreier_sequential.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/schreier_sequential.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/schreier_shared.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/schreier_shared.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/selector.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/sgraph.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/utility.cpp">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/utility.h">
+			<Option target="dejavu-auto"/>
+			<Option target="bench"/>
+			<Option target="dejavu-api"/>
+		</Unit>
+		<Unit filename="/home/markus/Downloads/dejavu-1.0 (2)/dejavu/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>
