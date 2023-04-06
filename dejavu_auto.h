@@ -224,7 +224,7 @@ private:
             }
 
             dejavu::dfs_ir D;
-            D.setup(0, &W.R, nullptr, nullptr);
+            D.setup(0, &W.R, nullptr);
             const int dfs_reached_level = D.do_dfs(g, start_c);
             if(dfs_reached_level == 0) {
                 long double add_grp_sz = D.grp_sz_man;

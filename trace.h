@@ -1,8 +1,8 @@
 #ifndef DEJAVU_TRACE_H
 #define DEJAVU_TRACE_H
 
-#include<vector>
-#include "assert.h"
+#include <vector>
+#include <cassert>
 
 #define TRACE_MARKER_INDIVIDUALIZE     (-1)
 #define TRACE_MARKER_REFINE_START      (-2)
@@ -11,6 +11,17 @@
 #define TRACE_MARKER_REFINE_CELL_END   (-5)
 
 namespace dejavu {
+
+    /**
+     * Class that serves to store and compare the trace of a walk in an individualization-refinement tree. The class
+     * provides several different modes in which information is recorded and/or compared.
+     *
+     * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a full
+     * trace and recording a hash invariant as soon as the new computation deviates from the stored trace.
+     *
+     * While comparing to a stored trace, the class facilitates the use of the blueprint heuristic, which enables
+     * skipping of non-splitting cells in the stored trace.
+    */
     class trace {
     protected:
         std::vector<int> data;
@@ -18,12 +29,12 @@ namespace dejavu {
     private:
         // the trace
         trace *compare_trace = nullptr;
-        std::vector<long> hash;
+        long hash;
 
         // mode
         bool compare = false;
-        bool freeze = false;
-        bool record = false;
+        bool freeze  = false;
+        bool record  = false;
 
         // housekeeping
         int cell_act_spot = -1;
@@ -161,6 +172,14 @@ namespace dejavu {
 
         void set_compare(bool compare) {
             this->compare = compare;
+        }
+
+        long get_hash() {
+            return hash;
+        }
+
+        void set_hash(long hash) {
+            this->hash = hash;
         }
 
         // does this deviate from compare trace yet?

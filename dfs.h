@@ -11,15 +11,58 @@
 
 namespace dejavu {
 
-    enum ir_mode { IR_MODE_COMPARE, IR_MODE_RECORD};
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// UTILITY                                                                                                     ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * The ir_mode determines in which mode the trace is used: whether a new trace is recorded, or whether the current
+     * computation is compared to a stored trace.
+     */
+    enum ir_mode { IR_MODE_COMPARE_TRACE, IR_MODE_RECORD_TRACE, IR_MODE_RECORD_HASH};
 
-    // TODO: enable a "compressed state" only consisting of base
-    struct ir_save {
-        std::vector<int> base_color;
-        coloring*        c = nullptr;
-        trace*           T = nullptr;
+    static void color_diff_automorphism(int n, int* vertex_to_col, int* col_to_vertex,
+                                        int* automorphism_map, work_list* automorphism_supp) {
+        for(int v1 = 0; v1 < n; ++v1) {
+            const int col = vertex_to_col[v1];
+            const int v2  = col_to_vertex[col];
+            if(v1 != v2) {
+                automorphism_map[v1] = v2;
+                automorphism_supp->push_back(v1);
+            }
+        }
+    }
+
+
+    // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
+    // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
+    /**
+     * Using this class, partial information of a state of an IR computation can be stored. Using this information,
+     * IR computations can be resumed from this state either using BFS or random walks. The state in particular does not
+     * keep enough information to resume using DFS.
+     */
+    class ir_reduced_save {
+        std::vector<int> base_vertex;
+        coloring c;
+        long     invariant = 0;
+    public:
+        void set_state(std::vector<int>& base_vertex, coloring& c, long invariant) {
+            this->base_vertex = base_vertex;
+            this->c.copy(&c);
+            this->invariant = invariant;
+        }
+
+        coloring* get_coloring() {
+            return &c;
+        }
+
+        long get_invariant_hash() {
+            return invariant;
+        }
     };
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// IR CONTROL                                                                                                  ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     struct ir_controller {
         coloring*    c = nullptr;
         trace*       T = nullptr;
@@ -40,13 +83,15 @@ namespace dejavu {
         std::function<type_split_color_hook>    my_split_hook;
         std::function<type_worklist_color_hook> my_worklist_hook;
 
+        // settings
+        ir_mode mode = IR_MODE_RECORD_TRACE;
+
+        // heuristics
         bool h_last_refinement_singleton_only = true;
         int  h_hint_color                     = -1;
         bool h_hint_color_is_singleton_now    = true;
         bool h_cell_active                    = false;
         bool h_individualize                  = false;
-
-        ir_mode mode = IR_MODE_RECORD;
 
         int base_pos = 0;
     private:
@@ -73,14 +118,15 @@ namespace dejavu {
             my_worklist_hook = self_worklist_hook();
         }
 
-        // TODO for BFS & random reset
-        void save_state(ir_save* state) {
-
+        // TODO incomplete state save for BFS & random reset
+        void save_state(ir_reduced_save* state) {
+            state->set_state(base_vertex, *c, T->get_hash());
         }
 
-        // TODO for BFS & random reset
-        void load_state(ir_save* state) {
-
+        // TODO incomplete state load for BFS & random reset
+        void load_state(ir_reduced_save* state) {
+            c->copy(state->get_coloring());
+            T->set_hash(state->get_invariant_hash());
         }
 
         coloring* get_coloring() {
@@ -166,7 +212,7 @@ namespace dejavu {
 
             if(T) T->op_refine_start();
 
-            if(mode == IR_MODE_RECORD) {
+            if(mode == IR_MODE_RECORD_TRACE) {
                 R->refine_coloring(g, c, init_color_class, -1, my_split_hook, my_worklist_hook);
                 if(T && h_cell_active) T->op_refine_cell_end();
                 if(T) T->op_refine_end();
@@ -179,6 +225,7 @@ namespace dejavu {
 
             base_cells.push_back(c->cells);
         }
+
         void   __attribute__ ((noinline)) move_to_parent() {
             // unwind invariant
             if(T) T->rewind_to_individualization();
@@ -222,6 +269,10 @@ namespace dejavu {
     struct splitmap {
 
     };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// SELECTOR                                                                                                    ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
     // TODO: enable different selector strategies for restarts
@@ -386,11 +437,19 @@ namespace dejavu {
 
     };
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// SCHREIER-SIMS                                                                                               ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     // TODO implement sparse schreier-sims for fixed base
     // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
     class schreier {
 
     };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// BFS                                                                                                         ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // TODO implement new, simpler bfs
     // TODO depends on ir_tree, and selector
@@ -398,11 +457,19 @@ namespace dejavu {
 
     };
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// RANDOM IR                                                                                                   ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     // TODO implement dejavu strategy, more simple
     // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
     class random_ir {
 
     };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// DFS                                                                                                         ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // DFS IR which does not backtrack, parallelizes according to given split-map
     // not able to solve difficult combinatorial graphs
@@ -411,13 +478,12 @@ namespace dejavu {
         int         fail_cnt = 0;
         int         threads  = 1;
         refinement* R        = nullptr;
-        selector*   S        = nullptr;
         splitmap*   SM       = nullptr;
     public:
         long double grp_sz_man   = 1.0;
         int grp_sz_exp = 0;
 
-        void setup(int threads, refinement* R, selector* S, splitmap* SM) {
+        void setup(int threads, refinement* R, selector* S) {
             this->R        = R;
             this->threads  = threads;
         }
@@ -480,17 +546,6 @@ namespace dejavu {
             }
         }
 
-        void  color_diff_automorphism(int n, int* vertex_to_col, int* col_to_vertex, int* automorphism_map, work_list* automorphism_supp) {
-            for(int v1 = 0; v1 < n; ++v1) {
-                const int col = vertex_to_col[v1];
-                const int v2  = col_to_vertex[col];
-                if(v1 != v2) {
-                    automorphism_map[v1] = v2;
-                    automorphism_supp->push_back(v1);
-                }
-            }
-        }
-
         // reset internal automorphism structure to the identity
         static void  reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
             for(int i = 0; i < automorphism_supp->cur_pos; ++i) {
@@ -534,7 +589,7 @@ namespace dejavu {
             std::copy(state->singletons.begin(), state->singletons.end(), state->compare_singletons.begin());
 
 
-            state->mode = IR_MODE_COMPARE;
+            state->mode = IR_MODE_COMPARE_TRACE;
         }
 
         // returns base-level reached (from leaf)
@@ -554,11 +609,6 @@ namespace dejavu {
             for(int i = 0; i < g->v_size; ++i)
                 automorphism[i] = i;
 
-            selector Se;
-
-            Se.empty_cache();
-            S = &Se;
-
             trace T;
             T.set_compare(false);
             T.set_record(true);
@@ -569,6 +619,7 @@ namespace dejavu {
 
             // start DFS from a leaf!
             //move_to_leaf(g, &local_state);
+            // TODO move this outside DFS, only give state in leaf node (we dont even need a selector here!)
             selector_factory wizard;
             wizard.find_base(R, g, &local_state);
 
@@ -677,6 +728,10 @@ namespace dejavu {
             return local_state.base_pos;
         }
     };
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// MAIN ALGORITHM                                                                                              ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // TODO high-level strategy
     //  - full restarts, change selector, but make use previously computed automorphisms (maybe inprocess) -- goal:
