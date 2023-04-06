@@ -13,7 +13,13 @@ namespace dejavu {
 
     enum ir_mode { IR_MODE_COMPARE, IR_MODE_RECORD};
 
-    struct ir_state {
+    struct ir_save {
+        std::vector<int> base_color;
+        coloring*        c = nullptr;
+        trace*           T = nullptr;
+    };
+
+    struct ir_controller {
         coloring*    c = nullptr;
         trace*       T = nullptr;
         mark_set     touched_color;
@@ -52,11 +58,8 @@ namespace dejavu {
         }
 
     public:
-        coloring* get_coloring() {
-            return c;
-        }
 
-        ir_state(coloring* c, trace* T) {
+        ir_controller(coloring* c, trace* T) {
             this->c = c;
             this->T = T;
 
@@ -68,6 +71,20 @@ namespace dejavu {
 
             my_split_hook    = self_split_hook();
             my_worklist_hook = self_worklist_hook();
+        }
+
+        // TODO for BFS & random reset
+        void save_state(ir_save* state) {
+
+        }
+
+        // TODO for BFS & random reset
+        void load_state(ir_save* state) {
+
+        }
+
+        coloring* get_coloring() {
+            return c;
         }
 
         bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
@@ -123,15 +140,15 @@ namespace dejavu {
         }
 
         std::function<type_split_color_hook> self_split_hook() {
-            return std::bind(&ir_state::split_hook, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+            return std::bind(&ir_controller::split_hook, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
         }
 
         std::function<type_worklist_color_hook> self_worklist_hook() {
-            return std::bind(&ir_state::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
+            return std::bind(&ir_controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
         }
 
         // move this to static functions
-        void  move_to_child(refinement* R, sgraph* g, int v) {
+        void move_to_child(refinement* R, sgraph* g, int v) {
             ++base_pos;
             base_singleton_pt.push_back(singletons.size());
             base_vertex.push_back(v);
@@ -162,7 +179,7 @@ namespace dejavu {
 
             base_cells.push_back(c->cells);
         }
-        void  move_to_parent() {
+        void   __attribute__ ((noinline)) move_to_parent() {
             // unwind invariant
             if(T) T->rewind_to_individualization();
 
@@ -206,7 +223,7 @@ namespace dejavu {
 
     };
 
-    // heuristics to attempt to find a good selector, as well as creating a split-map for dfs
+    // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
     // TODO: enable different selector strategies for restarts
     // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
     class selector_factory {
@@ -215,7 +232,7 @@ namespace dejavu {
     public:
         mark_set test_set;
 
-        void  __attribute__ ((noinline)) find_base(refinement* R, sgraph* g, ir_state* state) {
+        void  __attribute__ ((noinline)) find_base(refinement* R, sgraph* g, ir_controller* state) {
             std::vector<int> candidates;
             test_set.initialize(g->v_size);
             candidates.reserve(locked_lim);
@@ -319,7 +336,7 @@ namespace dejavu {
             return;
         }
 
-        int color_score(sgraph* g, ir_state* state, int color) {
+        int color_score(sgraph* g, ir_controller* state, int color) {
             //return (state->c->ptn[color] +1)*100; //+ d + non_triv_col_d;
 
             test_set.reset();
@@ -338,7 +355,7 @@ namespace dejavu {
             return state->get_coloring()->ptn[color] * non_triv_col_d;
         }
 
-        int alt_score(sgraph* g, ir_state* state, int color) {
+        int alt_score(sgraph* g, ir_controller* state, int color) {
             test_set.reset();
             const int v     = state->get_coloring()->lab[color];
             const int d     = g->d[v];
@@ -355,7 +372,7 @@ namespace dejavu {
             return non_triv_col_d;
         }
 
-        int state_score(sgraph* g, ir_state* state) {
+        int state_score(sgraph* g, ir_controller* state) {
             return state->get_coloring()->cells;
         }
 
@@ -364,9 +381,41 @@ namespace dejavu {
         }
     };
 
+    // TODO high-level strategy
+    //  - full restarts, change selector, but make use previously computed automorphisms (maybe inprocess) -- goal:
+    //    stable performance
+    //  - exploit strengths of DFS, random walks, BFS, and their synergies
+    class dejavu2 {
+
+    };
+
+    // TODO tree structure for BFS + random walk
+    class ir_tree {
+
+    };
+
+    // TODO implement sparse schreier-sims for fixed base
+    // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
+    class schreier {
+
+    };
+
+    // TODO implement new, simpler bfs
+    // TODO depends on ir_tree, and selector
+    class bfs_ir {
+
+    };
+
+    // TODO implement dejavu strategy, more simple
+    // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
+    class random_ir {
+
+    };
+
     // DFS IR which does not backtrack, parallelizes according to given split-map
     // not able to solve difficult combinatorial graphs
-    class dfs {
+    // TODO should depend on given selector
+    class dfs_ir {
         int         fail_cnt = 0;
         int         threads  = 1;
         refinement* R        = nullptr;
@@ -381,7 +430,7 @@ namespace dejavu {
             this->threads  = threads;
         }
 
-        std::pair<bool, bool>  __attribute__ ((noinline)) recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_state* state, work_list* automorphism, work_list* automorphism_supp) {
+        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_controller* state, work_list* automorphism, work_list* automorphism_supp) {
             bool prev_fail     = false;
             int  prev_fail_pos = -1;
             int cert_pos   = 0;
@@ -459,13 +508,13 @@ namespace dejavu {
         };
 
         // adds a given automorphism to the tiny_orbit structure
-        void  __attribute__ ((noinline)) add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
+        void  add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
             for(int i = 0; i < nsupp; ++i) {
                 orbit->combine_orbits(automorphism[supp[i]], supp[i]);
             }
         }
 
-        void  __attribute__ ((noinline)) write_singleton_automorphism(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end, int* rautomorphism, work_list* automorphism_supp) {
+        void  write_singleton_automorphism(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end, int* rautomorphism, work_list* automorphism_supp) {
             for(int i = pos_start; i < pos_end; ++i) {
                 const int from = (*singletons1)[i];
                 const int to   = (*singletons2)[i];
@@ -479,7 +528,7 @@ namespace dejavu {
 
         trace compare_T;
 
-        void  make_compare_snapshot(ir_state* state) {
+        void  make_compare_snapshot(ir_controller* state) {
             compare_T.set_compare(true);
             compare_T.set_record(false);
             compare_T.set_compare_trace(state->T);
@@ -524,7 +573,7 @@ namespace dejavu {
 
             mark_set color_class(g->v_size);
 
-            ir_state local_state(c, &T);
+            ir_controller local_state(c, &T);
 
             // start DFS from a leaf!
             //move_to_leaf(g, &local_state);
@@ -630,12 +679,9 @@ namespace dejavu {
                         grp_sz_exp += 1;
                     }
                 }
-
-                //std::cout << "leaf/orb: " << count_leaf << "/" << count_orb << std::endl;
             }
 
-            //grp_sz = 10;
-            std::cout << "dfs: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
+            std::cout << "dfs_ir: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
             return local_state.base_pos;
         }
     };

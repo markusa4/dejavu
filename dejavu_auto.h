@@ -12,7 +12,7 @@
 #include "schreier_shared.h"
 #include "group_shared.h"
 #include "schreier_sequential.h"
-#include "microdfs.h"
+#include "dfs.h"
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -223,7 +223,7 @@ private:
                 return a;
             }
 
-            dejavu::microdfs D;
+            dejavu::dfs_ir D;
             D.setup(0, &W.R, nullptr, nullptr);
             const int dfs_reached_level = D.do_dfs(g, start_c);
             if(dfs_reached_level == 0) {

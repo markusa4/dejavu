@@ -16,7 +16,7 @@
 // bool split_color_hook(int color_initial, int new_color, int new_color_sz);
 typedef bool type_split_color_hook(const int, const int, const int);
 
-// return whether to continue color refinement
+// return whether to continue splitting the respective cell, or skip it
 // bool worklist_color_hook(int color, int color_sz);
 typedef bool type_worklist_color_hook(const int, const int);
 
@@ -497,7 +497,11 @@ private:
     bool init    = false;
 };
 
-// refinement manager, preserving the workspace between refinements
+/**
+ * Class that is used to preserve a workspace for color refinement, automorphism certification, and other miscellaneous
+ * tasks. Once initialized to a certain size, the workspace can not be enlargened and methods can only be used for
+ * graphs of the initial size, or smaller.
+*/
 class refinement {
 public:
     // color refinement
@@ -733,22 +737,33 @@ public:
         return comp;
     }
 
-    bool refine_coloring(sgraph *g, coloring *c, int init_color_class, int cell_limit,
-                         const std::function<type_split_color_hook>& split_hook,
-                         const std::function<type_worklist_color_hook>& worklist_hook) {
-        bool comp = true;
-
+    /**
+     * The color refinement algorithm. Refines a given coloring with respect to a given graph.
+     * @param g The graph.
+     * @param c The coloring to be refined.
+     * @param init_color Initialize the worklist with a single color class (e.g., after individualization). The
+     * default value -1 denotes that the worklist is initialized with all color classes of the coloring.
+     * @param color_limit Integer which is used to stop refinement whenever the refined coloring reaches this number of
+     * color classes. The default value -1 denotes that refinement is performed exhaustively.
+     * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used to stop
+     * refinement early.
+     * @param worklist_hook Function pointer that is called whenever a color class is considered for refinement. Return value
+     * Can be used to skip refinement of that color class.
+     */
+    void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
+                         const std::function<type_split_color_hook>& split_hook = nullptr,
+                         const std::function<type_worklist_color_hook>& worklist_hook = nullptr) {
         invariant trash_I;
         trash_I.only_acc = true;
 
         singleton_hint.reset();
         assure_initialized(g);
-        int deviation_expander = (cell_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
+        int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
         if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
 
         cell_todo.reset(&queue_pointer);
 
-        if(init_color_class < 0) {
+        if(init_color < 0) {
             // initialize queue with all classes (except for largest one)
             for (int i = 0; i < c->ptn_sz;) {
                 cell_todo.add_cell(&queue_pointer, i);
@@ -760,11 +775,11 @@ public:
 
             }
         } else {
-            const int col_sz = c->ptn[init_color_class];
-            assert(c->vertex_to_col[c->lab[init_color_class]] == init_color_class);
-            cell_todo.add_cell(&queue_pointer, init_color_class);
+            const int col_sz = c->ptn[init_color];
+            assert(c->vertex_to_col[c->lab[init_color]] == init_color);
+            cell_todo.add_cell(&queue_pointer, init_color);
             if(col_sz == 0) {
-                //singleton_hint.push_back(init_color_class);
+                //singleton_hint.push_back(init_color);
             }
         }
         int its = 0;
@@ -783,31 +798,27 @@ public:
 
             bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
-            const bool pre_comp = comp;
-
             if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
-                comp = refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
+                refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
                                                     &color_class_splits, &trash_I);
             } else if(g->dense) {
                 if(dense_dense) { // dense-dense
-                    comp = refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
+                    refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
                                                           &color_class_splits, &trash_I);
                 } else { // dense-sparse
-                    comp = refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
+                    refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
                                                     &color_class_splits, &trash_I);
                 }
             } else { // sparse
-                comp = refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                                 &color_class_splits, &trash_I);
+                refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
+                                          &color_class_splits, &trash_I);
             }
 
-            comp = comp && pre_comp;
-
-            deviation_expander -= (!comp);
+            /*deviation_expander -= (!comp);
             if(!comp && deviation_expander <= 0) {
                 break;
-            }
+            }*/
 
             // add all new classes except for the first, largest one
             int skip = 0;
@@ -827,7 +838,7 @@ public:
                 int class_size = c->ptn[new_class];
 
                 if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]+1))
-                    return false;
+                    return;
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
@@ -870,20 +881,17 @@ public:
             }
 
             // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
-            if(c->cells == cell_limit && comp && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+            if(c->cells == color_limit && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
-                return comp;
+                return;
             }
 
             // mark end of cell and denote whether this cell was splitting or non-splitting
-            if(!comp && deviation_expander <= 0) break;
+            //if(!comp && deviation_expander <= 0) break;
         }
-
-        return comp;
     }
 
-    // individualize a vertex in a coloring
     int  individualize_vertex(coloring* c, int v, mark_set* touched_color = nullptr,
                               work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
         const int color = c->vertex_to_col[v];
@@ -915,7 +923,13 @@ public:
         return color + color_class_size;
     }
 
-    // individualize a vertex in a coloring
+    /**
+     * Individualizes a vertex in a coloring.
+     * @param c Coloring in which the vertex is individualized.
+     * @param v Vertex to be individualized.
+     * @param split_hook Function to be called whenever a color class is split. Return value is not used.
+     * @return
+     */
     int  individualize_vertex(coloring* c, int v, const std::function<type_split_color_hook>& split_hook) {
         const int color = c->vertex_to_col[v];
         const int pos   = c->vertex_to_lab[v];
@@ -947,8 +961,7 @@ public:
 
     // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
     // techniques -- meant to be used as the first refinement in automorphism computation
-    bool refine_coloring_first(sgraph  *g, coloring *c,
-                               int init_color_class) {
+    bool refine_coloring_first(sgraph  *g, coloring *c, int init_color_class = -1) {
         assure_initialized(g);
         singleton_hint.reset();
 
