@@ -13,12 +13,14 @@ namespace dejavu {
     #define TRACE_MARKER_REFINE_CELL_END   (-5)
 
     /**
+     * \brief The trace invariant.
+     *
      * Class that serves to store and compare the trace of a walk in an individualization-refinement tree. The class
      * provides several different modes in which information is recorded and/or compared.
      *
      * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a full
      * trace and recording a hash invariant as soon as the new computation deviates from the stored trace (see also
-     * \sa dejavu::ir_mode).
+     * \ref ir_mode ).
      *
      * While comparing to a stored trace (2, 3), the class facilitates the use of the blueprint heuristic, which enables
      * skipping of non-splitting cells in the stored trace.
@@ -32,9 +34,9 @@ namespace dejavu {
         long hash = 0; /**< hash value to summarize all operations performed on this trace */
 
         // mode
-        bool compare = false; /** whether to compare operations to a stored trace*/
+        bool compare = false; /**< whether to compare operations to a stored trace*/
         bool freeze  = false;
-        bool record  = false; /** whether to record a trace */
+        bool record  = false; /**< whether to record a trace */
 
         // housekeeping
         int cell_act_spot = -1;

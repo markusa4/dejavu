@@ -11,16 +11,30 @@
 
 namespace dejavu {
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// UTILITY                                                                                                     ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
+     * \brief Mode of trace for IR search
      * The ir_mode determines in which mode the trace is used: whether a new trace is recorded, or whether the current
      * computation is compared to a stored trace.
+     *
      */
     enum ir_mode { IR_MODE_COMPARE_TRACE, IR_MODE_RECORD_TRACE, IR_MODE_RECORD_HASH};
 
-    static void color_diff_automorphism(int n, int* vertex_to_col, int* col_to_vertex,
+
+    /**
+     * int type_selector_hook(const coloring* c, const int base_pos);
+     */
+    typedef bool type_selector_hook(const coloring*, const int, const int);
+
+    // reset internal automorphism structure to the identity
+    static void  reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
+        for(int i = 0; i < automorphism_supp->cur_pos; ++i) {
+            rautomorphism[(*automorphism_supp)[i]] = (*automorphism_supp)[i];
+        }
+        automorphism_supp->reset();
+    };
+
+    // make automorphism from colorings
+    static void color_diff_automorphism(int n, const int* vertex_to_col, const int* col_to_vertex,
                                         int* automorphism_map, work_list* automorphism_supp) {
         for(int v1 = 0; v1 < n; ++v1) {
             const int col = vertex_to_col[v1];
@@ -32,15 +46,68 @@ namespace dejavu {
         }
     }
 
-
-    // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
-    // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
     /**
+     * \brief Workspace to sparse automorphisms
+     *
+     * Enables O(1) lookup on a sparse automorphism by using an O(n) workspace.
+     */
+    class sparse_automorphism_workspace {
+        work_list automorphism;
+        work_list automorphism_supp;
+        int domain_size;
+    public:
+        sparse_automorphism_workspace(int domain_size) {
+            automorphism.initialize(domain_size);
+            for(int i = 0; i < domain_size; ++i)
+                automorphism[i] = i;
+            automorphism_supp.initialize(domain_size);
+            this->domain_size = domain_size;
+        }
+
+        void wr_color_diff(const int* vertex_to_col, const int* col_to_vertex) {
+            color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
+                                    &automorphism_supp);
+        }
+
+        void  wr_singleton(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end) {
+            for(int i = pos_start; i < pos_end; ++i) {
+                const int from = (*singletons1)[i];
+                const int to   = (*singletons2)[i];
+                assert(automorphism[from] == from);
+                if(from != to) {
+                    automorphism_supp.push_back(from);
+                    automorphism[from] = to;
+                }
+            }
+        }
+
+        void reset() {
+            reset_automorphism(automorphism.get_array(), &automorphism_supp);
+        }
+
+        int* perm() {
+            return automorphism.get_array();
+        }
+        int* support() {
+            return automorphism_supp.get_array();
+        }
+        int nsupport() {
+            return automorphism_supp.cur_pos;
+        }
+    };
+
+
+    /**
+     * \brief Reduced IR save state
+     *
      * Using this class, partial information of a state of an IR computation can be stored. Using this information,
      * IR computations can be resumed from this state either using BFS or random walks. The state in particular does not
      * keep enough information to resume using DFS.
      */
     class ir_reduced_save {
+        // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
+        // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
+
         std::vector<int> base_vertex;
         coloring c;
         long     invariant = 0;
@@ -119,14 +186,14 @@ namespace dejavu {
         }
 
         // TODO incomplete state save for BFS & random reset
-        void save_state(ir_reduced_save* state) {
-            state->set_state(base_vertex, *c, T->get_hash());
+        void save_state(ir_reduced_save& state) {
+            state.set_state(base_vertex, *c, T->get_hash());
         }
 
         // TODO incomplete state load for BFS & random reset
-        void load_state(ir_reduced_save* state) {
-            c->copy(state->get_coloring());
-            T->set_hash(state->get_invariant_hash());
+        void load_state(ir_reduced_save& state) {
+            c->copy(state.get_coloring());
+            T->set_hash(state.get_invariant_hash());
         }
 
         coloring* get_coloring() {
@@ -270,18 +337,34 @@ namespace dejavu {
 
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// SELECTOR                                                                                                    ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
-    // TODO: enable different selector strategies for restarts
-    // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
+    /**
+     * \brief Creates cell selectors.
+     *
+     * Heuristics which enable the creation of different cell selectors, as well as moving an \ref ir_controller to a
+     * leaf of the IR tree.
+     */
     class selector_factory {
+        // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
+        // TODO: enable different selector strategies for restarts
+        // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
         int locked_lim = 512;
 
     public:
         mark_set test_set;
+
+        // TODO: save the base of state for blueprint selection
+        void save_base(ir_controller* state) {
+
+        }
+
+        // TODO configuration of dynamic selector when deviating from base
+
+        /**
+         * @return A selector hook based on the saved base and configured dynamic selector.
+         */
+        std::function<type_selector_hook>* get_selector_hook() {
+
+        }
 
         void  __attribute__ ((noinline)) find_base(refinement* R, sgraph* g, ir_controller* state) {
             state->T->set_compare(false);
@@ -447,7 +530,9 @@ namespace dejavu {
     // TODO implement sparse schreier-sims for fixed base
     // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
     class schreier {
+        bool sift(int* automorphism, work_list* automorphism_supp) {
 
+        }
     };
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -468,15 +553,28 @@ namespace dejavu {
     // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
     class random_ir {
 
+        // TODO leaf storage, maybe do extra class that can be shared across threads
+
+    public:
+        void setup(int error, int leaf_store_limit) {
+
+        }
+
+        // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
+        void random_walks(schreier& group, ir_controller& local_state, ir_reduced_save& start_from) {
+            local_state.load_state(start_from);
+
+            // TODO continue...
+        }
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// DFS                                                                                                         ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // DFS IR which does not backtrack, parallelizes according to given split-map
-    // not able to solve difficult combinatorial graphs
-    // TODO should depend on given selector
+    /**
+     * \brief Depth-first search without backtracking.
+     *
+     * Depth-first IR search which does not backtrack. Can parallelize along the base.
+     * Due to the search not back-tracking, this module can not deal with difficult parts of combinatorial graphs.
+     */
     class dfs_ir {
         int         fail_cnt = 0;
         int         threads  = 1;
@@ -491,7 +589,7 @@ namespace dejavu {
             this->threads  = threads;
         }
 
-        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, int* initial_colors, ir_controller* state, work_list* automorphism, work_list* automorphism_supp) {
+        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, int* initial_colors, ir_controller* state, sparse_automorphism_workspace& automorphism) {
             bool prev_fail     = false;
             int  prev_fail_pos = -1;
             int cert_pos   = 0;
@@ -503,8 +601,8 @@ namespace dejavu {
                     return {false, false};
                 const int ind_v = state->c->lab[col];
                 state->move_to_child(R, g, ind_v);
-                write_singleton_automorphism(&state->compare_singletons, &state->singletons, state->base_singleton_pt[state->base_singleton_pt.size()-1], state->singletons.size(),
-                                             automorphism->get_array(), automorphism_supp);
+                automorphism.wr_singleton(&state->compare_singletons, &state->singletons,
+                                          state->base_singleton_pt[state->base_singleton_pt.size()-1], state->singletons.size());
                 //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
                 //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
@@ -513,22 +611,22 @@ namespace dejavu {
                 assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
 
                 if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                    prev_cert = R->check_single_failure(g, initial_colors, automorphism->get_array(), prev_fail_pos);
+                    prev_cert = R->check_single_failure(g, initial_colors, automorphism.perm(), prev_fail_pos);
                 }
 
                 //if(state->c->cells == g->v_size) {
                 if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
                     // TODO: add better heuristic to not always do this check, too expensive!
                     auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
-                                                                          automorphism->get_array(),
-                                                                          automorphism_supp->cur_pos,
-                                                                          automorphism_supp->get_array(), cert_pos);
+                                                                          automorphism.perm(),
+                                                                          automorphism.nsupport(),
+                                                                          automorphism.support(), cert_pos);
                     cert_pos = std::get<2>(cert_res);
                     if (std::get<0>(cert_res)) {
                         cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
-                                                                                     automorphism->get_array(),
-                                                                                     automorphism_supp->cur_pos,
-                                                                                     automorphism_supp->get_array(),
+                                                                                     automorphism.perm(),
+                                                                                     automorphism.nsupport(),
+                                                                                     automorphism.support(),
                                                                                      0);
                     }
 
@@ -549,30 +647,10 @@ namespace dejavu {
             }
         }
 
-        // reset internal automorphism structure to the identity
-        static void  reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
-            for(int i = 0; i < automorphism_supp->cur_pos; ++i) {
-                rautomorphism[(*automorphism_supp)[i]] = (*automorphism_supp)[i];
-            }
-            automorphism_supp->reset();
-        };
-
         // adds a given automorphism to the tiny_orbit structure
         void  add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
             for(int i = 0; i < nsupp; ++i) {
                 orbit->combine_orbits(automorphism[supp[i]], supp[i]);
-            }
-        }
-
-        void  write_singleton_automorphism(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end, int* rautomorphism, work_list* automorphism_supp) {
-            for(int i = pos_start; i < pos_end; ++i) {
-                const int from = (*singletons1)[i];
-                const int to   = (*singletons2)[i];
-                assert(rautomorphism[from] == from);
-                if(from != to) {
-                    automorphism_supp->push_back(from);
-                    rautomorphism[from] = to;
-                }
             }
         }
 
@@ -597,16 +675,15 @@ namespace dejavu {
 
         // returns base-level reached (from leaf)
         int do_dfs(sgraph* g, int* initial_colors, ir_controller& local_state) {
+            // TODO should depend on given selector
             int gens = 0;
 
             tiny_orbit orbs;
             orbs.initialize(g->v_size);
 
-            work_list automorphism(g->v_size);
-            work_list automorphism_supp(g->v_size);
-
-            for(int i = 0; i < g->v_size; ++i)
-                automorphism[i] = i;
+            //work_list automorphism(g->v_size);
+            //work_list automorphism_supp(g->v_size);
+            sparse_automorphism_workspace pautomorphism(g->v_size);
 
             mark_set color_class(g->v_size);
 
@@ -654,42 +731,39 @@ namespace dejavu {
                     local_state.move_to_child(R, g, ind_v);
                     bool found_auto = false;
                     //if(local_state.h_last_refinement_singleton_only) {
-                    write_singleton_automorphism(&local_state.compare_singletons, &local_state.singletons,
-                                                 local_state.base_singleton_pt[
-                                                         local_state.base_singleton_pt.size() - 1],
-                                                 local_state.singletons.size(),
-                                                 automorphism.get_array(), &automorphism_supp);
-                    found_auto = R->certify_automorphism_sparse(g, initial_colors,
-                                                                     automorphism.get_array(),
-                                                                     automorphism_supp.cur_pos,
-                                                                     automorphism_supp.get_array());
-                    assert(automorphism[vert] == ind_v);
+                    pautomorphism.wr_singleton(&local_state.compare_singletons, &local_state.singletons,
+                                               local_state.base_singleton_pt[
+                                                       local_state.base_singleton_pt.size() - 1],
+                                               local_state.singletons.size());
+                    found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
+                                                                pautomorphism.nsupport(),
+                                                                pautomorphism.support());
+                    assert(pautomorphism.perm()[vert] == ind_v);
                     //}
                     //std::cout << found_auto << ", " << automorphism_supp.cur_pos << std::endl;
                     //reset_automorphism(automorphism.get_array(), &automorphism_supp);
 
                     // try proper recursion
                     if(!found_auto) {
-                        auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, &automorphism, &automorphism_supp);
+                        auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, pautomorphism);
                         found_auto = (rec_succeeded.first && rec_succeeded.second);
                         if (rec_succeeded.first && !rec_succeeded.second) {
-                            reset_automorphism(automorphism.get_array(), &automorphism_supp);
-                            color_diff_automorphism(g->v_size, local_state.c->vertex_to_col, leaf_color.lab,
-                                                    automorphism.get_array(), &automorphism_supp);
+                            pautomorphism.reset();
+                            pautomorphism.wr_color_diff(local_state.c->vertex_to_col, leaf_color.lab);
                             found_auto = R->certify_automorphism_sparse(g, initial_colors,
-                                                                          automorphism.get_array(),
-                                                                          automorphism_supp.cur_pos,
-                                                                          automorphism_supp.get_array());
+                                                                          pautomorphism.perm(),
+                                                                          pautomorphism.nsupport(),
+                                                                          pautomorphism.support());
                         }
                     }
 
                     if (found_auto) {
-                        assert(automorphism[vert] == ind_v);
+                        assert(pautomorphism.perm()[vert] == ind_v);
                         ++gens;
-                        add_automorphism_to_orbit(&orbs, automorphism.get_array(),
-                                                  automorphism_supp.cur_pos, automorphism_supp.get_array());
+                        add_automorphism_to_orbit(&orbs, pautomorphism.perm(),
+                                                  pautomorphism.nsupport(), pautomorphism.support());
                     }
-                    reset_automorphism(automorphism.get_array(), &automorphism_supp);
+                    pautomorphism.reset();
 
                     while(prev_base_pos < local_state.base_pos) {
                         local_state.move_to_parent();
@@ -720,18 +794,11 @@ namespace dejavu {
         }
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// MAIN ALGORITHM                                                                                              ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    // TODO high-level strategy
-    //  - full restarts, change selector, but make use of previously computed automorphisms (maybe inprocess) -- goal:
-    //    stable, single-threaded performance
-    //  - exploit strengths of DFS, random walks, BFS, and their synergies
-    //  - try to use no-pruning DFS to fill up available leafs more efficiently
-
     /**
-     * The dejavu solver.
+     * \brief The dejavu solver.
+     *
+     * Contains the high-level strategy of the dejavu solver, controlling the interaction between the different modules
+     * of the solver.
      */
     class dejavu2 {
     private:
@@ -778,9 +845,20 @@ namespace dejavu {
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
             std::cout << "dejavu2" << std::endl;
+            // TODO high-level strategy
+            //  - full restarts, change selector, but make use of previously computed automorphisms (maybe inprocess) -- goal:
+            //    stable, single-threaded performance
+            //  - exploit strengths of DFS, random walks, BFS, and their synergies
+            //  - try to use no-pruning DFS to fill up available leafs more efficiently
+
+            // control values
+            int h_limit_leaf = 0;
+            int h_limit_fail = 0;
+            int h_error_prob = 10;
+            int h_restarts   = 0;
 
             // TODO facilities for restarts
-            
+
             // preprocess the graph using sassy
             sassy::sgraph gg;
             transfer_sgraph_to_sassy_sgraph(g, &gg);
@@ -795,7 +873,11 @@ namespace dejavu {
             trace local_trace;
             ir_controller local_state(&local_coloring, &local_trace);
 
-            // find a selector, moves local_state to a leaf
+            // save root state for random and BFS search
+            ir_reduced_save root_save;
+            local_state.save_state(root_save);
+
+            // find a selector, moves local_state to a leaf of IR tree
             m_selectors.find_base(&m_refinement, g, &local_state);
             std::cout << "trace length: " << local_trace.get_position() << std::endl;
 
@@ -817,6 +899,8 @@ namespace dejavu {
             // intertwined random automorphisms and breadth-first search
 
             // random automorphisms
+            m_rand.setup(h_error_prob, h_limit_leaf);
+            m_rand.random_walks(m_schreier, local_state, root_save);
 
             // breadth-first search
 
