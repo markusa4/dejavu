@@ -42,9 +42,9 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
     auto empty_hook_func = sassy::sassy_hook(empty_hook);
-    dejavu_automorphisms(g, colmap, &empty_hook_func);
-    //dejavu d;
-    //d.automorphisms(g, nullptr);
+    //dejavu_automorphisms(g, colmap, &empty_hook_func);
+    dejavu::dejavu2 d;
+    d.automorphisms(g, colmap, &empty_hook_func);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
 }

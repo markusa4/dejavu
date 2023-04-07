@@ -223,7 +223,7 @@ private:
                 return a;
             }
 
-            dejavu::dfs_ir D;
+            /*dejavu::dfs_ir D;
             D.setup(0, &W.R, nullptr);
             const int dfs_reached_level = D.do_dfs(g, start_c);
             if(dfs_reached_level == 0) {
@@ -236,7 +236,7 @@ private:
                 a.grp_sz_man *= add_grp_sz;
                 std::cout << "DFS finished graph" << std::endl;
                 return a;
-            }
+            }*/
 
 
             if(config.CONFIG_PREPROCESS_EDGELIST_SORT) {

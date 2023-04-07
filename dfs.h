@@ -284,6 +284,9 @@ namespace dejavu {
         mark_set test_set;
 
         void  __attribute__ ((noinline)) find_base(refinement* R, sgraph* g, ir_controller* state) {
+            state->T->set_compare(false);
+            state->T->set_record(true);
+
             std::vector<int> candidates;
             test_set.initialize(g->v_size);
             candidates.reserve(locked_lim);
@@ -488,7 +491,7 @@ namespace dejavu {
             this->threads  = threads;
         }
 
-        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, work_list* initial_colors, ir_controller* state, work_list* automorphism, work_list* automorphism_supp) {
+        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, int* initial_colors, ir_controller* state, work_list* automorphism, work_list* automorphism_supp) {
             bool prev_fail     = false;
             int  prev_fail_pos = -1;
             int cert_pos   = 0;
@@ -510,19 +513,19 @@ namespace dejavu {
                 assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
 
                 if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                    prev_cert = R->check_single_failure(g, initial_colors->get_array(), automorphism->get_array(), prev_fail_pos);
+                    prev_cert = R->check_single_failure(g, initial_colors, automorphism->get_array(), prev_fail_pos);
                 }
 
                 //if(state->c->cells == g->v_size) {
                 if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
                     // TODO: add better heuristic to not always do this check, too expensive!
-                    auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                    auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
                                                                           automorphism->get_array(),
                                                                           automorphism_supp->cur_pos,
                                                                           automorphism_supp->get_array(), cert_pos);
                     cert_pos = std::get<2>(cert_res);
                     if (std::get<0>(cert_res)) {
-                        cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->get_array(),
+                        cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
                                                                                      automorphism->get_array(),
                                                                                      automorphism_supp->cur_pos,
                                                                                      automorphism_supp->get_array(),
@@ -593,12 +596,8 @@ namespace dejavu {
         }
 
         // returns base-level reached (from leaf)
-        int do_dfs(sgraph* g, coloring* c) {
+        int do_dfs(sgraph* g, int* initial_colors, ir_controller& local_state) {
             int gens = 0;
-            work_list initial_colors(g->v_size);
-            for(int i = 0; i < g->v_size; ++i) {
-                initial_colors[i] = c->vertex_to_col[i];
-            }
 
             tiny_orbit orbs;
             orbs.initialize(g->v_size);
@@ -609,27 +608,19 @@ namespace dejavu {
             for(int i = 0; i < g->v_size; ++i)
                 automorphism[i] = i;
 
-            trace T;
-            T.set_compare(false);
-            T.set_record(true);
-
             mark_set color_class(g->v_size);
 
-            ir_controller local_state(c, &T);
+            //ir_controller local_state(c, &T);
 
             // start DFS from a leaf!
             //move_to_leaf(g, &local_state);
             // TODO move this outside DFS, only give state in leaf node (we dont even need a selector here!)
-            selector_factory wizard;
-            wizard.find_base(R, g, &local_state);
-
-            std::cout << "trace length: " << T.get_position() << std::endl;
 
             // make a snapshot of the leaf to compare to!
             make_compare_snapshot(&local_state);
 
             coloring leaf_color;
-            leaf_color.copy(c);
+            leaf_color.copy(local_state.get_coloring());
 
             std::vector<int> individualize;
 
@@ -668,7 +659,7 @@ namespace dejavu {
                                                          local_state.base_singleton_pt.size() - 1],
                                                  local_state.singletons.size(),
                                                  automorphism.get_array(), &automorphism_supp);
-                    found_auto = R->certify_automorphism_sparse(g, initial_colors.get_array(),
+                    found_auto = R->certify_automorphism_sparse(g, initial_colors,
                                                                      automorphism.get_array(),
                                                                      automorphism_supp.cur_pos,
                                                                      automorphism_supp.get_array());
@@ -679,13 +670,13 @@ namespace dejavu {
 
                     // try proper recursion
                     if(!found_auto) {
-                        auto rec_succeeded = recurse_to_equal_leaf(g, &initial_colors, &local_state, &automorphism, &automorphism_supp);
+                        auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, &automorphism, &automorphism_supp);
                         found_auto = (rec_succeeded.first && rec_succeeded.second);
                         if (rec_succeeded.first && !rec_succeeded.second) {
                             reset_automorphism(automorphism.get_array(), &automorphism_supp);
                             color_diff_automorphism(g->v_size, local_state.c->vertex_to_col, leaf_color.lab,
                                                     automorphism.get_array(), &automorphism_supp);
-                            found_auto = R->certify_automorphism_sparse(g, initial_colors.get_array(),
+                            found_auto = R->certify_automorphism_sparse(g, initial_colors,
                                                                           automorphism.get_array(),
                                                                           automorphism_supp.cur_pos,
                                                                           automorphism_supp.get_array());
@@ -734,22 +725,100 @@ namespace dejavu {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // TODO high-level strategy
-    //  - full restarts, change selector, but make use previously computed automorphisms (maybe inprocess) -- goal:
-    //    stable performance
+    //  - full restarts, change selector, but make use of previously computed automorphisms (maybe inprocess) -- goal:
+    //    stable, single-threaded performance
     //  - exploit strengths of DFS, random walks, BFS, and their synergies
+    //  - try to use no-pruning DFS to fill up available leafs more efficiently
+
+    /**
+     * The dejavu solver.
+     */
     class dejavu2 {
     private:
-        sassy::preprocessor _prep;
-        dfs_ir    _dfs;
-        bfs_ir    _bfs;
-        random_ir _rand;
-        schreier  _schreier;
-        ir_tree   _tree;
+        // high-level modules of the algorithm
+        sassy::preprocessor m_prep;   /**< preprocessor */
+        dfs_ir    m_dfs;              /**< depth-first search */
+        bfs_ir    m_bfs;              /**< breadth-first search */
+        random_ir m_rand;             /**< randomized search */
 
-        selector_factory _selectors;
+        // utility tools used by other modules
+        refinement m_refinement;      /**< workspace for color refinement and other utilities */
+        selector_factory m_selectors; /**< cell selector creation */
+        schreier  m_schreier;         /**< Schreier-Sims algorithm */
+        ir_tree   m_tree;             /**< IR-tree */
+
+        // TODO: should not be necessary in the end!
+        void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
+            gg->v = g->v;
+            gg->d = g->d;
+            gg->e = g->e;
+            gg->v_size = g->v_size;
+            gg->d_size = g->d_size;
+            gg->e_size = g->e_size;
+        }
+        // TODO: should not be necessary in the end!
+        void transfer_sassy_sgraph_to_sgraph(sgraph* g, sassy::sgraph* gg) {
+            g->v = gg->v;
+            g->d = gg->d;
+            g->e = gg->e;
+            g->v_size = gg->v_size;
+            g->d_size = gg->d_size;
+            g->e_size = gg->e_size;
+        }
 
     public:
-        void automorphisms(sgraph* g, coloring* c, dejavu_hook hook) {
+        /**
+         * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
+         * using the function pointer \p hook.
+         * @param g The graph.
+         * @param colmap The vertex coloring of \p g. A null pointer is admissible as the trivial coloring.
+         * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
+         *
+         * @todo return automorphism group size
+         */
+        void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
+            std::cout << "dejavu2" << std::endl;
+
+            // TODO facilities for restarts
+            
+            // preprocess the graph using sassy
+            sassy::sgraph gg;
+            transfer_sgraph_to_sassy_sgraph(g, &gg);
+            m_prep.reduce(&gg, colmap, hook);
+            transfer_sassy_sgraph_to_sgraph(g, &gg);
+
+            // initialize a coloring using colors of preprocessed graph
+            coloring local_coloring;
+            g->initialize_coloring(&local_coloring, colmap);
+
+            // setup a local state for IR computations
+            trace local_trace;
+            ir_controller local_state(&local_coloring, &local_trace);
+
+            // find a selector, moves local_state to a leaf
+            m_selectors.find_base(&m_refinement, g, &local_state);
+            std::cout << "trace length: " << local_trace.get_position() << std::endl;
+
+            // depth-first search starting from the computed leaf in local_state
+            m_dfs.setup(0, &m_refinement, nullptr);
+            const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
+            if(dfs_reached_level == 0) {
+                /*long double add_grp_sz = D.grp_sz_man;
+                while(add_grp_sz > 10) {
+                    a.grp_sz_exp += 1;
+                    add_grp_sz = add_grp_sz / 10;
+                }
+                a.grp_sz_exp += D.grp_sz_exp;
+                a.grp_sz_man *= add_grp_sz;*/
+                std::cout << "DFS finished graph" << std::endl;
+                return;
+            }
+
+            // intertwined random automorphisms and breadth-first search
+
+            // random automorphisms
+
+            // breadth-first search
 
         }
     };

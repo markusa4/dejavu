@@ -4,37 +4,37 @@
 #include <vector>
 #include <cassert>
 
-#define TRACE_MARKER_INDIVIDUALIZE     (-1)
-#define TRACE_MARKER_REFINE_START      (-2)
-#define TRACE_MARKER_REFINE_END        (-3)
-#define TRACE_MARKER_REFINE_CELL_START (-4)
-#define TRACE_MARKER_REFINE_CELL_END   (-5)
-
 namespace dejavu {
+
+    #define TRACE_MARKER_INDIVIDUALIZE     (-1)
+    #define TRACE_MARKER_REFINE_START      (-2)
+    #define TRACE_MARKER_REFINE_END        (-3)
+    #define TRACE_MARKER_REFINE_CELL_START (-4)
+    #define TRACE_MARKER_REFINE_CELL_END   (-5)
 
     /**
      * Class that serves to store and compare the trace of a walk in an individualization-refinement tree. The class
      * provides several different modes in which information is recorded and/or compared.
      *
      * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a full
-     * trace and recording a hash invariant as soon as the new computation deviates from the stored trace.
+     * trace and recording a hash invariant as soon as the new computation deviates from the stored trace (see also
+     * \sa dejavu::ir_mode).
      *
-     * While comparing to a stored trace, the class facilitates the use of the blueprint heuristic, which enables
+     * While comparing to a stored trace (2, 3), the class facilitates the use of the blueprint heuristic, which enables
      * skipping of non-splitting cells in the stored trace.
     */
     class trace {
-    protected:
-        std::vector<int> data;
-
-    private:
         // the trace
-        trace *compare_trace = nullptr;
-        long hash;
+    protected:
+        std::vector<int> data; /**< keeps all the data of the trace */
+    private:
+        trace *compare_trace = nullptr; /**< link to a stored trace to compare to */
+        long hash = 0; /**< hash value to summarize all operations performed on this trace */
 
         // mode
-        bool compare = false;
+        bool compare = false; /** whether to compare operations to a stored trace*/
         bool freeze  = false;
-        bool record  = false;
+        bool record  = false; /** whether to record a trace */
 
         // housekeeping
         int cell_act_spot = -1;
@@ -64,28 +64,44 @@ namespace dejavu {
             ++position;
         }
     public:
-        // recording & comparing
+        /**
+         * Records an individualization.
+         * @param color The color being individualized.
+         */
         void op_individualize(int color) {
             assert(color >= 0);
             write_compare(TRACE_MARKER_INDIVIDUALIZE);
             write_compare(color);
         }
 
+        /**
+         * Records the start of a refinement.
+         */
         void op_refine_start() {
             assert(!assert_refine_act);
             write_compare(TRACE_MARKER_REFINE_START);
             assert_refine_act = true;
         }
 
-        void op_refine_cell_start(int old_color) {
+        /**
+         * Records the start of a refinement with respect to a color.
+         * @param color The color in respect to which the coloring is refined.
+         */
+        void op_refine_cell_start(int color) {
             assert(!assert_cell_act);
             write_compare(TRACE_MARKER_REFINE_CELL_START);
-            cell_old_color = old_color;
+            cell_old_color = color;
             cell_act_spot = data.size();
             write_skip_compare(false);
             assert_cell_act = true;
         }
 
+        /**
+         * Records a that a new color appeared while refining with respect to a color.
+         * @param new_color The new color that was refined.
+         * @param new_color_size The size of the new color.
+         * @param new_color_deg The color degree which lead to the new color class.
+         */
         void op_refine_cell_record(int new_color, int new_color_size, int new_color_deg) {
             assert(assert_cell_act);
             write_compare(new_color);
@@ -95,12 +111,18 @@ namespace dejavu {
                 data[cell_act_spot] = true;
         }
 
+        /**
+         * Records the end of a refinement with respect to a color.
+         */
         void op_refine_cell_end() {
             assert(assert_cell_act);
             assert_cell_act = false;
             write_compare(TRACE_MARKER_REFINE_CELL_END);
         }
 
+        /**
+         * Records the end of a refinement.
+         */
         void op_refine_end() {
             assert(!assert_cell_act);
             assert(assert_refine_act);
@@ -108,7 +130,12 @@ namespace dejavu {
             write_compare(TRACE_MARKER_REFINE_END);
         }
 
-        // blueprint usage
+        /**
+         * Only applicable if we are currently comparing to a stored trace (if \a compare is set).
+         *
+         * @return Determines whether in the stored trace, the next color in respect to which was refined created new colors
+         * (i.e., whether the next color is splitting).
+         */
         bool blueprint_is_next_cell_active() {
             if(!compare)
                 return true;
@@ -123,6 +150,12 @@ namespace dejavu {
             return compare_trace->data[read_pt];
         }
 
+        /**
+         * Only applicable if we are currently comparing to a stored trace (if \a compare is set).
+         *
+         * Skips the \a position to the start of the next refinement with respect to a color. To be used after
+         * \a blueprint_is_next_cell_active() determined the current color to be non-splitting.
+         */
         void blueprint_skip_to_next_cell() {
             assert(compare_trace->data[position] == TRACE_MARKER_REFINE_CELL_START);
             while(compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
@@ -132,7 +165,9 @@ namespace dejavu {
             ++position;
         }
 
-        // rewind the invariant to last individualization
+        /**
+         * Rewinds the \a position to the previous individualization.
+         */
         void rewind_to_individualization() {
             if(record) {
                 int read_pt = data.size() - 1;
@@ -151,7 +186,11 @@ namespace dejavu {
             }
         }
 
-        // skip the invariant to next individualization
+        /**
+         * Only applicable if we are currently comparing to a stored trace (if \a compare is set).
+         *
+         * Skips the \a position to the next individualization in the \a compare_trace.
+         */
         void skip_to_individualization() {
             assert_cell_act   = false;
             assert_refine_act = false;
@@ -164,30 +203,51 @@ namespace dejavu {
             }
         }
 
-        // compare to other traces
+        /**
+         * Stores a new trace to compare to.
+         *
+         * @param compare_trace
+         */
         void set_compare_trace(trace *compare_trace) {
             this->compare_trace = compare_trace;
             compare_trace->freeze = true;
         }
 
+        /**
+         * Determines whether we want to compare the following operations with those of the trace stored in
+         * \a compare_trace.
+         *
+         * @param compare
+         */
         void set_compare(bool compare) {
             this->compare = compare;
         }
 
+        /**
+         * @return A hash value summarizing the operations recorded in this trace.
+         */
         long get_hash() {
             return hash;
         }
 
+        /**
+         * Sets the hash value to a pre-determined value.
+         * @param hash The hash value.
+         */
         void set_hash(long hash) {
             this->hash = hash;
         }
 
-        // does this deviate from compare trace yet?
+        /**
+         * @return Whether the recorded operations deviated from the stored trace in \a compare_trace.
+         */
         bool trace_equal() {
             return comp;
         }
 
-        // reset comparison failure
+        /**
+         * Resets the trace to find new deviations from the stored trace.
+         */
         void reset_trace_equal() {
             comp = true;
         }

@@ -748,7 +748,7 @@ public:
      * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used to stop
      * refinement early.
      * @param worklist_hook Function pointer that is called whenever a color class is considered for refinement. Return value
-     * Can be used to skip refinement of that color class.
+     * can be used to skip refinement of that color class.
      */
     void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
