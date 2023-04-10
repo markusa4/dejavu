@@ -13,17 +13,17 @@ namespace dejavu {
 
     /**
      * \brief Mode of trace for IR search
+     *
      * The ir_mode determines in which mode the trace is used: whether a new trace is recorded, or whether the current
      * computation is compared to a stored trace.
      *
      */
-    enum ir_mode { IR_MODE_COMPARE_TRACE, IR_MODE_RECORD_TRACE, IR_MODE_RECORD_HASH};
-
+    enum ir_mode { IR_MODE_COMPARE_TRACE, IR_MODE_RECORD_TRACE, IR_MODE_RECORD_HASH_IRREVERSIBLE};
 
     /**
-     * int type_selector_hook(const coloring* c, const int base_pos);
+     * int type_selector_hook(coloring* c, const int base_pos);
      */
-    typedef bool type_selector_hook(const coloring*, const int, const int);
+    typedef int type_selector_hook(const coloring*, const int);
 
     // reset internal automorphism structure to the identity
     static void  reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
@@ -56,6 +56,11 @@ namespace dejavu {
         work_list automorphism_supp;
         int domain_size;
     public:
+        /**
+         * Initializes the stored automorphism to the identity.
+         *
+         * @param domain_size Size of the domain on which automorphisms operate
+         */
         sparse_automorphism_workspace(int domain_size) {
             automorphism.initialize(domain_size);
             for(int i = 0; i < domain_size; ++i)
@@ -64,12 +69,27 @@ namespace dejavu {
             this->domain_size = domain_size;
         }
 
-        void wr_color_diff(const int* vertex_to_col, const int* col_to_vertex) {
+        /**
+         * Create automorphism from two given vertex colorings.
+         *
+         * @param vertex_to_col a vertex-to-color mapping which describes the first coloring
+         * @param col_to_vertex a color-to-vertex mapping which describes the second coloring
+         */
+        void write_color_diff(const int* vertex_to_col, const int* col_to_vertex) {
             color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
                                     &automorphism_supp);
         }
 
-        void  wr_singleton(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end) {
+        /**
+         * Create automorphism from two canonically-ordered vectors of singletons. The resulting automorphism maps
+         * \p singletons1[i] to \p singletons2[i] for i in \p pos_start, ..., \p pos_end.
+         *
+         * @param singletons1 first vector of singletons
+         * @param singletons2 second vector of singletons
+         * @param pos_start start reading the vectors at this position
+         * @param pos_end stop reading the vecvtors at this position.
+         */
+        void  write_singleton(std::vector<int>* singletons1, std::vector<int>* singletons2, int pos_start, int pos_end) {
             for(int i = pos_start; i < pos_end; ++i) {
                 const int from = (*singletons1)[i];
                 const int to   = (*singletons2)[i];
@@ -81,16 +101,30 @@ namespace dejavu {
             }
         }
 
+        /**
+         * Reset the contained automorphism back to the identity.
+         */
         void reset() {
             reset_automorphism(automorphism.get_array(), &automorphism_supp);
         }
 
+        /**
+         * @return Integer array \p p describing the stored automorphism, where point v is mapped to \p p[v].
+         */
         int* perm() {
             return automorphism.get_array();
         }
+
+        /**
+         * @return Integer array which contains all vertices in the support of the contained automorphism.
+         */
         int* support() {
             return automorphism_supp.get_array();
         }
+
+        /**
+         * @return Size of the support.
+         */
         int nsupport() {
             return automorphism_supp.cur_pos;
         }
@@ -108,28 +142,55 @@ namespace dejavu {
         // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
         // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
 
-        std::vector<int> base_vertex;
-        coloring c;
-        long     invariant = 0;
+        std::vector<int> base_vertex; /**< base of vertices of this IR node (optional) */
+        coloring c; /**< vertex coloring of this IR node */
+        long     invariant = 0; /**< hash of invariant of this IR node */
+        int      trace_position = 0; /**< position of trace of this IR node */
+        int      base_position = 0; /**< length of base of this IR node */
     public:
-        void set_state(std::vector<int>& base_vertex, coloring& c, long invariant) {
+        void set_state(std::vector<int>& base_vertex, coloring& c, long invariant, int trace_position, int base_position) {
             this->base_vertex = base_vertex;
             this->c.copy(&c);
             this->invariant = invariant;
+            this->trace_position = trace_position;
+            this->base_position  = base_position;
         }
 
         coloring* get_coloring() {
             return &c;
         }
 
+        /**
+         * @return hash of invariant of this IR node
+         */
         long get_invariant_hash() {
             return invariant;
         }
+
+        /**
+         * @return position of trace of this IR node
+         */
+        int get_trace_position() {
+            return trace_position;
+        }
+
+        /**
+         * @return length of base of this IR node
+         */
+        int get_base_position() {
+            return base_position;
+        }
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// IR CONTROL                                                                                                  ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * \brief Controls movement in IR tree
+     *
+     * Keeps a state of an IR node. Enables the movement to a child of the node, or to the parent of the node.
+     * The controller manages data structures and functions, which facilitate the trace \a T as well as the reversal of
+     * color refinement.
+     *
+     * Has different modes (managed by \a mode) depending on whether color refinement should be reversible or not.
+     */
     struct ir_controller {
         coloring*    c = nullptr;
         trace*       T = nullptr;
@@ -186,18 +247,31 @@ namespace dejavu {
         }
 
         // TODO incomplete state save for BFS & random reset
-        void save_state(ir_reduced_save& state) {
-            state.set_state(base_vertex, *c, T->get_hash());
+        void save_reduced_state(ir_reduced_save& state) {
+            state.set_state(base_vertex, *c, T->get_hash(), T->get_position(), base_pos);
         }
 
         // TODO incomplete state load for BFS & random reset
-        void load_state(ir_reduced_save& state) {
+        void load_reduced_state(ir_reduced_save& state) {
             c->copy(state.get_coloring());
             T->set_hash(state.get_invariant_hash());
+            T->set_position(state.get_trace_position());
+            base_pos = state.get_base_position();
+
+            // deactivate reversability
+            mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
         }
 
         coloring* get_coloring() {
             return c;
+        }
+
+        int get_base_pos() {
+            return base_pos;
+        }
+
+        int set_base_pos(int pos) {
+            base_pos = pos;
         }
 
         bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
@@ -211,16 +285,18 @@ namespace dejavu {
                 h_hint_color_is_singleton_now = true;
             }
 
-            // write singletons to singleton list
-            if(new_color_sz == 1) {
-                singletons.push_back(c->lab[new_color]);
-            }
+            if(mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
+                // write singletons to singleton list
+                if (new_color_sz == 1) {
+                    singletons.push_back(c->lab[new_color]);
+                }
 
-            // record colors that were changed
-            if(!touched_color.get(new_color)) {
-                touched_color.set(new_color);
-                prev_color_list.push_back(old_color);
-                touched_color_list.push_back(new_color);
+                // record colors that were changed
+                if (!touched_color.get(new_color)) {
+                    touched_color.set(new_color);
+                    prev_color_list.push_back(old_color);
+                    touched_color_list.push_back(new_color);
+                }
             }
 
             // record split into trace invariant, unless we are individualizing
@@ -260,13 +336,22 @@ namespace dejavu {
             return std::bind(&ir_controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
         }
 
-        // move this to static functions
+        /**
+         * Move IR node kept in this controller to a child, specified by a vertex to be individualized.
+         *
+         * @param R a refinement workspace
+         * @param g the graph
+         * @param v the vertex to be individualized
+         */
         void move_to_child(refinement* R, sgraph* g, int v) {
             ++base_pos;
-            base_singleton_pt.push_back(singletons.size());
-            base_vertex.push_back(v);
-            base_color.push_back(c->vertex_to_col[v]);
-            base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
+
+            if(mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
+                base_singleton_pt.push_back(singletons.size());
+                base_vertex.push_back(v);
+                base_color.push_back(c->vertex_to_col[v]);
+                base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
+            }
 
             assert(!h_cell_active);
 
@@ -284,16 +369,22 @@ namespace dejavu {
                 if(T && h_cell_active) T->op_refine_cell_end();
                 if(T) T->op_refine_end();
             } else {
+                // TODO compare_base_cells not necessarily applicable
                 R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos-1], my_split_hook, my_worklist_hook);
                 if(T) T->skip_to_individualization();
             }
 
             h_cell_active = false;
 
-            base_cells.push_back(c->cells);
+            if(mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) base_cells.push_back(c->cells);
         }
 
-        void   __attribute__ ((noinline)) move_to_parent() {
+        /**
+         * Move IR node kept in this controller back to its parent.
+         */
+        void move_to_parent() {
+            assert(mode != IR_MODE_RECORD_HASH_IRREVERSIBLE);
+
             // unwind invariant
             if(T) T->rewind_to_individualization();
 
@@ -349,6 +440,9 @@ namespace dejavu {
         // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
         int locked_lim = 512;
 
+        std::vector<int> saved_color_base;
+        std::function<type_selector_hook> dynamic_seletor;
+
     public:
         mark_set test_set;
 
@@ -360,10 +454,27 @@ namespace dejavu {
         // TODO configuration of dynamic selector when deviating from base
 
         /**
+         *
+         */
+         int dynamic_selector(const coloring * c, const int base_pos) {
+             if(base_pos >= 0 && base_pos < saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0) {
+                 return saved_color_base[base_pos];
+             }
+            for (int i = 0; i < c->ptn_sz;) {
+                if (c->ptn[i] > 0) {
+                    return i;
+                }
+                i += c->ptn[i] + 1;
+            }
+            return -1;
+         }
+
+        /**
          * @return A selector hook based on the saved base and configured dynamic selector.
          */
         std::function<type_selector_hook>* get_selector_hook() {
-
+            dynamic_seletor = std::bind(&selector_factory::dynamic_selector, this, std::placeholders::_1, std::placeholders::_2);
+            return &dynamic_seletor;
         }
 
         void  __attribute__ ((noinline)) find_base(refinement* R, sgraph* g, ir_controller* state) {
@@ -470,6 +581,8 @@ namespace dejavu {
                 state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
                 //std::cout << "picked color " << best_color << " score " << best_score << " among " << num_tested << " colors" << ", cells: " << state->c->cells << "/" << g->v_size << std::endl;
             }
+
+            saved_color_base = state->base_color;
             return;
         }
 
@@ -523,36 +636,116 @@ namespace dejavu {
 
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// SCHREIER-SIMS                                                                                               ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    class stored_automorphism {
+        enum stored_automorphism_type {STORE_DENSE, STORE_SPARSE, STORE_BOTH};
 
-    // TODO implement sparse schreier-sims for fixed base
-    // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
+        std::vector<int> sparse_cycles;
+        std::vector<int> dense_map;
+
+        stored_automorphism_type store_type;
+
+    };
+
+    class stored_transversal {
+        enum stored_transversal_type {STORE_DENSE, STORE_SPARSE, STORE_BOTH};
+
+        std::mutex lock_transversal;          /**< locks this transversal */
+
+        int fixed;
+
+        std::vector<int> fixed_orbit;         /**< contains vertices of orbit at this schreier level */
+        std::vector<int> fixed_orbit_to_perm; /**< maps fixed_orbit[i] to generators[i] in class \ref schreier. */
+        std::vector<int> fixed_orbit_to_pwr;  /**< power that needs to be applied to generators[i] in class \ref schreier. */
+
+        stored_transversal_type store_type = STORE_SPARSE; /**< whether above structures are stored dense or sparse */
+
+        std::pair<int, int>& get_generator_pwr(int v) {
+
+        }
+
+    public:
+        /**
+         * @param automorphism
+         * @return whether transversal was extended
+         */
+        bool extend_with_automorphism(sparse_automorphism_workspace& automorphism) {
+
+        }
+
+        /**
+         * @param automorphism
+         * @return whether transversal was extended
+         */
+        bool fix_automorphism(sparse_automorphism_workspace& automorphism) {
+
+        }
+
+
+        // TODO: flip to dense over certain threshold -- could also include "semi-dense" with sorted list or hash
+    };
+
+    /**
+     * \brief Schreier structure with fixed base.
+     *
+     * Enables sifting of automorphisms into a Schreier structure with fixed base. Can be used across multiple threads
+     * in a safe manner, i.e., the structure can lock appropriate parts of itself.
+     *
+     */
     class schreier {
-        bool sift(int* automorphism, work_list* automorphism_supp) {
+        // TODO implement sparse schreier-sims for fixed base
+        // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
 
+        std::mutex lock_generators;          /**< locks the generators */
+
+        std::vector<stored_automorphism> generators; /** list of generators */
+        std::vector<stored_transversal>  transversals;
+
+    public:
+        /**
+         * Sift automorphism into the schreier structure.
+         *
+         * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
+         * @return Whether automorphism was added to the schreier structure or not.
+         */
+        bool sift(sparse_automorphism_workspace& automorphism) {
+            bool changed = false;
+
+            // TODO:
+            for(int level = 0; level < transversals.size(); ++level) {
+                if(transversals[level].extend_with_automorphism(automorphism)) {
+                    changed = true;
+                    // TODO: copy add to generators
+                    // TODO: maybe re-arrange, dependencies are weird
+                }
+                const bool is_identity = transversals[level].fix_automorphism(automorphism);
+                if(is_identity)
+                    break;
+            }
+            return changed;
         }
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// BFS                                                                                                         ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // TODO implement new, simpler bfs
-    // TODO depends on ir_tree, and selector
+
+    /**
+     * \brief Breadth-first search.
+     */
     class bfs_ir {
-
+        // TODO implement new, simpler bfs
+        // TODO depends on ir_tree, and selector
     };
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// RANDOM IR                                                                                                   ///
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    // TODO implement dejavu strategy, more simple
-    // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
+    /**
+     * \brief IR search using random walks.
+     *
+     * Performs random walks of the IR tree, sifting resulting automorphisms into the given Schreier structure. If the
+     * Schreier structure is complete with respect to the base, or the probabilistic abort criterion satisfied, the
+     * process terminates. The algorithm guarantees to find all automorphisms up to the specified error bound.
+     *
+     * Alternatively, a limit for the amount of discovered differing leafs can be set.
+     */
     class random_ir {
-
+        std::default_random_engine generator;
         // TODO leaf storage, maybe do extra class that can be shared across threads
 
     public:
@@ -560,10 +753,27 @@ namespace dejavu {
 
         }
 
+        // TODO implement dejavu strategy, more simple
+        // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
         // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
-        void random_walks(schreier& group, ir_controller& local_state, ir_reduced_save& start_from) {
-            local_state.load_state(start_from);
+        void random_walks(refinement& R, std::function<type_selector_hook>* selector, sgraph* g, schreier& group,
+                          ir_controller& local_state, ir_reduced_save& start_from) {
+            std::cout << "random walks" << std::endl;
 
+            for(int i = 0; i < 50; ++i ) {
+                local_state.load_reduced_state(start_from);
+                int base_pos = local_state.base_pos;
+                while (g->v_size != local_state.c->cells) {
+                    const int col = (*selector)(local_state.c, base_pos);
+                    const int col_sz = local_state.c->ptn[col] + 1;
+                    const int rand = ((int) generator()) % col_sz;
+                    const int v = local_state.c->lab[col + rand];
+                    local_state.move_to_child(&R, g, v);
+                    ++base_pos;
+                }
+
+                std::cout << "leaf " << local_state.T->get_hash() << std::endl;
+            }
             // TODO continue...
         }
     };
@@ -601,8 +811,9 @@ namespace dejavu {
                     return {false, false};
                 const int ind_v = state->c->lab[col];
                 state->move_to_child(R, g, ind_v);
-                automorphism.wr_singleton(&state->compare_singletons, &state->singletons,
-                                          state->base_singleton_pt[state->base_singleton_pt.size()-1], state->singletons.size());
+                automorphism.write_singleton(&state->compare_singletons, &state->singletons,
+                                             state->base_singleton_pt[state->base_singleton_pt.size() - 1],
+                                             state->singletons.size());
                 //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
                 //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
@@ -731,10 +942,10 @@ namespace dejavu {
                     local_state.move_to_child(R, g, ind_v);
                     bool found_auto = false;
                     //if(local_state.h_last_refinement_singleton_only) {
-                    pautomorphism.wr_singleton(&local_state.compare_singletons, &local_state.singletons,
-                                               local_state.base_singleton_pt[
-                                                       local_state.base_singleton_pt.size() - 1],
-                                               local_state.singletons.size());
+                    pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
+                                                  local_state.base_singleton_pt[
+                                                          local_state.base_singleton_pt.size() - 1],
+                                                  local_state.singletons.size());
                     found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
                                                                 pautomorphism.nsupport(),
                                                                 pautomorphism.support());
@@ -749,7 +960,7 @@ namespace dejavu {
                         found_auto = (rec_succeeded.first && rec_succeeded.second);
                         if (rec_succeeded.first && !rec_succeeded.second) {
                             pautomorphism.reset();
-                            pautomorphism.wr_color_diff(local_state.c->vertex_to_col, leaf_color.lab);
+                            pautomorphism.write_color_diff(local_state.c->vertex_to_col, leaf_color.lab);
                             found_auto = R->certify_automorphism_sparse(g, initial_colors,
                                                                           pautomorphism.perm(),
                                                                           pautomorphism.nsupport(),
@@ -797,7 +1008,7 @@ namespace dejavu {
     /**
      * \brief The dejavu solver.
      *
-     * Contains the high-level strategy of the dejavu solver, controlling the interaction between the different modules
+     * Contains the high-level strategy of the dejavu solver, controlling the interactions between the different modules
      * of the solver.
      */
     class dejavu2 {
@@ -875,11 +1086,13 @@ namespace dejavu {
 
             // save root state for random and BFS search
             ir_reduced_save root_save;
-            local_state.save_state(root_save);
+            local_state.save_reduced_state(root_save);
 
             // find a selector, moves local_state to a leaf of IR tree
             m_selectors.find_base(&m_refinement, g, &local_state);
+            std::function<type_selector_hook>* current_selector = m_selectors.get_selector_hook();
             std::cout << "trace length: " << local_trace.get_position() << std::endl;
+            std::cout << "leaf " << local_state.T->get_hash() << std::endl;
 
             // depth-first search starting from the computed leaf in local_state
             m_dfs.setup(0, &m_refinement, nullptr);
@@ -893,14 +1106,14 @@ namespace dejavu {
                 a.grp_sz_exp += D.grp_sz_exp;
                 a.grp_sz_man *= add_grp_sz;*/
                 std::cout << "DFS finished graph" << std::endl;
-                return;
+                //return;
             }
 
             // intertwined random automorphisms and breadth-first search
 
             // random automorphisms
             m_rand.setup(h_error_prob, h_limit_leaf);
-            m_rand.random_walks(m_schreier, local_state, root_save);
+            m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
 
             // breadth-first search
 

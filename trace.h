@@ -48,7 +48,12 @@ namespace dejavu {
         int  position = 0;
         bool comp = true;
 
+        void add_to_hash(int d) {
+            hash += (d * (352355 - d * 3));
+        }
+
         void write_compare(int d) {
+            add_to_hash(d);
             if (record)
                 data.push_back(d);
             if (compare) {
