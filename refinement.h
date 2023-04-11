@@ -4,7 +4,6 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "invariant.h"
-#include "trace.h"
 #include "configuration.h"
 #include "utility.h"
 #include <list>
@@ -89,7 +88,9 @@ public:
         initialize(size);
     }
     void initialize(int size) {
-        arr     = new T[size];
+        assert(!init);
+        //arr     = new T[size];
+        arr     = (T*) malloc(sizeof(T) * size);
         arr_sz  = size;
         init     = true;
         cur_pos = 0;
@@ -121,13 +122,22 @@ public:
         return cur_pos == 0;
     }
 
+    void set_size(const int size) {
+        cur_pos = size;
+    }
+
+    int size() {
+        return cur_pos;
+    }
+
     void reset() {
         cur_pos = 0;
     }
 
     ~work_list_t() {
         if(init) {
-            delete[] arr;
+            //delete[] arr;
+            free(arr);
         }
     }
 
@@ -511,17 +521,14 @@ public:
                          std::vector<int>* early_individualized, mark_set* touched_color,
                          work_list* touched_color_list) {
         return refine_coloring(g, c, I, init_color_class, m, cell_early, individualize_early, early_individualized, touched_color,
-                               touched_color_list, nullptr, nullptr, nullptr, nullptr);
+                               touched_color_list, nullptr, nullptr, nullptr);
     }
     bool refine_coloring(sgraph *g, coloring *c, invariant *I,
                          int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
                          std::vector<int>* early_individualized, mark_set* touched_color,
-                         work_list* touched_color_list, work_list* prev_color_list, dejavu::trace* trace,
+                         work_list* touched_color_list, work_list* prev_color_list,
                          std::function<type_split_color_hook> split_hook, std::function<type_worklist_color_hook> worklist_hook) {
         bool comp = true;
-
-        if(trace)
-            trace->op_refine_start();
 
         singleton_hint.reset();
         int individualize_pos = individualize_early;
@@ -560,9 +567,6 @@ public:
             if(m)
                 m->color_refinement_cost += next_color_class_sz;
             comp = I->write_top_and_compare(INV_MARK_STARTCELL, true) && comp;
-
-            if(trace)
-                trace->op_refine_cell_start(next_color_class);
 
             if(worklist_hook && !worklist_hook(next_color_class, next_color_class_sz))
                 continue;
@@ -633,10 +637,6 @@ public:
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
 
-                if(trace) {
-                    trace->op_refine_cell_record(new_class, c->ptn[new_class], 1);
-                }
-
                 if(split_hook) {
                     const bool res = split_hook(old_class, new_class, c->ptn[new_class]+1);
                     if(!res) {
@@ -687,9 +687,6 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
-            if(trace)
-                trace->op_refine_cell_end();
-
             // detection if coloring is discrete
             if(c->cells == g->v_size) {
                 //const int new_cells = c->cells - pre_cells;
@@ -732,8 +729,6 @@ public:
             comp = I->write_top_and_compare(INV_MARK_ENDREF, true) && comp;
         }
 
-        if(trace)
-            trace->op_refine_end();
         return comp;
     }
 

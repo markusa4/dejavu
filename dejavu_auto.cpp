@@ -1,11 +1,10 @@
 #include <iostream>
+#include "configuration.h"
 #include "parser.h"
 #include "dejavu_auto.h"
-#include <assert.h>
-#include "configuration.h"
+#include <cassert>
 #include <chrono>
 #include <string>
-#include <fstream>
 
 typedef std::chrono::high_resolution_clock Clock;
 

@@ -3,11 +3,11 @@
 
 #include <random>
 #include <chrono>
+#include "refinement.h"
+#include "bijection.h"
+#include "coloring.h"
 #include "sgraph.h"
-#include "invariant.h"
-#include "selector.h"
-#include "bfs.h"
-#include "schreier_sequential.h"
+#include "trace.h"
 
 namespace dejavu {
 
@@ -24,6 +24,20 @@ namespace dejavu {
      * int type_selector_hook(coloring* c, const int base_pos);
      */
     typedef int type_selector_hook(const coloring*, const int);
+
+
+    static void progress_print_header() {
+
+        PRINT("________________________________________________________________");
+        PRINT(std::setw(16) << std::left <<"T (ms)"                                  << std::setw(16) << "proc"  << std::setw(16) << "P1"        << std::setw(16)        << "P2");
+        PRINT("________________________________________________________________");
+        PRINT(std::setw(16) << std::left << 0 << std::setw(16) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
+    }
+
+    static void progress_print(const std::string proc, const std::string p1, const std::string p2) {
+        static std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+        PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+    }
 
     // reset internal automorphism structure to the identity
     static void  reset_automorphism(int* rautomorphism, work_list* automorphism_supp) {
@@ -47,7 +61,7 @@ namespace dejavu {
     }
 
     /**
-     * \brief Workspace to sparse automorphisms
+     * \brief Workspace for sparse automorphisms
      *
      * Enables O(1) lookup on a sparse automorphism by using an O(n) workspace.
      */
@@ -636,394 +650,456 @@ namespace dejavu {
 
     };
 
-    class stored_automorphism {
-        enum stored_automorphism_type {STORE_DENSE, STORE_SPARSE, STORE_BOTH};
+    namespace group_structure {
 
-        std::vector<int> sparse_cycles;
-        std::vector<int> dense_map;
-
-        stored_automorphism_type store_type;
-
-    };
-
-    class stored_transversal {
-        enum stored_transversal_type {STORE_DENSE, STORE_SPARSE, STORE_BOTH};
-
-        std::mutex lock_transversal;          /**< locks this transversal */
-
-        int fixed;
-
-        std::vector<int> fixed_orbit;         /**< contains vertices of orbit at this schreier level */
-        std::vector<int> fixed_orbit_to_perm; /**< maps fixed_orbit[i] to generators[i] in class \ref schreier. */
-        std::vector<int> fixed_orbit_to_pwr;  /**< power that needs to be applied to generators[i] in class \ref schreier. */
-
-        stored_transversal_type store_type = STORE_SPARSE; /**< whether above structures are stored dense or sparse */
-
-        std::pair<int, int>& get_generator_pwr(int v) {
-
-        }
-
-    public:
         /**
-         * @param automorphism
-         * @return whether transversal was extended
+         * \brief Stores an automorphism in a dynamically dense or sparse manner.
          */
-        bool extend_with_automorphism(sparse_automorphism_workspace& automorphism) {
+        class stored_automorphism {
+            enum stored_automorphism_type {
+                STORE_DENSE, STORE_SPARSE, STORE_BOTH
+            };
 
-        }
+            std::vector<int> sparse_cycles;
+            std::vector<int> dense_map;
+
+            stored_automorphism_type store_type;
+
+        public:
+            /**
+             * Use the stored automorphism \a p and a given power \p pwr to multiply p^pwr to the given automorphism.
+             *
+             * @param automorphism automorphism to multiply p^pwr to
+             * @param pwr the power used as described above
+             */
+            void multiply_to(sparse_automorphism_workspace &automorphism, const int pwr) {
+                // TODO: load sparse_cycles into a separate workspace?
+            }
+        };
+
+        class stored_generators {
+            std::mutex lock_generators;          /**< locks the generators */
+            std::vector<stored_automorphism> generators; /** list of generators */
+
+            int add_generator(sparse_automorphism_workspace& automorphism) {
+
+            }
+
+            stored_automorphism& get_generator(const int num) {
+
+            }
+        };
+
+        class stored_transversal {
+            enum stored_transversal_type {
+                STORE_DENSE, STORE_SPARSE, STORE_BOTH
+            };
+
+            std::mutex lock_transversal;          /**< locks this transversal */
+
+            int fixed;                            /**< vertex fixed by this transversal */
+            int sz_upb;                           /**< upper bound for size of the transversal (e.g. color class size) */
+
+            std::vector<int> fixed_orbit;         /**< contains vertices of orbit at this schreier level */
+            std::vector<int> fixed_orbit_to_perm; /**< maps fixed_orbit[i] to generators[i] in class \ref schreier. */
+            std::vector<int> fixed_orbit_to_pwr;  /**< power that should to be applied to generators[i] in class \ref schreier. */
+
+            stored_transversal_type store_type = STORE_SPARSE; /**< whether above structures are stored dense or sparse */
+
+            std::pair<int, int> &get_generator_pwr(int v) {
+
+            }
+
+        public:
+            void setup(const int fixed_vertex) {
+                fixed = fixed_vertex;
+            }
+            /**
+             * @param generators
+             * @param automorphism
+             * @return whether transversal was extended
+             */
+            bool extend_with_automorphism(stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+
+                return false;
+            }
+
+            /**
+             * @param generators
+             * @param automorphism
+             * @return whether transversal was extended
+             */
+            bool fix_automorphism(stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+
+                return false;
+            }
+
+
+            // TODO: flip to dense over certain threshold -- could also include "semi-dense" with sorted list or hash
+        };
 
         /**
-         * @param automorphism
-         * @return whether transversal was extended
-         */
-        bool fix_automorphism(sparse_automorphism_workspace& automorphism) {
-
-        }
-
-
-        // TODO: flip to dense over certain threshold -- could also include "semi-dense" with sorted list or hash
-    };
-
-    /**
-     * \brief Schreier structure with fixed base.
-     *
-     * Enables sifting of automorphisms into a Schreier structure with fixed base. Can be used across multiple threads
-     * in a safe manner, i.e., the structure can lock appropriate parts of itself.
-     *
-     */
-    class schreier {
-        // TODO implement sparse schreier-sims for fixed base
-        // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
-
-        std::mutex lock_generators;          /**< locks the generators */
-
-        std::vector<stored_automorphism> generators; /** list of generators */
-        std::vector<stored_transversal>  transversals;
-
-    public:
-        /**
-         * Sift automorphism into the schreier structure.
+         * \brief Schreier structure with fixed base.
          *
-         * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
-         * @return Whether automorphism was added to the schreier structure or not.
+         * Enables sifting of automorphisms into a Schreier structure with fixed base. Can be used across multiple threads
+         * in a safe manner, i.e., the structure can lock appropriate parts of itself.
+         *
          */
-        bool sift(sparse_automorphism_workspace& automorphism) {
-            bool changed = false;
+        class schreier {
+            // TODO implement sparse schreier-sims for fixed base
+            // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
+            // TODO could use color sizes for memory allocation, predicting dense/sparse?
 
-            // TODO:
-            for(int level = 0; level < transversals.size(); ++level) {
-                if(transversals[level].extend_with_automorphism(automorphism)) {
-                    changed = true;
-                    // TODO: copy add to generators
-                    // TODO: maybe re-arrange, dependencies are weird
+            stored_generators generators;
+            work_list_t<stored_transversal> transversals;
+
+        public:
+
+            /**
+             * Set up this Schreier structure using the given base. The base is then fixed and can not be adjusted
+             * later on.
+             *
+             * @param base the base
+             * @param stop integer which indicates to stop reading the base at this position
+             */
+            void setup(std::vector<int>& base, const int stop) {
+                assert(base.size() >= stop);
+                transversals.initialize(stop);
+                transversals.set_size(stop);
+                for(int i = 0; i < stop; ++i) {
+                    transversals[i].setup(base[i]);
                 }
-                const bool is_identity = transversals[level].fix_automorphism(automorphism);
-                if(is_identity)
-                    break;
             }
-            return changed;
-        }
-    };
 
+            /**
+             * Sift automorphism into the Schreier structure.
+             *
+             * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
+             * @return Whether automorphism was added to the Schreier structure or not.
+             */
+            bool sift(sparse_automorphism_workspace &automorphism) {
+                bool changed = false;
 
-
-    /**
-     * \brief Breadth-first search.
-     */
-    class bfs_ir {
-        // TODO implement new, simpler bfs
-        // TODO depends on ir_tree, and selector
-    };
-
-    /**
-     * \brief IR search using random walks.
-     *
-     * Performs random walks of the IR tree, sifting resulting automorphisms into the given Schreier structure. If the
-     * Schreier structure is complete with respect to the base, or the probabilistic abort criterion satisfied, the
-     * process terminates. The algorithm guarantees to find all automorphisms up to the specified error bound.
-     *
-     * Alternatively, a limit for the amount of discovered differing leafs can be set.
-     */
-    class random_ir {
-        std::default_random_engine generator;
-        // TODO leaf storage, maybe do extra class that can be shared across threads
-
-    public:
-        void setup(int error, int leaf_store_limit) {
-
-        }
-
-        // TODO implement dejavu strategy, more simple
-        // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
-        // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
-        void random_walks(refinement& R, std::function<type_selector_hook>* selector, sgraph* g, schreier& group,
-                          ir_controller& local_state, ir_reduced_save& start_from) {
-            std::cout << "random walks" << std::endl;
-
-            for(int i = 0; i < 50; ++i ) {
-                local_state.load_reduced_state(start_from);
-                int base_pos = local_state.base_pos;
-                while (g->v_size != local_state.c->cells) {
-                    const int col = (*selector)(local_state.c, base_pos);
-                    const int col_sz = local_state.c->ptn[col] + 1;
-                    const int rand = ((int) generator()) % col_sz;
-                    const int v = local_state.c->lab[col + rand];
-                    local_state.move_to_child(&R, g, v);
-                    ++base_pos;
+                for (int level = 0; level < transversals.size(); ++level) {
+                    changed = transversals[level].extend_with_automorphism(generators, automorphism) || changed;
+                    const bool is_identity = transversals[level].fix_automorphism(generators, automorphism);
+                    if (is_identity) break;
                 }
 
-                std::cout << "leaf " << local_state.T->get_hash() << std::endl;
+                return changed;
             }
-            // TODO continue...
-        }
-    };
+        };
+    }
 
 
-    /**
-     * \brief Depth-first search without backtracking.
-     *
-     * Depth-first IR search which does not backtrack. Can parallelize along the base.
-     * Due to the search not back-tracking, this module can not deal with difficult parts of combinatorial graphs.
-     */
-    class dfs_ir {
-        int         fail_cnt = 0;
-        int         threads  = 1;
-        refinement* R        = nullptr;
-        splitmap*   SM       = nullptr;
-    public:
-        long double grp_sz_man   = 1.0;
-        int grp_sz_exp = 0;
+    namespace search_strategy {
+        /**
+         * \brief Breadth-first search.
+         */
+        class bfs_ir {
+            // TODO implement new, simpler bfs
+            // TODO depends on ir_tree, and selector
+        };
 
-        void setup(int threads, refinement* R, selector* S) {
-            this->R        = R;
-            this->threads  = threads;
-        }
+        /**
+         * \brief IR search using random walks.
+         *
+         * Performs random walks of the IR tree, sifting resulting automorphisms into the given Schreier structure. If the
+         * Schreier structure is complete with respect to the base, or the probabilistic abort criterion satisfied, the
+         * process terminates. The algorithm guarantees to find all automorphisms up to the specified error bound.
+         *
+         * Alternatively, a limit for the amount of discovered differing leafs can be set.
+         */
+        class random_ir {
+            std::default_random_engine generator;
+            // TODO leaf storage, maybe do extra class that can be shared across threads
 
-        std::pair<bool, bool> recurse_to_equal_leaf(sgraph* g, int* initial_colors, ir_controller* state, sparse_automorphism_workspace& automorphism) {
-            bool prev_fail     = false;
-            int  prev_fail_pos = -1;
-            int cert_pos   = 0;
+        public:
+            void setup(int error, int leaf_store_limit) {
 
-            while((size_t) state->base_pos < state->compare_base_color.size()) {
-                const int col = state->compare_base_color[state->base_pos];
-                const int col_sz = state->c->ptn[col] + 1;
-                if(col_sz < 2)
+            }
+
+            // TODO implement dejavu strategy, more simple
+            // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
+            // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
+            void random_walks(refinement &R, std::function<type_selector_hook> *selector, sgraph *g,
+                              group_structure::schreier &group, ir_controller &local_state, ir_reduced_save &start_from) {
+                for (int i = 0; i < 50; ++i) {
+                    local_state.load_reduced_state(start_from);
+                    int base_pos = local_state.base_pos;
+                    while (g->v_size != local_state.c->cells) {
+                        const int col = (*selector)(local_state.c, base_pos);
+                        const int col_sz = local_state.c->ptn[col] + 1;
+                        const int rand = ((int) generator()) % col_sz;
+                        const int v = local_state.c->lab[col + rand];
+                        local_state.move_to_child(&R, g, v);
+                        ++base_pos;
+                    }
+
+                    //std::cout << "leaf " << local_state.T->get_hash() << std::endl;
+                }
+                // TODO continue...
+            }
+        };
+
+
+        /**
+         * \brief Depth-first search without backtracking.
+         *
+         * Depth-first IR search which does not backtrack. Can parallelize along the base.
+         * Due to the search not back-tracking, this module can not deal with difficult parts of combinatorial graphs.
+         */
+        class dfs_ir {
+            int fail_cnt = 0;
+            int threads = 1;
+            refinement *R = nullptr;
+            splitmap *SM = nullptr;
+            trace compare_T;
+
+        public:
+            long double grp_sz_man = 1.0; /**< group size mantissa */
+            int         grp_sz_exp = 0;   /**< group size exponent */
+
+            /**
+             * Setup the DFS module.
+             *
+             * @param threads number of threads we are allowed to dispatch
+             * @param R refinement workspace
+             */
+            void setup(int threads, refinement *R) {
+                this->R = R;
+                this->threads = threads;
+            }
+
+            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, int *initial_colors, ir_controller *state,
+                                                        sparse_automorphism_workspace &automorphism) {
+                bool prev_fail = false;
+                int prev_fail_pos = -1;
+                int cert_pos = 0;
+
+                while ((size_t) state->base_pos < state->compare_base_color.size()) {
+                    const int col = state->compare_base_color[state->base_pos];
+                    const int col_sz = state->c->ptn[col] + 1;
+                    if (col_sz < 2)
+                        return {false, false};
+                    const int ind_v = state->c->lab[col];
+                    state->move_to_child(R, g, ind_v);
+                    automorphism.write_singleton(&state->compare_singletons, &state->singletons,
+                                                 state->base_singleton_pt[state->base_singleton_pt.size() - 1],
+                                                 state->singletons.size());
+                    //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
+                    //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
+
+                    bool prev_cert = true;
+
+                    assert(state->h_hint_color_is_singleton_now ? state->h_last_refinement_singleton_only : true);
+
+                    if (prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                        prev_cert = R->check_single_failure(g, initial_colors, automorphism.perm(), prev_fail_pos);
+                    }
+
+                    //if(state->c->cells == g->v_size) {
+                    if (prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                        // TODO: add better heuristic to not always do this check, too expensive!
+                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
+                                                                                          automorphism.perm(),
+                                                                                          automorphism.nsupport(),
+                                                                                          automorphism.support(),
+                                                                                          cert_pos);
+                        cert_pos = std::get<2>(cert_res);
+                        if (std::get<0>(cert_res)) {
+                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
+                                                                                         automorphism.perm(),
+                                                                                         automorphism.nsupport(),
+                                                                                         automorphism.support(),
+                                                                                         0);
+                        }
+
+                        if (std::get<0>(cert_res)) {
+                            //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
+                            return {true, true};
+                        } else {
+                            prev_fail = true;
+                            prev_fail_pos = std::get<1>(cert_res);
+                        }
+                    }
+                }
+                if (state->c->cells == g->v_size) {
+                    //std::cout << "fail" << std::endl;
+                    return {true, false};
+                } else {
                     return {false, false};
-                const int ind_v = state->c->lab[col];
-                state->move_to_child(R, g, ind_v);
-                automorphism.write_singleton(&state->compare_singletons, &state->singletons,
-                                             state->base_singleton_pt[state->base_singleton_pt.size() - 1],
-                                             state->singletons.size());
-                //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
-                //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
-
-                bool prev_cert = true;
-
-                assert(state->h_hint_color_is_singleton_now?state->h_last_refinement_singleton_only:true);
-
-                if(prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                    prev_cert = R->check_single_failure(g, initial_colors, automorphism.perm(), prev_fail_pos);
-                }
-
-                //if(state->c->cells == g->v_size) {
-                if(prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                    // TODO: add better heuristic to not always do this check, too expensive!
-                    auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
-                                                                          automorphism.perm(),
-                                                                          automorphism.nsupport(),
-                                                                          automorphism.support(), cert_pos);
-                    cert_pos = std::get<2>(cert_res);
-                    if (std::get<0>(cert_res)) {
-                        cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
-                                                                                     automorphism.perm(),
-                                                                                     automorphism.nsupport(),
-                                                                                     automorphism.support(),
-                                                                                     0);
-                    }
-
-                    if (std::get<0>(cert_res)) {
-                        //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
-                        return {true, true};
-                    } else {
-                        prev_fail = true;
-                        prev_fail_pos = std::get<1>(cert_res);
-                    }
                 }
             }
-            if(state->c->cells == g->v_size) {
-                //std::cout << "fail" << std::endl;
-                return {true, false};
-            } else {
-                return {false, false};
+
+            // adds a given automorphism to the tiny_orbit structure
+            void add_automorphism_to_orbit(tiny_orbit *orbit, int *automorphism, int nsupp, int *supp) {
+                for (int i = 0; i < nsupp; ++i) {
+                    orbit->combine_orbits(automorphism[supp[i]], supp[i]);
+                }
             }
-        }
 
-        // adds a given automorphism to the tiny_orbit structure
-        void  add_automorphism_to_orbit(tiny_orbit* orbit, int* automorphism, int nsupp, int* supp) {
-            for(int i = 0; i < nsupp; ++i) {
-                orbit->combine_orbits(automorphism[supp[i]], supp[i]);
+            void make_leaf_snapshot(ir_controller *state) {
+                compare_T.set_compare(true);
+                compare_T.set_record(false);
+                compare_T.set_compare_trace(state->T);
+                compare_T.set_position(state->T->get_position());
+                state->T = &compare_T;
+                state->compare_base_color.resize(state->base_color.size());
+                std::copy(state->base_color.begin(), state->base_color.end(), state->compare_base_color.begin());
+                state->compare_base_cells.resize(state->base_cells.size());
+                std::copy(state->base_cells.begin(), state->base_cells.end(), state->compare_base_cells.begin());
+                state->compare_singletons.resize(state->singletons.size());
+                std::copy(state->singletons.begin(), state->singletons.end(), state->compare_singletons.begin());
+
+                state->mode = IR_MODE_COMPARE_TRACE;
             }
-        }
 
-        trace compare_T;
+            // returns base-level reached (from leaf)
+            int do_dfs(sgraph *g, int *initial_colors, ir_controller &local_state) {
+                // TODO should depend on given selector
+                int gens = 0;
 
-        void  make_compare_snapshot(ir_controller* state) {
-            compare_T.set_compare(true);
-            compare_T.set_record(false);
-            compare_T.set_compare_trace(state->T);
-            compare_T.set_position(state->T->get_position());
-            state->T = &compare_T;
-            state->compare_base_color.resize(state->base_color.size());
-            std::copy(state->base_color.begin(), state->base_color.end(), state->compare_base_color.begin());
-            state->compare_base_cells.resize(state->base_cells.size());
-            std::copy(state->base_cells.begin(), state->base_cells.end(), state->compare_base_cells.begin());
-            state->compare_singletons.resize(state->singletons.size());
-            std::copy(state->singletons.begin(), state->singletons.end(), state->compare_singletons.begin());
+                tiny_orbit orbs;
+                orbs.initialize(g->v_size);
 
+                //work_list automorphism(g->v_size);
+                //work_list automorphism_supp(g->v_size);
+                sparse_automorphism_workspace pautomorphism(g->v_size);
 
-            state->mode = IR_MODE_COMPARE_TRACE;
-        }
+                mark_set color_class(g->v_size);
 
-        // returns base-level reached (from leaf)
-        int do_dfs(sgraph* g, int* initial_colors, ir_controller& local_state) {
-            // TODO should depend on given selector
-            int gens = 0;
+                //ir_controller local_state(c, &T);
 
-            tiny_orbit orbs;
-            orbs.initialize(g->v_size);
+                // start DFS from a leaf!
+                //move_to_leaf(g, &local_state);
+                // TODO move this outside DFS, only give state in leaf node (we dont even need a selector here!)
 
-            //work_list automorphism(g->v_size);
-            //work_list automorphism_supp(g->v_size);
-            sparse_automorphism_workspace pautomorphism(g->v_size);
+                // make a snapshot of the leaf to compare to!
+                make_leaf_snapshot(&local_state);
 
-            mark_set color_class(g->v_size);
+                coloring leaf_color;
+                leaf_color.copy(local_state.get_coloring());
 
-            //ir_controller local_state(c, &T);
+                std::vector<int> individualize;
 
-            // start DFS from a leaf!
-            //move_to_leaf(g, &local_state);
-            // TODO move this outside DFS, only give state in leaf node (we dont even need a selector here!)
+                bool fail = false;
 
-            // make a snapshot of the leaf to compare to!
-            make_compare_snapshot(&local_state);
+                // loop that serves to optimize Tinhofer graphs
+                while (local_state.base_pos > 0 && !fail) {
+                    local_state.move_to_parent();
+                    const int col = local_state.base_color[local_state.base_pos]; // TODO: detect stack of "same color"?
+                    const int col_sz = local_state.c->ptn[col] + 1;
+                    const int vert = local_state.base_vertex[local_state.base_pos];
 
-            coloring leaf_color;
-            leaf_color.copy(local_state.get_coloring());
+                    int count_leaf = 0;
+                    int count_orb = 0;
 
-            std::vector<int> individualize;
+                    for (int i = col_sz - 1; i >= 0; --i) {
+                        const int ind_v = leaf_color.lab[col + i];
+                        if (ind_v == vert || !orbs.represents_orbit(ind_v))
+                            continue;
+                        if (orbs.are_in_same_orbit(ind_v, vert)) { // TODO somehow skip to ones not in same orbit?
+                            ++count_orb;
+                            continue;
+                        }
 
-            bool fail = false;
+                        ++count_leaf;
 
-            // loop that serves to optimize Tinhofer graphs
-            while(local_state.base_pos > 0 && !fail) {
-                local_state.move_to_parent();
-                const int col    = local_state.base_color[local_state.base_pos]; // TODO: detect stack of "same color"?
-                const int col_sz = local_state.c->ptn[col] + 1;
-                const int vert   = local_state.base_vertex[local_state.base_pos];
+                        // call actual DFS with limited fails
+                        // Tinhofer graphs will never fail, and have recursion width = 1
+                        const int prev_base_pos = local_state.base_pos;
+                        local_state.T->reset_trace_equal(); // probably need to re-adjust position?
+                        local_state.move_to_child(R, g, ind_v);
+                        bool found_auto = false;
+                        //if(local_state.h_last_refinement_singleton_only) {
+                        pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
+                                                      local_state.base_singleton_pt[
+                                                              local_state.base_singleton_pt.size() - 1],
+                                                      local_state.singletons.size());
+                        found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
+                                                                    pautomorphism.nsupport(),
+                                                                    pautomorphism.support());
+                        assert(pautomorphism.perm()[vert] == ind_v);
+                        //}
+                        //std::cout << found_auto << ", " << automorphism_supp.cur_pos << std::endl;
+                        //reset_automorphism(automorphism.get_array(), &automorphism_supp);
 
-                int count_leaf = 0;
-                int count_orb  = 0;
+                        // try proper recursion
+                        if (!found_auto) {
+                            // TODO: heuristic that once this becomes common, we start to copy away the state and recover it, and don't track
+                            // TODO: touched stuff
+                            auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, pautomorphism);
+                            found_auto = (rec_succeeded.first && rec_succeeded.second);
+                            if (rec_succeeded.first && !rec_succeeded.second) {
+                                pautomorphism.reset();
+                                pautomorphism.write_color_diff(local_state.c->vertex_to_col, leaf_color.lab);
+                                found_auto = R->certify_automorphism_sparse(g, initial_colors,
+                                                                            pautomorphism.perm(),
+                                                                            pautomorphism.nsupport(),
+                                                                            pautomorphism.support());
+                            }
+                        }
 
-                for(int i = col_sz - 1; i >= 0; --i) {
-                    const int ind_v = leaf_color.lab[col + i];
-                    if(ind_v == vert || !orbs.represents_orbit(ind_v))
-                        continue;
-                    if(orbs.are_in_same_orbit(ind_v, vert)) { // TODO somehow skip to ones not in same orbit?
-                        ++count_orb;
-                        continue;
-                    }
+                        if (found_auto) {
+                            assert(pautomorphism.perm()[vert] == ind_v);
+                            ++gens;
+                            add_automorphism_to_orbit(&orbs, pautomorphism.perm(),
+                                                      pautomorphism.nsupport(), pautomorphism.support());
+                        }
+                        pautomorphism.reset();
 
-                    ++count_leaf;
+                        while (prev_base_pos < local_state.base_pos) {
+                            local_state.move_to_parent();
+                        }
 
-                    // call actual DFS with limited fails
-                    // Tinhofer graphs will never fail, and have recursion width = 1
-                    const int prev_base_pos = local_state.base_pos;
-                    local_state.T->reset_trace_equal(); // probably need to re-adjust position?
-                    local_state.move_to_child(R, g, ind_v);
-                    bool found_auto = false;
-                    //if(local_state.h_last_refinement_singleton_only) {
-                    pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
-                                                  local_state.base_singleton_pt[
-                                                          local_state.base_singleton_pt.size() - 1],
-                                                  local_state.singletons.size());
-                    found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
-                                                                pautomorphism.nsupport(),
-                                                                pautomorphism.support());
-                    assert(pautomorphism.perm()[vert] == ind_v);
-                    //}
-                    //std::cout << found_auto << ", " << automorphism_supp.cur_pos << std::endl;
-                    //reset_automorphism(automorphism.get_array(), &automorphism_supp);
+                        if (!found_auto) {
+                            std::cout << ind_v << "(F) " << std::endl;
+                            fail = true;
+                            break;
+                        }
 
-                    // try proper recursion
-                    if(!found_auto) {
-                        auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, pautomorphism);
-                        found_auto = (rec_succeeded.first && rec_succeeded.second);
-                        if (rec_succeeded.first && !rec_succeeded.second) {
-                            pautomorphism.reset();
-                            pautomorphism.write_color_diff(local_state.c->vertex_to_col, leaf_color.lab);
-                            found_auto = R->certify_automorphism_sparse(g, initial_colors,
-                                                                          pautomorphism.perm(),
-                                                                          pautomorphism.nsupport(),
-                                                                          pautomorphism.support());
+                        if (orbs.orbit_size(vert) == col_sz) {
+                            break;
                         }
                     }
 
-                    if (found_auto) {
-                        assert(pautomorphism.perm()[vert] == ind_v);
-                        ++gens;
-                        add_automorphism_to_orbit(&orbs, pautomorphism.perm(),
-                                                  pautomorphism.nsupport(), pautomorphism.support());
-                    }
-                    pautomorphism.reset();
-
-                    while(prev_base_pos < local_state.base_pos) {
-                        local_state.move_to_parent();
-                    }
-
-                    if(!found_auto) {
-                        std::cout << ind_v << "(F) " << std::endl;
-                        fail = true;
-                        break;
-                    }
-
-                    if(orbs.orbit_size(vert) == col_sz) {
-                        break;
+                    if (!fail) {
+                        grp_sz_man *= col_sz;
+                        while (grp_sz_man > 10) {
+                            grp_sz_man /= 10;
+                            grp_sz_exp += 1;
+                        }
                     }
                 }
 
-                if(!fail) {
-                    grp_sz_man *= col_sz;
-                    while(grp_sz_man > 10) {
-                        grp_sz_man /= 10;
-                        grp_sz_exp += 1;
-                    }
-                }
+                /*std::cout << "dfs_ir: gens " << gens << ", levels covered " << local_state.base_pos << "-"
+                          << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^"
+                          << grp_sz_exp << std::endl;*/
+                return local_state.base_pos;
             }
-
-            std::cout << "dfs_ir: gens " << gens << ", levels covered " << local_state.base_pos << "-" << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
-            return local_state.base_pos;
-        }
-    };
+        };
+    }
 
     /**
      * \brief The dejavu solver.
      *
-     * Contains the high-level strategy of the dejavu solver, controlling the interactions between the different modules
+     * Contains the high-level strategy of the dejavu solver, controlling the interactions between different modules
      * of the solver.
      */
     class dejavu2 {
     private:
         // high-level modules of the algorithm
-        sassy::preprocessor m_prep;   /**< preprocessor */
-        dfs_ir    m_dfs;              /**< depth-first search */
-        bfs_ir    m_bfs;              /**< breadth-first search */
-        random_ir m_rand;             /**< randomized search */
+        sassy::preprocessor m_prep;        /**< preprocessor */
+        search_strategy::dfs_ir    m_dfs;  /**< depth-first search */
+        search_strategy::bfs_ir    m_bfs;  /**< breadth-first search */
+        search_strategy::random_ir m_rand; /**< randomized search */
 
         // utility tools used by other modules
-        refinement m_refinement;      /**< workspace for color refinement and other utilities */
-        selector_factory m_selectors; /**< cell selector creation */
-        schreier  m_schreier;         /**< Schreier-Sims algorithm */
-        ir_tree   m_tree;             /**< IR-tree */
+        refinement       m_refinement; /**< workspace for color refinement and other utilities */
+        selector_factory m_selectors;  /**< cell selector creation */
+        group_structure::schreier m_schreier; /**< Schreier-Sims algorithm */
+        ir_tree   m_tree;              /**< IR-tree */
 
         // TODO: should not be necessary in the end!
         void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
@@ -1044,10 +1120,27 @@ namespace dejavu {
             g->e_size = gg->e_size;
         }
 
+        void add_to_group_size(long double add_grp_sz_man, int add_grp_sz_exp) {
+            while (add_grp_sz_man > 10) {
+                grp_sz_exp += 1;
+                add_grp_sz_man = add_grp_sz_man / 10;
+            }
+            grp_sz_exp += add_grp_sz_exp;
+            grp_sz_man *= add_grp_sz_man;
+            while (add_grp_sz_man > 10) {
+                grp_sz_exp += 1;
+                add_grp_sz_man = add_grp_sz_man / 10;
+            }
+        }
+
     public:
+        long double grp_sz_man = 1.0; /**< group size mantissa */
+        int         grp_sz_exp = 0;   /**< group size exponent */
+
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
          * using the function pointer \p hook.
+         *
          * @param g The graph.
          * @param colmap The vertex coloring of \p g. A null pointer is admissible as the trivial coloring.
          * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
@@ -1055,12 +1148,16 @@ namespace dejavu {
          * @todo return automorphism group size
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
-            std::cout << "dejavu2" << std::endl;
             // TODO high-level strategy
             //  - full restarts, change selector, but make use of previously computed automorphisms (maybe inprocess) -- goal:
             //    stable, single-threaded performance
             //  - exploit strengths of DFS, random walks, BFS, and their synergies
             //  - try to use no-pruning DFS to fill up available leafs more efficiently
+
+            // TODO miscellaneous SAT-inspired stuff
+            //      - consider calloc when appropriate
+            //      - weigh variables for earlier individualization in restarts (maybe just non-sense, have to see how well
+            //        restarts work out first anyway)
 
             // control values
             int h_limit_leaf = 0;
@@ -1071,16 +1168,21 @@ namespace dejavu {
             // TODO facilities for restarts
 
             // preprocess the graph using sassy
+            std::cout << "preprocessing..." << std::endl;
             sassy::sgraph gg;
             transfer_sgraph_to_sassy_sgraph(g, &gg);
             m_prep.reduce(&gg, colmap, hook);
+            add_to_group_size(m_prep.base, m_prep.exp);
             transfer_sassy_sgraph_to_sgraph(g, &gg);
+
+            std::cout << std::endl << "solving..." << std::endl;
+            progress_print_header();
 
             // initialize a coloring using colors of preprocessed graph
             coloring local_coloring;
             g->initialize_coloring(&local_coloring, colmap);
 
-            // setup a local state for IR computations
+            // set up a local state for IR computations
             trace local_trace;
             ir_controller local_state(&local_coloring, &local_trace);
 
@@ -1091,32 +1193,33 @@ namespace dejavu {
             // find a selector, moves local_state to a leaf of IR tree
             m_selectors.find_base(&m_refinement, g, &local_state);
             std::function<type_selector_hook>* current_selector = m_selectors.get_selector_hook();
-            std::cout << "trace length: " << local_trace.get_position() << std::endl;
-            std::cout << "leaf " << local_state.T->get_hash() << std::endl;
+            progress_print("selector", std::to_string(local_state.base_pos), std::to_string(local_trace.get_position()));
+            int base_size = local_state.base_pos;
+
+            std::vector<int> base = local_state.base_vertex;
 
             // depth-first search starting from the computed leaf in local_state
-            m_dfs.setup(0, &m_refinement, nullptr);
+            m_dfs.setup(0, &m_refinement);
             const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
+            progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level), std::to_string(m_dfs.grp_sz_man)+"10^"+std::to_string(m_dfs.grp_sz_exp));
             if(dfs_reached_level == 0) {
-                /*long double add_grp_sz = D.grp_sz_man;
-                while(add_grp_sz > 10) {
-                    a.grp_sz_exp += 1;
-                    add_grp_sz = add_grp_sz / 10;
-                }
-                a.grp_sz_exp += D.grp_sz_exp;
-                a.grp_sz_man *= add_grp_sz;*/
-                std::cout << "DFS finished graph" << std::endl;
+                add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
                 //return;
             }
+
+            // setup schreier structure
+            m_schreier.setup(base, dfs_reached_level);
 
             // intertwined random automorphisms and breadth-first search
 
             // random automorphisms
             m_rand.setup(h_error_prob, h_limit_leaf);
             m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
+            progress_print("urandom", "_", "_");
 
             // breadth-first search
 
+            std::cout << "#symmetries: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
         }
     };
 }
