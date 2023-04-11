@@ -690,6 +690,15 @@ namespace dejavu {
             }
         };
 
+        class schreier_workspace {
+        public:
+            schreier_workspace(int domain_size) : scratch_auto(domain_size) {
+                scratch1.initialize(domain_size);
+            }
+            mark_set scratch1;
+            sparse_automorphism_workspace scratch_auto;
+        };
+
         class stored_transversal {
             enum stored_transversal_type {
                 STORE_DENSE, STORE_SPARSE, STORE_BOTH
@@ -710,18 +719,59 @@ namespace dejavu {
 
             }
 
+            void load_orbit_to_scratch(schreier_workspace& w) {
+                for(int i = 0; i < fixed_orbit.size(); ++i) {
+                    w.scratch1.set(fixed_orbit[i]);
+                }
+            }
+
+            void add_to_fixed_orbit(const int vertex, const int perm, const int pwr) {
+                fixed_orbit.push_back(vertex);
+                fixed_orbit_to_perm.push_back(perm);
+                fixed_orbit_to_pwr.push_back(pwr);
+            }
+
+            int find_point(const int p) {
+                for(int i = 0; i < fixed_orbit.size(); ++i) {
+                    if(p == fixed_orbit[i]) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+
+            void apply_perm(sparse_automorphism_workspace &automorphism, stored_generators& generators, const int perm, const int pwr) {
+                // TODO write this
+            }
+
         public:
             void setup(const int fixed_vertex) {
                 fixed = fixed_vertex;
+                add_to_fixed_orbit(fixed_vertex, -1, 0);
             }
             /**
              * @param generators
              * @param automorphism
              * @return whether transversal was extended
              */
-            bool extend_with_automorphism(stored_generators& generators, sparse_automorphism_workspace &automorphism) {
-
-                return false;
+            bool extend_with_automorphism(schreier_workspace& w, stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+                load_orbit_to_scratch(w);
+                bool changed = false;
+                // TODO probably aquire lock already here
+                // TODO how this is performed precisely should depend on fixed_orbit size versus support of generator
+                for(int i = 0; i < fixed_orbit.size(); ++i) {
+                    int j = automorphism.perm()[fixed_orbit[i]];
+                    int pwr = 1;
+                    while(!w.scratch1.get(j)) {
+                        changed = true;
+                        add_to_fixed_orbit(j, -1, pwr); // TODO manage storing of perm!
+                        w.scratch1.set(j);
+                        j = automorphism.perm()[j];
+                        ++pwr;
+                    }
+                }
+                w.scratch1.reset();
+                return changed;
             }
 
             /**
@@ -729,8 +779,17 @@ namespace dejavu {
              * @param automorphism
              * @return whether transversal was extended
              */
-            bool fix_automorphism(stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+            bool fix_automorphism(schreier_workspace& w, stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+                int fixed_map = automorphism.perm()[fixed];
+                while(fixed != fixed_map) {
+                    const int pos = find_point(fixed_map);
+                    const int perm = fixed_orbit_to_perm[pos];
+                    const int pwr  = fixed_orbit_to_pwr[pos];
 
+                    apply_perm(automorphism, generators, perm, pwr);
+
+                    fixed_map = automorphism.perm()[fixed];
+                }
                 return false;
             }
 
@@ -750,6 +809,8 @@ namespace dejavu {
             // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
             // TODO could use color sizes for memory allocation, predicting dense/sparse?
 
+            int domain_size;
+
             stored_generators generators;
             work_list_t<stored_transversal> transversals;
 
@@ -762,8 +823,9 @@ namespace dejavu {
              * @param base the base
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void setup(std::vector<int>& base, const int stop) {
+            void setup(const int domain_size, std::vector<int>& base, const int stop) {
                 assert(base.size() >= stop);
+                this->domain_size = domain_size;
                 transversals.initialize(stop);
                 transversals.set_size(stop);
                 for(int i = 0; i < stop; ++i) {
@@ -778,11 +840,12 @@ namespace dejavu {
              * @return Whether automorphism was added to the Schreier structure or not.
              */
             bool sift(sparse_automorphism_workspace &automorphism) {
+                schreier_workspace w(domain_size);
                 bool changed = false;
 
                 for (int level = 0; level < transversals.size(); ++level) {
-                    changed = transversals[level].extend_with_automorphism(generators, automorphism) || changed;
-                    const bool is_identity = transversals[level].fix_automorphism(generators, automorphism);
+                    changed = transversals[level].extend_with_automorphism(w, generators, automorphism) || changed;
+                    const bool is_identity = transversals[level].fix_automorphism(w, generators, automorphism);
                     if (is_identity) break;
                 }
 
@@ -1208,7 +1271,7 @@ namespace dejavu {
             }
 
             // setup schreier structure
-            m_schreier.setup(base, dfs_reached_level);
+            m_schreier.setup(g->v_size, base, dfs_reached_level);
 
             // intertwined random automorphisms and breadth-first search
 
