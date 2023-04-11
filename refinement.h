@@ -96,13 +96,6 @@ public:
         cur_pos = 0;
     }
 
-    void initialize_from_array(T* arr, int size) {
-        this->arr = arr;
-        arr_sz    = size;
-        init      = false;
-        cur_pos   = 0;
-    }
-
     void push_back(T value) {
         assert(cur_pos >= 0 && cur_pos < arr_sz);
         arr[cur_pos] = value;
@@ -1176,6 +1169,49 @@ public:
                 if(!scratch_set.get(vertex_j)) {
                     return false;
                 }
+                scratch_set.unset(vertex_j);
+                found -= 1;
+            }
+            if(found != 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // certify an automorphism on a graph, sparse
+    bool __attribute__ ((noinline)) certify_automorphism_sparse(const sgraph *g, const int* p, int supp, const int* supp_arr) {
+        int i, found;
+
+        assure_initialized(g);
+
+        //for(i = 0; i < g->v_size; ++i) {
+        for(int f = 0; f < supp; ++f) {
+            i = supp_arr[f];
+            const int image_i = p[i];
+            if(image_i == i)
+                continue;
+            if(g->d[i] != g->d[image_i]) // degrees must be equal
+                return false;
+
+            scratch_set.reset();
+            // automorphism must preserve neighbours
+            found = 0;
+            for(int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                const int vertex_j = g->e[j];
+                const int image_j  = p[vertex_j];
+                scratch_set.set(image_j);
+                //scratch[image_j] = vertex_j;
+                found += 1;
+            }
+            for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                const int vertex_j = g->e[j];
+                if(!scratch_set.get(vertex_j)) {
+                    return false;
+                }
+                //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
+                //    return false;
                 scratch_set.unset(vertex_j);
                 found -= 1;
             }

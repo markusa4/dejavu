@@ -71,6 +71,35 @@ namespace dejavu {
             ++position;
         }
     public:
+
+        void update_blueprint_hash() {
+            bool skipping_cell    = false;
+            bool write_false_next = false;
+            hash = 0;
+            for(int i = 0; i < data.size(); ++i) {
+                const int dt = data[i];
+                if(dt == TRACE_MARKER_REFINE_CELL_START) {
+                    if(data[i+1] == false) {
+                        skipping_cell = true;
+                    } else {
+                        write_false_next = true;
+                    }
+                }
+                if(!skipping_cell) {
+                    if(write_false_next) {
+                        add_to_hash(false);
+                        write_false_next = false;
+                    } else {
+                        add_to_hash(dt);
+                    }
+                }
+                if(dt == TRACE_MARKER_REFINE_CELL_END) {
+                    skipping_cell    = false;
+                    write_false_next = false;
+                }
+            }
+        }
+
         /**
          * Records an individualization.
          * @param color The color being individualized.

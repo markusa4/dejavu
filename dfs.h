@@ -69,6 +69,8 @@ namespace dejavu {
         work_list automorphism;
         work_list automorphism_supp;
         int domain_size;
+
+        bool support01 = false;
     public:
         /**
          * Initializes the stored automorphism to the identity.
@@ -83,6 +85,10 @@ namespace dejavu {
             this->domain_size = domain_size;
         }
 
+        void set_support01(bool support01) {
+            this->support01 = support01;
+        }
+
         /**
          * Create automorphism from two given vertex colorings.
          *
@@ -93,6 +99,105 @@ namespace dejavu {
             color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
                                     &automorphism_supp);
         }
+
+        /**
+         * Apply another automorphism to the stored automorphism. Closely follows the implementation in nauty / Traces.
+         *
+         * @param other
+         * @param pwr
+         */
+        void apply(work_list& scratch_apply1, work_list& scratch_apply2, mark_set& scratch_apply3, sparse_automorphism_workspace* other, int pwr = 1) {
+            apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
+        }
+
+        void __attribute__ ((noinline)) update_support() {
+            // rewrite support
+            if(!support01) {
+                automorphism_supp.reset();
+                for (int i = 0; i < domain_size; ++i) {
+                    if (i != automorphism[i])
+                        automorphism_supp.push_back(i);
+                }
+            } else {
+                automorphism_supp.reset();
+                int i;
+                for (i = 0; i < domain_size; ++i) {
+                    if (i != automorphism[i]) break;
+                }
+                automorphism_supp.cur_pos = (i != domain_size);
+            }
+        }
+
+        /**
+         * Apply another automorphism to the stored automorphism. Closely follows the implementation in nauty / Traces.
+         *
+         * @param other
+         * @param pwr
+         */
+        void __attribute__ ((noinline)) apply(work_list& scratch_apply1, work_list& scratch_apply2, mark_set& scratch_apply3, int* p, int pwr = 1) {
+            if(pwr == 0)
+                return;
+            if(pwr <= 5) {
+                if (pwr == 1)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[automorphism[i]];
+                else if (pwr == 2)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[automorphism[i]]];
+                else if (pwr == 3)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[p[automorphism[i]]]];
+                else if (pwr == 4)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[p[p[automorphism[i]]]]];
+                else if (pwr == 5)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[p[p[p[automorphism[i]]]]]];
+            } else if(pwr <= 19) {
+                // apply other automorphism
+                if (pwr >= 6) {
+                    for (int j = 0; j < domain_size; ++j) {
+                        scratch_apply1[j] = p[p[p[j]]];
+                    }
+                    for (; pwr >= 6; pwr -= 6)
+                        for (int j = 0; j < domain_size; ++j)
+                            automorphism[j] = scratch_apply1[scratch_apply1[automorphism[j]]];
+                }
+
+                if (pwr == 1)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[automorphism[i]];
+                else if (pwr == 2)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[automorphism[i]]];
+                else if (pwr == 3)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = scratch_apply1[automorphism[i]];
+                else if (pwr == 4)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[scratch_apply1[automorphism[i]]];
+                else if (pwr == 5)
+                    for (int i = 0; i < domain_size; ++i) automorphism[i] = p[p[scratch_apply1[automorphism[i]]]];
+            } else {
+                // 1 cycle at a time
+
+                scratch_apply3.reset();
+                for (int i = 0; i < domain_size; ++i) {
+                    if (scratch_apply3.get(i)) continue;
+                    if (p[i] == i)
+                        scratch_apply2[i] = i;
+                    else {
+                        int cyclen = 1;
+                        scratch_apply1[0] = i;
+                        for (int j = p[i]; j != i; j = p[j]) {
+                            scratch_apply1[cyclen++] = j;
+                            scratch_apply3.set(j);
+                        }
+                        int kk = pwr % cyclen;
+                        for (int j = 0; j < cyclen; ++j) {
+                            scratch_apply2[scratch_apply1[j]] = scratch_apply1[kk];
+                            if (++kk == cyclen) kk = 0;
+                        }
+                    }
+                }
+                for (int i = 0; i < domain_size; ++i) automorphism[i] = scratch_apply2[automorphism[i]];
+            }
+
+            // rewrite support
+            update_support();
+        }
+
 
         /**
          * Create automorphism from two canonically-ordered vectors of singletons. The resulting automorphism maps
@@ -112,6 +217,14 @@ namespace dejavu {
                     automorphism_supp.push_back(from);
                     automorphism[from] = to;
                 }
+            }
+        }
+
+        void write_single_map(const int from, const int to) {
+            assert(automorphism[from] == from);
+            if(from != to) {
+                automorphism_supp.push_back(from);
+                automorphism[from] = to;
             }
         }
 
@@ -214,6 +327,7 @@ namespace dejavu {
         std::vector<int>  singletons;
         std::vector<int>  base_vertex;
         std::vector<int>  base_color;
+        std::vector<int>  base_color_sz;
         std::vector<int>  base_touched_color_list_pt;
         std::vector<int>  base_cells;
         std::vector<int>  base_singleton_pt;
@@ -364,6 +478,7 @@ namespace dejavu {
                 base_singleton_pt.push_back(singletons.size());
                 base_vertex.push_back(v);
                 base_color.push_back(c->vertex_to_col[v]);
+                base_color_sz.push_back(c->ptn[c->vertex_to_col[v]]+1);
                 base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
             }
 
@@ -432,6 +547,7 @@ namespace dejavu {
 
             base_vertex.pop_back();
             base_color.pop_back();
+            base_color_sz.pop_back();
             base_touched_color_list_pt.pop_back();
             base_cells.pop_back();
             base_singleton_pt.pop_back();
@@ -652,51 +768,212 @@ namespace dejavu {
 
     namespace group_structure {
 
+        typedef void type_unload_hook();
+
+        class dynamic_auto_loader {
+            int*                        loaded_automorphism;
+            std::function<type_unload_hook>* unload_hook;
+        public:
+            void load(int* automorphism, std::function<type_unload_hook>* unload_hook) {
+                loaded_automorphism = automorphism;
+                this->unload_hook = unload_hook;
+            }
+
+            int* p() {
+                return loaded_automorphism;
+            }
+
+            void unload() {
+                if(unload_hook) (*unload_hook)();
+            }
+        };
+
         /**
-         * \brief Stores an automorphism in a dynamically dense or sparse manner.
+         * \brief Stores an automorphism in a dense or sparse manner, dynamically.
          */
         class stored_automorphism {
+        public:
             enum stored_automorphism_type {
                 STORE_DENSE, STORE_SPARSE, STORE_BOTH
             };
 
-            std::vector<int> sparse_cycles;
-            std::vector<int> dense_map;
-
-            stored_automorphism_type store_type;
+        private:
+            work_list data;
+            int domain_size;
+            stored_automorphism_type store_type = STORE_SPARSE;
 
         public:
+
+            stored_automorphism_type get_store_type() {
+                return store_type;
+            }
+
             /**
-             * Use the stored automorphism \a p and a given power \p pwr to multiply p^pwr to the given automorphism.
+             * Load this stored automorphism into workspace.
              *
-             * @param automorphism automorphism to multiply p^pwr to
-             * @param pwr the power used as described above
+             * @param automorphism
              */
-            void multiply_to(sparse_automorphism_workspace &automorphism, const int pwr) {
-                // TODO: load sparse_cycles into a separate workspace?
+            void __attribute__ ((noinline)) load(dynamic_auto_loader& loader, sparse_automorphism_workspace &automorphism) {
+                if(store_type == STORE_SPARSE) {
+                    automorphism.reset();
+                    int first_of_cycle = 0;
+                    for (int i = 0; i < data.size(); ++i) {
+                        const int j = abs(data[i]) - 1;
+                        const bool is_last = data[i] < 0;
+                        assert(i == data.size() - 1 ? is_last : true);
+                        if (is_last) {
+                            automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
+                            first_of_cycle = i + 1;
+                        } else {
+                            assert(i + 1 < data.size());
+                            automorphism.write_single_map(j, abs(data[i + 1]) - 1);
+                        }
+                    }
+                    loader.load(automorphism.perm(), nullptr);
+                } else {
+                    loader.load(data.get_array(), nullptr);
+                }
+            }
+
+            /**
+             * Load inverse of stored automorphism into workspace.
+             *
+             * @param automorphism
+             */
+            void __attribute__ ((noinline)) load_inverse(dynamic_auto_loader& loader, sparse_automorphism_workspace &automorphism) {
+                if(store_type == STORE_SPARSE) {
+                    automorphism.reset();
+                    int first_of_cycle = data.size() - 1;
+                    for (int i = data.size() - 1; i >= 0; --i) {
+                        if (data[i] < 0)
+                            first_of_cycle = i;
+
+                        const int j = abs(data[i]) - 1;
+                        const bool is_last = i == 0 || (data[i - 1] < 0);
+                        if (is_last) {
+                            automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
+                        } else {
+                            automorphism.write_single_map(j, abs(data[i - 1]) - 1);
+                        }
+                    }
+                    loader.load(automorphism.perm(), nullptr);
+                } else {
+                    automorphism.reset();
+                    for(int i = 0; i < domain_size; ++i) {
+                        if(i != data[i]) {
+                            automorphism.write_single_map(data[i], i);
+                        }
+                    }
+                    loader.load(automorphism.perm(), nullptr);
+                }
+            }
+
+            /**
+             * Store the given automorphism workspace.
+             *
+             * @param automorphism
+             */
+            void __attribute__ ((noinline)) store(int domain_size, sparse_automorphism_workspace& automorphism, mark_set& helper) {
+                this->domain_size = domain_size;
+                assert(data.empty());
+
+                int support = 0;
+                for (int i = 0; i < domain_size; ++i) support += (automorphism.perm()[i] != i);
+
+                if(support < domain_size / 4) { // domain_size / 4
+                    store_type = STORE_SPARSE;
+                    helper.reset();
+
+                    data.initialize(support);
+                    for (int i = 0; i < domain_size; ++i) {
+                        if(automorphism.perm()[i] == i) continue;
+                        const int j = i;
+                        if (helper.get(j)) continue;
+                        helper.set(j);
+                        int map_j = automorphism.perm()[j];
+                        assert(map_j != j);
+                        while (!helper.get(map_j)) {
+                            data.push_back(map_j + 1);
+                            helper.set(map_j);
+                            map_j = automorphism.perm()[map_j];
+                        }
+                        assert(map_j == j);
+                        data.push_back(-(j + 1));
+                    }
+                    assert(data.size() == support);
+                } else {
+                    store_type = STORE_DENSE;
+                    data.initialize(domain_size);
+                    data.set_size(domain_size);
+                    memcpy(data.get_array(), automorphism.perm(), domain_size * sizeof(int));
+                    assert(data.size() == domain_size);
+                }
             }
         };
+
+        /**
+         * A global (thread local) state used for computations in Schreier structures.
+         */
+        class schreier_workspace {
+        public:
+            schreier_workspace(int domain_size, refinement * R, sgraph* g) : scratch_auto(domain_size) {
+                scratch1.initialize(domain_size);
+                scratch2.initialize(domain_size);
+                scratch_apply1.initialize(domain_size);
+                scratch_apply2.initialize(domain_size);
+                scratch_apply3.initialize(domain_size);
+                this->R = R;
+                this-> g = g;
+            }
+            dynamic_auto_loader loader;
+
+            mark_set scratch1;
+            mark_set scratch2;
+            work_list scratch_apply1;
+            work_list scratch_apply2;
+            mark_set  scratch_apply3;
+            sparse_automorphism_workspace scratch_auto;
+
+            // TODO debug
+            refinement* R;
+            sgraph* g;
+        };
+
 
         class stored_generators {
             std::mutex lock_generators;          /**< locks the generators */
-            std::vector<stored_automorphism> generators; /** list of generators */
-
-            int add_generator(sparse_automorphism_workspace& automorphism) {
-
-            }
-
-            stored_automorphism& get_generator(const int num) {
-
-            }
-        };
-
-        class schreier_workspace {
+            std::vector<stored_automorphism*> generators; /** list of generators */
+            int domain_size;
         public:
-            schreier_workspace(int domain_size) : scratch_auto(domain_size) {
-                scratch1.initialize(domain_size);
+            int s_stored_sparse = 0;
+            int s_stored_dense  = 0;
+
+            void setup(int domain_size) {
+                this->domain_size = domain_size;
             }
-            mark_set scratch1;
-            sparse_automorphism_workspace scratch_auto;
+
+            int add_generator(schreier_workspace& w, sparse_automorphism_workspace& automorphism) {
+                lock_generators.lock();
+                generators.emplace_back(new stored_automorphism);
+                const int num = generators.size()-1;
+                assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(), automorphism.support()));
+                generators[num]->store(domain_size, automorphism, w.scratch2);
+                lock_generators.unlock();
+
+                s_stored_sparse += (generators[num]->get_store_type() == stored_automorphism::stored_automorphism_type::STORE_SPARSE);
+                s_stored_dense  += (generators[num]->get_store_type() == stored_automorphism::stored_automorphism_type::STORE_DENSE);
+
+                return num;
+            }
+
+            stored_automorphism* get_generator(const int num) {
+                // TODO locks...
+                return generators[num];
+            }
+
+            int size() {
+                return generators.size();
+            }
         };
 
         class stored_transversal {
@@ -707,7 +984,9 @@ namespace dejavu {
             std::mutex lock_transversal;          /**< locks this transversal */
 
             int fixed;                            /**< vertex fixed by this transversal */
-            int sz_upb;                           /**< upper bound for size of the transversal (e.g. color class size) */
+            int sz_upb = INT32_MAX;               /**< upper bound for size of the transversal (e.g. color class size) */
+            int level;
+            bool finished = false;
 
             std::vector<int> fixed_orbit;         /**< contains vertices of orbit at this schreier level */
             std::vector<int> fixed_orbit_to_perm; /**< maps fixed_orbit[i] to generators[i] in class \ref schreier. */
@@ -715,22 +994,42 @@ namespace dejavu {
 
             stored_transversal_type store_type = STORE_SPARSE; /**< whether above structures are stored dense or sparse */
 
-            std::pair<int, int> &get_generator_pwr(int v) {
-
-            }
-
-            void load_orbit_to_scratch(schreier_workspace& w) {
+            void __attribute__ ((noinline)) load_orbit_to_scratch(schreier_workspace& w) {
                 for(int i = 0; i < fixed_orbit.size(); ++i) {
                     w.scratch1.set(fixed_orbit[i]);
                 }
             }
 
             void add_to_fixed_orbit(const int vertex, const int perm, const int pwr) {
+                //std::cout << "add " << vertex << ", " << perm << ", " << pwr << std::endl;
                 fixed_orbit.push_back(vertex);
                 fixed_orbit_to_perm.push_back(perm);
                 fixed_orbit_to_pwr.push_back(pwr);
             }
 
+
+            void __attribute__ ((noinline)) apply_perm(schreier_workspace& w, sparse_automorphism_workspace &automorphism, stored_generators& generators, const int perm, const int pwr) {
+                // load perm into workspace
+                auto generator = generators.get_generator(perm);
+
+                //if(level == 0) {
+                //    std::cout << perm << "^" << pwr << std::endl;
+                //}
+
+                if(pwr < 0) {
+                    generator->load_inverse(w.loader, w.scratch_auto);
+
+                    // multiply
+                    automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), abs(pwr));
+                } else if(pwr > 0) {
+                    generator->load(w.loader, w.scratch_auto);
+
+                    // multiply
+                    automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
+                }
+            }
+
+        public:
             int find_point(const int p) {
                 for(int i = 0; i < fixed_orbit.size(); ++i) {
                     if(p == fixed_orbit[i]) {
@@ -740,13 +1039,34 @@ namespace dejavu {
                 return -1;
             }
 
-            void apply_perm(sparse_automorphism_workspace &automorphism, stored_generators& generators, const int perm, const int pwr) {
-                // TODO write this
+            void reduce_to_unfinished(schreier_workspace& w, std::vector<int>& selection, int base_pos) {
+                load_orbit_to_scratch(w);
+                int back_swap = selection.size() - 1;
+                int front_pt;
+                for(front_pt = 0; front_pt <= back_swap;) {
+                    if(!w.scratch1.get(selection[front_pt])) {
+                        ++front_pt;
+                    } else {
+                        selection[front_pt] = selection[back_swap];
+                        --back_swap;
+                    }
+                }
+                selection.resize(front_pt);
+                w.scratch1.reset();
             }
 
-        public:
-            void setup(const int fixed_vertex) {
+            bool is_finished() {
+                return finished;
+            }
+
+            int fixed_point() {
+                return fixed;
+            }
+
+            void setup(const int fixed_vertex, const int level, const int sz_upb) {
                 fixed = fixed_vertex;
+                this->level = level;
+                this->sz_upb= sz_upb;
                 add_to_fixed_orbit(fixed_vertex, -1, 0);
             }
             /**
@@ -755,21 +1075,67 @@ namespace dejavu {
              * @return whether transversal was extended
              */
             bool extend_with_automorphism(schreier_workspace& w, stored_generators& generators, sparse_automorphism_workspace &automorphism) {
+                if(finished)
+                    return false;
+
                 load_orbit_to_scratch(w);
                 bool changed = false;
                 // TODO probably aquire lock already here
                 // TODO how this is performed precisely should depend on fixed_orbit size versus support of generator
+                int gen_num = -1;
+
+                int self_apply_after = 0;
+
                 for(int i = 0; i < fixed_orbit.size(); ++i) {
                     int j = automorphism.perm()[fixed_orbit[i]];
-                    int pwr = 1;
+                    if(w.scratch1.get(j))
+                        continue;
+
+                    int ipwr = 0; // inverted power
+                    int npwr = 1; //non-inverted power
+                    int jj;
+                    for (jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) ++ipwr;
+                    //bool reversible = (jj == fixed_orbit[i]) && (ipwr > 100);
+
+                    /*if(!w.scratch1.get(j) && reversible && i == 0) {
+                        assert(fixed_orbit[i] == fixed);
+                        self_apply_after = ipwr;
+                    }*/
+
+                    //int pwr = 1;
                     while(!w.scratch1.get(j)) {
+                        // we change this traversal
                         changed = true;
-                        add_to_fixed_orbit(j, -1, pwr); // TODO manage storing of perm!
+
+                        // add generator to generating set (once)
+                        if(gen_num == -1) gen_num = generators.add_generator(w, automorphism);
+
+                        // add entry to traversal
+                        //if(ipwr <= npwr || !reversible) {
+                            add_to_fixed_orbit(j, gen_num, ipwr);
+                       // } else {
+                        //    add_to_fixed_orbit(j, gen_num, -npwr);
+                       // }
                         w.scratch1.set(j);
+
+                        // we check out the entire cycle of j now
                         j = automorphism.perm()[j];
-                        ++pwr;
+                        --ipwr;
+                        ++npwr;
                     }
                 }
+
+                /*if(self_apply_after > 0) {
+                    assert(changed);
+                    assert(gen_num >= 0);
+                    apply_perm(w, automorphism, generators, gen_num, self_apply_after);
+                    assert(automorphism.perm()[fixed] == fixed);
+                }*/
+
+                if(sz_upb == fixed_orbit.size() && !finished) {
+                    finished = true;
+                }
+
                 w.scratch1.reset();
                 return changed;
             }
@@ -785,12 +1151,17 @@ namespace dejavu {
                     const int pos = find_point(fixed_map);
                     const int perm = fixed_orbit_to_perm[pos];
                     const int pwr  = fixed_orbit_to_pwr[pos];
+                    //std::cout << "fixing " << fixed_map << "->" << fixed << " using " << perm << "^" << pwr << std::endl;
 
-                    apply_perm(automorphism, generators, perm, pwr);
+                    assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(), automorphism.support()));
+                    apply_perm(w, automorphism, generators, perm, pwr);
+                    assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(), automorphism.support()));
 
                     fixed_map = automorphism.perm()[fixed];
                 }
-                return false;
+
+                assert(automorphism.perm()[fixed] == fixed);
+                return automorphism.nsupport() == 0;
             }
 
 
@@ -808,13 +1179,22 @@ namespace dejavu {
             // TODO implement sparse schreier-sims for fixed base
             // TODO support for sparse tables, sparse automorphism, maybe mix sparse & dense
             // TODO could use color sizes for memory allocation, predicting dense/sparse?
+            // TODO using inverses to reduce pwr seems like low-hanging fruit
 
             int domain_size;
+            int finished_up_to = -1;
 
             stored_generators generators;
-            work_list_t<stored_transversal> transversals;
+            work_list_t<stored_transversal*> transversals;
 
         public:
+
+            int stat_sparsegen() {
+                return generators.s_stored_sparse;
+            }
+            int stat_densegen() {
+                return generators.s_stored_dense;
+            }
 
             /**
              * Set up this Schreier structure using the given base. The base is then fixed and can not be adjusted
@@ -823,14 +1203,40 @@ namespace dejavu {
              * @param base the base
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void setup(const int domain_size, std::vector<int>& base, const int stop) {
+            void setup(const int domain_size, std::vector<int>& base, std::vector<int>& base_sizes, const int stop) {
                 assert(base.size() >= stop);
                 this->domain_size = domain_size;
+                generators.setup(domain_size);
                 transversals.initialize(stop);
                 transversals.set_size(stop);
                 for(int i = 0; i < stop; ++i) {
-                    transversals[i].setup(base[i]);
+                    transversals[i] = new stored_transversal();
+                    transversals[i]->setup(base[i], i, base_sizes[i]); // TODO add proper upper bound
                 }
+            }
+
+            int base_point(int pos) {
+                return transversals[pos]->fixed_point();
+            }
+
+            int base_size() {
+                return transversals.size();
+            }
+
+            bool is_in_base_orbit(const int base_pos, const int v) {
+                if(base_pos >= transversals.size()) return false;
+                assert(base_pos >= 0);
+                assert(base_pos < transversals.size());
+                const int search = transversals[base_pos]->find_point(v);
+                return search != -1;
+            }
+
+            void reduce_to_unfinished(schreier_workspace& w, std::vector<int>& selection, int base_pos) {
+                transversals[base_pos]->reduce_to_unfinished(w, selection, base_pos);
+            }
+
+            bool is_finished(const int base_pos) {
+                return transversals[base_pos]->is_finished();
             }
 
             /**
@@ -839,17 +1245,32 @@ namespace dejavu {
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool sift(sparse_automorphism_workspace &automorphism) {
-                schreier_workspace w(domain_size);
+            bool sift(schreier_workspace& w, sgraph* g, refinement* R, sparse_automorphism_workspace &automorphism) {
                 bool changed = false;
 
+                automorphism.set_support01(true);
                 for (int level = 0; level < transversals.size(); ++level) {
-                    changed = transversals[level].extend_with_automorphism(w, generators, automorphism) || changed;
-                    const bool is_identity = transversals[level].fix_automorphism(w, generators, automorphism);
+                    //std::cout << "extending transversal..." << std::endl;
+                    changed = transversals[level]->extend_with_automorphism(w, generators, automorphism) || changed;
+
+                    if(finished_up_to == level - 1 && transversals[level]->is_finished()) {
+                        ++finished_up_to;
+                    }
+
+                    //std::cout << "fixing automorphism..." << std::endl;
+                    const bool is_identity = transversals[level]->fix_automorphism(w, generators, automorphism);
                     if (is_identity) break;
                 }
+                automorphism.set_support01(false);
+                automorphism.update_support();
+                automorphism.reset();
 
+                //std::cout << generators.size() << ", " << finished_up_to << "/" << transversals.size() << std::endl;
                 return changed;
+            }
+
+            int finished_up_to_level() {
+                return finished_up_to;
             }
         };
     }
@@ -864,6 +1285,71 @@ namespace dejavu {
             // TODO depends on ir_tree, and selector
         };
 
+        class stored_leaf {
+            coloring store_c;
+        public:
+            stored_leaf(coloring& c, std::vector<int>& base) {
+                // TODO make the stored leaf more properly
+                store_c.copy(&c);
+            }
+
+            coloring* get_coloring() {
+                return &store_c;
+            }
+        };
+
+        class stored_leafs {
+            std::mutex lock;
+            std::unordered_multimap<long, stored_leaf*> leaf_store;
+            std::vector<stored_leaf*> garbage_collector;
+
+        public:
+            int s_leaves = 0;
+
+            ~stored_leafs() {
+                for(int i = 0; i < garbage_collector.size(); ++i) {
+                    delete garbage_collector[i];
+                }
+            }
+
+            /**
+             * Lookup whether a leaf with the given hash already exists.
+             *
+             * @param hash
+             * @return
+             */
+            stored_leaf* lookup_leaf(long hash) {
+                lock.lock();
+                auto find = leaf_store.find(hash);
+                if(find != leaf_store.end()) {
+                    auto result = find->second;
+                    lock.unlock();
+                    return result;
+                } else {
+                    lock.unlock();
+                    return nullptr;
+                }
+            }
+
+            /**
+             * Add leaf with the given hash. Does not add the leaf, if a leaf with the given hash already exists.
+             *
+             * @param hash
+             * @param ptr
+             */
+            void add_leaf(long hash, coloring& c, std::vector<int>& base) {
+                lock.lock();
+                if(!leaf_store.contains(hash)) {
+                    auto new_leaf = new stored_leaf(c, base);
+                    leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
+                    ++s_leaves;
+                    lock.unlock();
+                } else {
+                    lock.unlock();
+                }
+            }
+        };
+
         /**
          * \brief IR search using random walks.
          *
@@ -875,11 +1361,54 @@ namespace dejavu {
          */
         class random_ir {
             std::default_random_engine generator;
-            // TODO leaf storage, maybe do extra class that can be shared across threads
+            stored_leafs leaf_storage;
+
+            int consecutive_success = 0;
+            int error_bound = 5;
 
         public:
             void setup(int error, int leaf_store_limit) {
+            }
 
+            void record_sift_result(const bool changed) {
+                if(!changed) {
+                    ++consecutive_success;
+                } else {
+                    if(consecutive_success > 0) {
+                        ++error_bound;
+                        consecutive_success = 0;
+                    }
+                }
+            }
+
+            bool probabilistic_abort_criterion() {
+                return (consecutive_success > error_bound);
+            }
+
+            bool deterministic_abort_criterion(group_structure::schreier &group) {
+                return (group.finished_up_to_level() + 1 == group.base_size());
+            }
+
+            int stat_leaves() {
+                return leaf_storage.s_leaves;
+            }
+
+            void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
+                               group_structure::schreier &group, ir_controller &local_state, ir_reduced_save &start_from) {
+                local_state.load_reduced_state(start_from);
+                int base_pos = local_state.base_pos;
+
+                while (g->v_size != local_state.c->cells) {
+                    int v = base_vertex[local_state.base_pos];
+                    local_state.move_to_child(&R, g, v);
+                    ++base_pos;
+                }
+
+                auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
+                if(other_leaf == nullptr) {
+                    std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
+                    leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
+                }
             }
 
             // TODO implement dejavu strategy, more simple
@@ -887,21 +1416,75 @@ namespace dejavu {
             // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
             void random_walks(refinement &R, std::function<type_selector_hook> *selector, sgraph *g,
                               group_structure::schreier &group, ir_controller &local_state, ir_reduced_save &start_from) {
-                for (int i = 0; i < 50; ++i) {
+                sparse_automorphism_workspace automorphism(g->v_size);
+                group_structure::schreier_workspace w(g->v_size, &R, g);
+                std::vector<int> heuristic_reroll;
+
+                while(!probabilistic_abort_criterion() && !deterministic_abort_criterion(group)) {
                     local_state.load_reduced_state(start_from);
+                    int could_start_from = group.finished_up_to_level();
+                    if(local_state.base_pos < could_start_from) {
+                        while (local_state.base_pos <= could_start_from) {
+                            //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
+                            local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
+                        }
+                        local_state.save_reduced_state(start_from);
+                    }
+
                     int base_pos = local_state.base_pos;
+
+                    bool base_aligned = true;
+                    bool uniform = true;
+
                     while (g->v_size != local_state.c->cells) {
                         const int col = (*selector)(local_state.c, base_pos);
                         const int col_sz = local_state.c->ptn[col] + 1;
                         const int rand = ((int) generator()) % col_sz;
-                        const int v = local_state.c->lab[col + rand];
+                        int v = local_state.c->lab[col + rand];
+
+                        if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)) {
+                            heuristic_reroll.clear();
+                            for(int i = 0; i < col_sz; ++i) {
+                                heuristic_reroll.push_back(local_state.c->lab[col + i]);
+                            }
+                            group.reduce_to_unfinished(w, heuristic_reroll, base_pos);
+                            if(heuristic_reroll.size() > 0) {
+                                const int rand = ((int) generator()) % heuristic_reroll.size();
+                                v = heuristic_reroll[rand];
+                                //std::cout << group.is_finished(base_pos) << "re-roll!"
+                                //          << group.is_in_base_orbit(base_pos, v) << std::endl;
+                            }
+                        }
+
+                        if(group.is_in_base_orbit(base_pos, v) && base_aligned) {
+                            v = group.base_point(local_state.base_pos);
+                            assert(local_state.c->vertex_to_col[v] == col);
+                            uniform = false;
+                        } else {
+                            base_aligned = false;
+                        }
+
                         local_state.move_to_child(&R, g, v);
                         ++base_pos;
                     }
 
-                    //std::cout << "leaf " << local_state.T->get_hash() << std::endl;
+                    auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
+                    if(other_leaf == nullptr) {
+                        std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
+                        leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
+                    } else {
+                        //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
+                        automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
+                        const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
+                        if(cert) {
+                            //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
+                            const bool sift = group.sift(w, g, &R, automorphism);
+                            if(uniform) record_sift_result(sift);
+                        }
+
+                        automorphism.reset();
+                    }
                 }
-                // TODO continue...
             }
         };
 
@@ -922,6 +1505,8 @@ namespace dejavu {
         public:
             long double grp_sz_man = 1.0; /**< group size mantissa */
             int         grp_sz_exp = 0;   /**< group size exponent */
+
+            int         cost_snapshot = 0;
 
             /**
              * Setup the DFS module.
@@ -946,6 +1531,7 @@ namespace dejavu {
                     if (col_sz < 2)
                         return {false, false};
                     const int ind_v = state->c->lab[col];
+
                     state->move_to_child(R, g, ind_v);
                     automorphism.write_singleton(&state->compare_singletons, &state->singletons,
                                                  state->base_singleton_pt[state->base_singleton_pt.size() - 1],
@@ -1003,6 +1589,8 @@ namespace dejavu {
             }
 
             void make_leaf_snapshot(ir_controller *state) {
+                cost_snapshot = state->T->get_position();
+
                 compare_T.set_compare(true);
                 compare_T.set_record(false);
                 compare_T.set_compare_trace(state->T);
@@ -1046,10 +1634,12 @@ namespace dejavu {
 
                 std::vector<int> individualize;
 
+                double recent_cost_snapshot = 0;
+
                 bool fail = false;
 
                 // loop that serves to optimize Tinhofer graphs
-                while (local_state.base_pos > 0 && !fail) {
+                while (recent_cost_snapshot < 0.25 && local_state.base_pos > 0 && !fail) {
                     local_state.move_to_parent();
                     const int col = local_state.base_color[local_state.base_pos]; // TODO: detect stack of "same color"?
                     const int col_sz = local_state.c->ptn[col] + 1;
@@ -1059,6 +1649,8 @@ namespace dejavu {
                     int count_orb = 0;
 
                     for (int i = col_sz - 1; i >= 0; --i) {
+                        int cost_start = local_state.T->get_position();
+
                         const int ind_v = leaf_color.lab[col + i];
                         if (ind_v == vert || !orbs.represents_orbit(ind_v))
                             continue;
@@ -1104,6 +1696,10 @@ namespace dejavu {
                             }
                         }
 
+                        int cost_end = local_state.T->get_position();
+                        double cost_partial = (cost_end - cost_start) / (cost_snapshot*1.0);
+                        recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
+
                         if (found_auto) {
                             assert(pautomorphism.perm()[vert] == ind_v);
                             ++gens;
@@ -1136,9 +1732,6 @@ namespace dejavu {
                     }
                 }
 
-                /*std::cout << "dfs_ir: gens " << gens << ", levels covered " << local_state.base_pos << "-"
-                          << local_state.compare_base_color.size() << ", grp_sz covered: " << grp_sz_man << "*10^"
-                          << grp_sz_exp << std::endl;*/
                 return local_state.base_pos;
             }
         };
@@ -1197,8 +1790,8 @@ namespace dejavu {
         }
 
     public:
-        long double grp_sz_man = 1.0; /**< group size mantissa */
-        int         grp_sz_exp = 0;   /**< group size exponent */
+        long double grp_sz_man = 1.0; /**< group size mantissa, see also \a grp_sz_exp */
+        int         grp_sz_exp = 0;   /**< group size exponent, see also \a grp_sz_man  */
 
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
@@ -1208,7 +1801,6 @@ namespace dejavu {
          * @param colmap The vertex coloring of \p g. A null pointer is admissible as the trivial coloring.
          * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
          *
-         * @todo return automorphism group size
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
             // TODO high-level strategy
@@ -1259,26 +1851,35 @@ namespace dejavu {
             progress_print("selector", std::to_string(local_state.base_pos), std::to_string(local_trace.get_position()));
             int base_size = local_state.base_pos;
 
-            std::vector<int> base = local_state.base_vertex;
+            std::vector<int> base       = local_state.base_vertex;
+            std::vector<int> base_sizes = local_state.base_color_sz;
+
+            // TODO fix this, should work...
+            //local_state.T->update_blueprint_hash();
+            //std::cout << local_state.T->get_hash() << std::endl;
 
             // depth-first search starting from the computed leaf in local_state
             m_dfs.setup(0, &m_refinement);
-            const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
+            //m_dfs.make_leaf_snapshot(&local_state);
+
+           const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
             progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level), std::to_string(m_dfs.grp_sz_man)+"10^"+std::to_string(m_dfs.grp_sz_exp));
             if(dfs_reached_level == 0) {
                 add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
                 //return;
             }
 
-            // setup schreier structure
-            m_schreier.setup(g->v_size, base, dfs_reached_level);
+            // set up schreier structure
+            m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
 
             // intertwined random automorphisms and breadth-first search
 
             // random automorphisms
             m_rand.setup(h_error_prob, h_limit_leaf);
+            m_rand.specific_walk(m_refinement, base, g, m_schreier, local_state, root_save);
             m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
-            progress_print("urandom", "_", "_");
+            progress_print("urandom", std::to_string(m_rand.stat_leaves()), "_");
+            progress_print("schreier", "s"+std::to_string(m_schreier.stat_sparsegen())+"/d"+std::to_string(m_schreier.stat_densegen()), "_");
 
             // breadth-first search
 
