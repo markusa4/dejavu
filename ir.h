@@ -75,6 +75,13 @@ namespace dejavu {
             int get_base_position() {
                 return base_position;
             }
+
+            /**
+             * @return base of this IR node
+             */
+            std::vector<int>& get_base() {
+                return base_vertex;
+            }
         };
 
         /**
@@ -153,6 +160,7 @@ namespace dejavu {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
                 base_pos = state.get_base_position();
+                base_vertex = state.get_base();
 
                 // deactivate reversability
                 mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
@@ -242,10 +250,10 @@ namespace dejavu {
              */
             void move_to_child(refinement *R, sgraph *g, int v) {
                 ++base_pos;
+                base_vertex.push_back(v); // always keep track of base (needed for BFS)
 
                 if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
                     base_singleton_pt.push_back(singletons.size());
-                    base_vertex.push_back(v);
                     base_color.push_back(c->vertex_to_col[v]);
                     base_color_sz.push_back(c->ptn[c->vertex_to_col[v]] + 1);
                     base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
@@ -288,7 +296,7 @@ namespace dejavu {
                 if (T) T->rewind_to_individualization();
 
                 --base_pos;
-                while (prev_color_list.cur_pos > base_touched_color_list_pt[base_pos]) {
+                while (prev_color_list.cur_pos > base_touched_color_list_pt[base_touched_color_list_pt.size()-1]) {
                     const int old_color = prev_color_list.pop_back();
                     const int new_color = touched_color_list.pop_back();
 
@@ -554,9 +562,49 @@ namespace dejavu {
             }
         };
 
-        // TODO tree structure for BFS + random walk
-        class ir_tree {
+        class tree_node {
+            std::mutex    lock;
+            reduced_save* data;
+            tree_node*    next;
+        public:
+            tree_node(reduced_save* data, tree_node* next) {
+                this->data = data;
+                this->next = next;
+                if(next == nullptr) {
+                    next = this;
+                }
+            }
+            tree_node* get_next() {
+                return next;
+            }
+            void set_next(tree_node* next) {
+                this->next = next;
+            }
+        };
 
+        // TODO tree structure for BFS + random walk
+        class tree {
+            std::vector<tree_node*> tree_data;
+            std::vector<int>        tree_level_size;
+
+            void initialize(int base_size) {
+                tree_data.resize(base_size);
+                tree_level_size.resize(base_size);
+            }
+
+            void add_node(int level, reduced_save* data) {
+                // TODO use locks
+                ++tree_level_size[level];
+                if(tree_data[level] == nullptr) {
+                    tree_data[level] = new tree_node(data, nullptr);
+                } else {
+                    tree_node* a_node    = tree_data[level];
+                    tree_node* next_node = a_node->get_next();
+                    auto       new_node  = new tree_node(data, next_node);
+                    a_node->set_next(new_node);
+                    tree_data[level] = new_node;
+                }
+            }
         };
     }
 }

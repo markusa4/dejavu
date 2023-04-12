@@ -499,10 +499,10 @@ namespace dejavu {
         search_strategy::random_ir m_rand; /**< randomized search */
 
         // utility tools used by other modules
-        refinement       m_refinement; /**< workspace for color refinement and other utilities */
-        ir::selector_factory m_selectors;  /**< cell selector creation */
+        refinement m_refinement;          /**< workspace for color refinement and other utilities */
+        ir::selector_factory m_selectors; /**< cell selector creation */
         groups::schreier m_schreier; /**< Schreier-Sims algorithm */
-        ir::ir_tree   m_tree;              /**< IR-tree */
+        ir::tree m_tree;             /**< IR-tree */
 
         // TODO: should not be necessary in the end!
         void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
@@ -567,7 +567,7 @@ namespace dejavu {
             // TODO miscellaneous SAT-inspired stuff
             //      - consider calloc when appropriate
             //      - weigh variables for earlier individualization in restarts (maybe just non-sense, have to see how well
-            //        restarts work out first anyway)
+            //        restarts work out first anyway) -- could weigh variables more that turn out conflicting in fails
 
             // control values
             int h_limit_leaf = 0;
@@ -603,7 +603,7 @@ namespace dejavu {
             local_state.save_reduced_state(root_save);
 
             // loop to enable restarts
-            while(true) {
+            while(g->v_size > 0) {
                 ++h_restarts; // Dry land is not a myth, I've seen it!
 
                 grp_sz_man = 1.0; /**< group size mantissa, see also \a grp_sz_exp */
@@ -632,6 +632,8 @@ namespace dejavu {
                 progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                std::to_string(m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                 add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
+
+                if(dfs_reached_level == 0) break;
 
                 // set up schreier structure
                 m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
