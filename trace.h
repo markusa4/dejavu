@@ -89,7 +89,7 @@ namespace dejavu {
                     }
                     if (!skipping_cell) {
                         if (write_false_next) {
-                            add_to_hash(false);
+                            // uses write_skip_compare
                             write_false_next = false;
                         } else {
                             add_to_hash(dt);

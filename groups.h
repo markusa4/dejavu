@@ -547,6 +547,14 @@ namespace dejavu {
             }
 
         public:
+
+            /**
+             * @return Size of the transversal.
+             */
+            int size() {
+                return fixed_orbit.size();
+            }
+
             /**
              * Check whether a point \p p is contained in transversal.
              *
@@ -845,6 +853,22 @@ namespace dejavu {
              */
             int finished_up_to_level() {
                 return finished_up_to;
+            }
+
+            /**
+             * @return Size of group described by this Schreier structure.
+             */
+            std::pair<long double, int> compute_group_size() {
+                long double grp_sz_man = 1;
+                int         grp_sz_exp = 0;
+                for (int level = 0; level < transversals.size(); ++level) {
+                    grp_sz_man *= transversals[level]->size();
+                    while (grp_sz_man > 10) {
+                        grp_sz_exp += 1;
+                        grp_sz_man = grp_sz_man / 10;
+                    }
+                }
+                return {grp_sz_man, grp_sz_exp};
             }
         };
     }

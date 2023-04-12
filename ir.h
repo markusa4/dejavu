@@ -209,7 +209,7 @@ namespace dejavu {
 
                 // update some heuristic values
                 if (T) {
-                    if (!T->blueprint_is_next_cell_active()) {
+                    if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
                         if (config.CONFIG_IR_IDLE_SKIP) {
                             T->blueprint_skip_to_next_cell();
                             return false;

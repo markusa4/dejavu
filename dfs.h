@@ -156,7 +156,7 @@ namespace dejavu {
 
                 auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                 if(other_leaf == nullptr) {
-                    std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
+                    //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
                     leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
                 }
             }
@@ -192,7 +192,7 @@ namespace dejavu {
                         const int rand = ((int) generator()) % col_sz;
                         int v = local_state.c->lab[col + rand];
 
-                        if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)) {
+                        if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && leaf_storage.s_leaves <= 1) {
                             heuristic_reroll.clear();
                             for(int i = 0; i < col_sz; ++i) {
                                 heuristic_reroll.push_back(local_state.c->lab[col + i]);
@@ -206,7 +206,7 @@ namespace dejavu {
                             }
                         }
 
-                        if(group.is_in_base_orbit(base_pos, v) && base_aligned) {
+                        if(group.is_in_base_orbit(base_pos, v) && base_aligned && leaf_storage.s_leaves <= 1) {
                             v = group.base_point(local_state.base_pos);
                             assert(local_state.c->vertex_to_col[v] == col);
                             uniform = false;
@@ -220,7 +220,7 @@ namespace dejavu {
 
                     auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                     if(other_leaf == nullptr) {
-                        std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
+                        //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
                         leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
                     } else {
                         //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
@@ -368,8 +368,6 @@ namespace dejavu {
                 //work_list automorphism_supp(g->v_size);
                 groups::automorphism_workspace pautomorphism(g->v_size);
 
-                mark_set color_class(g->v_size);
-
                 //controller local_state(c, &T);
 
                 // start DFS from a leaf!
@@ -482,7 +480,7 @@ namespace dejavu {
                     }
                 }
 
-                return local_state.base_pos;
+                return local_state.base_pos + (fail);
             }
         };
     }
@@ -614,10 +612,7 @@ namespace dejavu {
 
            const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
             progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level), std::to_string(m_dfs.grp_sz_man)+"10^"+std::to_string(m_dfs.grp_sz_exp));
-            if(dfs_reached_level == 0) {
-                add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
-                //return;
-            }
+            add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
 
             // set up schreier structure
             m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
@@ -628,8 +623,12 @@ namespace dejavu {
             m_rand.setup(h_error_prob, h_limit_leaf);
             m_rand.specific_walk(m_refinement, base, g, m_schreier, local_state, root_save);
             m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
+
             progress_print("urandom", std::to_string(m_rand.stat_leaves()), "_");
             progress_print("schreier", "s"+std::to_string(m_schreier.stat_sparsegen())+"/d"+std::to_string(m_schreier.stat_densegen()), "_");
+
+            auto add_grp_sz = m_schreier.compute_group_size();
+            add_to_group_size(add_grp_sz.first, add_grp_sz.second);
 
             // breadth-first search
 
