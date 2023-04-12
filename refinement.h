@@ -262,38 +262,56 @@ public:
 // queue with fixed size limitation
 class work_queue {
 public:
-    void initialize(int size);
-    void initialize_from_array(int* arr, int size);
-    void push(int val);
-    int  pop();
-    void reset();
-    bool empty();
-    ~work_queue();
+    void initialize(int size) {
+        assert(!init);
+        sz = size;
+        pos = 0;
+        queue = new int[size];
+        init = true;
+    }
+
+    void push(int val) {
+        //assert(init);
+        assert(pos != sz);
+        queue[pos] = val;
+        pos++;
+    }
+
+    int pop() {
+        //assert(init);
+        assert(pos > 0);
+        pos--;
+        return queue[pos];
+    }
+
+    bool empty() {
+        //assert(init);
+        return (pos == 0);
+    }
+
+    ~work_queue() {
+        if(init) {
+            delete[] queue;
+        }
+    }
+
+    void reset() {
+        pos = 0;
+    }
+
+    void initialize_from_array(int* arr, int size) {
+        assert(!init);
+        sz = size;
+        pos = 0;
+        queue = arr;
+        init = false;
+    }
+
+private:
     int* queue;
     int  pos;
-private:
     bool init = false;
     int  sz;
-};
-
-// work set using less space than mark set, but more expensive reset operation
-class work_set {
-public:
-    void initialize(int size);
-    void set(int index);
-    bool get(int index);
-    void reset();
-    ~work_set();
-    void reset_hard();
-    void set_nr(int index);
-    void unset(int index);
-    void reset_soft();
-
-private:
-    work_queue reset_queue;
-    bool init = false;
-    bool* s;
-    int sz;
 };
 
 // work set with arbitrary type
@@ -304,7 +322,7 @@ public:
         s = new T[size];
         reset_queue.initialize(size);
 
-        memset(s, -1, size * sizeof(T));
+        memset(s, -1, size * sizeof(T)); // TODO should use calloc
 
         init = true;
         sz = size;
@@ -339,7 +357,7 @@ public:
 
     void reset_hard() {
         memset(s, -1, sz*sizeof(T));
-        reset_queue.pos = 0;
+        reset_queue.reset();
     }
 
     T   inc(int index) {
@@ -373,20 +391,46 @@ typedef work_set_t<char> work_set_char;
 // ring queue for pairs of integers
 class ring_pair {
 public:
-    void initialize(int size);
-    void push_back(std::pair<int, int> value);
-    std::pair<int, int>* front();
-    void pop();
-    bool empty();
-    void reset();
-    ~ring_pair();
+    void initialize(int size) {
+        arr = new std::pair<int, int>[size];
+        arr_sz = size;
+        back_pos  = 0;
+        front_pos = 0;
+        init = true;
+    }
+
+    void push_back(std::pair<int, int> value) {
+        arr[back_pos] = value;
+        back_pos = (back_pos + 1) % arr_sz;
+    }
+
+    std::pair<int, int>* front() {
+        return &arr[front_pos];
+    }
+
+    void pop() {
+        front_pos = (front_pos + 1) % arr_sz;
+    }
+
+    bool empty() {
+        return (front_pos == back_pos);
+    }
+
+    ~ring_pair() {
+        if(init)
+            delete[] arr;
+    }
+
+    void reset() {
+        front_pos = back_pos;
+    }
+
+private:
     std::pair<int, int>* arr;
     bool init = false;
     int arr_sz = -1;
     int front_pos = -1;
     int back_pos = -1;
-
-    void initialize_from_array(std::pair<int, int> *p, int size);
 };
 
 // worklist implementation for color refinement
