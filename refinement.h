@@ -3,7 +3,6 @@
 
 #include "coloring.h"
 #include "sgraph.h"
-#include "invariant.h"
 #include "configuration.h"
 #include "utility.h"
 #include <list>
@@ -567,9 +566,6 @@ public:
     void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
                          const std::function<type_worklist_color_hook>& worklist_hook = nullptr) {
-        invariant trash_I;
-        trash_I.only_acc = true;
-
         singleton_hint.reset();
         assure_initialized(g);
         int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
@@ -615,18 +611,18 @@ public:
             if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                                    &color_class_splits, &trash_I);
+                                                    &color_class_splits);
             } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
-                                                          &color_class_splits, &trash_I);
+                                                          &color_class_splits);
                 } else { // dense-sparse
                     refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
-                                                    &color_class_splits, &trash_I);
+                                                    &color_class_splits);
                 }
             } else { // sparse
                 refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                          &color_class_splits, &trash_I);
+                                          &color_class_splits);
             }
 
             /*deviation_expander -= (!comp);
@@ -1331,7 +1327,7 @@ private:
 
     bool refine_color_class_sparse(sgraph  *g, coloring *c,
                                    int color_class, int class_size,
-                                   work_list_pair_bool* color_class_split_worklist, invariant* I) {
+                                   work_list_pair_bool* color_class_split_worklist) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
@@ -1381,9 +1377,9 @@ private:
         }
 
         // write invariant for singleton color classes
-        comp = I->write_top_and_compare(singleton_inv1) && comp;
-        comp = I->write_top_and_compare(singleton_inv2) && comp;
-        comp = I->write_top_and_compare(-acc_in) && comp;
+        //comp = I->write_top_and_compare(singleton_inv1) && comp;
+        //comp = I->write_top_and_compare(singleton_inv2) && comp;
+        //comp = I->write_top_and_compare(-acc_in) && comp;
 
         // early out before sorting color classes
         /*if(!comp) {
@@ -1425,8 +1421,8 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                    comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
-                    comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
+                    //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
+                    //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
                         ptn[__col] = -1;
                 }
@@ -1514,7 +1510,7 @@ private:
 
     bool refine_color_class_dense(sgraph  *g, coloring *c,
                                   int color_class, int class_size,
-                                  work_list_pair_bool* color_class_split_worklist, invariant* I) {
+                                  work_list_pair_bool* color_class_split_worklist) {
         bool comp;
         int i, cc, acc, largest_color_class_size, singleton_inv, pos;
         cc = color_class; // iterate over color class
@@ -1554,17 +1550,17 @@ private:
         }
 
         // write singletons
-        comp = I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos) && comp;
+        //comp = I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos) && comp;
 
-        if(config.CONFIG_IR_FULL_INVARIANT) {
+        /*if(config.CONFIG_IR_FULL_INVARIANT) {
             vertex_worklist.sort();
             while (!vertex_worklist.empty()) {
                 const int col = vertex_worklist.pop_back();
-                comp = I->write_top_and_compare(g->v_size * 9 + col) && comp;
+                //comp = I->write_top_and_compare(g->v_size * 9 + col) && comp;
             }
         } else {
             comp = I->write_top_and_compare(singleton_inv) && comp;
-        }
+        }*/
 
         old_color_classes.sort();
 
@@ -1595,12 +1591,12 @@ private:
             neighbour_sizes.inc(first_index);
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
-            comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
+            //comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
-                const int v_degree = neighbours.get(c->lab[col]);
-                comp = I->write_top_and_compare(col + g->v_size * v_degree) && comp;
+                //const int v_degree = neighbours.get(c->lab[col]);
+                //comp = I->write_top_and_compare(col + g->v_size * v_degree) && comp;
                 continue;
             }
 
@@ -1617,8 +1613,8 @@ private:
                     c->ptn[_col] = -1; // this is val - 1, actually...
 
                     const int v_degree = i;
-                    comp = I->write_top_and_compare(_col + g->v_size * v_degree) && comp;
-                    comp = I->write_top_and_compare(_col + val + 1) && comp;
+                    //comp = I->write_top_and_compare(_col + g->v_size * v_degree) && comp;
+                    //comp = I->write_top_and_compare(_col + val + 1) && comp;
                 }
             }
 
@@ -1665,7 +1661,7 @@ private:
 
     bool refine_color_class_dense_dense(sgraph *g, coloring *c,
                                         int color_class, int class_size,
-                                        work_list_pair_bool* color_class_split_worklist, invariant* I) {
+                                        work_list_pair_bool* color_class_split_worklist) {
         bool comp;
         int i, j, acc, cc, largest_color_class_size;
         cc = color_class; // iterate over color class
@@ -1697,7 +1693,7 @@ private:
                 const int v_degree = neighbours.get(c->lab[col]) + 1;
                 if(v_degree == -1) // not connected! skip...
                     continue;
-                comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
+                //comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
                 continue;
             }
 
@@ -1720,15 +1716,15 @@ private:
             neighbour_sizes.inc(first_index);
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
-            comp = I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos) && comp;
+            //comp = I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos) && comp;
             // if(!comp) {neighbours.reset_hard(); return comp;}
 
             if(vertex_worklist.cur_pos == 1) {
                 // no split
                 const int v_degree = neighbours.get(c->lab[col]);
                 //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
-                comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
-                comp = I->write_top_and_compare(col + c->ptn[col] + 1) && comp;
+                //comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
+                //comp = I->write_top_and_compare(col + c->ptn[col] + 1) && comp;
                 continue;
             }
 
@@ -1745,9 +1741,9 @@ private:
                     c->ptn[_col] = -1; // this is val - 1, actually...
 
                     const int v_degree = i;
-                    comp = I->write_top_and_compare(-g->v_size * 5 - _col) && comp;
-                    comp = I->write_top_and_compare(_col + v_degree) && comp;
-                    comp = I->write_top_and_compare(_col + val + 1) && comp;
+                    //comp = I->write_top_and_compare(-g->v_size * 5 - _col) && comp;
+                    //comp = I->write_top_and_compare(_col + v_degree) && comp;
+                    //comp = I->write_top_and_compare(_col + val + 1) && comp;
                 }
             }
 
@@ -1796,7 +1792,7 @@ private:
 
     bool refine_color_class_singleton(sgraph  *g, coloring *c,
                                       int color_class, int class_size,
-                                      work_list_pair_bool *color_class_split_worklist, invariant *I) {
+                                      work_list_pair_bool *color_class_split_worklist) {
         bool comp;
         int i, cc, deg1_write_pos, deg1_read_pos, singleton_inv;
         cc = color_class; // iterate over color class
@@ -1836,26 +1832,26 @@ private:
         }
 
         singleton_inv += old_color_classes.cur_pos;
-        if(!config.CONFIG_IR_FULL_INVARIANT)
-            comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
+        //if(!config.CONFIG_IR_FULL_INVARIANT)
+        //    comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
 
         old_color_classes.sort();
 
         // write invariant first...
-        for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
+        /*for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
             //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
             comp = I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes[i])) && comp;
             // contains information about color degree (= 1)
-        }
+        }*/
 
         // sort and write down singletons in invariant
-        if(config.CONFIG_IR_FULL_INVARIANT)
+        /*if(config.CONFIG_IR_FULL_INVARIANT)
             vertex_worklist.sort();
 
         for(i = 0; i < vertex_worklist.cur_pos; ++i) {
             comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist[i]) && comp; // size
             // should contain information about color degree
-        }
+        }*/
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();
