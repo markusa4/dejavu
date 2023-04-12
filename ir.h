@@ -354,9 +354,13 @@ namespace dejavu {
             // TODO configuration of dynamic selector when deviating from base
 
             /**
+             * Dynamic cell selector, chooses first non-trivial color class, unless color class from stored base is
+             * applicable.
              *
+             * @param c Coloring from which a color class shall be selected.
+             * @param base_pos Current position in base.
              */
-            int dynamic_selector(const coloring *c, const int base_pos) {
+            int dynamic_selector_first(const coloring *c, const int base_pos) {
                 if (base_pos >= 0 && base_pos < saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0) {
                     return saved_color_base[base_pos];
                 }
@@ -373,12 +377,20 @@ namespace dejavu {
              * @return A selector hook based on the saved base and configured dynamic selector.
              */
             std::function<type_selector_hook> *get_selector_hook() {
-                dynamic_seletor = std::bind(&selector_factory::dynamic_selector, this, std::placeholders::_1,
+                dynamic_seletor = std::bind(&selector_factory::dynamic_selector_first, this, std::placeholders::_1,
                                             std::placeholders::_2);
                 return &dynamic_seletor;
             }
 
-            void __attribute__ ((noinline)) find_base(refinement *R, sgraph *g, controller *state) {
+            /**
+             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for simple,
+             * sparse graphs.
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_sparse_optimized_base(refinement *R, sgraph *g, controller *state) {
                 state->T->set_compare(false);
                 state->T->set_record(true);
 
@@ -413,12 +425,8 @@ namespace dejavu {
 
                     // heuristic, try to pick "good" color
                     if (best_color == -1) {
-                        //std::cout << "heuristic color" << std::endl;
                         candidates.clear();
                         int best_score = -1;
-
-                        int alt_best_color = -1;
-                        int alt_best_score = -1;
 
                         for (int i = 0; i < state->get_coloring()->ptn_sz;) {
                             if (state->get_coloring()->ptn[i] > 0) {
@@ -430,8 +438,6 @@ namespace dejavu {
 
                             i += state->get_coloring()->ptn[i] + 1;
                         }
-
-                        const int num_tested = candidates.size();
 
                         while (!candidates.empty()) {
                             const int test_color = candidates.back();
@@ -445,51 +451,80 @@ namespace dejavu {
                                 best_color = test_color;
                                 best_score = test_score;
                             }
-
-                            /*int alt_test_score = alt_score(g, state, test_color);
-                            if(neighbour_color.get(test_color)) {
-                                alt_test_score *= 10;
-                            }
-                            if (alt_test_score > alt_best_score) {
-                                alt_best_color = test_color;
-                                alt_best_score = test_score;
-                            }*/
                         }
-
-                        /*if (best_color != alt_best_color) {
-                            //std::cout << best_color << " vs. " << alt_best_color << std::endl;
-                            state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
-                            const int score1 = state_score(g, state);
-                            state->move_to_parent();
-                            state->move_to_child(R, g, state->get_coloring()->lab[alt_best_color]);
-                            const int score2 = state_score(g, state);
-                            state->move_to_parent();
-
-                            //std::cout << score1 << ":" << score2 << std::endl;
-                            if (score2 > score1) {
-                                best_color = alt_best_color;
-                            }
-                        }*/
-                    }
-
-                    if (best_color == -1) {
-                        std::cout << state->get_coloring()->cells << "/" << g->v_size << std::endl;
                     }
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
                     prev_color = best_color;
                     state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
-                    //std::cout << "picked color " << best_color << " score " << best_score << " among " << num_tested << " colors" << ", cells: " << state->c->cells << "/" << g->v_size << std::endl;
                 }
 
                 saved_color_base = state->base_color;
-                return;
+            }
+
+            /**
+             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for
+             * combinatorial graphs solved by bfs/random walks (i.e., by choosing large colors).
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_combinatorial_optimized_base(refinement *R, sgraph *g, controller *state) {
+                state->T->set_compare(false);
+                state->T->set_record(true);
+
+                std::vector<int> candidates;
+                test_set.initialize(g->v_size);
+                candidates.reserve(locked_lim);
+
+                mark_set neighbour_color;
+                neighbour_color.initialize(g->v_size);
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+
+                    // heuristic, try to pick "good" color
+                    if (best_color == -1) {
+                        candidates.clear();
+                        int best_score = -1;
+
+                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                candidates.push_back(i);
+                            }
+
+                            //if (candidates.size() >= (size_t) locked_lim)
+                            //    break;
+
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+
+                        while (!candidates.empty()) {
+                            const int test_color = candidates.back();
+                            candidates.pop_back();
+
+                            int test_score = color_score_size(g, state, test_color);
+                            if (neighbour_color.get(test_color)) {
+                                test_score *= 10;
+                            }
+                            if (test_score > best_score) {
+                                best_color = test_color;
+                                best_score = test_score;
+                            }
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base = state->base_color;
             }
 
             int color_score(sgraph *g, controller *state, int color) {
-                //return (state->c->ptn[color] +1)*100; //+ d + non_triv_col_d;
-
                 test_set.reset();
                 const int v = state->get_coloring()->lab[color];
                 const int d = g->d[v];
@@ -502,26 +537,13 @@ namespace dejavu {
                         test_set.set(test_col);
                     }
                 }
-                //return state->c->ptn[color] + d + non_triv_col_d;
                 return state->get_coloring()->ptn[color] * non_triv_col_d;
             }
 
-            int alt_score(sgraph *g, controller *state, int color) {
-                test_set.reset();
-                const int v = state->get_coloring()->lab[color];
-                const int d = g->d[v];
-                const int ept = g->v[v];
-                int non_triv_col_d = 1;
-                for (int i = 0; i < d; ++i) {
-                    const int test_col = state->get_coloring()->vertex_to_col[g->e[ept + i]];
-                    if (!test_set.get(test_col)) {
-                        non_triv_col_d += 1;
-                        test_set.set(test_col);
-                    }
-                }
-                //return state->c->ptn[color] + d + non_triv_col_d;
-                return non_triv_col_d;
+            int color_score_size(sgraph *g, controller *state, int color) {
+                return state->get_coloring()->ptn[color];
             }
+
 
             int state_score(sgraph *g, controller *state) {
                 return state->get_coloring()->cells;

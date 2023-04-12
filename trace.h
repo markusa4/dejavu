@@ -80,6 +80,8 @@ namespace dejavu {
                 hash = 0;
                 for (int i = 0; i < data.size(); ++i) {
                     const int dt = data[i];
+                    if(dt == TRACE_MARKER_REFINE_END)
+                        continue;
                     if (dt == TRACE_MARKER_REFINE_CELL_START) {
                         if (data[i + 1] == false) {
                             skipping_cell = true;
@@ -165,7 +167,7 @@ namespace dejavu {
                 assert(!assert_cell_act);
                 assert(assert_refine_act);
                 assert_refine_act = false;
-                write_compare(TRACE_MARKER_REFINE_END);
+                write_skip_compare(TRACE_MARKER_REFINE_END);
             }
 
             /**

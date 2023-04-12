@@ -490,6 +490,7 @@ namespace dejavu {
         /**
          * \brief A transversal in a Schreier structure.
          *
+         * Can be used across multiple threads.
          */
         class transversal {
             enum stored_transversal_type {
@@ -523,24 +524,18 @@ namespace dejavu {
             }
 
 
-            void __attribute__ ((noinline))
-            apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
+            void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
                        generating_set &generators, const int perm, const int pwr) {
                 // load perm into workspace
                 auto generator = generators.get_generator(perm);
 
-                //if(level == 0) {
-                //    std::cout << perm << "^" << pwr << std::endl;
-                //}
-
-                if (pwr < 0) {
+                // apply generator
+                if (pwr < 0) { // use inverse
                     generator->load_inverse(w.loader, w.scratch_auto);
-
                     // multiply
                     automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), abs(pwr));
-                } else if (pwr > 0) {
+                } else if (pwr > 0) { // use generator
                     generator->load(w.loader, w.scratch_auto);
-
                     // multiply
                     automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
                 }
@@ -634,7 +629,7 @@ namespace dejavu {
 
                 load_orbit_to_scratch(w);
                 bool changed = false;
-                // TODO probably aquire lock already here
+                // TODO probably acquire lock already here
                 // TODO how this is performed precisely should depend on fixed_orbit size versus support of generator
                 int gen_num = -1;
 
@@ -706,17 +701,9 @@ namespace dejavu {
                     const int pos = find_point(fixed_map);
                     const int perm = fixed_orbit_to_perm[pos];
                     const int pwr = fixed_orbit_to_pwr[pos];
-                    //std::cout << "fixing " << fixed_map << "->" << fixed << " using " << perm << "^" << pwr << std::endl;
-
-                    assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(),
-                                                            automorphism.support()));
                     apply_perm(w, automorphism, generators, perm, pwr);
-                    assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(),
-                                                            automorphism.support()));
-
                     fixed_map = automorphism.perm()[fixed];
                 }
-
                 assert(automorphism.perm()[fixed] == fixed);
                 return automorphism.nsupport() == 0;
             }
@@ -744,10 +731,16 @@ namespace dejavu {
 
         public:
 
+            /**
+             * @return Number of stored generators using a sparse data structure.
+             */
             int stat_sparsegen() {
                 return generators.s_stored_sparse;
             }
 
+            /**
+             * @return Number of stored generators using a dense data structure.
+             */
             int stat_densegen() {
                 return generators.s_stored_dense;
             }
@@ -813,6 +806,12 @@ namespace dejavu {
                 transversals[base_pos]->reduce_to_unfinished(w, selection);
             }
 
+            /**
+             * Checks whether the traversal at position \p base_pos matches its size upper bound.
+             *
+             * @param base_pos Position in base.
+             * @return Bool that indicates whether the traversal at position \p base_pos matches its size upper bound.
+             */
             bool is_finished(const int base_pos) {
                 return transversals[base_pos]->is_finished();
             }

@@ -156,7 +156,6 @@ namespace dejavu {
 
                 auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                 if(other_leaf == nullptr) {
-                    //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
                     leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
                 }
             }
@@ -524,17 +523,25 @@ namespace dejavu {
             g->e_size = gg->e_size;
         }
 
+        void man_to_exp_group_size() {
+            while(grp_sz_man >= 10.0) {
+                grp_sz_exp += 1;
+                grp_sz_man = grp_sz_man / 10;
+            }
+        }
+
+        void add_to_group_size(std::pair<long double, int> add_grp_sz) {
+            add_to_group_size(add_grp_sz.first, add_grp_sz.second);
+        }
+
         void add_to_group_size(long double add_grp_sz_man, int add_grp_sz_exp) {
-            while (add_grp_sz_man > 10) {
+            while (add_grp_sz_man >= 10.0) {
                 grp_sz_exp += 1;
                 add_grp_sz_man = add_grp_sz_man / 10;
             }
             grp_sz_exp += add_grp_sz_exp;
             grp_sz_man *= add_grp_sz_man;
-            while (add_grp_sz_man > 10) {
-                grp_sz_exp += 1;
-                add_grp_sz_man = add_grp_sz_man / 10;
-            }
+            man_to_exp_group_size();
         }
 
     public:
@@ -581,6 +588,9 @@ namespace dejavu {
             std::cout << std::endl << "solving..." << std::endl;
             progress_print_header();
 
+            // root state for random and BFS search, as well as restarts
+            ir::reduced_save root_save;
+
             // initialize a coloring using colors of preprocessed graph
             coloring local_coloring;
             g->initialize_coloring(&local_coloring, colmap);
@@ -590,47 +600,59 @@ namespace dejavu {
             ir::controller local_state(&local_coloring, &local_trace);
 
             // save root state for random and BFS search
-            ir::reduced_save root_save;
             local_state.save_reduced_state(root_save);
 
-            // find a selector, moves local_state to a leaf of IR tree
-            m_selectors.find_base(&m_refinement, g, &local_state);
-            std::function<ir::type_selector_hook>* current_selector = m_selectors.get_selector_hook();
-            progress_print("selector", std::to_string(local_state.base_pos), std::to_string(local_trace.get_position()));
-            int base_size = local_state.base_pos;
+            // loop to enable restarts
+            while(true) {
+                ++h_restarts; // Dry land is not a myth, I've seen it!
 
-            std::vector<int> base       = local_state.base_vertex;
-            std::vector<int> base_sizes = local_state.base_color_sz;
+                grp_sz_man = 1.0; /**< group size mantissa, see also \a grp_sz_exp */
+                grp_sz_exp = 0;   /**< group size exponent, see also \a grp_sz_man  */
+                add_to_group_size(m_prep.base, m_prep.exp);
 
-            // TODO fix this, should work...
-            //local_state.T->update_blueprint_hash();
-            //std::cout << local_state.T->get_hash() << std::endl;
+                // find a selector, moves local_state to a leaf of IR tree
+                m_selectors.find_sparse_optimized_base(&m_refinement, g, &local_state);
+                std::function<ir::type_selector_hook> *current_selector = m_selectors.get_selector_hook();
+                progress_print("selector", std::to_string(local_state.base_pos),
+                               std::to_string(local_trace.get_position()));
+                int base_size = local_state.base_pos;
 
-            // depth-first search starting from the computed leaf in local_state
-            m_dfs.setup(0, &m_refinement);
-            //m_dfs.make_leaf_snapshot(&local_state);
+                std::vector<int> base = local_state.base_vertex;
+                std::vector<int> base_sizes = local_state.base_color_sz;
 
-           const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
-            progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level), std::to_string(m_dfs.grp_sz_man)+"10^"+std::to_string(m_dfs.grp_sz_exp));
-            add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
+                // TODO fix this, should work...
+                //local_state.T->update_blueprint_hash();
+                //std::cout << local_state.T->get_hash() << std::endl;
 
-            // set up schreier structure
-            m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
+                // depth-first search starting from the computed leaf in local_state
+                m_dfs.setup(0, &m_refinement);
+                //m_dfs.make_leaf_snapshot(&local_state);
 
-            // intertwined random automorphisms and breadth-first search
+                const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
+                progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
+                               std::to_string(m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
+                add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
 
-            // random automorphisms
-            m_rand.setup(h_error_prob, h_limit_leaf);
-            m_rand.specific_walk(m_refinement, base, g, m_schreier, local_state, root_save);
-            m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
+                // set up schreier structure
+                m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
 
-            progress_print("urandom", std::to_string(m_rand.stat_leaves()), "_");
-            progress_print("schreier", "s"+std::to_string(m_schreier.stat_sparsegen())+"/d"+std::to_string(m_schreier.stat_densegen()), "_");
+                // intertwined random automorphisms and breadth-first search
 
-            auto add_grp_sz = m_schreier.compute_group_size();
-            add_to_group_size(add_grp_sz.first, add_grp_sz.second);
+                // random automorphisms, single origin
+                m_rand.setup(h_error_prob, h_limit_leaf);
+                m_rand.specific_walk(m_refinement, base, g, m_schreier, local_state, root_save);
+                m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
 
-            // breadth-first search
+                progress_print("urandom", std::to_string(m_rand.stat_leaves()), "_");
+                progress_print("schreier", "s" + std::to_string(m_schreier.stat_sparsegen()) + "/d" +
+                                           std::to_string(m_schreier.stat_densegen()), "_");
+
+                add_to_group_size(m_schreier.compute_group_size());
+
+                // breadth-first search & random automorphisms
+
+                break;
+            }
 
             std::cout << "#symmetries: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
         }
