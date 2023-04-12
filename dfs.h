@@ -134,7 +134,8 @@ namespace dejavu {
          * @param other
          * @param pwr
          */
-        void __attribute__ ((noinline)) apply(work_list& scratch_apply1, work_list& scratch_apply2, mark_set& scratch_apply3, int* p, int pwr = 1) {
+        void __attribute__ ((noinline)) apply(work_list& scratch_apply1, work_list& scratch_apply2, mark_set& scratch_apply3,
+                                              const int* p, int pwr = 1) {
             if(pwr == 0)
                 return;
             if(pwr <= 5) {

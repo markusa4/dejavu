@@ -1,7 +1,9 @@
 #include <iostream>
 #include "configuration.h"
 #include "parser.h"
-#include "dejavu_auto.h"
+#include <thread>
+#include "sassy/preprocessor.h"
+#include "dfs.h"
 #include <cassert>
 #include <chrono>
 #include <string>
@@ -43,6 +45,11 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     auto empty_hook_func = sassy::sassy_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
     dejavu::dejavu2 d;
+    if(colmap == nullptr) {
+        colmap = new int[g->v_size];
+        for(int i = 0; i < g->v_size; ++i)
+            colmap[i] = 0;
+    }
     d.automorphisms(g, colmap, &empty_hook_func);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
