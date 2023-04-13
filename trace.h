@@ -57,8 +57,12 @@ namespace dejavu {
                 if (record)
                     data.push_back(d);
                 if (compare) {
-                    assert(compare_trace->data.size() > position);
-                    comp = comp && compare_trace->data[position] == d;
+                    if(position < compare_trace->data.size()) {
+                        assert(compare_trace->data.size() > position);
+                        comp = comp && compare_trace->data[position] == d;
+                    } else {
+                        comp = false;
+                    }
                 }
                 ++position;
             }
@@ -66,9 +70,6 @@ namespace dejavu {
             void write_skip_compare(int d) {
                 if (record)
                     data.push_back(d);
-                if (compare) {
-                    assert(compare_trace->data.size() > position);
-                }
                 ++position;
             }
 
@@ -118,7 +119,7 @@ namespace dejavu {
              * Records the start of a refinement.
              */
             void op_refine_start() {
-                assert(!assert_refine_act);
+                assert(!comp || !assert_refine_act);
                 write_compare(TRACE_MARKER_REFINE_START);
                 assert_refine_act = true;
             }
@@ -128,7 +129,7 @@ namespace dejavu {
              * @param color The color in respect to which the coloring is refined.
              */
             void op_refine_cell_start(int color) {
-                assert(!assert_cell_act);
+                assert(!comp || !assert_cell_act);
                 write_compare(TRACE_MARKER_REFINE_CELL_START);
                 cell_old_color = color;
                 cell_act_spot = data.size();
@@ -143,7 +144,7 @@ namespace dejavu {
              * @param new_color_deg The color degree which lead to the new color class.
              */
             void op_refine_cell_record(int new_color, int new_color_size, int new_color_deg) {
-                assert(assert_cell_act);
+                assert(!comp || assert_cell_act);
                 write_compare(new_color);
                 //write_compare(new_color_size);
                 //write_compare(new_color_deg);
@@ -151,11 +152,15 @@ namespace dejavu {
                     data[cell_act_spot] = true;
             }
 
+            void op_additional_info(int d) {
+                write_compare(d);
+            }
+
             /**
              * Records the end of a refinement with respect to a color.
              */
             void op_refine_cell_end() {
-                assert(assert_cell_act);
+                assert(!comp || assert_cell_act);
                 assert_cell_act = false;
                 write_compare(TRACE_MARKER_REFINE_CELL_END);
             }
@@ -164,7 +169,7 @@ namespace dejavu {
              * Records the end of a refinement.
              */
             void op_refine_end() {
-                assert(!assert_cell_act);
+                assert(!comp || !assert_cell_act);
                 assert(assert_refine_act);
                 assert_refine_act = false;
                 write_skip_compare(TRACE_MARKER_REFINE_END);
@@ -300,6 +305,8 @@ namespace dejavu {
 
             // position the trace
             void set_position(int position) {
+                assert_cell_act   = false;
+                assert_refine_act = false;
                 this->position = position;
             }
 

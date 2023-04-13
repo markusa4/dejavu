@@ -51,7 +51,7 @@ namespace dejavu {
             void set_state(std::vector<int> &base_vertex, coloring &c, long invariant, int trace_position,
                            int base_position) {
                 this->base_vertex = base_vertex;
-                this->c.copy(&c);
+                this->c.copy_force(&c);
                 this->invariant = invariant;
                 this->trace_position = trace_position;
                 this->base_position = base_position;
@@ -119,6 +119,7 @@ namespace dejavu {
 
             std::function<type_split_color_hook> my_split_hook;
             std::function<type_worklist_color_hook> my_worklist_hook;
+            std::function<type_additional_info_hook> my_add_hook;
 
             // settings
             ir_mode mode = IR_MODE_RECORD_TRACE;
@@ -129,6 +130,7 @@ namespace dejavu {
             bool h_hint_color_is_singleton_now = true;
             bool h_cell_active = false;
             bool h_individualize = false;
+            bool h_trace_early_out = false;
 
             int base_pos = 0;
         private:
@@ -138,6 +140,13 @@ namespace dejavu {
                     touched_color.set(i);
                     i += c->ptn[i] + 1;
                 }
+            }
+
+            void reset_touched() {
+                touched_color.reset();
+                touched_color_list.reset();
+                prev_color_list.reset();
+                touch_initial_colors();
             }
 
         public:
@@ -153,6 +162,20 @@ namespace dejavu {
 
                 my_split_hook = self_split_hook();
                 my_worklist_hook = self_worklist_hook();
+                my_add_hook   = self_add_hook();
+            }
+
+            void use_limited_reversible_for_next() {
+                reset_touched();
+                mode = IR_MODE_COMPARE_TRACE;
+            }
+
+            void reset_trace_equal() {
+                T->reset_trace_equal();
+            }
+
+            void use_trace_early_out(bool trace_early_out) {
+                this->h_trace_early_out = trace_early_out;
             }
 
             // TODO incomplete state save for BFS & random reset
@@ -162,11 +185,45 @@ namespace dejavu {
 
             // TODO incomplete state load for BFS & random reset
             void load_reduced_state(reduced_save &state) {
-                c->copy(state.get_coloring());
+                bool partial_base = false;
+                /*if(state.get_base().size() <= base_vertex.size()) {
+                    int i;
+                    for (i = 0; i < state.get_base().size(); ++i) if (state.get_base()[i] != base_vertex[i]) break;
+                    partial_base = (i == state.get_base().size());
+                }
+
+                if(partial_base) {
+                    c->copy(state.get_coloring());
+                } else {*/
+                    c->copy_force(state.get_coloring());
+                //}
+
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
+                T->reset_trace_equal();
                 base_pos = state.get_base_position();
                 base_vertex = state.get_base();
+
+                // these become meaningless
+                base_singleton_pt.clear();
+                base_color.clear();
+                base_color_sz.clear();
+                base_touched_color_list_pt.clear();
+
+                // deactivate reversability
+                mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
+            }
+
+            void load_reduced_state_without_coloring(reduced_save &state) {
+                T->set_hash(state.get_invariant_hash());
+                T->set_position(state.get_trace_position());
+                T->reset_trace_equal();
+
+                // these become meaningless
+                base_singleton_pt.clear();
+                base_color.clear();
+                base_color_sz.clear();
+                base_touched_color_list_pt.clear();
 
                 // deactivate reversability
                 mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
@@ -180,8 +237,12 @@ namespace dejavu {
                 return base_pos;
             }
 
-            int set_base_pos(int pos) {
+            void set_base_pos(int pos) {
                 base_pos = pos;
+            }
+
+            void add_hook(const int d) {
+                if (T) T->op_additional_info(d);
             }
 
             bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
@@ -212,7 +273,9 @@ namespace dejavu {
                 // record split into trace invariant, unless we are individualizing
                 if (T && !h_individualize) T->op_refine_cell_record(new_color, new_color_sz, 1);
 
-                return true;
+                const bool cont = !h_trace_early_out || T->trace_equal();
+
+                return cont;
             }
 
             bool worklist_hook(const int color, const int color_sz) {
@@ -247,6 +310,10 @@ namespace dejavu {
                 return std::bind(&controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
             }
 
+            std::function<type_additional_info_hook> self_add_hook() {
+                return std::bind(&controller::add_hook, this, std::placeholders::_1);
+            }
+
             /**
              * Move IR node kept in this controller to a child, specified by a vertex to be individualized.
              *
@@ -277,14 +344,15 @@ namespace dejavu {
                 if (T) T->op_refine_start();
 
                 if (mode == IR_MODE_RECORD_TRACE) {
-                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook, my_worklist_hook);
+                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
+                                       my_worklist_hook, my_add_hook);
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
                 } else {
                     // TODO compare_base_cells not necessarily applicable
                     R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos - 1], my_split_hook,
-                                       my_worklist_hook);
-                    if (T) T->skip_to_individualization();
+                                       my_worklist_hook, my_add_hook);
+                    if (T && T->trace_equal()) T->skip_to_individualization();
                 }
 
                 h_cell_active = false;
@@ -586,23 +654,29 @@ namespace dejavu {
             void set_next(tree_node* next) {
                 this->next = next;
             }
+            reduced_save* get_save() {
+                return data;
+            }
         };
 
         // TODO tree structure for BFS + random walk
         class tree {
             std::vector<tree_node*> tree_data;
             std::vector<int>        tree_level_size;
+            int                     finished_up_to = 0;
         public:
-            void initialize(int base_size) {
-                tree_data.resize(base_size);
-                tree_level_size.resize(base_size);
+            void initialize(int base_size, ir::reduced_save* root) {
+                tree_data.resize(base_size + 1);
+                tree_level_size.resize(base_size + 1);
+                add_node(0, root);
             }
 
             void add_node(int level, reduced_save* data) {
                 // TODO use locks
-                ++tree_level_size[level];
                 if(tree_data[level] == nullptr) {
+                    tree_level_size[level] = 0;
                     tree_data[level] = new tree_node(data, nullptr);
+                    tree_data[level]->set_next(tree_data[level]);
                 } else {
                     tree_node* a_node    = tree_data[level];
                     tree_node* next_node = a_node->get_next();
@@ -610,6 +684,34 @@ namespace dejavu {
                     a_node->set_next(new_node);
                     tree_data[level] = new_node;
                 }
+                ++tree_level_size[level];
+            }
+
+            ir::tree_node* pick_node_from_level(const int level, int num) {
+                num = num % tree_level_size[level];
+                auto pick = tree_data[level];
+                assert(pick != nullptr);
+                for(int i = 0; i < num; ++i) {
+                    pick = pick->get_next();
+                }
+                assert(pick != nullptr);
+                return pick;
+            }
+
+            int get_finished_up_to() {
+                return finished_up_to;
+            }
+
+            void set_finished_up_to(const int finished_up_to) {
+                this->finished_up_to = finished_up_to;
+            }
+
+            tree_node* get_level(int level) {
+                return tree_data[level];
+            }
+
+            int get_level_size(int level) {
+                return tree_level_size[level];
             }
 
             ~tree() {

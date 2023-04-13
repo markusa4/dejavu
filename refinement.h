@@ -18,6 +18,10 @@ typedef bool type_split_color_hook(const int, const int, const int);
 // bool worklist_color_hook(int color, int color_sz);
 typedef bool type_worklist_color_hook(const int, const int);
 
+// return whether to continue splitting the respective cell, or skip it
+// bool worklist_color_hook(int color, int color_sz);
+typedef void type_additional_info_hook(const int);
+
 // sorting utilizing minimal sorting networks for n <= 6
 template<class T>
 void sort_t(T* arr, int sz) {
@@ -478,7 +482,8 @@ public:
      */
     void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
-                         const std::function<type_worklist_color_hook>& worklist_hook = nullptr) {
+                         const std::function<type_worklist_color_hook>& worklist_hook = nullptr,
+                         const std::function<type_additional_info_hook>& add_hook = nullptr) {
         singleton_hint.reset();
         assure_initialized(g);
         int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
@@ -524,7 +529,7 @@ public:
             if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                                    &color_class_splits);
+                                                    &color_class_splits, add_hook);
             } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
@@ -535,7 +540,7 @@ public:
                 }
             } else { // sparse
                 refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                          &color_class_splits);
+                                          &color_class_splits, add_hook);
             }
 
             /*deviation_expander -= (!comp);
@@ -550,6 +555,8 @@ public:
             bool skipped_largest  = false;
             const int pre_cells   = c->cells;
 
+            bool early_out = false;
+
             // color class splits are sorted in reverse
             // the old color class will always come last
             while(!color_class_splits.empty()) {
@@ -560,8 +567,9 @@ public:
                 c->cells += (old_class != new_class);
                 int class_size = c->ptn[new_class];
 
-                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]+1))
-                    return;
+                if(split_hook && !split_hook(old_class, new_class, c->ptn[new_class]+1)) {
+                    early_out = true;
+                }
 
                 c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0)?
                                                class_size:c->smallest_cell_lower_bound;
@@ -594,6 +602,9 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
+            if(early_out)
+                break;
+
             // detection if coloring is discrete
             if(c->cells == g->v_size) {
                 //const int new_cells = c->cells - pre_cells;
@@ -607,7 +618,7 @@ public:
             if(c->cells == color_limit && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
-                return;
+                break;
             }
 
             // mark end of cell and denote whether this cell was splitting or non-splitting
@@ -1209,7 +1220,8 @@ private:
 
     bool refine_color_class_sparse(sgraph  *g, coloring *c,
                                    int color_class, int class_size,
-                                   work_list_pair_bool* color_class_split_worklist) {
+                                   work_list_pair_bool* color_class_split_worklist,
+                                   const std::function<type_additional_info_hook>& add_hook = nullptr) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
@@ -1259,7 +1271,7 @@ private:
         }
 
         // write invariant for singleton color classes
-        //comp = I->write_top_and_compare(singleton_inv1) && comp;
+        if(add_hook) add_hook(singleton_inv1);
         //comp = I->write_top_and_compare(singleton_inv2) && comp;
         //comp = I->write_top_and_compare(-acc_in) && comp;
 
@@ -1303,6 +1315,7 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
+                    if(add_hook) add_hook(v_degree);
                     //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                     //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
@@ -1663,9 +1676,10 @@ private:
         return comp;
     }
 
-    bool refine_color_class_singleton(sgraph  *g, coloring *c,
+    void refine_color_class_singleton(sgraph  *g, coloring *c,
                                       int color_class, int class_size,
-                                      work_list_pair_bool *color_class_split_worklist) {
+                                      work_list_pair_bool *color_class_split_worklist,
+                                      const std::function<type_additional_info_hook>& add_hook = nullptr) {
         bool comp;
         int i, cc, deg1_write_pos, deg1_read_pos, singleton_inv;
         cc = color_class; // iterate over color class
@@ -1686,10 +1700,7 @@ private:
 
             if(c->ptn[col] == 0) {
                 // if full invariant, sort -- else use a hash value
-                if(config.CONFIG_IR_FULL_INVARIANT)
-                    vertex_worklist.push_back(col); // treat singletons in separate list (more efficient sorting)
-                else
-                    singleton_inv += MASH5(col);
+                singleton_inv += MASH5(col);
                 continue;
             }
 
@@ -1705,7 +1716,16 @@ private:
         }
 
         singleton_inv += old_color_classes.cur_pos;
+        if(add_hook) (add_hook)(singleton_inv);
+
         old_color_classes.sort();
+
+        // write invariant first...
+        for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
+            //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
+            if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
+            // contains information about color degree (= 1)
+        }
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();
@@ -1766,8 +1786,6 @@ private:
             // reset neighbours count to -1
             neighbours.set(deg0_col, -1);
         }
-
-        return comp;
     }
 
     bool refine_color_class_singleton_first(sgraph  *g, coloring *c,
