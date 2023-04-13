@@ -8,6 +8,12 @@
 #include "trace.h"
 
 namespace dejavu {
+    /**
+     * \brief IR fundamentals.
+     *
+     * Contains fundamental algorithms and data structures to implement individualization-refinement algorithms. This
+     * includes graphs, colorings, color refinement, cell selectors as well as higher level control mechanisms.
+     */
     namespace ir {
         /**
          * \brief Mode of trace for IR search
@@ -586,7 +592,7 @@ namespace dejavu {
         class tree {
             std::vector<tree_node*> tree_data;
             std::vector<int>        tree_level_size;
-
+        public:
             void initialize(int base_size) {
                 tree_data.resize(base_size);
                 tree_level_size.resize(base_size);
@@ -605,6 +611,10 @@ namespace dejavu {
                     tree_data[level] = new_node;
                 }
             }
+
+            ~tree() {
+                //TODO: write this
+            };
         };
     }
 }

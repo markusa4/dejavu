@@ -171,93 +171,6 @@ private:
 typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
 typedef work_list_t<int> work_list;
 
-class tiny_orbit {
-    int               sz;
-    mark_set          touched;
-    work_list_t<int>  reset_arr;
-    work_list_t<int>  map_arr;
-    work_list_t<int>  orb_sz;
-public:
-    int find_and_cut_orbit(const int v1) {
-        assert(v1 >= 0);
-        assert(v1 < sz);
-        int orbit1 = map_arr[v1];
-        while(orbit1 != map_arr[orbit1])
-            orbit1 = map_arr[orbit1];
-        map_arr[v1] = orbit1;
-        return orbit1;
-    }
-
-    int orbit_size(const int v1) {
-        assert(v1 >= 0);
-        assert(v1 < sz);
-        return orb_sz[find_and_cut_orbit(v1)];
-    }
-
-    bool represents_orbit(const int v1) {
-        return v1 == map_arr[v1];
-    }
-
-    void combine_orbits(const int v1, const int v2) {
-        assert(v1 >= 0);
-        assert(v2 >= 0);
-        assert(v1 < sz);
-        assert(v2 < sz);
-        if(v1 != v2) {
-            if(!touched.get(v1))
-                reset_arr.push_back(v1);
-            if(!touched.get(v2))
-                reset_arr.push_back(v2);
-            touched.set(v1);
-            touched.set(v2);
-            int orbit1 = find_and_cut_orbit(v1);
-            int orbit2 = find_and_cut_orbit(v2);
-            if(orbit1 == orbit2)
-                return;
-            if(orbit1 < orbit2) {
-                map_arr[orbit2] = orbit1;
-                orb_sz[orbit1] += orb_sz[orbit2];
-            } else {
-                map_arr[orbit1] = orbit2;
-                orb_sz[orbit2] += orb_sz[orbit1];
-            }
-        }
-    }
-
-    bool are_in_same_orbit(const int v1, const int v2) {
-        assert(v1 >= 0);
-        assert(v2 >= 0);
-        assert(v1 < sz);
-        assert(v2 < sz);
-        if(v1 == v2)
-            return true;
-        const int orbit1 = find_and_cut_orbit(v1);
-        const int orbit2 = find_and_cut_orbit(v2);
-        return (orbit1 == orbit2);
-    }
-
-    void reset() {
-        while(!reset_arr.empty()) {
-            const int v = reset_arr.pop_back();
-            map_arr[v] = v;
-            orb_sz[v]  = 1;
-        }
-        touched.reset();
-    }
-
-    void initialize(int domain_size) {
-        sz = domain_size;
-        touched.initialize(domain_size);
-        reset_arr.initialize(domain_size);
-        map_arr.initialize(domain_size);
-        orb_sz.initialize(domain_size);
-        for(int i = 0; i < domain_size; ++i) {
-            map_arr.push_back(i);
-            orb_sz.push_back(1);
-        }
-    }
-};
-
 // queue with fixed size limitation
 class work_queue {
 public:
@@ -700,37 +613,6 @@ public:
             // mark end of cell and denote whether this cell was splitting or non-splitting
             //if(!comp && deviation_expander <= 0) break;
         }
-    }
-
-    int  individualize_vertex(coloring* c, int v, mark_set* touched_color = nullptr,
-                              work_list* touched_color_list  = nullptr, work_list* prev_color_list  = nullptr) {
-        const int color = c->vertex_to_col[v];
-        const int pos   = c->vertex_to_lab[v];
-
-        int color_class_size = c->ptn[color];
-
-        assert(color_class_size > 0);
-
-        const int vertex_at_pos = c->lab[color + color_class_size];
-        c->lab[pos] = vertex_at_pos;
-        c->vertex_to_lab[vertex_at_pos] = pos;
-
-        c->lab[color + color_class_size] = v;
-        c->vertex_to_lab[v] = color + color_class_size;
-        c->vertex_to_col[v] = color + color_class_size;
-
-        c->ptn[color] -= 1;
-        c->ptn[color + color_class_size] = 0;
-        c->ptn[color + color_class_size - 1] = 0;
-        c->cells += 1;
-
-        if(touched_color) {
-            touched_color->set(color + color_class_size);
-            touched_color_list->push_back(color + color_class_size);
-            prev_color_list->push_back(color);
-        }
-
-        return color + color_class_size;
     }
 
     /**
@@ -1716,15 +1598,9 @@ private:
             neighbour_sizes.inc(first_index);
             neighbour_sizes.set(first_index, col_sz - total - 1);
 
-            //comp = I->write_top_and_compare(g->v_size * 12 + vertex_worklist.cur_pos) && comp;
-            // if(!comp) {neighbours.reset_hard(); return comp;}
-
             if(vertex_worklist.cur_pos == 1) {
                 // no split
                 const int v_degree = neighbours.get(c->lab[col]);
-                //comp = comp && I->write_top_and_compare(-g->v_size * 10 - col);
-                //comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
-                //comp = I->write_top_and_compare(col + c->ptn[col] + 1) && comp;
                 continue;
             }
 
@@ -1741,9 +1617,6 @@ private:
                     c->ptn[_col] = -1; // this is val - 1, actually...
 
                     const int v_degree = i;
-                    //comp = I->write_top_and_compare(-g->v_size * 5 - _col) && comp;
-                    //comp = I->write_top_and_compare(_col + v_degree) && comp;
-                    //comp = I->write_top_and_compare(_col + val + 1) && comp;
                 }
             }
 
@@ -1832,26 +1705,7 @@ private:
         }
 
         singleton_inv += old_color_classes.cur_pos;
-        //if(!config.CONFIG_IR_FULL_INVARIANT)
-        //    comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
-
         old_color_classes.sort();
-
-        // write invariant first...
-        /*for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
-            //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-            comp = I->write_top_and_compare(g->v_size * 14 + neighbours.get(old_color_classes[i])) && comp;
-            // contains information about color degree (= 1)
-        }*/
-
-        // sort and write down singletons in invariant
-        /*if(config.CONFIG_IR_FULL_INVARIANT)
-            vertex_worklist.sort();
-
-        for(i = 0; i < vertex_worklist.cur_pos; ++i) {
-            comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist[i]) && comp; // size
-            // should contain information about color degree
-        }*/
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();

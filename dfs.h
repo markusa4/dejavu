@@ -26,6 +26,12 @@ namespace dejavu {
         PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
     }
 
+    /**
+     * \brief High-level IR search strategies.
+     *
+     * Contains different high-level individualization-refinement search strategies. In particular, depth-first search,
+     * breadth-first search as well as different methods of random search.
+     */
     namespace search_strategy {
         /**
          * \brief Breadth-first search.
@@ -110,16 +116,21 @@ namespace dejavu {
          * Alternatively, a limit for the amount of discovered differing leafs can be set.
          */
         class random_ir {
-            std::default_random_engine generator;
-            stored_leafs leaf_storage;
+            stored_leafs leaf_storage; /**< stores all the leaves */
 
-            int consecutive_success = 0;
-            int error_bound = 5;
+            std::default_random_engine generator; /**< random number generator */
+            int consecutive_success = 0; /**< track repeated sifts for probabilistic abort criterion */
+            int error_bound = 5;         /**< determines error probability */
 
         public:
             void setup(int error, int leaf_store_limit) {
             }
 
+            /**
+             * Records a sift result for the probabilistic abort criterion.
+             *
+             * @param changed Whether the sift was successful or not.
+             */
             void record_sift_result(const bool changed) {
                 if(!changed) {
                     ++consecutive_success;
@@ -131,14 +142,24 @@ namespace dejavu {
                 }
             }
 
+            /**
+             * @return Whether the probabilistic abort criterion allows termination or not.
+             */
             bool probabilistic_abort_criterion() {
                 return (consecutive_success > error_bound);
             }
 
+            /**
+             * @param group The Schreier structure of the group we are considering.
+             * @return Whether the deterministic abort criterion allows termination or not.
+             */
             bool deterministic_abort_criterion(groups::schreier &group) {
                 return (group.finished_up_to_level() + 1 == group.base_size());
             }
 
+            /**
+             * @return How many leaves were stored during random search.
+             */
             int stat_leaves() {
                 return leaf_storage.s_leaves;
             }
@@ -157,6 +178,77 @@ namespace dejavu {
                 auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                 if(other_leaf == nullptr) {
                     leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
+                }
+            }
+
+            void random_walk(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
+                              groups::schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
+                groups::automorphism_workspace automorphism(g->v_size);
+                groups::schreier_workspace w(g->v_size, &R, g);
+                std::vector<int> heuristic_reroll;
+
+                local_state.load_reduced_state(start_from);
+                int could_start_from = group.finished_up_to_level();
+                if(local_state.base_pos < could_start_from) {
+                    while (local_state.base_pos <= could_start_from) {
+                        //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
+                        local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
+                    }
+                    local_state.save_reduced_state(start_from);
+                }
+
+                int base_pos = local_state.base_pos;
+
+                bool base_aligned = true;
+                bool uniform = true;
+
+                while (g->v_size != local_state.c->cells) {
+                    const int col = (*selector)(local_state.c, base_pos);
+                    const int col_sz = local_state.c->ptn[col] + 1;
+                    const int rand = ((int) generator()) % col_sz;
+                    int v = local_state.c->lab[col + rand];
+
+                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && leaf_storage.s_leaves <= 1) {
+                        heuristic_reroll.clear();
+                        for(int i = 0; i < col_sz; ++i) {
+                            heuristic_reroll.push_back(local_state.c->lab[col + i]);
+                        }
+                        group.reduce_to_unfinished(w, heuristic_reroll, base_pos);
+                        if(heuristic_reroll.size() > 0) {
+                            const int rand = ((int) generator()) % heuristic_reroll.size();
+                            v = heuristic_reroll[rand];
+                            //std::cout << group.is_finished(base_pos) << "re-roll!"
+                            //          << group.is_in_base_orbit(base_pos, v) << std::endl;
+                        }
+                    }
+
+                    if(group.is_in_base_orbit(base_pos, v) && base_aligned && leaf_storage.s_leaves <= 1) {
+                        v = group.base_point(local_state.base_pos);
+                        assert(local_state.c->vertex_to_col[v] == col);
+                        uniform = false;
+                    } else {
+                        base_aligned = false;
+                    }
+
+                    local_state.move_to_child(&R, g, v);
+                    ++base_pos;
+                }
+
+                auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
+                if(other_leaf == nullptr) {
+                    //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
+                    leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
+                } else {
+                    //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
+                    automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
+                    const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
+                    if(cert) {
+                        //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
+                        const bool sift = group.sift(w, g, &R, automorphism);
+                        if(uniform) record_sift_result(sift);
+                    }
+
+                    automorphism.reset();
                 }
             }
 
@@ -250,12 +342,11 @@ namespace dejavu {
             refinement *R = nullptr;
             ir::splitmap *SM = nullptr;
             ir::trace compare_T;
+            int cost_snapshot = 0; /**< used to track cost-based abort criterion */
 
         public:
             long double grp_sz_man = 1.0; /**< group size mantissa */
             int         grp_sz_exp = 0;   /**< group size exponent */
-
-            int         cost_snapshot = 0;
 
             /**
              * Setup the DFS module.
@@ -314,7 +405,6 @@ namespace dejavu {
                         }
 
                         if (std::get<0>(cert_res)) {
-                            //std::cout << "deep_automorphism" << "@" << state->base_pos << "/" << state->compare_base_color.size() << "(" << state->c->cells << "/" << g->v_size << ")" << std::endl;
                             return {true, true};
                         } else {
                             prev_fail = true;
@@ -323,20 +413,13 @@ namespace dejavu {
                     }
                 }
                 if (state->c->cells == g->v_size) {
-                    //std::cout << "fail" << std::endl;
                     return {true, false};
                 } else {
                     return {false, false};
                 }
             }
 
-            // adds a given automorphism to the tiny_orbit structure
-            void add_automorphism_to_orbit(tiny_orbit *orbit, int *automorphism, int nsupp, int *supp) {
-                for (int i = 0; i < nsupp; ++i) {
-                    orbit->combine_orbits(automorphism[supp[i]], supp[i]);
-                }
-            }
-
+            // TODO: maybe this should go into the controller?
             void make_leaf_snapshot(ir::controller *state) {
                 cost_snapshot = state->T->get_position();
 
@@ -355,82 +438,64 @@ namespace dejavu {
                 state->mode = ir::IR_MODE_COMPARE_TRACE;
             }
 
-            // returns base-level reached (from leaf)
+            /**
+             * Performs DFS from a given leaf node. Does not backtrack and returns the level up to which DFS succeeded.
+             *
+             * @param g The graph.
+             * @param initial_colors The initial coloring of the graph \p g.
+             * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR tree.
+             * @return The level up to which DFS succeeded.
+             */
             int do_dfs(sgraph *g, int *initial_colors, ir::controller &local_state) {
-                // TODO should depend on given selector
-                int gens = 0;
-
-                tiny_orbit orbs;
+                // orbit algorithm structure
+                groups::orbit orbs;
                 orbs.initialize(g->v_size);
 
-                //work_list automorphism(g->v_size);
-                //work_list automorphism_supp(g->v_size);
+                // automorphism workspace
                 groups::automorphism_workspace pautomorphism(g->v_size);
-
-                //controller local_state(c, &T);
-
-                // start DFS from a leaf!
-                //move_to_leaf(g, &local_state);
-                // TODO move this outside DFS, only give state in leaf node (we dont even need a selector here!)
 
                 // make a snapshot of the leaf to compare to!
                 make_leaf_snapshot(&local_state);
-
                 coloring leaf_color;
                 leaf_color.copy(local_state.get_coloring());
 
-                std::vector<int> individualize;
-
+                // abort criteria
                 double recent_cost_snapshot = 0;
-
-                bool fail = false;
+                bool   fail = false;
 
                 // loop that serves to optimize Tinhofer graphs
                 while (recent_cost_snapshot < 0.25 && local_state.base_pos > 0 && !fail) {
                     local_state.move_to_parent();
-                    const int col = local_state.base_color[local_state.base_pos]; // TODO: detect stack of "same color"?
+                    const int col = local_state.base_color[local_state.base_pos];
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int vert = local_state.base_vertex[local_state.base_pos];
 
-                    int count_leaf = 0;
-                    int count_orb = 0;
-
+                    // iterate over current color class
                     for (int i = col_sz - 1; i >= 0; --i) {
-                        int cost_start = local_state.T->get_position();
-
                         const int ind_v = leaf_color.lab[col + i];
-                        if (ind_v == vert || !orbs.represents_orbit(ind_v))
-                            continue;
-                        if (orbs.are_in_same_orbit(ind_v, vert)) { // TODO somehow skip to ones not in same orbit?
-                            ++count_orb;
-                            continue;
-                        }
+                        if (ind_v == vert || !orbs.represents_orbit(ind_v)) continue;
+                        if (orbs.are_in_same_orbit(ind_v, vert))        continue;
 
-                        ++count_leaf;
+                        // track cost of this refinement for whatever is to come
+                        const int cost_start = local_state.T->get_position();
 
-                        // call actual DFS with limited fails
-                        // Tinhofer graphs will never fail, and have recursion width = 1
+                        // perform individualization-refinement
                         const int prev_base_pos = local_state.base_pos;
                         local_state.T->reset_trace_equal(); // probably need to re-adjust position?
                         local_state.move_to_child(R, g, ind_v);
-                        bool found_auto = false;
-                        //if(local_state.h_last_refinement_singleton_only) {
+                        const int wr_pos_st = local_state.base_singleton_pt[local_state.base_singleton_pt.size() - 1];
+                        const int wr_pos_end= (int) local_state.singletons.size();
+
+                        // check for sparse automorphism
                         pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
-                                                      local_state.base_singleton_pt[
-                                                              local_state.base_singleton_pt.size() - 1],
-                                                      local_state.singletons.size());
-                        found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
+                                                      wr_pos_st,wr_pos_end);
+                        bool found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
                                                                     pautomorphism.nsupport(),
                                                                     pautomorphism.support());
                         assert(pautomorphism.perm()[vert] == ind_v);
-                        //}
-                        //std::cout << found_auto << ", " << automorphism_supp.cur_pos << std::endl;
-                        //reset_automorphism(automorphism.get_array(), &automorphism_supp);
 
-                        // try proper recursion
+                        // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
-                            // TODO: heuristic that once this becomes common, we start to copy away the state and recover it, and don't track
-                            // TODO: touched stuff
                             auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, pautomorphism);
                             found_auto = (rec_succeeded.first && rec_succeeded.second);
                             if (rec_succeeded.first && !rec_succeeded.second) {
@@ -443,33 +508,36 @@ namespace dejavu {
                             }
                         }
 
-                        int cost_end = local_state.T->get_position();
-                        double cost_partial = (cost_end - cost_start) / (cost_snapshot*1.0);
+                        // track cost-based abort criterion
+                        const int cost_end = local_state.T->get_position();
+                        double cost_partial  = (cost_end - cost_start) / (cost_snapshot*1.0);
                         recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
 
+                        // if we found automorphism, add to abort, (and TODO: call hook)
                         if (found_auto) {
                             assert(pautomorphism.perm()[vert] == ind_v);
-                            ++gens;
-                            add_automorphism_to_orbit(&orbs, pautomorphism.perm(),
-                                                      pautomorphism.nsupport(), pautomorphism.support());
+                            orbs.add_automorphism_to_orbit(pautomorphism);
                         }
                         pautomorphism.reset();
 
+                        // move state back up where we started in this iteration
                         while (prev_base_pos < local_state.base_pos) {
                             local_state.move_to_parent();
                         }
 
+                        // if no automorphism could be determined we would have to backtrack -- so stop!
                         if (!found_auto) {
-                            std::cout << ind_v << "(F) " << std::endl;
-                            fail = true;
+                            fail = true; // TODO: need to track global failure
                             break;
                         }
 
+                        // if orbit size equals color size now, we are done on this DFS level
                         if (orbs.orbit_size(vert) == col_sz) {
                             break;
                         }
                     }
 
+                    // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
                         grp_sz_man *= col_sz;
                         while (grp_sz_man > 10) {
@@ -479,6 +547,7 @@ namespace dejavu {
                     }
                 }
 
+                // if DFS failed on current level, we did not finish the current level -- has to be accounted for
                 return local_state.base_pos + (fail);
             }
         };
@@ -606,8 +675,8 @@ namespace dejavu {
             while(g->v_size > 0) {
                 ++h_restarts; // Dry land is not a myth, I've seen it!
 
-                grp_sz_man = 1.0; /**< group size mantissa, see also \a grp_sz_exp */
-                grp_sz_exp = 0;   /**< group size exponent, see also \a grp_sz_man  */
+                grp_sz_man = 1.0;
+                grp_sz_exp = 0;
                 add_to_group_size(m_prep.base, m_prep.exp);
 
                 // find a selector, moves local_state to a leaf of IR tree
@@ -636,7 +705,7 @@ namespace dejavu {
                 if(dfs_reached_level == 0) break;
 
                 // set up schreier structure
-                m_schreier.setup(g->v_size, base, base_sizes, dfs_reached_level);
+                m_schreier.initialize(g->v_size, base, base_sizes, dfs_reached_level);
 
                 // intertwined random automorphisms and breadth-first search
 

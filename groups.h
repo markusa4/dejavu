@@ -9,7 +9,11 @@
 
 namespace dejavu {
 
-
+    /**
+     * \brief Data structures and algorithms to deal with groups.
+     *
+     * Contains basic data structures to construct and deal with automorphisms, as well as a Schreier structure.
+     */
     namespace groups {
 
         // reset internal automorphism structure to the identity
@@ -108,8 +112,7 @@ namespace dejavu {
              * @param other
              * @param pwr
              */
-            void __attribute__ ((noinline))
-            apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
+            void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
                   const int *p, int pwr = 1) {
                 if (pwr == 0)
                     return;
@@ -233,6 +236,150 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief Orbit partition
+         *
+         * Keeps track of an orbit partition, and provides tools to manipulate the orbits within.
+         */
+        class orbit {
+            int               sz;
+            mark_set          touched;
+            work_list_t<int>  reset_arr;
+            work_list_t<int>  map_arr;
+            work_list_t<int>  orb_sz;
+        public:
+
+            /**
+             * Retrieve the orbit of the given vertex.
+             *
+             * @param v Vertex of the specified domain.
+             * @return The orbit of \p v.
+             */
+            int find_and_cut_orbit(const int v) {
+                assert(v >= 0);
+                assert(v < sz);
+                int orbit1 = map_arr[v];
+                while(orbit1 != map_arr[orbit1])
+                    orbit1 = map_arr[orbit1];
+                map_arr[v] = orbit1;
+                return orbit1;
+            }
+
+            /**
+             * Returns the size of an orbit.
+             *
+             * @param v Vertex of the specified domain.
+             * @return Size of the orbit of \p v.
+             */
+            int orbit_size(const int v) {
+                assert(v >= 0);
+                assert(v < sz);
+                return orb_sz[find_and_cut_orbit(v)];
+            }
+
+            /**
+             * Every orbit has precisely one representative. This function enables to test this.
+             *
+             * @param v Vertex of the specified domain.
+             * @return Whether \p v is the representative of the orbit of \p v.
+             */
+            bool represents_orbit(const int v) {
+                return v == map_arr[v];
+            }
+
+            /**
+             * Combines the orbits of two given vertices.
+             *
+             * @param v1 The first vertex.
+             * @param v2  The second vertex.
+             */
+            void combine_orbits(const int v1, const int v2) {
+                assert(v1 >= 0);
+                assert(v2 >= 0);
+                assert(v1 < sz);
+                assert(v2 < sz);
+                if(v1 != v2) {
+                    if(!touched.get(v1))
+                        reset_arr.push_back(v1);
+                    if(!touched.get(v2))
+                        reset_arr.push_back(v2);
+                    touched.set(v1);
+                    touched.set(v2);
+                    int orbit1 = find_and_cut_orbit(v1);
+                    int orbit2 = find_and_cut_orbit(v2);
+                    if(orbit1 == orbit2)
+                        return;
+                    if(orbit1 < orbit2) {
+                        map_arr[orbit2] = orbit1;
+                        orb_sz[orbit1] += orb_sz[orbit2];
+                    } else {
+                        map_arr[orbit1] = orbit2;
+                        orb_sz[orbit2] += orb_sz[orbit1];
+                    }
+                }
+            }
+
+
+            /**
+             * Checks whether two given vertices are in the same orbit
+             *
+             * @param v1 The first vertex.
+             * @param v2  The second vertex.
+             * @return Whether \p v1 and \p v2 are in the same orbit.
+             */
+            bool are_in_same_orbit(const int v1, const int v2) {
+                assert(v1 >= 0);
+                assert(v2 >= 0);
+                assert(v1 < sz);
+                assert(v2 < sz);
+                if(v1 == v2)
+                    return true;
+                const int orbit1 = find_and_cut_orbit(v1);
+                const int orbit2 = find_and_cut_orbit(v2);
+                return (orbit1 == orbit2);
+            }
+
+            void reset() {
+                while(!reset_arr.empty()) {
+                    const int v = reset_arr.pop_back();
+                    map_arr[v] = v;
+                    orb_sz[v]  = 1;
+                }
+                touched.reset();
+            }
+
+            /**
+             * Applies an automorphism to the orbit structure.
+             *
+             * @param aut Automorphism workspace which is applied.
+             */
+            void add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
+                const int  nsupp = aut.nsupport();
+                const int* supp  = aut.support();
+                const int* p     = aut.perm();
+                for (int i = 0; i < nsupp; ++i) {
+                    combine_orbits(p[supp[i]], supp[i]);
+                }
+            }
+
+            /**
+             * Initializes the orbit structure with the given size.
+             *
+             * @param domain_size The size of the underlying domain.
+             */
+            void initialize(int domain_size) {
+                sz = domain_size;
+                touched.initialize(domain_size);
+                reset_arr.initialize(domain_size);
+                map_arr.initialize(domain_size);
+                orb_sz.initialize(domain_size);
+                for(int i = 0; i < domain_size; ++i) {
+                    map_arr.push_back(i);
+                    orb_sz.push_back(1);
+                }
+            }
+        };
+
         typedef void type_unload_hook();
 
         /**
@@ -263,7 +410,9 @@ namespace dejavu {
          */
         class stored_automorphism {
         public:
-            enum stored_automorphism_type { STORE_DENSE, STORE_SPARSE };
+            enum stored_automorphism_type { STORE_DENSE, ///< stored densely, in size O(\a domain_size)
+                                            STORE_SPARSE ///< stored in minimal encoding size of automorphism
+                                          };
 
         private:
             work_list data;
@@ -440,7 +589,7 @@ namespace dejavu {
              * Set up this generating set.
              * @param domain_size Size of the domain of the stored generators.
              */
-            void setup(int domain_size) {
+            void initialize(int domain_size) {
                 this->domain_size = domain_size;
             }
 
@@ -608,7 +757,7 @@ namespace dejavu {
              * @param level Position of the transversal in the base of Schreier structure.
              * @param sz_upb Upper bound for the size of transversal (e.g., color class size in combinatorial base).
              */
-            void setup(const int fixed_vertex, const int level, const int sz_upb) {
+            void initialize(const int fixed_vertex, const int level, const int sz_upb) {
                 fixed = fixed_vertex;
                 this->level = level;
                 this->sz_upb = sz_upb;
@@ -752,15 +901,15 @@ namespace dejavu {
              * @param base the base
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void setup(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop) {
+            void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop) {
                 assert(base.size() >= stop);
                 this->domain_size = domain_size;
-                generators.setup(domain_size);
+                generators.initialize(domain_size);
                 transversals.initialize(stop);
                 transversals.set_size(stop);
                 for (int i = 0; i < stop; ++i) {
                     transversals[i] = new transversal();
-                    transversals[i]->setup(base[i], i, base_sizes[i]);
+                    transversals[i]->initialize(base[i], i, base_sizes[i]);
                 }
             }
 
