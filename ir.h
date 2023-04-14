@@ -91,7 +91,7 @@ namespace dejavu {
         };
 
         /**
-         * \brief Controls movement in IR tree
+         * \brief Controls movement in IR shared_tree
          *
          * Keeps a state of an IR node. Enables the movement to a child of the node, or to the parent of the node.
          * The controller manages data structures and functions, which facilitate the trace \a T as well as the reversal of
@@ -100,8 +100,13 @@ namespace dejavu {
          * Has different modes (managed by \a mode) depending on whether color refinement should be reversible or not.
          */
         struct controller {
-            coloring *c = nullptr;
-            trace *T = nullptr;
+            coloring      *c  = nullptr;
+            trace         *T  = nullptr;
+            trace         *cT = nullptr;
+
+            trace _T1;
+            trace _T2;
+
             mark_set touched_color;
             work_list touched_color_list;
             work_list prev_color_list;
@@ -117,6 +122,8 @@ namespace dejavu {
             std::vector<int> compare_base_cells;
             std::vector<int> compare_singletons;
             std::vector<int> compare_base;
+
+            coloring leaf_color;
 
             std::function<type_split_color_hook> my_split_hook;
             std::function<type_worklist_color_hook> my_worklist_hook;
@@ -158,6 +165,8 @@ namespace dejavu {
 
             void mode_search_for_base() {
                 T->reset();
+                cT->reset();
+
                 reset_touched();
                 mode = IR_MODE_RECORD_TRACE;
                 T->set_compare(false);
@@ -165,7 +174,7 @@ namespace dejavu {
             }
 
             void mode_dfs() {
-
+                mode = ir::IR_MODE_COMPARE_TRACE;
             }
 
             void mode_bfs() {
@@ -176,9 +185,42 @@ namespace dejavu {
 
             }
 
-            controller(coloring *c, trace *T) {
+            void flip_trace() {
+                trace* t_flip = T;
+                T  = cT;
+                cT = t_flip;
+            }
+
+            void compare_to_this() {
+                cT->set_compare(true);
+                cT->set_record(false);
+                cT->set_compare_trace(T);
+                cT->set_position(T->get_position());
+                flip_trace();
+
+                compare_base_color.clear();
+                compare_base_color.resize(base_color.size());
+                std::copy(base_color.begin(), base_color.end(), compare_base_color.begin());
+                compare_base_cells.clear();
+                compare_base_cells.resize(base_cells.size());
+                std::copy(base_cells.begin(), base_cells.end(), compare_base_cells.begin());
+                compare_singletons.clear();
+                compare_singletons.resize(singletons.size());
+                std::copy(singletons.begin(), singletons.end(), compare_singletons.begin());
+                compare_base.clear();
+                compare_base.resize(base_vertex.size());
+                std::copy(base_vertex.begin(), base_vertex.end(), compare_base.begin());
+
+                leaf_color.copy_force(c);
+
+                mode = ir::IR_MODE_COMPARE_TRACE;
+            }
+
+            controller(coloring *c) {
                 this->c = c;
-                this->T = T;
+
+                T  = &_T1;
+                cT = &_T2;
 
                 touched_color.initialize(c->lab_sz);
                 touched_color_list.initialize(c->lab_sz);
@@ -472,7 +514,7 @@ namespace dejavu {
          * \brief Creates cell selectors.
          *
          * Heuristics which enable the creation of different cell selectors, as well as moving an \ref controller to a
-         * leaf of the IR tree.
+         * leaf of the IR shared_tree.
          */
         class selector_factory {
             // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
@@ -805,8 +847,11 @@ namespace dejavu {
             }
         };
 
-        // TODO tree structure for BFS + random walk
-        class tree {
+        typedef std::pair<ir::tree_node*, int> missing_node;
+
+        // TODO shared_tree structure for BFS + random walk
+        class shared_tree {
+            shared_queue_t<missing_node>         missing_nodes;
             std::vector<tree_node*>              tree_data;
             std::vector<std::vector<tree_node*>> tree_data_jump_map;
             std::vector<int>        tree_level_size;
@@ -817,6 +862,22 @@ namespace dejavu {
                 tree_level_size.resize(base_size + 1);
                 tree_data_jump_map.resize(base_size + 1);
                 add_node(0, root, true);
+            }
+
+            void queue_reserve(const int n) {
+                missing_nodes.reserve(n);
+            }
+
+            void queue_missing_node(missing_node node) {
+                missing_nodes.add(node);
+            }
+
+            bool queue_missing_node_empty() {
+                return missing_nodes.empty();
+            }
+
+            missing_node queue_missing_node_pop() {
+                return missing_nodes.pop();
             }
 
             void add_node(int level, reduced_save* data, bool is_base = false) {
@@ -873,7 +934,7 @@ namespace dejavu {
                 return tree_level_size[level];
             }
 
-            ~tree() {
+            ~shared_tree() {
                 //TODO: write this
             };
         };

@@ -19,9 +19,9 @@ struct configstruct {
     int  CONFIG_IR_CELL_SELECTOR  = 3;     // selector type, if CONFIG_IR_FORCE_SELECTOR is set
     int  CONFIG_IR_SIZE_FACTOR    = 10;    // tradeoff between restarts and allowed breadth-first width
     bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
-    bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search tree
+    bool CONFIG_IR_FULL_BFS       = false; // enforces full traversal of the search shared_tree
     bool CONFIG_IR_IDLE_SKIP      = true;  // blueprints
-    bool CONFIG_IR_FAST_TOLERANCE_INC  = true;  // tolerance of solver is raised more quickly if search tree appears difficult
+    bool CONFIG_IR_FAST_TOLERANCE_INC  = true;  // tolerance of solver is raised more quickly if search shared_tree appears difficult
     bool CONFIG_IR_INDIVIDUALIZE_EARLY = false; // experimental feature, based on an idea by Adolfo Piperno
     int  CONFIG_IR_EXPAND_DEVIATION = 5;   // additional cells processed after deviation is detected
     bool CONFIG_IR_FORCE_EXPAND_DEVIATION = false;

@@ -15,7 +15,7 @@ namespace dejavu {
         /**
          * \brief The trace invariant.
          *
-         * Class that serves to store and compare the trace of a walk in an individualization-refinement tree. The class
+         * Class that serves to store and compare the trace of a walk in an individualization-refinement shared_tree. The class
          * provides several different modes in which information is recorded and/or compared.
          *
          * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a full

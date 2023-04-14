@@ -82,6 +82,37 @@ void sort_t(T* arr, int sz) {
 #undef max
 }
 
+template<class T>
+class shared_queue_t {
+private:
+    std::mutex lock;
+    std::vector<T> queue;
+public:
+    void add(T& t) {
+        lock.lock();
+        queue.emplace_back(t);
+        lock.unlock();
+    }
+
+    void reserve(int n) {
+        lock.lock();
+        queue.reserve(n);
+        lock.unlock();
+    }
+
+    bool empty() {
+        return queue.empty();
+    }
+
+    T pop() {
+        lock.lock();
+        auto element = queue.back();
+        queue.pop_back();
+        lock.unlock();
+        return element;
+    }
+};
+
 // work list / stack with fixed size limitation
 template<class T>
 class work_list_t {
