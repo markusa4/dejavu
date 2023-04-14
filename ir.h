@@ -116,6 +116,7 @@ namespace dejavu {
             std::vector<int> compare_base_color;
             std::vector<int> compare_base_cells;
             std::vector<int> compare_singletons;
+            std::vector<int> compare_base;
 
             std::function<type_split_color_hook> my_split_hook;
             std::function<type_worklist_color_hook> my_worklist_hook;
@@ -131,6 +132,10 @@ namespace dejavu {
             bool h_cell_active = false;
             bool h_individualize = false;
             bool h_trace_early_out = false;
+
+            bool  h_deviation_inc_active  = false;
+            int   h_deviation_inc         = 10;
+            int   h_deviation_inc_current = 0;
 
             int base_pos = 0;
         private:
@@ -150,6 +155,27 @@ namespace dejavu {
             }
 
         public:
+
+            void mode_search_for_base() {
+                T->reset();
+                reset_touched();
+                mode = IR_MODE_RECORD_TRACE;
+                T->set_compare(false);
+                T->set_record(true);
+            }
+
+            void mode_dfs() {
+
+            }
+
+            void mode_bfs() {
+
+            }
+
+            void mode_random_walk() {
+
+            }
+
             controller(coloring *c, trace *T) {
                 this->c = c;
                 this->T = T;
@@ -172,10 +198,16 @@ namespace dejavu {
 
             void reset_trace_equal() {
                 T->reset_trace_equal();
+                h_deviation_inc_current = 0;
             }
 
             void use_trace_early_out(bool trace_early_out) {
                 this->h_trace_early_out = trace_early_out;
+                if(!trace_early_out) use_increase_deviation_hash(false);
+            }
+
+            void use_increase_deviation_hash(bool deviation_inc_active) {
+                h_deviation_inc_active = deviation_inc_active;
             }
 
             // TODO incomplete state save for BFS & random reset
@@ -184,7 +216,7 @@ namespace dejavu {
             }
 
             // TODO incomplete state load for BFS & random reset
-            void load_reduced_state(reduced_save &state) {
+            void __attribute__ ((noinline)) load_reduced_state(reduced_save &state) {
                 bool partial_base = false;
                 /*if(state.get_base().size() <= base_vertex.size()) {
                     int i;
@@ -201,6 +233,7 @@ namespace dejavu {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
+                T->set_compare(true);
                 base_pos = state.get_base_position();
                 base_vertex = state.get_base();
 
@@ -241,7 +274,7 @@ namespace dejavu {
                 base_pos = pos;
             }
 
-            void add_hook(const int d) {
+            void add_hook(const long d) {
                 if (T) T->op_additional_info(d);
             }
 
@@ -275,7 +308,26 @@ namespace dejavu {
 
                 const bool cont = !h_trace_early_out || T->trace_equal();
 
-                return cont;
+                h_deviation_inc_current += (!cont);
+                const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
+
+                return cont || deviation_override;
+            }
+
+            void write_strong_invariant(sgraph* g) {
+                work_list test(g->v_size);
+                for(int v = 0; v < g->v_size; ++v) {
+                    T->op_additional_info(-1);
+                    for(int pt = g->v[v]; pt < g->v[v] + g->d[v]; ++pt) {
+                        const int other_v = g->e[pt];
+                        test.push_back(c->vertex_to_col[other_v]);
+                    }
+                    test.sort();
+                    for(int j = 0; j < test.size(); ++j) {
+                        T->op_additional_info(test[j]);
+                    }
+                    test.reset();
+                }
             }
 
             bool worklist_hook(const int color, const int color_sz) {
@@ -285,16 +337,18 @@ namespace dejavu {
                 }
 
                 // update some heuristic values
-                if (T) {
+                // TODO: only activate blueprints on first few restarts!
+                /*if (T) {
                     if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
                         if (config.CONFIG_IR_IDLE_SKIP) {
                             T->blueprint_skip_to_next_cell();
                             return false;
                         }
                     }
-                }
+                }*/
 
                 if (T) T->op_refine_cell_start(color);
+                if (T && !h_individualize) T->op_additional_info(color_sz);
 
                 h_cell_active = true;
 
@@ -335,8 +389,9 @@ namespace dejavu {
                 assert(!h_cell_active);
 
                 h_individualize = true;
+                const int prev_col = c->vertex_to_col[v];
                 const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
-                T->op_individualize(c->vertex_to_col[v]);
+                T->op_individualize(prev_col, c->vertex_to_col[v]);
                 h_individualize = false;
 
                 h_last_refinement_singleton_only = true;
@@ -345,13 +400,16 @@ namespace dejavu {
 
                 if (mode == IR_MODE_RECORD_TRACE) {
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
-                                       my_worklist_hook, my_add_hook);
+                                       my_worklist_hook, my_add_hook
+                                       );
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
                 } else {
                     // TODO compare_base_cells not necessarily applicable
-                    R->refine_coloring(g, c, init_color_class, compare_base_cells[base_pos - 1], my_split_hook,
-                                       my_worklist_hook, my_add_hook);
+                    // compare_base_cells[base_pos - 1]
+                    R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
+                                       my_worklist_hook, my_add_hook
+                                       );
                     if (T && T->trace_equal()) T->skip_to_individualization();
                 }
 
@@ -464,6 +522,20 @@ namespace dejavu {
                 return &dynamic_seletor;
             }
 
+
+            void find_base(const int m_choose, refinement *R, sgraph *g, controller *state) {
+                switch(m_choose % 3) {
+                    case 0:
+                        find_sparse_optimized_base(R, g, state);
+                        break;
+                    case 1:
+                        find_combinatorial_optimized_base(R, g, state);
+                        break;
+                    case 2:
+                        find_small_optimized_base(R, g, state);
+                        break;
+                }
+            }
             /**
              * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for simple,
              * sparse graphs.
@@ -473,8 +545,7 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_sparse_optimized_base(refinement *R, sgraph *g, controller *state) {
-                state->T->set_compare(false);
-                state->T->set_record(true);
+                state->mode_search_for_base();
 
                 std::vector<int> candidates;
                 test_set.initialize(g->v_size);
@@ -546,6 +617,62 @@ namespace dejavu {
             }
 
             /**
+             * Find a base/selector for a given graph \p g from state \p state. Attempts to find a with small color
+             * classes.
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_small_optimized_base(refinement *R, sgraph *g, controller *state) {
+                state->mode_search_for_base();
+
+                std::vector<int> candidates;
+                test_set.initialize(g->v_size);
+                candidates.reserve(locked_lim);
+                int prev_color = -1;
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+
+                    // heuristic, try to pick "good" color
+                    if (best_color == -1) {
+                        candidates.clear();
+                        int best_score = INT32_MIN;
+
+                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                candidates.push_back(i);
+                            }
+
+                            if (candidates.size() >= (size_t) locked_lim)
+                                break;
+
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+
+                        while (!candidates.empty()) {
+                            const int test_color = candidates.back();
+                            candidates.pop_back();
+
+                            int test_score = color_score_anti_size(g, state, test_color);
+                            if (test_score > best_score || best_color == -1) {
+                                best_color = test_color;
+                                best_score = test_score;
+                            }
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color = best_color;
+                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base = state->base_color;
+            }
+
+            /**
              * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for
              * combinatorial graphs solved by bfs/random walks (i.e., by choosing large colors).
              *
@@ -554,8 +681,7 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_combinatorial_optimized_base(refinement *R, sgraph *g, controller *state) {
-                state->T->set_compare(false);
-                state->T->set_record(true);
+                state->mode_search_for_base();
 
                 std::vector<int> candidates;
                 test_set.initialize(g->v_size);
@@ -626,6 +752,10 @@ namespace dejavu {
                 return state->get_coloring()->ptn[color];
             }
 
+            int color_score_anti_size(sgraph *g, controller *state, int color) {
+                return INT32_MAX - state->get_coloring()->ptn[color];
+            }
+
 
             int state_score(sgraph *g, controller *state) {
                 return state->get_coloring()->cells;
@@ -640,6 +770,8 @@ namespace dejavu {
             std::mutex    lock;
             reduced_save* data;
             tree_node*    next;
+            bool          is_base = false;
+            bool          is_pruned = false;
         public:
             tree_node(reduced_save* data, tree_node* next) {
                 this->data = data;
@@ -657,45 +789,72 @@ namespace dejavu {
             reduced_save* get_save() {
                 return data;
             }
+
+            void prune() {
+                is_pruned = true;
+            }
+            bool get_prune() {
+                return is_pruned;
+            }
+
+            void base() {
+                is_base = true;
+            }
+            bool get_base() {
+                return is_base;
+            }
         };
 
         // TODO tree structure for BFS + random walk
         class tree {
-            std::vector<tree_node*> tree_data;
+            std::vector<tree_node*>              tree_data;
+            std::vector<std::vector<tree_node*>> tree_data_jump_map;
             std::vector<int>        tree_level_size;
             int                     finished_up_to = 0;
         public:
             void initialize(int base_size, ir::reduced_save* root) {
                 tree_data.resize(base_size + 1);
                 tree_level_size.resize(base_size + 1);
-                add_node(0, root);
+                tree_data_jump_map.resize(base_size + 1);
+                add_node(0, root, true);
             }
 
-            void add_node(int level, reduced_save* data) {
+            void add_node(int level, reduced_save* data, bool is_base = false) {
                 // TODO use locks
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;
                     tree_data[level] = new tree_node(data, nullptr);
                     tree_data[level]->set_next(tree_data[level]);
+                    if(is_base) tree_data[level]->base();
                 } else {
                     tree_node* a_node    = tree_data[level];
                     tree_node* next_node = a_node->get_next();
                     auto       new_node  = new tree_node(data, next_node);
+                    if(is_base) new_node->base();
                     a_node->set_next(new_node);
                     tree_data[level] = new_node;
                 }
                 ++tree_level_size[level];
             }
 
-            ir::tree_node* pick_node_from_level(const int level, int num) {
-                num = num % tree_level_size[level];
-                auto pick = tree_data[level];
-                assert(pick != nullptr);
-                for(int i = 0; i < num; ++i) {
-                    pick = pick->get_next();
+            void finish_level(int level) {
+                if(tree_data_jump_map[level].size() == 0) {
+                    tree_node * first = tree_data[level];
+                    tree_data_jump_map[level].reserve(tree_level_size[level]);
+                    tree_node * next = first;
+                    do {
+                        tree_data_jump_map[level].push_back(next);
+                        next = next->get_next();
+                    } while (next != first);
+                    assert(tree_data_jump_map[level].size() == tree_level_size[level]);
                 }
-                assert(pick != nullptr);
-                return pick;
+            }
+
+            ir::tree_node* pick_node_from_level(const int level, int num) {
+                finish_level(level);
+                // TODO very sure this is too slow!
+                num = num % tree_level_size[level];
+                return tree_data_jump_map[level][num];
             }
 
             int get_finished_up_to() {

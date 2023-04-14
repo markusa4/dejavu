@@ -109,10 +109,13 @@ namespace dejavu {
              * Records an individualization.
              * @param color The color being individualized.
              */
-            void op_individualize(int color) {
-                assert(color >= 0);
+            void op_individualize(int old_color, int ind_color) {
+                assert(ind_color >= 0);
+                assert(old_color >= 0);
+                assert(ind_color != old_color);
                 write_compare(TRACE_MARKER_INDIVIDUALIZE);
-                write_compare(color);
+                write_compare(old_color);
+                write_compare(ind_color);
             }
 
             /**
@@ -152,7 +155,7 @@ namespace dejavu {
                     data[cell_act_spot] = true;
             }
 
-            void op_additional_info(int d) {
+            void op_additional_info(long d) {
                 write_compare(d);
             }
 
@@ -296,6 +299,14 @@ namespace dejavu {
              */
             void reset_trace_equal() {
                 comp = true;
+            }
+
+            void reset() {
+                data.clear();
+                compare_trace = nullptr;
+                position = 0;
+                hash = 0;
+                reset_trace_equal();
             }
 
             // record to trace

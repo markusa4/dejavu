@@ -20,7 +20,7 @@ typedef bool type_worklist_color_hook(const int, const int);
 
 // return whether to continue splitting the respective cell, or skip it
 // bool worklist_color_hook(int color, int color_sz);
-typedef void type_additional_info_hook(const int);
+typedef void type_additional_info_hook(const long);
 
 // sorting utilizing minimal sorting networks for n <= 6
 template<class T>
@@ -482,8 +482,9 @@ public:
      */
     void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
-                         const std::function<type_worklist_color_hook>& worklist_hook = nullptr,
-                         const std::function<type_additional_info_hook>& add_hook = nullptr) {
+                         const std::function<type_worklist_color_hook>& worklist_hook = nullptr
+                                 ,const std::function<type_additional_info_hook>& add_hook = nullptr
+                                 ) {
         singleton_hint.reset();
         assure_initialized(g);
         int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
@@ -602,8 +603,9 @@ public:
             }
             const int new_cells = c->cells - pre_cells;
 
-            if(early_out)
+            if(early_out) {
                 break;
+            }
 
             // detection if coloring is discrete
             if(c->cells == g->v_size) {
@@ -1270,11 +1272,8 @@ private:
             cc += 1;
         }
 
-        // write invariant for singleton color classes
         if(add_hook) add_hook(singleton_inv1);
-        //comp = I->write_top_and_compare(singleton_inv2) && comp;
-        //comp = I->write_top_and_compare(-acc_in) && comp;
-
+        if(add_hook) add_hook(acc_in);
         // early out before sorting color classes
         /*if(!comp) {
             while(!old_color_classes.empty()) {
@@ -1315,7 +1314,7 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                    if(add_hook) add_hook(v_degree);
+                     if(add_hook) add_hook(v_degree);
                     //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                     //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
@@ -1678,10 +1677,11 @@ private:
 
     void refine_color_class_singleton(sgraph  *g, coloring *c,
                                       int color_class, int class_size,
-                                      work_list_pair_bool *color_class_split_worklist,
-                                      const std::function<type_additional_info_hook>& add_hook = nullptr) {
+                                      work_list_pair_bool *color_class_split_worklist
+                                      ,const std::function<type_additional_info_hook>& add_hook = nullptr
+                                              ) {
         bool comp;
-        int i, cc, deg1_write_pos, deg1_read_pos, singleton_inv;
+        int i, cc, deg1_write_pos, deg1_read_pos;
         cc = color_class; // iterate over color class
         comp = true;
 
@@ -1690,7 +1690,8 @@ private:
         vertex_worklist.reset();
         old_color_classes.reset();
 
-        singleton_inv = 0;
+        int singleton_inv = 0;
+
         const int vc = c->lab[cc];
         const int pe = g->v[vc];
         const int end_i = pe + g->d[vc];

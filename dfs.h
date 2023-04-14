@@ -14,11 +14,14 @@
 namespace dejavu {
 
     static void progress_print_header() {
-
         PRINT("________________________________________________________________");
         PRINT(std::setw(16) << std::left <<"T (ms)"                                  << std::setw(16) << "proc"  << std::setw(16) << "P1"        << std::setw(16)        << "P2");
         PRINT("________________________________________________________________");
         PRINT(std::setw(16) << std::left << 0 << std::setw(16) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
+    }
+
+    static void progress_print_split() {
+        PRINT("________________________________________________________________");
     }
 
     static void progress_print(const std::string
@@ -73,12 +76,27 @@ namespace dejavu {
          */
         class bfs_ir {
             search_strategy::bfs_queue bfs_todo;
+            std::unordered_set<long> deviation_map;
+            int computed_for_base = 0;
+            int expected_for_base = 0;
+            bool deviation_done = false;
+
+            int s_deviation_prune = 0;
+            int s_total_prune     = 0;
+            int s_total_kept      = 0;
+
         public:
             void do_a_level(refinement* R, sgraph* g, ir::tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
+
+                s_deviation_prune = 0;
+                s_total_prune     = 0;
+                s_total_kept      = 0;
+
                 queue_up_level(bfs_todo, selector, ir_tree, current_level);
                 work_on_todo(bfs_todo, R, g, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
+                //std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
             }
 
             int next_level_estimate(ir::tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
@@ -93,10 +111,16 @@ namespace dejavu {
             }
 
             void queue_up_level(bfs_queue& queue, std::function<ir::type_selector_hook> *selector, ir::tree& ir_tree, int base_pos) {
-                const auto start_node = ir_tree.get_level(base_pos);
+                auto start_node = ir_tree.get_level(base_pos);
+                while(!start_node->get_base()) {
+                    start_node = start_node->get_next();
+                }
+                start_node = start_node->get_next();
+
                 const auto level_size = ir_tree.get_level_size(base_pos);
                 auto next_node = start_node;
                 bool reserve = false;
+                reset_deviation_map();
 
                 do {
                     auto next_node_save = next_node->get_save();
@@ -104,6 +128,7 @@ namespace dejavu {
                     auto base_pos    = next_node_save->get_base_position();
                     int col = (*selector)(c, base_pos);
                     if(!reserve && col >= 0) {
+                        expected_for_base = c->ptn[col] + 1;
                         queue.reserve((c->ptn[col] + 1) * level_size);
                         reserve = true;
                     }
@@ -115,25 +140,79 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
+            void reset_deviation_map() {
+                deviation_map.clear();
+                computed_for_base = 0;
+                deviation_done = false;
+            }
+
+            void add_deviation(long hash) {
+                deviation_map.insert(hash);
+            }
+
+            void finish_deviation() {
+                deviation_done = true;
+            }
+
+            bool check_deviation(long hash) {
+                return !deviation_done || deviation_map.contains(hash);
+            }
+
             void compute_node(refinement* R, sgraph* g, ir::tree* ir_tree,  ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
                 auto next_node_save = node->get_save();
 
-                if(next_node_save != last_load) {
+                // node is already pruned
+                const bool is_pruned = node->get_prune();
+                if(is_pruned) {
+                    ++s_total_prune;
+                    ++s_deviation_prune;
+                    return;
+                }
+
+                // do efficient loading if parent is the same as previous load
+                if(next_node_save != last_load || g->v_size < 500) {
                     local_state.load_reduced_state(*next_node_save);
                 } else {
                     local_state.move_to_parent();
                     local_state.load_reduced_state_without_coloring(*next_node_save);
                 }
+
+                if(local_state.base_pos > 0) local_state.use_increase_deviation_hash(true);
+
+                // do computation
                 local_state.reset_trace_equal();
-                local_state.use_limited_reversible_for_next();
+                if(g->v_size >= 500) local_state.use_limited_reversible_for_next();
                 local_state.use_trace_early_out(true);
                 local_state.move_to_child(R, g, v);
 
+                // we want to keep track of whether we are on the base or not
+                const bool parent_is_base = node->get_base();
+                const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.base_pos-1]);
+
                 if(local_state.T->trace_equal()) { // TODO: what if leaf?
+                    ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
-                    ir_tree->add_node(local_state.base_pos, new_save);
+                    ir_tree->add_node(local_state.base_pos, new_save, is_base);
                 } else {
+                    // deviation map
+                    if(local_state.base_pos > 1) {
+                        ++s_total_prune;
+                        if (parent_is_base) add_deviation(local_state.T->get_hash());
+                        else {
+                            if (!check_deviation(local_state.T->get_hash())) {
+                                node->prune();
+                            }
+                        }
+                    }
+                }
+
+                // keep track how many we computed for deviation map
+                if(parent_is_base && local_state.base_pos > 1) {
+                    computed_for_base += 1;
+                    if(computed_for_base == expected_for_base) {
+                        finish_deviation();
+                    }
                 }
             }
 
@@ -204,11 +283,17 @@ namespace dejavu {
                 if(!leaf_store.contains(hash)) {
                     auto new_leaf = new stored_leaf(c, base);
                     leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
+                    garbage_collector.push_back(new_leaf);
                     ++s_leaves;
                     lock.unlock();
                 } else {
                     lock.unlock();
                 }
+            }
+
+            void clear() {
+                s_leaves = 0;
+                leaf_store.clear();
             }
         };
 
@@ -240,8 +325,23 @@ namespace dejavu {
                 h_required_first_level_success = required_first_level_success;
             }
 
+            void reset() {
+                h_leaf_limit = 0;
+                h_rolling_success = 0;
+                h_rolling_first_level_success  = 1.0;
+                h_required_first_level_success = 0;
+            }
+
+            void clear_leaves() {
+                leaf_storage.clear();
+            }
+
             double get_rolling_sucess_rate() {
                 return h_rolling_success;
+            }
+
+            double get_rolling_first_level_success_rate() {
+                return h_rolling_first_level_success;
             }
 
             /**
@@ -437,6 +537,8 @@ namespace dejavu {
                         ++base_pos;
                     }
 
+                    // local_state.write_strong_invariant(g);
+
                     auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                     if(other_leaf == nullptr) {
                         //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
@@ -451,6 +553,8 @@ namespace dejavu {
                             //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
                             const bool sift = group.sift(w, g, &R, automorphism);
                             if(uniform) record_sift_result(sift);
+                        } else {
+                            //std::cout << "cert fail " << std::endl;
                         }
                         automorphism.reset();
                     }
@@ -460,21 +564,24 @@ namespace dejavu {
             // TODO implement dejavu strategy, more simple
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR tree later? or just don't use automorphism pruning on BFS...?
-            void random_walks_from_tree(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
+            void __attribute__ ((noinline)) random_walks_from_tree(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
                               groups::schreier &group, ir::controller &local_state, ir::tree &ir_tree) {
                 groups::automorphism_workspace automorphism(g->v_size);
                 groups::schreier_workspace w(g->v_size, &R, g);
                 std::vector<int> heuristic_reroll;
-
                 local_state.use_trace_early_out(false);
 
                 h_rolling_first_level_success = 1;
                 const int pick_from_level = ir_tree.get_finished_up_to();
 
                 while(!probabilistic_abort_criterion() && !deterministic_abort_criterion(group)
-                      && leaf_storage.s_leaves <= h_leaf_limit) { //  * h_rolling_first_level_success
+                      && leaf_storage.s_leaves <= h_leaf_limit
+                      && (leaf_storage.s_leaves <= h_leaf_limit/4 || h_rolling_success > 0.001 || h_rolling_first_level_success > 0.1) // re-consider...
+                      ) { //  * h_rolling_first_level_success
                     auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                     local_state.load_reduced_state(*node->get_save());
+
+                    long started_from_hash = local_state.T->get_hash();
 
                     int base_pos                  = local_state.base_pos;
                     const int start_from_base_pos = base_pos;
@@ -492,27 +599,42 @@ namespace dejavu {
                             h_rolling_first_level_success =
                                     (9.0 * h_rolling_first_level_success + (local_state.T->trace_equal())) / 10.0;
                         }
-
                         ++base_pos;
                     }
 
-                    auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
-                    if(other_leaf == nullptr) {
-                        h_rolling_success = (9.0*h_rolling_success + 0.0) / 10.0;
-                        //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
-                        leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
-                    } else {
-                        //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
-                        automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
-                        const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
-                        if(cert) {
-                            h_rolling_success = (9.0*h_rolling_success + 1.0) / 10.0;
-                            //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
-                            const bool sift = group.sift(w, g, &R, automorphism);
-                            if(uniform) record_sift_result(sift);
-                        }
+                    //local_state.write_strong_invariant(g);
 
-                        automorphism.reset();
+                    for(int hashf = 0; hashf < 32; ++hashf) {
+                        long hash_c = local_state.T->get_hash()+hashf;
+                        auto other_leaf = leaf_storage.lookup_leaf(hash_c);
+                        if (other_leaf == nullptr) {
+                            h_rolling_success = (9.0 * h_rolling_success + 0.0) / 10.0;
+                            leaf_storage.add_leaf(hash_c, *local_state.c, local_state.base_vertex);
+                            break;
+                        } else {
+                            automorphism.reset();
+                            for (int i = 0; i < g->v_size; ++i) {
+                                assert(i == automorphism.perm()[i]);
+                            }
+                            automorphism.write_color_diff(local_state.c->vertex_to_col,
+                                                          other_leaf->get_coloring()->lab);
+                            const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(),
+                                                                            automorphism.nsupport(),
+                                                                            automorphism.support());
+                            if (cert) {
+                                //std::cout << "cert success" << hash_c << std::endl;
+                                h_rolling_success = (9.0 * h_rolling_success + 1.0) / 10.0;
+                                //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
+                                const bool sift = group.sift(w, g, &R, automorphism);
+                                if (uniform) record_sift_result(sift);
+                                automorphism.reset();
+                                break;
+                            } else {
+                                //std::cout << "cert fail" << hash_c << " / " << local_state.T->trace_equal()  << "/" << started_from_hash << std::endl;
+                                automorphism.reset();
+                                continue;
+                            }
+                        }
                     }
                 }
             }
@@ -548,6 +670,8 @@ namespace dejavu {
             void setup(int threads, refinement *R) {
                 this->R = R;
                 this->threads = threads;
+                grp_sz_man = 1.0;
+                grp_sz_exp = 0;
             }
 
             std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, int *initial_colors, ir::controller *state,
@@ -620,12 +744,18 @@ namespace dejavu {
                 compare_T.set_position(state->T->get_position());
                 state->T = &compare_T;
 
+                state->compare_base_color.clear();
                 state->compare_base_color.resize(state->base_color.size());
                 std::copy(state->base_color.begin(), state->base_color.end(), state->compare_base_color.begin());
+                state->compare_base_cells.clear();
                 state->compare_base_cells.resize(state->base_cells.size());
                 std::copy(state->base_cells.begin(), state->base_cells.end(), state->compare_base_cells.begin());
+                state->compare_singletons.clear();
                 state->compare_singletons.resize(state->singletons.size());
                 std::copy(state->singletons.begin(), state->singletons.end(), state->compare_singletons.begin());
+                state->compare_base.clear();
+                state->compare_base.resize(state->base_vertex.size());
+                std::copy(state->base_vertex.begin(), state->base_vertex.end(), state->compare_base.begin());
 
                 state->mode = ir::IR_MODE_COMPARE_TRACE;
             }
@@ -762,7 +892,7 @@ namespace dejavu {
         // utility tools used by other modules
         refinement m_refinement;          /**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
-        groups::schreier m_schreier; /**< Schreier-Sims algorithm */
+        groups::schreier* m_schreier; /**< Schreier-Sims algorithm */
         ir::tree m_tree;             /**< IR-tree */
 
         // TODO: should not be necessary in the end!
@@ -834,7 +964,10 @@ namespace dejavu {
             int h_limit_leaf = 0;
             int h_limit_fail = 0;
             int h_error_prob = 10;
-            int h_restarts   = 0;
+            int h_restarts   = -1;
+            int h_budget     = 1;
+            int h_cost       = 0;
+            int h_budget_inc_fact = 10;
 
             // TODO facilities for restarts
 
@@ -866,15 +999,26 @@ namespace dejavu {
             // loop to enable restarts
             while(g->v_size > 0) {
                 ++h_restarts; // Dry land is not a myth, I've seen it!
+                if(h_restarts >= 1) {
+                    progress_print_split();
+                    h_budget *= h_budget_inc_fact;
+                    h_cost    = 0;
+
+                    m_rand.clear_leaves();
+                    m_rand.reset();
+
+                    // TODO: notice similarities to previous base, make use of restarts more
+                }
 
                 grp_sz_man = 1.0;
                 grp_sz_exp = 0;
                 add_to_group_size(m_prep.base, m_prep.exp);
 
                 // find a selector, moves local_state to a leaf of IR tree
-                m_selectors.find_sparse_optimized_base(&m_refinement, g, &local_state);
+                m_selectors.find_base(h_restarts, &m_refinement, g, &local_state);
+                //m_selectors.find_sparse_optimized_base(&m_refinement, g, &local_state);
                 std::function<ir::type_selector_hook> *current_selector = m_selectors.get_selector_hook();
-                progress_print("selector", std::to_string(local_state.base_pos),
+                progress_print("selector" + std::to_string(h_restarts), std::to_string(local_state.base_pos),
                                std::to_string(local_trace.get_position()));
                 int base_size = local_state.base_pos;
 
@@ -897,7 +1041,8 @@ namespace dejavu {
                 if(dfs_reached_level == 0) break;
 
                 // set up schreier structure
-                m_schreier.initialize(g->v_size, base, base_sizes, dfs_reached_level);
+                m_schreier = new groups::schreier(); // TODO bad memory leak
+                m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
 
                 // set up IR tree
                 ir::tree ir_tree;
@@ -906,58 +1051,87 @@ namespace dejavu {
                 int bfs_cost_estimate;
                 int leaf_store_limit;
                 bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
-                leaf_store_limit  = 1 + bfs_cost_estimate / 20;
+                leaf_store_limit  = std::min(1 + bfs_cost_estimate / 20, h_budget);
+                //std::cout << bfs_cost_estimate << ", " << leaf_store_limit << std::endl;
 
                 // special code to tune heuristic for regular graph
-                if(root_save.get_coloring()->cells <= 2) {
+                bool h_skip_random_paths = false;
+                if((root_save.get_coloring()->cells <= 2 && base_size <= 2) || (root_save.get_coloring()->cells == 1)) {
                     leaf_store_limit = 1;
-                    bfs_cost_estimate = bfs_cost_estimate / 5;
+                    //std::cout << "1" << std::endl;
+                    h_skip_random_paths = true;
                 }
 
-                m_rand.specific_walk(m_refinement, base, g, m_schreier, local_state, root_save);
+                bool fail = false;
 
-                while(true) {
-                    // random automorphisms, single origin
+                m_rand.specific_walk(m_refinement, base, g, *m_schreier, local_state, root_save);
+
+                while(!fail) {
+                    leaf_store_limit  = std::min(leaf_store_limit, h_budget);
                     m_rand.setup(h_error_prob, leaf_store_limit, 0.1);
 
                     if(ir_tree.get_finished_up_to() == 0) {
-                        m_rand.random_walks(m_refinement, current_selector, g, m_schreier, local_state, root_save);
+                        // random automorphisms, single origin
+                        m_rand.random_walks(m_refinement, current_selector, g, *m_schreier, local_state, root_save);
                     } else {
-                        m_rand.random_walks_from_tree(m_refinement, current_selector, g, m_schreier, local_state,
+                        // random automorphisms, sampled from tree
+                        m_rand.random_walks_from_tree(m_refinement, current_selector, g, *m_schreier, local_state,
                                                       ir_tree);
                     }
+
                     // TODO: random walks should record how many "would fail" on first next level to get better bfs_cost_estimate
 
                     progress_print("urandom", std::to_string(m_rand.stat_leaves()), std::to_string(m_rand.get_rolling_sucess_rate()));
-                    progress_print("schreier", "s" + std::to_string(m_schreier.stat_sparsegen()) + "/d" +
-                                               std::to_string(m_schreier.stat_densegen()), "_");
+                    progress_print("schreier", "s" + std::to_string(m_schreier->stat_sparsegen()) + "/d" +
+                                               std::to_string(m_schreier->stat_densegen()), "_");
 
-                    if(m_rand.deterministic_abort_criterion(m_schreier) || m_rand.probabilistic_abort_criterion())
+                    if(m_rand.deterministic_abort_criterion(*m_schreier) || m_rand.probabilistic_abort_criterion())
                         break;
 
+                    h_cost += m_rand.stat_leaves();
+                    if(h_cost > h_budget) {
+                        fail = true;
+                        progress_print("restart", std::to_string(h_cost), std::to_string(h_budget));
+                        break;
+                    }
                     // TODO: if rolling sucess very high, and base large, should start skipping levels to fill Schreier faster! (CFI)
 
-                    if(m_rand.get_rolling_sucess_rate() > 0.25) {
-                        leaf_store_limit *= 2;
-                        continue;
+                    if(!(bfs_cost_estimate < g->v_size && bfs_cost_estimate * m_rand.get_rolling_first_level_success_rate() < 12)) {
+                        if (m_rand.get_rolling_sucess_rate() > 0.25 && !h_skip_random_paths) {
+                            leaf_store_limit *= 2;
+                            continue;
+                        }
+                        if (m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate > leaf_store_limit &&
+                            !h_skip_random_paths) {
+                            //std::cout << "increased here " << m_rand.get_rolling_first_level_success_rate() << ", "
+                            //          << bfs_cost_estimate << std::endl;
+                            leaf_store_limit = std::max((int) m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate, (int)1.5*(leaf_store_limit+1));
+                            continue;
+                        }
                     }
+
+                    h_skip_random_paths = false;
 
                     m_bfs.do_a_level(&m_refinement, g, ir_tree, local_state, current_selector);
                     progress_print("bfs", "0-" + std::to_string(ir_tree.get_finished_up_to()) + "(" + std::to_string(bfs_cost_estimate) + ")",
                                    std::to_string(ir_tree.get_level_size(ir_tree.get_finished_up_to())));
 
-                    bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
-                    leaf_store_limit  += (1 + bfs_cost_estimate / 5);
-
                     if(ir_tree.get_finished_up_to() == base_size)
                         break;
+
+                    bfs_cost_estimate  = m_bfs.next_level_estimate(ir_tree, current_selector);
+                    leaf_store_limit  += ir_tree.get_level_size(ir_tree.get_finished_up_to());
                 }
                 // breadth-first search & random automorphisms
 
-                break;
+                if(!fail) {
+                    break;
+                } else {
+                    local_state.load_reduced_state(root_save);
+                }
             }
 
-            add_to_group_size(m_schreier.compute_group_size());
+            add_to_group_size(m_schreier->compute_group_size());
 
             std::cout << "#symmetries: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
         }

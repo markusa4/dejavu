@@ -971,7 +971,7 @@ namespace dejavu {
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool sift(schreier_workspace &w, sgraph *g, refinement *R, automorphism_workspace &automorphism) {
+            bool __attribute__ ((noinline)) sift(schreier_workspace &w, sgraph *g, refinement *R, automorphism_workspace &automorphism) {
                 bool changed = false;
 
                 automorphism.set_support01(true);
