@@ -1284,8 +1284,8 @@ private:
                 const int v   = g->e[i];
                 const int col = vertex_to_col[v];
                 if(ptn[col] == 0) {
-                    singleton_inv1 += MASH2(col);
-                    //singleton_inv2 += (col + 3) * (723732 - (col + 2));
+                    singleton_inv1 += MASH2(col*3);
+                    singleton_inv2 += (col + 3) * (723732 - (col + 2));
                     continue;
                 }
                 neighbours.inc_nr(v);
@@ -1304,6 +1304,7 @@ private:
         }
 
         if(add_hook) add_hook(singleton_inv1);
+        if(add_hook) add_hook(singleton_inv2);
         if(add_hook) add_hook(acc_in);
         // early out before sorting color classes
         /*if(!comp) {

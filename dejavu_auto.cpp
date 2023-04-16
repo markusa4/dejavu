@@ -3,7 +3,7 @@
 #include "parser.h"
 #include <thread>
 #include "sassy/preprocessor.h"
-#include "dfs.h"
+#include "dejavu.h"
 #include <cassert>
 #include <chrono>
 #include <string>
@@ -48,14 +48,17 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     auto empty_hook_func = sassy::sassy_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
     dejavu::dejavu2 d;
+    bool del = false;
     if(colmap == nullptr) {
         colmap = new int[g->v_size];
+        del = true;
         for(int i = 0; i < g->v_size; ++i)
             colmap[i] = 0;
     }
     d.automorphisms(g, colmap, &empty_hook_func);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     finished = true;
+    if(del) delete[] colmap;
 }
 
 int commandline_mode(int argc, char **argv) {
@@ -182,7 +185,7 @@ int commandline_mode(int argc, char **argv) {
     sgraph *g = new sgraph;
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    p.parse_dimacs_file(filename, g, &colmap);
+    p.parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph..." << std::endl;

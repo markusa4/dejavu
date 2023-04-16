@@ -449,7 +449,8 @@ namespace dejavu {
                 } else {
                     // TODO compare_base_cells not necessarily applicable
                     // compare_base_cells[base_pos - 1]
-                    R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
+                    // T->trace_equal()?compare_base_cells[base_pos - 1]:-1
+                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
                                        my_worklist_hook, my_add_hook
                                        );
                     if (T && T->trace_equal()) T->skip_to_individualization();
@@ -653,6 +654,63 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     prev_color = best_color;
                     state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base = state->base_color;
+            }
+
+            void find_test_base(refinement *R, sgraph *g, controller *state) {
+                state->mode_search_for_base();
+
+                std::vector<int> candidates;
+                candidates.reserve(locked_lim);
+                int prev_color = -1;
+
+                mark_set neighbour_color;
+                neighbour_color.initialize(g->v_size);
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+
+                    // pick previous color if possible
+                    if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
+                        //std::cout << "previous color" << std::endl;
+                        best_color = prev_color;
+                    }
+
+                    // heuristic, try to pick "good" color
+                    if (best_color == -1) {
+                        candidates.clear();
+                        int best_score = -1;
+
+                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                candidates.push_back(i);
+                            }
+
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+
+                        while (!candidates.empty()) {
+                            const int test_color = candidates.back();
+                            candidates.pop_back();
+
+                            int test_score = color_score_size(g, state, test_color);
+                            if (neighbour_color.get(test_color)) {
+                                test_score *= 10;
+                            }
+                            if (test_score > best_score) {
+                                best_color = test_color;
+                                best_score = test_score;
+                            }
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color = best_color;
+                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                    std::cout << state->get_coloring()->cells << std::endl;
                 }
 
                 saved_color_base = state->base_color;
@@ -878,6 +936,17 @@ namespace dejavu {
 
             missing_node queue_missing_node_pop() {
                 return missing_nodes.pop();
+            }
+
+            void mark_first_level(mark_set& marks) {
+                if(tree_data[1] == nullptr) return;
+
+                tree_node * first = tree_data[1];
+                tree_node * next = first;
+                do {
+                    marks.set(next->get_save()->get_base()[0]);
+                    next = next->get_next();
+                } while (next != first);
             }
 
             void add_node(int level, reduced_save* data, bool is_base = false) {
