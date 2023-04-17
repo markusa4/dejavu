@@ -1042,7 +1042,7 @@ namespace sassy {
                 const int n = g->v_size;
 
                 // reducing contention on heap allocator through bulk allocation...
-                workspace_int = new int[n * 2];
+                workspace_int = new int[n];
 
                 vertex_worklist.initialize(n * 2);
                 //singletons.initialize(n);
@@ -1054,7 +1054,7 @@ namespace sassy {
                 color_vertices_considered.initialize(n);
 
                 scratch = (int *) workspace_int;
-                scratch_set.initialize_from_array(workspace_int + n, n);
+                scratch_set.initialize(n);
 
                 color_class_splits.initialize(n);
                 cell_todo.initialize(n * 2);

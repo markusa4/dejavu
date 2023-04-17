@@ -29,8 +29,7 @@ namespace dejavu {
         class dfs_ir {
             int fail_cnt = 0;
             int threads = 1;
-            refinement *R = nullptr;
-            ir::splitmap *SM = nullptr;
+            refinement   *R = nullptr;
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
             ir::trace compare_T; // TODO should not be inside dfs_ir
 
@@ -51,7 +50,7 @@ namespace dejavu {
                 grp_sz_exp = 0;
             }
 
-            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, int *initial_colors, ir::controller *state,
+            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state,
                                                         groups::automorphism_workspace &automorphism) {
                 bool prev_fail = false;
                 int prev_fail_pos = -1;
@@ -73,23 +72,23 @@ namespace dejavu {
 
                     bool prev_cert = true;
 
-                    assert(state->h_hint_color_is_singleton_now ? state->h_last_refinement_singleton_only : true);
+                    //assert(state->h_hint_color_is_singleton_now ? state->h_last_refinement_singleton_only : true);
 
                     if (prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
-                        prev_cert = R->check_single_failure(g, initial_colors, automorphism.perm(), prev_fail_pos);
+                        prev_cert = R->check_single_failure(g, initial_colors->vertex_to_col, automorphism.perm(), prev_fail_pos);
                     }
 
                     //if(state->c->cells == g->v_size) {
                     if (prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
                         // TODO: add better heuristic to not always do this check, too expensive!
-                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
+                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
                                                                                           automorphism.perm(),
                                                                                           automorphism.nsupport(),
                                                                                           automorphism.support(),
                                                                                           cert_pos);
                         cert_pos = std::get<2>(cert_res);
                         if (std::get<0>(cert_res)) {
-                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors,
+                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
                                                                                          automorphism.perm(),
                                                                                          automorphism.nsupport(),
                                                                                          automorphism.support(),
@@ -119,7 +118,7 @@ namespace dejavu {
              * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
              * @return The level up to which DFS succeeded.
              */
-            int do_dfs(sgraph *g, int *initial_colors, ir::controller &local_state) {
+            int do_dfs(sgraph *g, coloring *initial_colors, ir::controller &local_state, std::vector<int>* save_to_individualize) {
                 // orbit algorithm structure
                 groups::orbit orbs;
                 orbs.initialize(g->v_size);
@@ -170,7 +169,7 @@ namespace dejavu {
                         // ... and then check whether this implies a (sparse) automorphism
                         pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
                                                       wr_pos_st,wr_pos_end);
-                        bool found_auto = R->certify_automorphism_sparse(g, initial_colors, pautomorphism.perm(),
+                        bool found_auto = R->certify_automorphism_sparse(g, initial_colors->vertex_to_col, pautomorphism.perm(),
                                                                     pautomorphism.nsupport(),
                                                                     pautomorphism.support());
                         assert(pautomorphism.perm()[vert] == ind_v);
@@ -182,7 +181,7 @@ namespace dejavu {
                             if (rec_succeeded.first && !rec_succeeded.second) {
                                 pautomorphism.reset();
                                 pautomorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                                found_auto = R->certify_automorphism_sparse(g, initial_colors,
+                                found_auto = R->certify_automorphism_sparse(g, initial_colors->vertex_to_col,
                                                                             pautomorphism.perm(),
                                                                             pautomorphism.nsupport(),
                                                                             pautomorphism.support());
@@ -218,6 +217,13 @@ namespace dejavu {
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
+
+                        if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col && initial_colors->ptn[col] + 1 == col_sz) {
+                            save_to_individualize->push_back(local_state.leaf_color.lab[col]);
+                        } else {
+                            //std::cout << (initial_colors->vertex_to_col[initial_colors->lab[col]]  == col) << ", " << (initial_colors->ptn[col] + 1 == col_sz) << std::endl;
+                        }
+
                         grp_sz_man *= col_sz;
                         while (grp_sz_man > 10) {
                             grp_sz_man /= 10;

@@ -102,11 +102,12 @@ namespace dejavu {
                 if(is_pruned) {
                     ++s_total_prune;
                     ++s_deviation_prune;
+                    assert(!node->get_base());
                     return;
                 }
 
                 // do efficient loading if parent is the same as previous load
-                if(next_node_save != last_load || g->v_size < 500) {
+                if(next_node_save != last_load || g->v_size < 2000) { // TODO heuristic to check how much has changed
                     local_state.load_reduced_state(*next_node_save);
                 } else {
                     local_state.move_to_parent();
@@ -117,7 +118,7 @@ namespace dejavu {
 
                 // do computation
                 local_state.reset_trace_equal();
-                if(g->v_size >= 500) local_state.use_limited_reversible_for_next();
+                if(g->v_size >= 2000) local_state.use_limited_reversible_for_next();
                 local_state.use_trace_early_out(true);
                 local_state.move_to_child(R, g, v);
 
@@ -125,21 +126,27 @@ namespace dejavu {
                 const bool parent_is_base = node->get_base();
                 const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.base_pos-1]);
 
+                //std::cout << "is_base " << is_base << std::endl;
+
                 if(local_state.T->trace_equal()) { // TODO: what if leaf?
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
                     ir_tree->add_node(local_state.base_pos, new_save, is_base);
                 } else {
+                    assert(!is_base);
                     // deviation map
                     if(local_state.base_pos > 1) {
                         ++s_total_prune;
                         if (parent_is_base) add_deviation(local_state.T->get_hash());
                         else {
                             if (!check_deviation(local_state.T->get_hash())) {
+                                assert(!parent_is_base);
                                 node->prune();
                             }
                         }
+                    } else {
+                        ir_tree->record_invariant(v, local_state.T->get_hash());
                     }
                 }
 

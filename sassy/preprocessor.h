@@ -1310,7 +1310,7 @@ namespace sassy {
                         int pos = 0;
 
                         //automorphism_supp.reset();
-                        // descending tree of child_to while writing automorphism
+                        // descending shared_tree of child_to while writing automorphism
                         stack1.reset();
                         assert(map[pos] != pair_to);
                         //const int to_1 = translate_back(pair_to);
@@ -1457,7 +1457,7 @@ namespace sassy {
                         child_from = parentlist[0];
                     }
 
-                    // descending tree of child_from while writing map
+                    // descending shared_tree of child_from while writing map
                     stack1.reset();
                     map.reset(); // TODO: could be automorphism_supp, then reset automorphism_supp only half-way
                     map.push_back(child_from);
@@ -1494,7 +1494,7 @@ namespace sassy {
 
                         _automorphism_supp.reset();
 
-                        // descending tree of child_to while writing automorphism
+                        // descending shared_tree of child_to while writing automorphism
                         stack1.reset();
                         assert(map[pos] != child_to);
 
@@ -2332,7 +2332,7 @@ namespace sassy {
             return {cell, hint};
         }
 
-        // TODO: flat version that stays on first level of IR tree? or deep version that goes as deep as possible while preserving an initial color?
+        // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
         // performs sparse probing for all color classes, but only for 1 individualization
         void sparse_ir_probe(sgraph *g, int *colmap, sassy_hook* consume, selector_type sel_type) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_PROBE)
@@ -3569,7 +3569,7 @@ namespace sassy {
             return global_automorphisms_found;
         }
 
-        // adds a given automorphism to the tiny_orbit structure
+        // adds a given automorphism to the orbit structure
         void add_automorphism_to_orbit(tiny_orbit *orbit, int *automorphism, int nsupp, int *supp) {
             for (int i = 0; i < nsupp; ++i) {
                 orbit->combine_orbits(automorphism[supp[i]], supp[i]);
@@ -4580,8 +4580,9 @@ namespace sassy {
                 if(!in_order)
                     break;
             }
-            if(in_order)
+            if(in_order) {
                 return;
+            }
 
             g->initialize_coloring(&c, colmap);
 
@@ -4701,6 +4702,16 @@ namespace sassy {
 
             //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_setup" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
+            const int test_d = g->d[0];
+            int i;
+            for (i = 0; i < g->v_size && g->d[i] == test_d; ++i);
+
+            if(i == g->v_size) {
+                // graph is regular
+                PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "regular" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                return;
+            }
+
             backward_translation_layers.emplace_back(std::vector<int>());
             const size_t back_ind = backward_translation_layers.size() - 1;
             translation_layers.emplace_back(std::vector<int>());
@@ -4715,6 +4726,7 @@ namespace sassy {
             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_order" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             g->initialize_coloring(&c, colmap);
+
             refinement R_stack = refinement(config);
             R1 = &R_stack;
             R1->refine_coloring_first(g, &c, -1);

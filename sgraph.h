@@ -1,5 +1,5 @@
-#ifndef DEJAVU_GRAPH_H
-#define DEJAVU_GRAPH_H
+#ifndef DEJAVU_SGRAPH_H
+#define DEJAVU_SGRAPH_H
 
 #include <vector>
 #include "bijection.h"
@@ -10,35 +10,33 @@
 #include <set>
 #include <cstring>
 
-template<class vertex_t, class degree_t, class edge_t>
-class sgraph_t {
+class sgraph {
     struct vertexComparator {
-        vertexComparator(const sgraph_t<vertex_t, degree_t, edge_t>& g) : g(g) {}
-        const sgraph_t& g;
+        vertexComparator(const sgraph& g) : g(g) {}
+        const sgraph& g;
 
-         bool operator()(const vertex_t & v1, const vertex_t & v2) {
+         bool operator()(const int & v1, const int & v2) {
             return g.d[v1] < g.d[v2];
         }
     };
 
     struct vertexComparatorColor {
-        vertexComparatorColor(const sgraph_t<vertex_t, degree_t, edge_t>& g, const vertex_t* vertex_to_col) : g(g), vertex_to_col(vertex_to_col) {}
-        const sgraph_t& g;
-        const vertex_t* vertex_to_col;
+        vertexComparatorColor(const sgraph& g, const int* vertex_to_col) : g(g), vertex_to_col(vertex_to_col) {}
+        const sgraph& g;
+        const int* vertex_to_col;
 
-        bool operator()(const vertex_t & v1, const vertex_t & v2) {
+        bool operator()(const int & v1, const int & v2) {
             //return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));
             return (vertex_to_col[v1] < vertex_to_col[v2]);
         }
     };
 public:
     bool initialized = false;
-    edge_t*   v;
-    degree_t* d;
-    vertex_t* e;
+    int* v;
+    int* d;
+    int* e;
 
     int v_size;
-    int d_size;
     int e_size;
 
     bool dense = false;
@@ -47,13 +45,13 @@ public:
 
     void initialize(int nv, int ne) {
         initialized = true;
-        v = new edge_t[nv];
-        d = new degree_t[nv];
-        e = new vertex_t[ne];
+        v = new int[nv];
+        d = new int[nv];
+        e = new int[ne];
     }
 
     // initialize a coloring of this sgraph, partitioning degrees of vertices
-    void initialize_coloring(coloring *c, vertex_t* vertex_to_col) {
+    void initialize_coloring(coloring *c, int* vertex_to_col) {
         c->alloc(this->v_size);
         std::memset(c->ptn, 1, sizeof(int) * v_size);
 
@@ -235,10 +233,9 @@ public:
         return true;
     }
 
-    void permute_graph(sgraph_t<vertex_t, degree_t, edge_t>* ng, bijection* p) {
+    void permute_graph(sgraph* ng, bijection* p) {
         ng->initialize(v_size, e_size);
         ng->v_size = v_size;
-        ng->d_size = d_size;
         ng->e_size = e_size;
         ng->max_degree = max_degree;
 
@@ -269,7 +266,6 @@ public:
 
         assert(ng->v_size == v_size);
         assert(ng->e_size == e_size);
-        assert(ng->d_size == d_size);
         std::cout << epos << ", " << ng->e_size << std::endl;
         assert(epos == ng->e_size);
 
@@ -321,7 +317,7 @@ public:
 #endif
     }
 
-    void copy_graph(sgraph_t<vertex_t, degree_t, edge_t>* g) {
+    void copy_graph(sgraph* g) {
         if(initialized) {
             delete[] v;
             delete[] d;
@@ -329,11 +325,10 @@ public:
         }
         initialize(g->v_size, g->e_size);
 
-        memcpy(v, g->v, g->v_size*sizeof(edge_t));
-        memcpy(d, g->d, g->d_size*sizeof(degree_t));
-        memcpy(e, g->e, g->e_size*sizeof(vertex_t));
+        memcpy(v, g->v, g->v_size*sizeof(int));
+        memcpy(d, g->d, g->v_size*sizeof(int));
+        memcpy(e, g->e, g->e_size*sizeof(int));
         v_size = g->v_size;
-        d_size = g->d_size;
         e_size = g->e_size;
         max_degree = g->max_degree;
     }
@@ -348,7 +343,6 @@ public:
 
     void print() {
         PRINT("[api] v_size: " << v_size);
-        PRINT("[api] d_size: " << d_size);
         PRINT("[api] e_size: " << e_size);
         /*for(int i = 0; i < v_size; ++i) {
             const int estart = v[i];
@@ -359,7 +353,7 @@ public:
         }*/
     }
 
-    ~sgraph_t() {
+    ~sgraph() {
         if(initialized) {
             delete[] v;
             delete[] d;
@@ -368,119 +362,8 @@ public:
     }
 };
 
-
-template<class vertex_type_src, class degree_type_src, class edge_type_src,
-         class vertex_type_tgt, class degree_type_tgt, class edge_type_tgt>
-static void copy_graph(sgraph_t<vertex_type_src, degree_type_src, edge_type_src>* g1,
-                       sgraph_t<vertex_type_tgt, degree_type_tgt, edge_type_tgt>* g2) {
-    g2->v_size = g1->v_size;
-    g2->d_size = g1->d_size;
-    g2->e_size = g1->e_size;
-    g2->max_degree = g1->max_degree;
-
-    g2->initialize(g2->v_size, g2->e_size);
-
-    for(int i = 0; i < g1->v_size; ++i) {
-        g2->v[i] = static_cast<edge_type_tgt>(g1->v[i]);
-    }
-    for(int i = 0; i < g1->d_size; ++i) {
-        g2->d[i] = static_cast<degree_type_tgt>(g1->d[i]);
-    }
-    for(int i = 0; i < g1->e_size; ++i) {
-        g2->e[i] = static_cast<vertex_type_tgt>(g1->e[i]);
-    }
-}
-
-enum sgraph_type {DSG_INT_INT_INT, DSG_SHORT_SHORT_INT, DSG_SHORT_SHORT_SHORT, DSG_CHAR_CHAR_SHORT, DSG_CHAR_CHAR_CHAR};
-struct dynamic_sgraph {
-    sgraph_type type;
-    sgraph_t<int, int, int>*             sgraph_0 = nullptr;
-    sgraph_t<int16_t, int16_t, int>*     sgraph_1 = nullptr;
-    sgraph_t<int16_t, int16_t, int16_t>* sgraph_2 = nullptr;
-    sgraph_t<int8_t,  int8_t,  int16_t>* sgraph_3 = nullptr;
-    sgraph_t<int8_t,  int8_t,  int8_t>*  sgraph_4 = nullptr;
-
-    static void read(sgraph_t<int, int, int>* g, dynamic_sgraph* sg) {
-        bool short_v = (g->v_size <= 32767);
-        bool short_e = (g->e_size <= 32767);
-        bool char_v  = (g->v_size <= 127);
-        bool char_e  = (g->e_size <= 127);
-
-        if(char_v && char_e) {
-            sg->sgraph_4 = new sgraph_t<int8_t,  int8_t,  int8_t>;
-            copy_graph<int, int, int, int8_t,  int8_t,  int8_t>(g, sg->sgraph_4);
-            sg->type = DSG_CHAR_CHAR_CHAR;
-            return;
-        }
-
-        if(char_v && short_e) {
-            sg->sgraph_3 = new sgraph_t<int8_t,  int8_t,  int16_t>;
-            copy_graph<int, int, int, int8_t,  int8_t,  int16_t>(g, sg->sgraph_3);
-            sg->type = DSG_CHAR_CHAR_SHORT;
-            return;
-        }
-
-        if(short_v && short_e) {
-            sg->sgraph_2 = new sgraph_t<int16_t,  int16_t,  int16_t>;
-            copy_graph<int, int, int, int16_t,  int16_t,  int16_t>(g, sg->sgraph_2);
-            sg->type = DSG_SHORT_SHORT_SHORT;
-            return;
-        }
-
-        if(short_v && !short_e) {
-            sg->sgraph_1 = new sgraph_t<int16_t,  int16_t,  int>;
-            copy_graph<int, int, int, int16_t,  int16_t,  int>(g, sg->sgraph_1);
-            sg->type = DSG_SHORT_SHORT_INT;
-            return;
-        }
-
-        sg->sgraph_0 = g;
-        sg->type = DSG_INT_INT_INT;
-        return;
-    }
-};
-
-
-template<class vertex_t, class degree_t, class edge_t>
-sgraph_t<vertex_t, degree_t, edge_t>* disjoint_union(sgraph_t<vertex_t, degree_t, edge_t>* g1,
-                                                     sgraph_t<vertex_t, degree_t, edge_t>* g2) {
-    sgraph_t<vertex_t, degree_t, edge_t>* union_g = new  sgraph_t<vertex_t, degree_t, edge_t>();
-    union_g->v_size = g1->v_size + g2->v_size;
-    union_g->e_size = g1->e_size + g2->e_size;
-    union_g->d_size = g1->d_size + g2->d_size;
-
-    int g2_vshift= g1->v_size;
-    int g2_eshift= g1->e_size;
-    int g2_dshift= g1->d_size;
-
-    union_g->initialize(union_g->v_size, union_g->e_size);
-
-    for(int i = 0; i < g1->v_size; ++i)
-        union_g->v[i] = g1->v[i];
-    for(int i = 0; i < g2->v_size; ++i)
-        union_g->v[i + g2_vshift] = g2->v[i] + g2_eshift;
-
-    for(int i = 0; i < g1->d_size; ++i)
-        union_g->d[i] = g1->d[i];
-    for(int i = 0; i < g2->d_size; ++i)
-        union_g->d[i + g2_dshift] = g2->d[i];
-
-    for(int i = 0; i < g1->e_size; ++i)
-        union_g->e[i] = g1->e[i];
-    for(int i = 0; i < g2->e_size; ++i)
-        union_g->e[i + g2_eshift] = g2->e[i] + g2_vshift;
-
-    union_g->max_degree = std::max(g1->max_degree, g2->max_degree);
-
-    return union_g;
-}
-
-
-typedef sgraph_t<int, int, int> sgraph;
-
-template<class vertex_t>
-void permute_colmap(int** colmap, int colmap_sz, vertex_t* p) {
-    int* new_colmap = new vertex_t[colmap_sz];
+void permute_colmap(int** colmap, int colmap_sz, int* p) {
+    int* new_colmap = new int[colmap_sz];
     for(int i = 0; i < colmap_sz; ++i) {
         new_colmap[i] = (*colmap)[p[i]];
     }
@@ -491,4 +374,4 @@ void permute_colmap(int** colmap, int colmap_sz, vertex_t* p) {
 
 static sgraph test_graph;
 
-#endif //DEJAVU_GRAPH_H
+#endif //DEJAVU_SGRAPH_H

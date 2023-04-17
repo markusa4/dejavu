@@ -45,50 +45,43 @@ namespace sassy {
         mark_set() {};
         mark_set(int size) {
             initialize(size);
-        };
-        void initialize(int size) {
-            if(init)
-                delete[] s;
-
-            s = new int[size];
-            sz = size;
-            init = true;
-            memset(s, mark, sz * sizeof(int));
-            reset();
         }
 
-        void initialize_from_array(int *arr, int size) {
-            if(init)
-                delete[] s;
-            s = arr;
+        void initialize(int size) {
+            //s = new int[size];
+            s = (int*) calloc(size, sizeof(int));
+            sz = size;
+            init = true;
+            //memset(s, mark, sz * sizeof(int));
+            reset();
+        }
+        /*void initialize_from_array(int* arr, int size) {
+            s  = arr;
             sz = size;
             init = false;
             memset(s, mark, sz * sizeof(int));
             reset();
-        }
-
+        }*/
         bool get(int pos) {
             return s[pos] == mark;
         }
-
         void set(int pos) {
             s[pos] = mark;
         }
-
         void unset(int pos) {
             s[pos] = mark - 1;
         }
-
         void reset() {
-            if (mark == -1) {
+            if(mark == -1) {
                 memset(s, mark, sz * sizeof(int));
             }
             ++mark;
         }
-
         ~mark_set() {
-            if (init)
-                delete[] s;
+            /*if(init)
+                delete[] s;*/
+            if(init)
+                free(s);
         }
     };
 

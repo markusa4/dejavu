@@ -293,6 +293,9 @@ namespace dejavu {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
+                T->set_compare(true);
+                base_pos = state.get_base_position();
+                base_vertex = state.get_base();
 
                 // these become meaningless
                 base_singleton_pt.clear();
@@ -459,6 +462,22 @@ namespace dejavu {
                 h_cell_active = false;
 
                 if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) base_cells.push_back(c->cells);
+            }
+
+            /**
+             * Move IR node kept in this controller to a child, specified by a vertex to be individualized.
+             *
+             * @param R a refinement workspace
+             * @param g the graph
+             * @param v the vertex to be individualized
+             */
+            void move_to_child_no_trace(refinement *R, sgraph *g, int v) {
+                const int init_color_class = R->individualize_vertex(c, v);
+                R->refine_coloring_first(g, c, init_color_class);
+            }
+
+            void refine(refinement *R, sgraph *g) {
+                R->refine_coloring_first(g, c);
             }
 
             /**
@@ -914,12 +933,20 @@ namespace dejavu {
             std::vector<std::vector<tree_node*>> tree_data_jump_map;
             std::vector<int>        tree_level_size;
             int                     finished_up_to = 0;
+
+            std::vector<long>       node_invariant;
         public:
+
+            std::vector<long>* get_node_invariant() {
+                return &node_invariant;
+            }
+
             void initialize(int base_size, ir::reduced_save* root) {
                 tree_data.resize(base_size + 1);
                 tree_level_size.resize(base_size + 1);
                 tree_data_jump_map.resize(base_size + 1);
                 add_node(0, root, true);
+                node_invariant.resize(root->get_coloring()->lab_sz);
             }
 
             void queue_reserve(const int n) {
@@ -947,6 +974,10 @@ namespace dejavu {
                     marks.set(next->get_save()->get_base()[0]);
                     next = next->get_next();
                 } while (next != first);
+            }
+
+            void record_invariant(int v, long inv) {
+                node_invariant[v] = inv;
             }
 
             void add_node(int level, reduced_save* data, bool is_base = false) {

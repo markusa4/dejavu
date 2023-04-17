@@ -4,6 +4,7 @@
 #include <thread>
 #include "sassy/preprocessor.h"
 #include "dejavu.h"
+#include "graph.h"
 #include <cassert>
 #include <chrono>
 #include <string>
@@ -50,15 +51,37 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     dejavu::dejavu2 d;
     bool del = false;
     if(colmap == nullptr) {
-        colmap = new int[g->v_size];
+        colmap = (int*) calloc(g->v_size, sizeof(int));
         del = true;
-        for(int i = 0; i < g->v_size; ++i)
-            colmap[i] = 0;
     }
     d.automorphisms(g, colmap, &empty_hook_func);
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    finished = true;
-    if(del) delete[] colmap;
+
+
+    /*dejavu::graph new_graph;
+    new_graph.copy_graph(g);
+    {
+        refinement_new_graph R_test2;
+        coloring   c_test2;
+        new_graph.initialize_coloring(&c_test2, colmap);
+
+        Clock::time_point timer = Clock::now();
+        R_test2.refine_coloring_first(&new_graph, &c_test2);
+        std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count())/ 1000000.0 << std::endl;
+    }
+
+    {
+        refinement R_test1;
+        coloring   c_test1;
+        g->initialize_coloring(&c_test1, colmap);
+
+        Clock::time_point timer = Clock::now();
+        R_test1.refine_coloring_first(g, &c_test1);
+        std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count())/ 1000000.0 << std::endl;
+    }*/
+
+     finished = true;
+    if(del) free(colmap);
 }
 
 int commandline_mode(int argc, char **argv) {

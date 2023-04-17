@@ -40,10 +40,10 @@ namespace dejavu {
         search_strategy::random_ir m_rand; /**< randomized search */
 
         // utility tools used by other modules
-        refinement m_refinement;          /**< workspace for color refinement and other utilities */
+        refinement           m_refinement;/**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
-        groups::schreier* m_schreier; /**< Schreier-Sims algorithm */
-        ir::shared_tree m_tree;             /**< IR-shared_tree */
+        groups::schreier*    m_schreier;  /**< Schreier-Sims algorithm */
+        ir::shared_tree m_tree;           /**< IR-shared_tree */
 
         // TODO: should not be necessary in the end!
         void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
@@ -51,7 +51,7 @@ namespace dejavu {
             gg->d = g->d;
             gg->e = g->e;
             gg->v_size = g->v_size;
-            gg->d_size = g->d_size;
+            gg->d_size = g->v_size;
             gg->e_size = g->e_size;
         }
         // TODO: should not be necessary in the end!
@@ -60,7 +60,6 @@ namespace dejavu {
             g->d = gg->d;
             g->e = gg->e;
             g->v_size = gg->v_size;
-            g->d_size = gg->d_size;
             g->e_size = gg->e_size;
         }
 
@@ -117,7 +116,7 @@ namespace dejavu {
             int h_restarts   = -1;
             int h_budget     = 1;
             int h_cost       = 0;
-            int h_budget_inc_fact = 10;
+            int h_budget_inc_fact = 5;
 
             // TODO facilities for restarts
 
@@ -174,6 +173,8 @@ namespace dejavu {
                         // TODO dfs elements into the structure!
                     }
 
+                    std::vector<int> save_to_individualize;
+
                     grp_sz_man = 1.0;
                     grp_sz_exp = 0;
                     add_to_group_size(m_prep.base, m_prep.exp);
@@ -201,7 +202,7 @@ namespace dejavu {
                     // TODO I think there should be no setup functions at all
                     m_dfs.setup(0, &m_refinement);
 
-                    const int dfs_reached_level = m_dfs.do_dfs(g, colmap, local_state);
+                    const int dfs_reached_level = m_dfs.do_dfs(g, root_save.get_coloring(), local_state, &save_to_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                    std::to_string(m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                     add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
@@ -226,8 +227,7 @@ namespace dejavu {
 
                     // special code to tune heuristic for regular graph
                     bool h_skip_random_paths = false;
-                    if ((root_save.get_coloring()->cells <= 2 && base_size <= 2) ||
-                        (root_save.get_coloring()->cells == 1)) {
+                    if ((root_save.get_coloring()->cells <= 2)) { // && base_size <= 2) || (root_save.get_coloring()->cells == 1
                         leaf_store_limit = 1;
                         //std::cout << "1" << std::endl;
                         h_skip_random_paths = true;
@@ -244,7 +244,7 @@ namespace dejavu {
 
                         if (ir_tree.get_finished_up_to() == 0) {
                             // random automorphisms, single origin
-                            m_rand.random_walks(m_refinement, current_selector, g, *m_schreier, local_state, root_save);
+                            m_rand.random_walks(m_refinement, current_selector, g, *m_schreier, local_state, &root_save);
                         } else {
                             // random automorphisms, sampled from shared_tree
                             m_rand.random_walks_from_tree(m_refinement, current_selector, g, *m_schreier,
@@ -283,12 +283,12 @@ namespace dejavu {
                                 //          << bfs_cost_estimate << std::endl;
                                 leaf_store_limit = std::max(
                                         (int) m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate,
-                                        (int) 1.5 * (leaf_store_limit + 1));
+                                        ((int) (1.5 * (leaf_store_limit + 1.0))));
                                 continue;
                             }
                         }
 
-                        if(h_restarts < 2 && bfs_cost_estimate > h_budget) {
+                        if(h_restarts < 2 && h_cost + bfs_cost_estimate > h_budget && !h_skip_random_paths) {
                             fail = true;
                             progress_print("restart", std::to_string(h_cost), std::to_string(h_budget));
                             break;
@@ -313,31 +313,53 @@ namespace dejavu {
                         break;
                     } else {
                         if(ir_tree.get_finished_up_to() >= 1) {
+                            // TODO: improve saving hash for pruned nodes, then propagate this to first level
+                            // TODO: use "pruned" flag, etc.
                             work_list hash(g->v_size);
-                            mark_set  is_pruned(g->v_size);
-                            ir_tree.mark_first_level(is_pruned);
+                            //mark_set  is_pruned(g->v_size);
+                            //ir_tree.mark_first_level(is_pruned);
 
                             for(int i = 0; i < g->v_size; ++i) {
-                                if(is_pruned.get(i)) hash[i] = 1;
-                                else                      hash[i] = 0;
+                                //if(is_pruned.get(i)) hash[i] = 1;
+                                //else                      hash[i] = 0;
+                                hash[i] = (int) (*ir_tree.get_node_invariant())[i] % 8;
                             }
                             local_state.load_reduced_state(root_save);
                             const int cell_prev = root_save.get_coloring()->cells;
                             for(int i = 0; i < g->v_size; ++i) {
-                                hash[i] = 2* local_state.c->vertex_to_col[i] + hash[i];
+                                hash[i] = 8* local_state.c->vertex_to_col[i] + hash[i];
                             }
                             g->initialize_coloring(local_state.c, hash.get_array());
-                            local_state.save_reduced_state(root_save);
-                            const int cell_after = root_save.get_coloring()->cells;
-
-                            progress_print("inprocess", std::to_string(cell_prev),
+                            const int cell_after = local_state.c->cells;
+                            progress_print("inproc_bfs", std::to_string(cell_prev),
                                            std::to_string(cell_after));
+                            if(cell_after != cell_prev) {
+                                local_state.refine(&m_refinement, g);
+                                progress_print("inproc_ref", std::to_string(cell_after),
+                                               std::to_string(local_state.c->cells));
+                            }
 
+                            m_schreier->determine_save_to_individualize(&save_to_individualize, local_state.get_coloring());
+
+                            if(!save_to_individualize.empty()) {
+                                for (int i = 0; i < save_to_individualize.size(); ++i) {
+                                    const int ind_v   = save_to_individualize[i];
+                                    const int ind_col = local_state.c->vertex_to_col[ind_v];
+                                    m_prep.multiply_to_group_size(local_state.c->ptn[ind_col]+1);
+                                    local_state.move_to_child_no_trace(&m_refinement, g, ind_v);
+                                }
+                                progress_print("inproc_ind", "_",
+                                               std::to_string(local_state.c->cells));
+                                save_to_individualize.clear();
+                            }
+
+                            local_state.save_reduced_state(root_save);
                             // TODO use orbit partition for 1 individualization
+                            // TODO could run sassy if individualization succeeds...
                         }
                     }
                 }
-                add_to_group_size(m_schreier->compute_group_size());
+                if(m_schreier) add_to_group_size(m_schreier->compute_group_size());
             }
 
             std::cout << "#symmetries: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;

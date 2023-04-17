@@ -914,6 +914,37 @@ namespace dejavu {
             }
 
             /**
+             * Set up this Schreier structure using the given base. The base is then fixed and can not be adjusted
+             * later on.
+             *
+             * @param base the base
+             * @param stop integer which indicates to stop reading the base at this position
+             */
+            void reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool resift) {
+                // TODO compare with stored base, keep whatever is possible
+                // TODO resift old generators if desired
+                this->domain_size = domain_size;
+                generators.initialize(domain_size);
+                transversals.initialize(stop);
+                transversals.set_size(stop);
+                // TODO resize transversals + check...
+                for (int i = 0; i < stop; ++i) {
+                    transversals[i] = new transversal();
+                    transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
+                }
+            }
+
+            // TODO: need to use root coloring instead!
+            void determine_save_to_individualize(std::vector<int>* save_to_individualize, coloring* root_coloring) {
+                for (int i = base_size()-1; i >= 0; --i) {
+                    const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
+                    if(transversals[i]->size() == corresponding_root_color_sz) {
+                        save_to_individualize->push_back(transversals[i]->fixed_point());
+                    }
+                }
+            }
+
+            /**
              * @param pos Position in base.
              * @return Vertex fixed at position \p pos in base.
              */

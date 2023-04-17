@@ -254,23 +254,25 @@ namespace dejavu {
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
             void random_walks(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                              groups::schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
+                              groups::schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
                 groups::automorphism_workspace automorphism(g->v_size);
                 groups::schreier_workspace w(g->v_size, &R, g);
                 std::vector<int> heuristic_reroll;
 
                 local_state.use_trace_early_out(false);
+                ir::reduced_save my_own_save;
 
                 while(!probabilistic_abort_criterion() && !deterministic_abort_criterion(group)
                       && leaf_storage.s_leaves <= h_leaf_limit) { // * h_rolling_first_level_success
-                    local_state.load_reduced_state(start_from);
+                    local_state.load_reduced_state(*start_from);
                     int could_start_from = group.finished_up_to_level();
                     if(local_state.base_pos < could_start_from) {
                         while (local_state.base_pos <= could_start_from) {
                             //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
                             local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
                         }
-                        local_state.save_reduced_state(start_from);
+                        local_state.save_reduced_state(my_own_save);
+                        start_from = &my_own_save;
                     }
 
                     const int start_from_base_pos = local_state.base_pos;
@@ -334,7 +336,7 @@ namespace dejavu {
                             const bool sift = group.sift(w, g, &R, automorphism);
                             if(uniform) record_sift_result(sift);
                         } else {
-                            std::cout << "cert fail " << std::endl;
+                            //std::cout << "cert fail " << std::endl;
                         }
                         automorphism.reset();
                     }
