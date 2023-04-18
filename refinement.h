@@ -117,6 +117,12 @@ public:
 // work list / stack with fixed size limitation
 template<class T>
 class work_list_t {
+private:
+    void alloc(const int size) {
+        arr     = (T*) malloc(sizeof(T) * size);
+        arr_sz  = size;
+    }
+
 public:
     work_list_t() {};
     work_list_t(int size) {
@@ -125,8 +131,7 @@ public:
     void initialize(int size) {
         assert(!init);
         //arr     = new T[size];
-        arr     = (T*) malloc(sizeof(T) * size);
-        arr_sz  = size;
+        alloc(size);
         init     = true;
         cur_pos = 0;
     }
@@ -160,6 +165,20 @@ public:
 
     void reset() {
         cur_pos = 0;
+    }
+
+    void resize(const int size) {
+        if(init && size <= arr_sz) return;
+        T*  old_arr    = nullptr;
+        int old_arr_sz = arr_sz;
+        if(init) old_arr = arr;
+        alloc(size);
+        init = true;
+        if(old_arr != nullptr) {
+            int cp_pt = std::min(old_arr_sz, arr_sz);
+            memcpy(arr, old_arr, cp_pt * sizeof(T));
+            free(old_arr);
+        }
     }
 
     ~work_list_t() {
@@ -519,8 +538,6 @@ public:
                                  ) {
         singleton_hint.reset();
         assure_initialized(g);
-        int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
-        if(config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
 
         cell_todo.reset(&queue_pointer);
 
@@ -576,18 +593,11 @@ public:
                                           &color_class_splits, add_hook);
             }
 
-            /*deviation_expander -= (!comp);
-            if(!comp && deviation_expander <= 0) {
-                break;
-            }*/
-
             // add all new classes except for the first, largest one
             int skip = 0;
 
             int  latest_old_class = -1;
             bool skipped_largest  = false;
-            const int pre_cells   = c->cells;
-
             bool early_out = false;
 
             // color class splits are sorted in reverse
@@ -633,7 +643,6 @@ public:
                     }
                 }
             }
-            const int new_cells = c->cells - pre_cells;
 
             if(early_out) {
                 break;
@@ -641,22 +650,17 @@ public:
 
             // detection if coloring is discrete
             if(c->cells == g->v_size) {
-                //const int new_cells = c->cells - pre_cells;
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
                 break;
-                //return comp;
             }
 
             // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
-            if(c->cells == color_limit && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+            if(c->cells == color_limit) {
                 color_class_splits.reset();
                 cell_todo.reset(&queue_pointer);
                 break;
             }
-
-            // mark end of cell and denote whether this cell was splitting or non-splitting
-            //if(!comp && deviation_expander <= 0) break;
         }
     }
 
@@ -939,10 +943,10 @@ public:
         for(int f = 0; f < supp; ++f) {
             i = supp_arr[f];
             const int image_i = p[i];
-            if(image_i == i)
-                continue;
-            if(g->d[i] != g->d[image_i]) // degrees must be equal
-                return false;
+            //if(image_i == i)
+            //    continue;
+            //if(g->d[i] != g->d[image_i]) // degrees must be equal
+            //    return false;
 
             scratch_set.reset();
             // automorphism must preserve neighbours
@@ -957,18 +961,17 @@ public:
             for(int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
                 const int vertex_j = g->e[j];
                 if(!scratch_set.get(vertex_j)) {
+                    scratch_set.reset();
                     return false;
                 }
                 //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
                 //    return false;
-                scratch_set.unset(vertex_j);
+                //scratch_set.unset(vertex_j);
                 found -= 1;
             }
-            if(found != 0) {
-                return false;
-            }
+            if(found != 0) {scratch_set.reset(); return false;}
         }
-
+        scratch_set.reset();
         return true;
     }
 

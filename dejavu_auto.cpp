@@ -225,7 +225,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     std::cout << "------------------------------------------------------------------" << std::endl;
-    std::cout << "dejavu" << std::endl;
+    std::cout << "dejavu 2.0beta" << std::endl;
     std::cout << "------------------------------------------------------------------" << std::endl;
     double dejavu_solve_time;
 

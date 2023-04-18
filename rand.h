@@ -97,6 +97,7 @@ namespace dejavu {
             double h_rolling_success = 0;
             double h_rolling_first_level_success  = 1.0;
             double h_required_first_level_success = 0;
+            int    h_paths = 0;
 
         public:
             void setup(int error, int leaf_store_limit, double required_first_level_success) {
@@ -106,10 +107,15 @@ namespace dejavu {
             }
 
             void reset() {
+                h_paths      = 0;
                 h_leaf_limit = 0;
                 h_rolling_success = 0;
                 h_rolling_first_level_success  = 1.0;
                 h_required_first_level_success = 0;
+            }
+
+            void reset_prob() {
+                consecutive_success = 0;
             }
 
             void clear_leaves() {
@@ -140,6 +146,10 @@ namespace dejavu {
                 }
             }
 
+            bool h_almost_done() {
+                return consecutive_success >= 1;
+            }
+
             /**
              * @return Whether the probabilistic abort criterion allows termination or not.
              */
@@ -165,88 +175,20 @@ namespace dejavu {
             void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
                                groups::schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
                 local_state.load_reduced_state(start_from);
-                int base_pos = local_state.base_pos;
 
                 while (g->v_size != local_state.c->cells) {
+                    //std::cout << local_state.T->get_position() <<  ", " << local_state.c->cells << ", " << local_state.T->trace_equal() << std::endl;
                     int v = base_vertex[local_state.base_pos];
                     local_state.move_to_child(&R, g, v);
-                    ++base_pos;
+                    assert(local_state.T->trace_equal());
                 }
+
+                local_state.write_strong_invariant(g);
 
                 auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                 if(other_leaf == nullptr) {
+                    //std::cout << "added" << local_state.T->get_hash() << std::endl;
                     leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
-                }
-            }
-
-            void random_walk(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                             groups::schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
-                groups::automorphism_workspace automorphism(g->v_size);
-                groups::schreier_workspace w(g->v_size, &R, g);
-                std::vector<int> heuristic_reroll;
-
-                local_state.load_reduced_state(start_from);
-                int could_start_from = group.finished_up_to_level();
-                if(local_state.base_pos < could_start_from) {
-                    while (local_state.base_pos <= could_start_from) {
-                        //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
-                        local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
-                    }
-                    local_state.save_reduced_state(start_from);
-                }
-
-                int base_pos = local_state.base_pos;
-
-                bool base_aligned = true;
-                bool uniform = true;
-
-                while (g->v_size != local_state.c->cells) {
-                    const int col = (*selector)(local_state.c, base_pos);
-                    const int col_sz = local_state.c->ptn[col] + 1;
-                    const int rand = ((int) generator()) % col_sz;
-                    int v = local_state.c->lab[col + rand];
-
-                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && leaf_storage.s_leaves <= 1) {
-                        heuristic_reroll.clear();
-                        for(int i = 0; i < col_sz; ++i) {
-                            heuristic_reroll.push_back(local_state.c->lab[col + i]);
-                        }
-                        group.reduce_to_unfinished(w, heuristic_reroll, base_pos);
-                        if(heuristic_reroll.size() > 0) {
-                            const int rand = ((int) generator()) % heuristic_reroll.size();
-                            v = heuristic_reroll[rand];
-                            //std::cout << group.is_finished(base_pos) << "re-roll!"
-                            //          << group.is_in_base_orbit(base_pos, v) << std::endl;
-                        }
-                    }
-
-                    if(group.is_in_base_orbit(base_pos, v) && base_aligned && leaf_storage.s_leaves <= 1) {
-                        v = group.base_point(local_state.base_pos);
-                        assert(local_state.c->vertex_to_col[v] == col);
-                        uniform = false;
-                    } else {
-                        base_aligned = false;
-                    }
-
-                    local_state.move_to_child(&R, g, v);
-                    ++base_pos;
-                }
-
-                auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
-                if(other_leaf == nullptr) {
-                    //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
-                    leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
-                } else {
-                    //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
-                    automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
-                    const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
-                    if(cert) {
-                        //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
-                        const bool sift = group.sift(w, g, &R, automorphism);
-                        if(uniform) record_sift_result(sift);
-                    }
-
-                    automorphism.reset();
                 }
             }
 
@@ -263,14 +205,18 @@ namespace dejavu {
                 ir::reduced_save my_own_save;
 
                 while(!probabilistic_abort_criterion() && !deterministic_abort_criterion(group)
-                      && leaf_storage.s_leaves <= h_leaf_limit) { // * h_rolling_first_level_success
+                      && (leaf_storage.s_leaves <= h_leaf_limit || (h_almost_done() && leaf_storage.s_leaves <= 2*h_leaf_limit))) { // * h_rolling_first_level_success
+
                     local_state.load_reduced_state(*start_from);
+
                     int could_start_from = group.finished_up_to_level();
+                    //int could_start_from = 0;
                     if(local_state.base_pos < could_start_from) {
                         while (local_state.base_pos <= could_start_from) {
                             //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
                             local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
                         }
+                        assert(local_state.T->trace_equal());
                         local_state.save_reduced_state(my_own_save);
                         start_from = &my_own_save;
                     }
@@ -282,6 +228,7 @@ namespace dejavu {
                     bool uniform = true;
 
                     while (g->v_size != local_state.c->cells) {
+                        //std::cout << local_state.T->get_position() <<  ", " << local_state.c->cells << ", " << local_state.T->trace_equal() << std::endl;
                         const int col = (*selector)(local_state.c, base_pos);
                         const int col_sz = local_state.c->ptn[col] + 1;
                         const int rand = ((int) generator()) % col_sz;
@@ -293,7 +240,7 @@ namespace dejavu {
                                 heuristic_reroll.push_back(local_state.c->lab[col + i]);
                             }
                             group.reduce_to_unfinished(w, heuristic_reroll, base_pos);
-                            if(heuristic_reroll.size() > 0) {
+                            if(!heuristic_reroll.empty()) {
                                 const int rand = ((int) generator()) % heuristic_reroll.size();
                                 v = heuristic_reroll[rand];
                                 //std::cout << group.is_finished(base_pos) << "re-roll!"
@@ -308,7 +255,7 @@ namespace dejavu {
                         } else {
                             base_aligned = false;
                         }
-
+                        assert(local_state.c->vertex_to_col[v] == col);
                         local_state.move_to_child(&R, g, v);
 
                         if(base_pos == start_from_base_pos) {
@@ -319,10 +266,13 @@ namespace dejavu {
                         ++base_pos;
                     }
 
-                    // local_state.write_strong_invariant(g);
+                    ++h_paths;
+
+                    local_state.write_strong_invariant(g);
 
                     auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
                     if(other_leaf == nullptr) {
+                        //std::cout << "added" << local_state.T->get_hash() << std::endl;
                         //std::cout << "adding leaf " << local_state.T->get_hash() << std::endl;
                         leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
                         h_rolling_success = (9.0*h_rolling_success + 0.0) / 10.0;
@@ -331,12 +281,15 @@ namespace dejavu {
                         automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
                         const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
                         if(cert) {
+                            //std::cout << "certified" << local_state.T->get_hash() << std::endl;
                             h_rolling_success = (9.0*h_rolling_success + 1.0) / 10.0;
                             //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
                             const bool sift = group.sift(w, g, &R, automorphism);
                             if(uniform) record_sift_result(sift);
                         } else {
-                            //std::cout << "cert fail " << std::endl;
+                            //std::cout << "testing" << local_state.T->get_hash() << std::endl;
+                            std::cout << "cert fail " << std::endl;
+                            assert(false);
                         }
                         automorphism.reset();
                     }
@@ -357,9 +310,9 @@ namespace dejavu {
                 const int pick_from_level = ir_tree.get_finished_up_to();
 
                 while(!probabilistic_abort_criterion() && !deterministic_abort_criterion(group)
-                      && leaf_storage.s_leaves <= h_leaf_limit
+                      && (leaf_storage.s_leaves <= h_leaf_limit || (h_almost_done() && leaf_storage.s_leaves <= 2*h_leaf_limit))
                       && (leaf_storage.s_leaves <= h_leaf_limit/4 || h_rolling_success > 0.001 || h_rolling_first_level_success > 0.1) // re-consider...
-                        ) { //  * h_rolling_first_level_success
+                      && h_rolling_first_level_success > 0.001) { //  * h_rolling_first_level_success
                     auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                     local_state.load_reduced_state(*node->get_save());
 
@@ -375,16 +328,26 @@ namespace dejavu {
                         const int col_sz = local_state.c->ptn[col] + 1;
                         const int rand = ((int) generator()) % col_sz;
                         int v = local_state.c->lab[col + rand];
+                        if(base_pos == start_from_base_pos) {
+                            local_state.use_trace_early_out(true);
+                        } else {
+                            local_state.use_trace_early_out(false);
+                        }
                         local_state.move_to_child(&R, g, v);
 
                         if(base_pos == start_from_base_pos) {
                             h_rolling_first_level_success =
                                     (9.0 * h_rolling_first_level_success + (local_state.T->trace_equal())) / 10.0;
+                            if(!local_state.T->trace_equal()) break;
                         }
                         ++base_pos;
                     }
 
-                    //local_state.write_strong_invariant(g);
+                    ++h_paths;
+
+                    if(base_pos == start_from_base_pos) {continue;}
+
+                    local_state.write_strong_invariant(g);
 
                     for(int hashf = 0; hashf < 32; ++hashf) {
                         long hash_c = local_state.T->get_hash()+hashf;
@@ -392,6 +355,7 @@ namespace dejavu {
                         if (other_leaf == nullptr) {
                             h_rolling_success = (9.0 * h_rolling_success + 0.0) / 10.0;
                             leaf_storage.add_leaf(hash_c, *local_state.c, local_state.base_vertex);
+                            //std::cout << "add leaf" << std::endl;
                             break;
                         } else {
                             automorphism.reset();
@@ -412,7 +376,7 @@ namespace dejavu {
                                 automorphism.reset();
                                 break;
                             } else {
-                                std::cout << "cert fail " << std::endl;
+                                //std::cout << "cert fail " << std::endl;
                                 //std::cout << "cert fail" << hash_c << " / " << local_state.T->trace_equal()  << "/" << started_from_hash << std::endl;
                                 automorphism.reset();
                                 continue;

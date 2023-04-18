@@ -29,7 +29,7 @@ namespace dejavu {
                                             int *automorphism_map, work_list *automorphism_supp) {
             for (int v1 = 0; v1 < n; ++v1) {
                 const int col = vertex_to_col[v1];
-                const int v2 = col_to_vertex[col];
+                const int v2  = col_to_vertex[col];
                 if (v1 != v2) {
                     automorphism_map[v1] = v2;
                     automorphism_supp->push_back(v1);
@@ -920,26 +920,44 @@ namespace dejavu {
              * @param base the base
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool resift) {
+            bool reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old) {
                 // TODO compare with stored base, keep whatever is possible
                 // TODO resift old generators if desired
-                this->domain_size = domain_size;
-                generators.initialize(domain_size);
-                transversals.initialize(stop);
-                transversals.set_size(stop);
-                // TODO resize transversals + check...
-                for (int i = 0; i < stop; ++i) {
+                //generators.initialize(domain_size);
+
+                const int old_size = transversals.size();
+                const int new_size = stop;
+
+                int keep_until = 0;
+                if(keep_old) {
+                    for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
+                        if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
+                    }
+                }
+
+                //std::cout << old_size << "->" << new_size << ", " << keep_until << std::endl;
+                if(keep_until == new_size && new_size == old_size) return false;
+
+                finished_up_to = -1;
+
+                transversals.resize(new_size);
+                transversals.set_size(new_size);
+
+                for (int i = keep_until; i < stop; ++i) {
+                    if(i < old_size) delete transversals[i];
                     transversals[i] = new transversal();
                     transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
                 }
+
+                return true;
             }
 
             // TODO: need to use root coloring instead!
-            void determine_save_to_individualize(std::vector<int>* save_to_individualize, coloring* root_coloring) {
+            void determine_save_to_individualize(std::vector<std::pair<int, int>>* save_to_individualize, coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
                     if(transversals[i]->size() == corresponding_root_color_sz) {
-                        save_to_individualize->push_back(transversals[i]->fixed_point());
+                        save_to_individualize->push_back({transversals[i]->fixed_point(), corresponding_root_color_sz});
                     }
                 }
             }
@@ -1022,6 +1040,8 @@ namespace dejavu {
                 automorphism.update_support();
                 automorphism.reset();
 
+                //std::cout << "sift " << changed << std::endl;
+
                 //std::cout << generators.size() << ", " << finished_up_to << "/" << transversals.size() << std::endl;
                 return changed;
             }
@@ -1042,6 +1062,7 @@ namespace dejavu {
                 int         grp_sz_exp = 0;
                 for (int level = 0; level < transversals.size(); ++level) {
                     grp_sz_man *= transversals[level]->size();
+                    //std::cout << transversals[level]->size() << std::endl;
                     while (grp_sz_man > 10) {
                         grp_sz_exp += 1;
                         grp_sz_man = grp_sz_man / 10;

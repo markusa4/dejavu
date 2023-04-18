@@ -32,7 +32,7 @@ namespace dejavu {
                 queue_up_level(selector, ir_tree, current_level);
                 work_on_todo(R, g, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
-                //std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
+                std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
             }
 
             int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
@@ -116,6 +116,7 @@ namespace dejavu {
 
                 if(local_state.base_pos > 0) local_state.use_increase_deviation_hash(true);
 
+                //std::cout << local_state.T->get_position() << std::endl;
                 // do computation
                 local_state.reset_trace_equal();
                 if(g->v_size >= 2000) local_state.use_limited_reversible_for_next();
@@ -126,12 +127,13 @@ namespace dejavu {
                 const bool parent_is_base = node->get_base();
                 const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.base_pos-1]);
 
-                //std::cout << "is_base " << is_base << std::endl;
+                //std::cout << "is_base " << is_base << ", " << local_state.base_pos << std::endl;
 
                 if(local_state.T->trace_equal()) { // TODO: what if leaf?
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
+                    //std::cout << local_state.T->get_position() << std::endl;
                     ir_tree->add_node(local_state.base_pos, new_save, is_base);
                 } else {
                     assert(!is_base);

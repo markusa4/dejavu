@@ -32,6 +32,7 @@ namespace dejavu {
             refinement   *R = nullptr;
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
             ir::trace compare_T; // TODO should not be inside dfs_ir
+            double h_recent_cost_snapshot_limit = 0.25;
 
         public:
             long double grp_sz_man = 1.0; /**< group size mantissa */
@@ -43,11 +44,12 @@ namespace dejavu {
              * @param threads number of threads we are allowed to dispatch
              * @param R refinement workspace
              */
-            void setup(int threads, refinement *R) {
+            void setup(int threads, refinement *R, double recent_cost_snapshot_limit = 0.25) {
                 this->R = R;
                 this->threads = threads;
                 grp_sz_man = 1.0;
                 grp_sz_exp = 0;
+                h_recent_cost_snapshot_limit = recent_cost_snapshot_limit;
             }
 
             std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state,
@@ -118,7 +120,7 @@ namespace dejavu {
              * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
              * @return The level up to which DFS succeeded.
              */
-            int do_dfs(sgraph *g, coloring *initial_colors, ir::controller &local_state, std::vector<int>* save_to_individualize) {
+            int do_dfs(sgraph *g, coloring *initial_colors, ir::controller &local_state, std::vector<std::pair<int, int>>* save_to_individualize) {
                 // orbit algorithm structure
                 groups::orbit orbs;
                 orbs.initialize(g->v_size);
@@ -137,7 +139,7 @@ namespace dejavu {
                 bool   fail = false;
 
                 // loop that serves to optimize Tinhofer graphs
-                while (recent_cost_snapshot < 0.25 && local_state.base_pos > 0 && !fail) {
+                while (recent_cost_snapshot < h_recent_cost_snapshot_limit && local_state.base_pos > 0 && !fail) {
                     // backtrack one level
                     local_state.move_to_parent();
 
@@ -219,7 +221,7 @@ namespace dejavu {
                     if (!fail) {
 
                         if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col && initial_colors->ptn[col] + 1 == col_sz) {
-                            save_to_individualize->push_back(local_state.leaf_color.lab[col]);
+                            save_to_individualize->push_back({local_state.leaf_color.lab[col], col_sz});
                         } else {
                             //std::cout << (initial_colors->vertex_to_col[initial_colors->lab[col]]  == col) << ", " << (initial_colors->ptn[col] + 1 == col_sz) << std::endl;
                         }

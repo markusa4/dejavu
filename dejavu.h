@@ -8,21 +8,35 @@
 
 namespace dejavu {
 
-    static void progress_print_header() {
-        PRINT("________________________________________________________________");
-        PRINT(std::setw(16) << std::left <<"T (ms)"                                  << std::setw(16) << "proc"  << std::setw(16) << "P1"        << std::setw(16)        << "P2");
-        PRINT("________________________________________________________________");
-        PRINT(std::setw(16) << std::left << 0 << std::setw(16) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
+    static void progress_print_split() {
+        PRINT("______________________________________________________________");
     }
 
-    static void progress_print_split() {
-        PRINT("________________________________________________________________");
+    static void progress_print_header() {
+        progress_print_split();
+        PRINT(std::setw(9) << std::left <<"T (ms)" << std::setw(9) << "δ (ms)" << std::setw(16) << "proc"  << std::setw(16) << "P1"        << std::setw(16)        << "P2");
+        progress_print_split();
+        PRINT(std::setw(9) << std::left << 0 << std::setw(9) << 0 << std::setw(16) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
     }
 
     static void progress_print(const std::string
                                proc, const std::string p1, const std::string p2) {
-        static std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-        PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+        static std::chrono::high_resolution_clock::time_point first    = std::chrono::high_resolution_clock::now();
+        static std::chrono::high_resolution_clock::time_point previous = std::chrono::high_resolution_clock::now();
+
+        auto now = std::chrono::high_resolution_clock::now();
+        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+        previous = now;
+    }
+
+    static void progress_print(const std::string
+                                 proc, const double p1, const double p2) {
+        static std::chrono::high_resolution_clock::time_point first    = std::chrono::high_resolution_clock::now();
+        static std::chrono::high_resolution_clock::time_point previous = std::chrono::high_resolution_clock::now();
+
+        auto now = std::chrono::high_resolution_clock::now();
+        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+        previous = now;
     }
 
     /**
@@ -42,7 +56,7 @@ namespace dejavu {
         // utility tools used by other modules
         refinement           m_refinement;/**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
-        groups::schreier*    m_schreier;  /**< Schreier-Sims algorithm */
+        groups::schreier*    m_schreier = nullptr;  /**< Schreier-Sims algorithm */
         ir::shared_tree m_tree;           /**< IR-shared_tree */
 
         // TODO: should not be necessary in the end!
@@ -117,6 +131,12 @@ namespace dejavu {
             int h_budget     = 1;
             int h_cost       = 0;
             int h_budget_inc_fact = 5;
+            bool h_large_base = false;
+            bool h_short_base = false;
+
+            int h_leaves_added_this_restart = 0;
+
+            bool inprocessed = false;
 
             // TODO facilities for restarts
 
@@ -135,6 +155,8 @@ namespace dejavu {
                 // initialize a coloring using colors of preprocessed graph
                 coloring local_coloring;
                 g->initialize_coloring(&local_coloring, colmap);
+
+                bool h_regular = local_coloring.cells == 1;
 
                 // set up a local state for IR computations
                 ir::controller local_state(&local_coloring);
@@ -158,8 +180,10 @@ namespace dejavu {
                         }
                         h_cost = 0;
 
-                        m_rand.clear_leaves(); // TODO: should just be part of reset?
+                        if(inprocessed) m_rand.clear_leaves();
                         m_rand.reset();
+
+                        h_leaves_added_this_restart = 0;
 
                         // TODO: notice similarities to previous base, don't throw away bfs etc. if same up to certain point!
                         // TODO: inprocess, sift previous automorphisms if graph hard and we got some, make use of restarts more
@@ -173,11 +197,12 @@ namespace dejavu {
                         // TODO dfs elements into the structure!
                     }
 
-                    std::vector<int> save_to_individualize;
+                    std::vector<std::pair<int, int>> save_to_individualize;
 
                     grp_sz_man = 1.0;
                     grp_sz_exp = 0;
                     add_to_group_size(m_prep.base, m_prep.exp);
+                    std::cout << "prep:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
 
                     // find a selector, moves local_state to a leaf of IR shared_tree
                     m_selectors.find_base(h_restarts, &m_refinement, g, &local_state);
@@ -186,7 +211,16 @@ namespace dejavu {
                     progress_print("selector" + std::to_string(h_restarts), std::to_string(local_state.base_pos),
                                    std::to_string(local_state.T->get_position()));
                     int base_size = local_state.base_pos;
-                    if (base_size > 10 * last_base_size) continue; // TODO: re-consider this
+                    if (base_size > 5 * last_base_size) {
+                        progress_print("skip" + std::to_string(h_restarts), std::to_string(local_state.base_pos),
+                                       std::to_string(last_base_size));
+                        continue; // TODO: re-consider this
+                    }
+                    if(base_size > sqrt(g->v_size)) {
+                        h_large_base = true;
+                    } else if(base_size <= 2) {
+                        h_short_base = true;
+                    }
                     // TODO: here needs to go an algorithm to determine whether we want to continue with this base
                     // TODO: ... and which parts we want to use of previous restart
                     last_base_size = base_size;
@@ -200,24 +234,31 @@ namespace dejavu {
 
                     // depth-first search starting from the computed leaf in local_state
                     // TODO I think there should be no setup functions at all
-                    m_dfs.setup(0, &m_refinement);
+                    m_dfs.setup(0, &m_refinement, h_large_base?0.33:0.25);
 
                     const int dfs_reached_level = m_dfs.do_dfs(g, root_save.get_coloring(), local_state, &save_to_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
-                                   std::to_string(m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
+                                   "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                     add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
+                    //std::cout << "dfs:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
 
                     if (dfs_reached_level == 0) break;
 
                     // set up schreier structure
-                    m_schreier = new groups::schreier(); // TODO bad memory leak, make a reset function
-                    m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
-
+                    if(m_schreier)  {
+                        const bool reset_prob = m_schreier->reset(base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed);
+                        if(reset_prob) {m_rand.reset_prob();}
+                    } else {
+                        m_schreier = new groups::schreier(); // TODO bad memory leak, make a reset function
+                        m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
+                    }
                     // set up IR shared_tree
                     // TODO: make a reset function -- maybe make the reset function smart and have it consider the base
                     // TODO: also consider saving older trees...
                     ir::shared_tree ir_tree;
                     ir_tree.initialize(base_size, &root_save);
+
+                    inprocessed = false;
 
                     int bfs_cost_estimate;
                     int leaf_store_limit;
@@ -238,10 +279,19 @@ namespace dejavu {
                     // TODO find a better way to add canonical leaf to leaf store
                     m_rand.specific_walk(m_refinement, base, g, *m_schreier, local_state, root_save);
 
-                    while (!fail) {
-                        leaf_store_limit = std::min(leaf_store_limit, h_budget);
-                        m_rand.setup(h_error_prob, leaf_store_limit, 0.1);
+                    //if(save_to_individualize.size() > 10) fail = true;
 
+                    const int flat_leaf_store_inc = m_rand.stat_leaves();
+
+                    leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
+                    while (!fail) {
+                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, 0.1);
+
+                        // TODO: if no node was pruned, use m_rand.random_walks instead of "from BFS"! should fix CFI
+
+                        std::cout << "budget: " << h_budget << " leafs: " << flat_leaf_store_inc << " add " << leaf_store_limit << std::endl;
+
+                        const int leaves_pre = m_rand.stat_leaves();
                         if (ir_tree.get_finished_up_to() == 0) {
                             // random automorphisms, single origin
                             m_rand.random_walks(m_refinement, current_selector, g, *m_schreier, local_state, &root_save);
@@ -250,20 +300,25 @@ namespace dejavu {
                             m_rand.random_walks_from_tree(m_refinement, current_selector, g, *m_schreier,
                                                           local_state,ir_tree);
                         }
+                        h_leaves_added_this_restart = m_rand.stat_leaves() - leaves_pre;
 
                         // TODO: random walks should record how many "would fail" on first next level to get better bfs_cost_estimate
                         // TODO: leaf store should not be in m_rand, but m_rand can contain the schreier workspace! (m_rand is a local workspace, such as the other modules)
                         // TODO: we should pass m_refinement in the constructor of the other modules
                         // TODO: if everything has reset functions, we could pass the other structures as well...
-                        progress_print("urandom", std::to_string(m_rand.stat_leaves()),
-                                       std::to_string(m_rand.get_rolling_sucess_rate()));
+                        progress_print("urandom", m_rand.stat_leaves(),
+                                       m_rand.get_rolling_sucess_rate());
                         progress_print("schreier", "s" + std::to_string(m_schreier->stat_sparsegen()) + "/d" +
                                                    std::to_string(m_schreier->stat_densegen()), "_");
 
-                        if (m_rand.deterministic_abort_criterion(*m_schreier) || m_rand.probabilistic_abort_criterion()) // TODO should be functions of m_schreier
+                        if (m_rand.deterministic_abort_criterion(*m_schreier) || m_rand.probabilistic_abort_criterion()) {
+                            //std::cout << m_rand.deterministic_abort_criterion(*m_schreier) << ", " << m_rand.probabilistic_abort_criterion() << std::endl;
+                            fail = false;
                             break;
+                        }
 
-                        h_cost += m_rand.stat_leaves()-1; // TODO: should only add diff
+                        h_cost += h_leaves_added_this_restart; // TODO: should only add diff
+                        std::cout << h_cost << "/" << h_budget << std::endl;
                         if (h_cost > h_budget) {
                             fail = true;
                             progress_print("restart", std::to_string(h_cost), std::to_string(h_budget));
@@ -271,9 +326,12 @@ namespace dejavu {
                         }
                         // TODO: if rolling sucess very high, and base large, should start skipping levels to fill Schreier faster! (CFI)
 
-                        if (!(bfs_cost_estimate <= g->v_size ||
-                              bfs_cost_estimate * m_rand.get_rolling_first_level_success_rate() < 12)) {
-                            if (m_rand.get_rolling_sucess_rate() > 0.25 && !h_skip_random_paths) {
+                        if(m_rand.get_rolling_first_level_success_rate() > 0.99) h_skip_random_paths = false;
+
+                        if(h_short_base && h_regular && m_rand.get_rolling_sucess_rate() < 0.01) h_skip_random_paths = true;
+                        else if (!(((bfs_cost_estimate <= g->v_size ||
+                              bfs_cost_estimate * m_rand.get_rolling_first_level_success_rate() < 12)) && m_rand.get_rolling_first_level_success_rate() < 0.99) && leaf_store_limit <= (bfs_cost_estimate*m_rand.get_rolling_first_level_success_rate())/2) {
+                            if (m_rand.get_rolling_sucess_rate() > 0.1 && !h_skip_random_paths) {
                                 leaf_store_limit *= 2;
                                 continue;
                             }
@@ -281,9 +339,9 @@ namespace dejavu {
                                 !h_skip_random_paths) {
                                 //std::cout << "increased here " << m_rand.get_rolling_first_level_success_rate() << ", "
                                 //          << bfs_cost_estimate << std::endl;
-                                leaf_store_limit = std::max(
+                                leaf_store_limit = std::min(std::max(
                                         (int) m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate,
-                                        ((int) (1.5 * (leaf_store_limit + 1.0))));
+                                        ((int) (1.5 * (leaf_store_limit + 1.0)))), h_budget+1);
                                 continue;
                             }
                         }
@@ -312,6 +370,9 @@ namespace dejavu {
                     if (!fail) {
                         break;
                     } else {
+                        local_state.load_reduced_state(root_save);
+                        const int cell_prev = root_save.get_coloring()->cells;
+
                         if(ir_tree.get_finished_up_to() >= 1) {
                             // TODO: improve saving hash for pruned nodes, then propagate this to first level
                             // TODO: use "pruned" flag, etc.
@@ -319,50 +380,56 @@ namespace dejavu {
                             //mark_set  is_pruned(g->v_size);
                             //ir_tree.mark_first_level(is_pruned);
 
-                            for(int i = 0; i < g->v_size; ++i) {
+                            for (int i = 0; i < g->v_size; ++i) {
                                 //if(is_pruned.get(i)) hash[i] = 1;
                                 //else                      hash[i] = 0;
-                                hash[i] = (int) (*ir_tree.get_node_invariant())[i] % 8;
+                                hash[i] = (int) (*ir_tree.get_node_invariant())[i] % 16;
                             }
-                            local_state.load_reduced_state(root_save);
-                            const int cell_prev = root_save.get_coloring()->cells;
-                            for(int i = 0; i < g->v_size; ++i) {
-                                hash[i] = 8* local_state.c->vertex_to_col[i] + hash[i];
+                            for (int i = 0; i < g->v_size; ++i) {
+                                hash[i] = 16 * local_state.c->vertex_to_col[i] + hash[i];
                             }
                             g->initialize_coloring(local_state.c, hash.get_array());
                             const int cell_after = local_state.c->cells;
                             progress_print("inproc_bfs", std::to_string(cell_prev),
                                            std::to_string(cell_after));
-                            if(cell_after != cell_prev) {
+                            if (cell_after != cell_prev) {
                                 local_state.refine(&m_refinement, g);
                                 progress_print("inproc_ref", std::to_string(cell_after),
                                                std::to_string(local_state.c->cells));
                             }
-
-                            m_schreier->determine_save_to_individualize(&save_to_individualize, local_state.get_coloring());
-
-                            if(!save_to_individualize.empty()) {
-                                for (int i = 0; i < save_to_individualize.size(); ++i) {
-                                    const int ind_v   = save_to_individualize[i];
-                                    const int ind_col = local_state.c->vertex_to_col[ind_v];
-                                    m_prep.multiply_to_group_size(local_state.c->ptn[ind_col]+1);
-                                    local_state.move_to_child_no_trace(&m_refinement, g, ind_v);
-                                }
-                                progress_print("inproc_ind", "_",
-                                               std::to_string(local_state.c->cells));
-                                save_to_individualize.clear();
-                            }
-
-                            local_state.save_reduced_state(root_save);
-                            // TODO use orbit partition for 1 individualization
-                            // TODO could run sassy if individualization succeeds...
                         }
+
+                        m_schreier->determine_save_to_individualize(&save_to_individualize, local_state.get_coloring());
+
+                        if(!save_to_individualize.empty()) {
+                            for (int i = 0; i < save_to_individualize.size(); ++i) {
+                                const int ind_v   = save_to_individualize[i].first;
+                                const int test_col_sz = save_to_individualize[i].second;
+                                //std::cout << test_col_sz << std::endl;
+                                const int ind_col = local_state.c->vertex_to_col[ind_v];
+                                assert(test_col_sz == local_state.c->ptn[ind_col]+1);
+                                m_prep.multiply_to_group_size(local_state.c->ptn[ind_col]+1);
+                                local_state.move_to_child_no_trace(&m_refinement, g, ind_v);
+                            }
+                            progress_print("inproc_ind", "_",
+                                           std::to_string(local_state.c->cells));
+                            save_to_individualize.clear();
+                        }
+
+                        local_state.save_reduced_state(root_save);
+                        // TODO use orbit partition for 1 individualization
+                        // TODO could run sassy if individualization succeeds...
+
+                        inprocessed = cell_prev != local_state.c->cells;
                     }
                 }
-                if(m_schreier) add_to_group_size(m_schreier->compute_group_size());
+                if(m_schreier) {
+                    add_to_group_size(m_schreier->compute_group_size());
+                    //std::cout << "schreier:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
+                }
             }
 
-            std::cout << "#symmetries: " << grp_sz_man << "*10^" << grp_sz_exp << std::endl;
+            std::cout << "#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
         }
     };
 }

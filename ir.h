@@ -91,7 +91,7 @@ namespace dejavu {
         };
 
         /**
-         * \brief Controls movement in IR shared_tree
+         * \brief Controls movement in IR tree
          *
          * Keeps a state of an IR node. Enables the movement to a child of the node, or to the parent of the node.
          * The controller manages data structures and functions, which facilitate the trace \a T as well as the reversal of
@@ -129,6 +129,8 @@ namespace dejavu {
             std::function<type_worklist_color_hook> my_worklist_hook;
             std::function<type_additional_info_hook> my_add_hook;
 
+            work_list workspace;
+
             // settings
             ir_mode mode = IR_MODE_RECORD_TRACE;
 
@@ -141,7 +143,7 @@ namespace dejavu {
             bool h_trace_early_out = false;
 
             bool  h_deviation_inc_active  = false;
-            int   h_deviation_inc         = 10;
+            int   h_deviation_inc         = 48;
             int   h_deviation_inc_current = 0;
 
             int base_pos = 0;
@@ -222,6 +224,7 @@ namespace dejavu {
                 T  = &_T1;
                 cT = &_T2;
 
+                workspace.initialize(c->lab_sz);
                 touched_color.initialize(c->lab_sz);
                 touched_color_list.initialize(c->lab_sz);
                 prev_color_list.initialize(c->lab_sz);
@@ -284,6 +287,7 @@ namespace dejavu {
                 base_color.clear();
                 base_color_sz.clear();
                 base_touched_color_list_pt.clear();
+                base_cells.clear();
 
                 // deactivate reversability
                 mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
@@ -302,6 +306,7 @@ namespace dejavu {
                 base_color.clear();
                 base_color_sz.clear();
                 base_touched_color_list_pt.clear();
+                base_cells.clear();
 
                 // deactivate reversability
                 mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
@@ -356,22 +361,25 @@ namespace dejavu {
                 h_deviation_inc_current += (!cont);
                 const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
 
-                return cont || deviation_override;
+                //const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[base_pos - 1] == c->cells);
+                const bool ndone = true;
+                return ndone && (cont || deviation_override);
             }
 
             void write_strong_invariant(sgraph* g) {
-                work_list test(g->v_size);
-                for(int v = 0; v < g->v_size; ++v) {
-                    T->op_additional_info(-1);
+                //T->op_additional_info(1);
+                for(int l = 0; l < g->v_size; ++l) {
+                    const int v = c->lab[l];
+                    int inv = 0;
                     for(int pt = g->v[v]; pt < g->v[v] + g->d[v]; ++pt) {
                         const int other_v = g->e[pt];
-                        test.push_back(c->vertex_to_col[other_v]);
+                        inv += MASH2(c->vertex_to_col[other_v]);
                     }
-                    test.sort();
-                    for(int j = 0; j < test.size(); ++j) {
-                        T->op_additional_info(test[j]);
-                    }
-                    test.reset();
+                    //workspace.sort();
+                    //for(int j = 0; j < workspace.size(); ++j) {
+                    T->op_additional_info(inv);
+                    //}
+                    workspace.reset();
                 }
             }
 
@@ -436,9 +444,8 @@ namespace dejavu {
                 h_individualize = true;
                 const int prev_col = c->vertex_to_col[v];
                 const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
-                T->op_individualize(prev_col, c->vertex_to_col[v]);
+                if (T) T->op_individualize(prev_col, c->vertex_to_col[v]);
                 h_individualize = false;
-
                 h_last_refinement_singleton_only = true;
 
                 if (T) T->op_refine_start();
@@ -449,14 +456,17 @@ namespace dejavu {
                                        );
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
+
+                    //std::cout << T->get_position() <<  ", " << c->cells << std::endl;
                 } else {
                     // TODO compare_base_cells not necessarily applicable
                     // compare_base_cells[base_pos - 1]
                     // T->trace_equal()?compare_base_cells[base_pos - 1]:-1
-                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
-                                       my_worklist_hook, my_add_hook
-                                       );
-                    if (T && T->trace_equal()) T->skip_to_individualization();
+
+                    R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
+                                       my_worklist_hook, my_add_hook);
+                    assert(T->trace_equal()?c->cells==compare_base_cells[base_pos-1]:true);
+                    if (T && T->trace_equal()) {T->skip_to_individualization();}
                 }
 
                 h_cell_active = false;
@@ -523,6 +533,8 @@ namespace dejavu {
                 base_touched_color_list_pt.pop_back();
                 base_cells.pop_back();
                 base_singleton_pt.pop_back();
+
+                T->reset_trace_equal();
             }
         };
 
@@ -534,7 +546,7 @@ namespace dejavu {
          * \brief Creates cell selectors.
          *
          * Heuristics which enable the creation of different cell selectors, as well as moving an \ref controller to a
-         * leaf of the IR shared_tree.
+         * leaf of the IR tree.
          */
         class selector_factory {
             // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
@@ -729,7 +741,6 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     prev_color = best_color;
                     state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
-                    std::cout << state->get_coloring()->cells << std::endl;
                 }
 
                 saved_color_base = state->base_color;
@@ -947,6 +958,10 @@ namespace dejavu {
                 tree_data_jump_map.resize(base_size + 1);
                 add_node(0, root, true);
                 node_invariant.resize(root->get_coloring()->lab_sz);
+            }
+
+            void reset(int new_base_size, ir::reduced_save* root, int keep_level) {
+
             }
 
             void queue_reserve(const int n) {

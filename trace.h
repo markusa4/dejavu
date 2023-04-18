@@ -6,11 +6,11 @@
 
 namespace dejavu {
     namespace ir {
-        #define TRACE_MARKER_INDIVIDUALIZE     (-1)
-        #define TRACE_MARKER_REFINE_START      (-2)
-        #define TRACE_MARKER_REFINE_END        (-3)
-        #define TRACE_MARKER_REFINE_CELL_START (-4)
-        #define TRACE_MARKER_REFINE_CELL_END   (-5)
+        #define TRACE_MARKER_INDIVIDUALIZE     (INT32_MAX-7)
+        #define TRACE_MARKER_REFINE_START      (INT32_MAX-2)
+        #define TRACE_MARKER_REFINE_END        (INT32_MAX-3)
+        #define TRACE_MARKER_REFINE_CELL_START (INT32_MAX-4)
+        #define TRACE_MARKER_REFINE_CELL_END   (INT32_MAX-5)
 
         /**
          * \brief The trace invariant.
@@ -49,10 +49,21 @@ namespace dejavu {
             bool comp = true;
 
             void add_to_hash(int d) {
-                hash += (d * (352355 - d * 3));
+                //hash += (d * (35237));
+                long ho = hash & 0xff00000000000000;    // extract high-order 8 bits from h
+                hash = hash << 8;                    // shift h left by 5 bits
+                hash = hash ^ (ho >> 56);     // move the highorder 5 bits to the low-order
+                //   end and XOR into h
+                hash = hash ^ d;
             }
 
             void write_compare(int d) {
+                d = d % (INT32_MAX-10);
+                assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
+                write_compare_no_limit(d);
+            }
+
+            void write_compare_no_limit(int d) {
                 add_to_hash(d);
                 if (record)
                     data.push_back(d);
@@ -68,8 +79,8 @@ namespace dejavu {
             }
 
             void write_skip_compare(int d) {
-                if (record)
-                    data.push_back(d);
+                d = std::min(INT32_MAX-10,d);
+                if (record) data.push_back(d);
                 ++position;
             }
 
@@ -113,7 +124,7 @@ namespace dejavu {
                 assert(ind_color >= 0);
                 assert(old_color >= 0);
                 assert(ind_color != old_color);
-                write_compare(TRACE_MARKER_INDIVIDUALIZE);
+                write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
                 write_compare(old_color);
                 write_compare(ind_color);
             }
@@ -123,7 +134,7 @@ namespace dejavu {
              */
             void op_refine_start() {
                 assert(!comp || !assert_refine_act);
-                write_compare(TRACE_MARKER_REFINE_START);
+                write_compare_no_limit(TRACE_MARKER_REFINE_START);
                 assert_refine_act = true;
             }
 
@@ -133,7 +144,7 @@ namespace dejavu {
              */
             void op_refine_cell_start(int color) {
                 assert(!comp || !assert_cell_act);
-                write_compare(TRACE_MARKER_REFINE_CELL_START);
+                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
                 cell_old_color = color;
                 cell_act_spot = data.size();
                 write_skip_compare(false);
@@ -165,7 +176,7 @@ namespace dejavu {
             void op_refine_cell_end() {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
-                write_compare(TRACE_MARKER_REFINE_CELL_END);
+                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
             /**
@@ -175,7 +186,7 @@ namespace dejavu {
                 assert(!comp || !assert_cell_act);
                 assert(assert_refine_act);
                 assert_refine_act = false;
-                write_skip_compare(TRACE_MARKER_REFINE_END);
+                write_compare_no_limit(TRACE_MARKER_REFINE_END);
             }
 
             /**
