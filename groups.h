@@ -935,7 +935,6 @@ namespace dejavu {
                     }
                 }
 
-                //std::cout << old_size << "->" << new_size << ", " << keep_until << std::endl;
                 if(keep_until == new_size && new_size == old_size) return false;
 
                 finished_up_to = -1;

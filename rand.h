@@ -6,16 +6,46 @@
 
 namespace dejavu {
     namespace search_strategy {
+        static void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
+                           ir::controller &local_state, ir::reduced_save &start_from) {
+            local_state.load_reduced_state(start_from);
+
+            while (g->v_size != local_state.c->cells) {
+                int v = base_vertex[local_state.base_pos];
+                local_state.move_to_child(&R, g, v);
+            }
+        }
+
+
         class stored_leaf {
-            coloring store_c;
+            work_list lab;
+            std::vector<int> base;
+            bool full_save;
         public:
-            stored_leaf(coloring& c, std::vector<int>& base) {
+            stored_leaf(coloring& c, std::vector<int>& base, bool full_save = true) {
                 // TODO make the stored leaf more properly
-                store_c.copy(&c);
+                this->full_save = full_save;
+                if(full_save) {
+                    //store_c.copy(&c);
+                    lab.initialize(c.lab_sz);
+                    memcpy(lab.get_array(), c.lab, c.lab_sz * sizeof(int));
+                } else {
+                    this->base = base;
+                }
             }
 
-            coloring* get_coloring() {
-                return &store_c;
+            void load_state(refinement &R, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
+                specific_walk(R, base, g, local_state, start_from);
+            }
+
+            /*coloring* get_coloring_if_possible() {
+                if(full_save) return &store_c;
+                return nullptr;
+            }*/
+
+            int* get_lab_if_possible() {
+                if(full_save) return lab.get_array();
+                return nullptr;
             }
         };
 
@@ -61,7 +91,7 @@ namespace dejavu {
             void add_leaf(long hash, coloring& c, std::vector<int>& base) {
                 lock.lock();
                 if(!leaf_store.contains(hash)) {
-                    auto new_leaf = new stored_leaf(c, base);
+                    auto new_leaf = new stored_leaf(c, base, s_leaves < 100);
                     leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
                     garbage_collector.push_back(new_leaf);
                     ++s_leaves;
@@ -98,12 +128,14 @@ namespace dejavu {
             double h_rolling_first_level_success  = 1.0;
             double h_required_first_level_success = 0;
             int    h_paths = 0;
+            bool   h_look_close = false;
 
         public:
-            void setup(int error, int leaf_store_limit, double required_first_level_success) {
+            void setup(int error, int leaf_store_limit, double required_first_level_success, bool look_close = false) {
                 h_leaf_limit = leaf_store_limit;
                 error_bound  = error;
                 h_required_first_level_success = required_first_level_success;
+                h_look_close = look_close;
             }
 
             void reset() {
@@ -278,7 +310,14 @@ namespace dejavu {
                         h_rolling_success = (9.0*h_rolling_success + 0.0) / 10.0;
                     } else {
                         //std::cout << "reading leaf " << local_state.T->get_hash() << std::endl;
-                        automorphism.write_color_diff(local_state.c->vertex_to_col, other_leaf->get_coloring()->lab);
+                        int* lab = other_leaf->get_lab_if_possible();
+                        if(lab != nullptr) {
+                            automorphism.write_color_diff(local_state.c->vertex_to_col, lab);
+                        } else {
+                            memcpy(w.scratch_apply1.get_array(), local_state.c->vertex_to_col, g->v_size * sizeof(int));
+                            other_leaf->load_state(R, g, local_state, *start_from);
+                            automorphism.write_color_diff(w.scratch_apply1.get_array(), local_state.c->lab);
+                        }
                         const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(), automorphism.support());
                         if(cert) {
                             //std::cout << "certified" << local_state.T->get_hash() << std::endl;
@@ -316,29 +355,21 @@ namespace dejavu {
                     auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                     local_state.load_reduced_state(*node->get_save());
 
-                    long started_from_hash = local_state.T->get_hash();
-
                     int base_pos                  = local_state.base_pos;
                     const int start_from_base_pos = base_pos;
-
-                    bool uniform = true;
 
                     while (g->v_size != local_state.c->cells) {
                         const int col    = (*selector)(local_state.c, base_pos);
                         const int col_sz = local_state.c->ptn[col] + 1;
                         const int rand = ((int) generator()) % col_sz;
                         int v = local_state.c->lab[col + rand];
-                        if(base_pos == start_from_base_pos) {
-                            local_state.use_trace_early_out(true);
-                        } else {
-                            local_state.use_trace_early_out(false);
-                        }
+                        local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                         local_state.move_to_child(&R, g, v);
 
                         if(base_pos == start_from_base_pos) {
                             h_rolling_first_level_success =
                                     (9.0 * h_rolling_first_level_success + (local_state.T->trace_equal())) / 10.0;
-                            if(!local_state.T->trace_equal()) break;
+                            if(!h_look_close && !local_state.T->trace_equal()) break;
                         }
                         ++base_pos;
                     }
@@ -348,6 +379,8 @@ namespace dejavu {
                     if(base_pos == start_from_base_pos) {continue;}
 
                     local_state.write_strong_invariant(g);
+
+                    bool used_load = false;
 
                     for(int hashf = 0; hashf < 32; ++hashf) {
                         long hash_c = local_state.T->get_hash()+hashf;
@@ -362,8 +395,16 @@ namespace dejavu {
                             for (int i = 0; i < g->v_size; ++i) {
                                 assert(i == automorphism.perm()[i]);
                             }
-                            automorphism.write_color_diff(local_state.c->vertex_to_col,
-                                                          other_leaf->get_coloring()->lab);
+                            int* lab = other_leaf->get_lab_if_possible();
+                            if(lab != nullptr) {
+                                automorphism.write_color_diff(local_state.c->vertex_to_col, lab);
+                            } else {
+                                memcpy(w.scratch_apply1.get_array(), local_state.c->vertex_to_col, g->v_size * sizeof(int));
+                                other_leaf->load_state(R, g, local_state, *ir_tree.pick_node_from_level(0,0)->get_save());
+                                automorphism.write_color_diff(w.scratch_apply1.get_array(), local_state.c->lab);
+                                used_load = true;
+                            }
+
                             const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(),
                                                                             automorphism.nsupport(),
                                                                             automorphism.support());
@@ -372,13 +413,14 @@ namespace dejavu {
                                 h_rolling_success = (9.0 * h_rolling_success + 1.0) / 10.0;
                                 //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
                                 const bool sift = group.sift(w, g, &R, automorphism);
-                                if (uniform) record_sift_result(sift);
+                                record_sift_result(sift);
                                 automorphism.reset();
                                 break;
                             } else {
-                                //std::cout << "cert fail " << std::endl;
+                                std::cout << "cert fail " << std::endl;
                                 //std::cout << "cert fail" << hash_c << " / " << local_state.T->trace_equal()  << "/" << started_from_hash << std::endl;
                                 automorphism.reset();
+                                if(used_load) break; // TODO maybe there is better fix here...
                                 continue;
                             }
                         }

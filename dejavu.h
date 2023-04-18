@@ -195,6 +195,8 @@ namespace dejavu {
                         // TODO: also, if it seems like "graph is hard" and sifting is not going to be of any issue, just start
                         // TODO: keeping the schreier structure, doesn't matter that it's a different base then... also sift
                         // TODO dfs elements into the structure!
+
+                        // TODO use trace distances to measure average cost of "~1 experimental path" or  "1 element in bfs"
                     }
 
                     std::vector<std::pair<int, int>> save_to_individualize;
@@ -202,7 +204,6 @@ namespace dejavu {
                     grp_sz_man = 1.0;
                     grp_sz_exp = 0;
                     add_to_group_size(m_prep.base, m_prep.exp);
-                    std::cout << "prep:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
 
                     // find a selector, moves local_state to a leaf of IR shared_tree
                     m_selectors.find_base(h_restarts, &m_refinement, g, &local_state);
@@ -285,11 +286,11 @@ namespace dejavu {
 
                     leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
                     while (!fail) {
-                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, 0.1);
+                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, 0.1, (m_rand.get_rolling_first_level_success_rate() > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
 
                         // TODO: if no node was pruned, use m_rand.random_walks instead of "from BFS"! should fix CFI
 
-                        std::cout << "budget: " << h_budget << " leafs: " << flat_leaf_store_inc << " add " << leaf_store_limit << std::endl;
+                        //std::cout << "budget: " << h_budget << " leafs: " << flat_leaf_store_inc << " add " << leaf_store_limit << std::endl;
 
                         const int leaves_pre = m_rand.stat_leaves();
                         if (ir_tree.get_finished_up_to() == 0) {
@@ -318,7 +319,7 @@ namespace dejavu {
                         }
 
                         h_cost += h_leaves_added_this_restart; // TODO: should only add diff
-                        std::cout << h_cost << "/" << h_budget << std::endl;
+                        //std::cout << h_cost << "/" << h_budget << std::endl;
                         if (h_cost > h_budget) {
                             fail = true;
                             progress_print("restart", std::to_string(h_cost), std::to_string(h_budget));

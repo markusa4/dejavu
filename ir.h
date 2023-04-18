@@ -329,46 +329,44 @@ namespace dejavu {
             }
 
             bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
-                // update some heuristic values
-                if (new_color_sz > 1) {
-                    h_last_refinement_singleton_only = false;
-                    h_hint_color = new_color;
-                    h_hint_color_is_singleton_now = false;
-                }
-                if (new_color == h_hint_color && new_color_sz == 1) {
-                    h_hint_color_is_singleton_now = true;
-                }
+                        if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
+                            // update some heuristic values
+                            if (new_color_sz > 1) {
+                                h_last_refinement_singleton_only = false;
+                                h_hint_color = new_color;
+                                h_hint_color_is_singleton_now = false;
+                            }
+                            if (new_color == h_hint_color && new_color_sz == 1) {
+                                h_hint_color_is_singleton_now = true;
+                            }
+                            // write singletons to singleton list
+                            if (new_color_sz == 1) {
+                                singletons.push_back(c->lab[new_color]);
+                            }
 
-                if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
-                    // write singletons to singleton list
-                    if (new_color_sz == 1) {
-                        singletons.push_back(c->lab[new_color]);
-                    }
+                            // record colors that were changed
+                            if (!touched_color.get(new_color)) {
+                                touched_color.set(new_color);
+                                prev_color_list.push_back(old_color);
+                                touched_color_list.push_back(new_color);
+                            }
+                        }
 
-                    // record colors that were changed
-                    if (!touched_color.get(new_color)) {
-                        touched_color.set(new_color);
-                        prev_color_list.push_back(old_color);
-                        touched_color_list.push_back(new_color);
-                    }
-                }
+                        // record split into trace invariant, unless we are individualizing
+                        if (!h_individualize) T->op_refine_cell_record(new_color, new_color_sz, 1);
 
-                // record split into trace invariant, unless we are individualizing
-                if (T && !h_individualize) T->op_refine_cell_record(new_color, new_color_sz, 1);
+                        const bool cont = !h_trace_early_out || T->trace_equal();
+                        h_deviation_inc_current += (!cont);
+                        const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
 
-                const bool cont = !h_trace_early_out || T->trace_equal();
-
-                h_deviation_inc_current += (!cont);
-                const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
-
-                //const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[base_pos - 1] == c->cells);
-                const bool ndone = true;
-                return ndone && (cont || deviation_override);
+                        //const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[base_pos - 1] == c->cells);
+                        const bool ndone = true;
+                        return ndone && (cont || deviation_override);
             }
 
-            void write_strong_invariant(sgraph* g) {
+            void __attribute__ ((noinline)) write_strong_invariant(sgraph* g) {
                 //T->op_additional_info(1);
-                for(int l = 0; l < g->v_size; ++l) {
+                for(int l = 0; l < g->v_size/2; ++l) { // "half of them should be enough"...
                     const int v = c->lab[l];
                     int inv = 0;
                     for(int pt = g->v[v]; pt < g->v[v] + g->d[v]; ++pt) {
@@ -385,26 +383,23 @@ namespace dejavu {
 
             bool worklist_hook(const int color, const int color_sz) {
                 if (h_cell_active) {
-                    if (T) T->op_refine_cell_end();
+                    T->op_refine_cell_end();
                     h_cell_active = false;
                 }
 
                 // update some heuristic values
                 // TODO: only activate blueprints on first few restarts!
-                /*if (T) {
-                    if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
-                        if (config.CONFIG_IR_IDLE_SKIP) {
-                            T->blueprint_skip_to_next_cell();
-                            return false;
-                        }
+                if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
+                    if (config.CONFIG_IR_IDLE_SKIP) {
+                        T->blueprint_skip_to_next_cell();
+                        return false;
                     }
-                }*/
+                }
 
-                if (T) T->op_refine_cell_start(color);
-                if (T && !h_individualize) T->op_additional_info(color_sz);
+                T->op_refine_cell_start(color);
+                if (!h_individualize) T->op_additional_info(color_sz);
 
                 h_cell_active = true;
-
                 return true;
             }
 
@@ -452,7 +447,7 @@ namespace dejavu {
 
                 if (mode == IR_MODE_RECORD_TRACE) {
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
-                                       my_worklist_hook, my_add_hook
+                                       my_worklist_hook, nullptr
                                        );
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
@@ -464,7 +459,7 @@ namespace dejavu {
                     // T->trace_equal()?compare_base_cells[base_pos - 1]:-1
 
                     R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
-                                       my_worklist_hook, my_add_hook);
+                                       my_worklist_hook, nullptr);
                     assert(T->trace_equal()?c->cells==compare_base_cells[base_pos-1]:true);
                     if (T && T->trace_equal()) {T->skip_to_individualization();}
                 }
@@ -963,6 +958,7 @@ namespace dejavu {
             void reset(int new_base_size, ir::reduced_save* root, int keep_level) {
 
             }
+
 
             void queue_reserve(const int n) {
                 missing_nodes.reserve(n);

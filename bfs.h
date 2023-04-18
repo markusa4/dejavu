@@ -32,7 +32,7 @@ namespace dejavu {
                 queue_up_level(selector, ir_tree, current_level);
                 work_on_todo(R, g, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
-                std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
+                //std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
             }
 
             int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
