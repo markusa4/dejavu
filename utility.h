@@ -5,7 +5,6 @@
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
-#include "configuration.h"
 #include <fstream>
 #include <set>
 #include <cstring>
@@ -37,5 +36,8 @@ inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
     return f.good();
 }
+
+typedef const std::function<void(int, const int *, int, const int *)> dejavu_hook;
+extern volatile int dejavu_kill_request;
 
 #endif //DEJAVU_UTILITY_H

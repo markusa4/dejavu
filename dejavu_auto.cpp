@@ -1,5 +1,8 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #include <iostream>
-#include "configuration.h"
 #include "parser.h"
 #include <thread>
 #include "sassy/preprocessor.h"
@@ -14,10 +17,10 @@ typedef std::chrono::high_resolution_clock Clock;
 thread_local bool bulk_domain_reset = false;
 
 
-configstruct config;
+//configstruct config;
 volatile int dejavu_kill_request = 0;
-thread_local int numnodes;
-thread_local int colorcost;
+//thread_local int numnodes;
+//thread_local int colorcost;
 
 bool finished = false;
 
@@ -92,7 +95,6 @@ int commandline_mode(int argc, char **argv) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
-    config.CONFIG_IR_WRITE_GROUPORDER = true;
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
         std::transform(arg.begin(), arg.end(), arg.begin(), ::toupper);
@@ -118,7 +120,7 @@ int commandline_mode(int argc, char **argv) {
         } else if (arg == "__ERR") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_RAND_ABORT = atoi(argv[i]);
+                //config.CONFIG_RAND_ABORT = atoi(argv[i]);
             } else {
                 std::cerr << "--err option requires one argument." << std::endl;
                 return 1;
@@ -126,19 +128,19 @@ int commandline_mode(int argc, char **argv) {
         } else if (arg == "__LEAF_LIMIT") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
+                //config.CONFIG_IR_LEAF_STORE_LIMIT = atoi(argv[i]);
             } else {
                 std::cerr << "--leaf-limit option requires one argument." << std::endl;
                 return 1;
             }
         } else if (arg == "__WRITE_AUTO") {
-            config.CONFIG_WRITE_AUTOMORPHISMS = true;
+            //config.CONFIG_WRITE_AUTOMORPHISMS = true;
         } else if (arg == "__WRITE_AUTO_GAP") {
-            config.CONFIG_WRITE_AUTOMORPHISMS_GAP = true;
+            //config.CONFIG_WRITE_AUTOMORPHISMS_GAP = true;
         }  else if (arg == "__THREADS") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
+                //config.CONFIG_THREADS_REFINEMENT_WORKERS = atoi(argv[i]);
             } else {
                 std::cerr << "--threads option requires one argument." << std::endl;
                 return 1;
@@ -148,18 +150,18 @@ int commandline_mode(int argc, char **argv) {
         } else if (arg == "__KDEVIATION") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
+                //config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
             } else {
                 std::cerr << "--kdeviation option requires one argument." << std::endl;
                 return 1;
             }
         } else if (arg == "__NO_IDLESKIP") {
-            config.CONFIG_IR_IDLE_SKIP = false;
+            //config.CONFIG_IR_IDLE_SKIP = false;
         }  else if (arg == "__EARLY_IR") {
-            config.CONFIG_IR_INDIVIDUALIZE_EARLY = true;
+            //config.CONFIG_IR_INDIVIDUALIZE_EARLY = true;
         } else if (arg == "__COMPRESS") {
-            config.CONFIG_PREPROCESS_COMPRESS      = true;
-            config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
+            //config.CONFIG_PREPROCESS_COMPRESS      = true;
+           // config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
         } else if (arg == "__PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
@@ -170,12 +172,12 @@ int commandline_mode(int argc, char **argv) {
                 return 1;
             }
         }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
-                config.CONFIG_ONLY_COLOR_REF_INVARIANT = true;
+                //config.CONFIG_ONLY_COLOR_REF_INVARIANT = true;
         }  else if (arg == "__FORCE_SELECTOR") {
             if (i + 1 < argc) {
                 i++;
-                config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
-                config.CONFIG_IR_FORCE_SELECTOR = true;
+                //config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
+                //config.CONFIG_IR_FORCE_SELECTOR = true;
             } else {
                 std::cerr << "--force_selector option requires one argument." << std::endl;
                 return 1;

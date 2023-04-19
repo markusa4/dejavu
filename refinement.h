@@ -1,3 +1,7 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef DEJAVU_REFINEMENT_H
 #define DEJAVU_REFINEMENT_H
 
@@ -5,7 +9,6 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "graph.h"
-#include "configuration.h"
 #include "utility.h"
 
 namespace dejavu {
@@ -198,8 +201,6 @@ namespace dejavu {
                     if (worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) {
                         continue;
                     }
-
-                    colorcost += next_color_class_sz;
 
                     bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
@@ -995,13 +996,13 @@ assert(c->cells == actual_cells);
                                 scratch_set.set(col);
                                 old_color_classes.push_back(col);
                             }
-                        } else {
+                        } /*else {
                             if (config.CONFIG_IR_FULL_INVARIANT)
                                 vertex_worklist.push_back(col);
                             else {
                                 singleton_inv += MASH4(col);
                             }
-                        }
+                        }*/
                     }
                     cc += 1;
                 }
@@ -1830,8 +1831,6 @@ assert(c->cells == actual_cells);
             ) {
                 singleton_hint.reset();
                 assure_initialized(g);
-                int deviation_expander = (color_limit == g->v_size) ? config.CONFIG_IR_EXPAND_DEVIATION : 0;
-                if (config.CONFIG_IR_FORCE_EXPAND_DEVIATION) deviation_expander = config.CONFIG_IR_EXPAND_DEVIATION;
 
                 cell_todo.reset(&queue_pointer);
 
@@ -1866,8 +1865,6 @@ assert(c->cells == actual_cells);
                         continue;
                     }
 
-                    colorcost += next_color_class_sz;
-
                     bool dense_dense = (g->d(c->lab[next_color_class]) > (g->v_size / (next_color_class_sz + 1)));
 
                     if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
@@ -1886,11 +1883,6 @@ assert(c->cells == actual_cells);
                         refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
                                                   &color_class_splits);
                     }
-
-                    /*deviation_expander -= (!comp);
-                if(!comp && deviation_expander <= 0) {
-                    break;
-                }*/
 
                     // add all new classes except for the first, largest one
                     int skip = 0;
@@ -1960,7 +1952,7 @@ assert(c->cells == actual_cells);
                     }
 
                     // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
-                    if (c->cells == color_limit && !config.CONFIG_IR_REFINE_EARLYOUT_LATE) {
+                    if (c->cells == color_limit) {
                         color_class_splits.reset();
                         cell_todo.reset(&queue_pointer);
                         break;
@@ -2673,13 +2665,13 @@ assert(c->cells == actual_cells);
                                 scratch_set.set(col);
                                 old_color_classes.push_back(col);
                             }
-                        } else {
+                        } /*else {
                             if (config.CONFIG_IR_FULL_INVARIANT)
                                 vertex_worklist.push_back(col);
                             else {
                                 singleton_inv += MASH4(col);
                             }
-                        }
+                        }*/
                     }
                     cc += 1;
                 }

@@ -1,3 +1,7 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef DEJAVU_IR_H
 #define DEJAVU_IR_H
 
@@ -397,10 +401,8 @@ namespace dejavu {
                 // update some heuristic values
                 // TODO: only activate blueprints on first few restarts!
                 if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
-                    if (config.CONFIG_IR_IDLE_SKIP) {
-                        T->blueprint_skip_to_next_cell();
-                        return false;
-                    }
+                    T->blueprint_skip_to_next_cell();
+                    return false;
                 }
 
                 T->op_refine_cell_start(color);
@@ -537,10 +539,6 @@ namespace dejavu {
 
                 T->reset_trace_equal();
             }
-        };
-
-        struct splitmap {
-
         };
 
         /**
@@ -890,10 +888,6 @@ namespace dejavu {
 
             int state_score(sgraph *g, controller *state) {
                 return state->get_coloring()->cells;
-            }
-
-            splitmap find_splitmap(sgraph *g, coloring *c) {
-                return splitmap();
             }
         };
 

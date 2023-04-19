@@ -94,7 +94,7 @@ public:
     }
 
     void alloc(int sz) {
-        if(config.CONFIG_BULK_ALLOCATOR) {
+        if(true) { // TODO need to work on colorings...
             if (!init) {
                 std::pair<int *, int *> alloc = coloring_allocator<int>::coloring_bulk_allocator(sz * 4);
                 bulk_alloc = alloc.first;
