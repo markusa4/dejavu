@@ -193,7 +193,7 @@ namespace dejavu {
              * @param group The Schreier structure of the group we are considering.
              * @return Whether the deterministic abort criterion allows termination or not.
              */
-            bool deterministic_abort_criterion(groups::schreier &group) {
+            bool deterministic_abort_criterion(groups::shared_schreier &group) {
                 return (group.finished_up_to_level() + 1 == group.base_size());
             }
 
@@ -205,7 +205,7 @@ namespace dejavu {
             }
 
             void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
-                               groups::schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
+                               groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
                 local_state.load_reduced_state(start_from);
 
                 while (g->v_size != local_state.c->cells) {
@@ -228,9 +228,9 @@ namespace dejavu {
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
             void random_walks(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                              groups::schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
+                              groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
                 groups::automorphism_workspace automorphism(g->v_size);
-                groups::schreier_workspace w(g->v_size, &R, g);
+                groups::schreier_workspace w(g->v_size);
                 std::vector<int> heuristic_reroll;
 
                 local_state.use_trace_early_out(false);
@@ -339,9 +339,9 @@ namespace dejavu {
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
             void __attribute__ ((noinline)) random_walks_from_tree(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                                                                   groups::schreier &group, ir::controller &local_state, ir::shared_tree &ir_tree) {
+                                                                   groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree &ir_tree) {
                 groups::automorphism_workspace automorphism(g->v_size);
-                groups::schreier_workspace w(g->v_size, &R, g);
+                groups::schreier_workspace w(g->v_size);
                 std::vector<int> heuristic_reroll;
                 local_state.use_trace_early_out(false);
 

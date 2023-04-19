@@ -56,7 +56,7 @@ namespace dejavu {
         // utility tools used by other modules
         refinement           m_refinement;/**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
-        groups::schreier*    m_schreier = nullptr;  /**< Schreier-Sims algorithm */
+        groups::shared_schreier*    m_schreier = nullptr;  /**< Schreier-Sims algorithm */
         ir::shared_tree m_tree;           /**< IR-shared_tree */
 
         // TODO: should not be necessary in the end!
@@ -250,7 +250,7 @@ namespace dejavu {
                         const bool reset_prob = m_schreier->reset(base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed);
                         if(reset_prob) {m_rand.reset_prob();}
                     } else {
-                        m_schreier = new groups::schreier(); // TODO bad memory leak, make a reset function
+                        m_schreier = new groups::shared_schreier(); // TODO bad memory leak, make a reset function
                         m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
                     }
                     // set up IR shared_tree
@@ -376,18 +376,20 @@ namespace dejavu {
 
                         if(ir_tree.get_finished_up_to() >= 1) {
                             // TODO: improve saving hash for pruned nodes, then propagate this to first level
+                            // TODO: could fix "usr" maybe?
                             // TODO: use "pruned" flag, etc.
+                            // TODO: hashing actually makes this worse!
                             work_list hash(g->v_size);
-                            //mark_set  is_pruned(g->v_size);
-                            //ir_tree.mark_first_level(is_pruned);
+                            mark_set  is_pruned(g->v_size);
+                            ir_tree.mark_first_level(is_pruned);
 
                             for (int i = 0; i < g->v_size; ++i) {
-                                //if(is_pruned.get(i)) hash[i] = 1;
-                                //else                      hash[i] = 0;
-                                hash[i] = (int) (*ir_tree.get_node_invariant())[i] % 16;
+                                if(is_pruned.get(i)) hash[i] = 1;
+                                else                      hash[i] = 0;
+                                hash[i] += (int) (*ir_tree.get_node_invariant())[i] % 16;
                             }
                             for (int i = 0; i < g->v_size; ++i) {
-                                hash[i] = 16 * local_state.c->vertex_to_col[i] + hash[i];
+                                hash[i] = 17 * local_state.c->vertex_to_col[i] + hash[i];
                             }
                             g->initialize_coloring(local_state.c, hash.get_array());
                             const int cell_after = local_state.c->cells;

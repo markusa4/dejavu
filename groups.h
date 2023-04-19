@@ -16,23 +16,39 @@ namespace dejavu {
      */
     namespace groups {
 
-        // reset internal automorphism structure to the identity
-        static void reset_automorphism(int *rautomorphism, work_list *automorphism_supp) {
-            for (int i = 0; i < automorphism_supp->cur_pos; ++i) {
-                rautomorphism[(*automorphism_supp)[i]] = (*automorphism_supp)[i];
+        /**
+         * Reset an automorphism given in \p automorphism with support \p support to the identity.
+         *
+         * @param automorphism Dense notation of the given automorphism, i.e., vertex `i` is mapped to `automorphism[i]`.
+         * @param support Support of the automorphism, contains all vertices where `i != automorphism[i]`.
+         */
+        static void reset_automorphism(int *automorphism, work_list *support) {
+            for (int i = 0; i < support->cur_pos; ++i) {
+                automorphism[(*support)[i]] = (*support)[i];
             }
-            automorphism_supp->reset();
+            support->reset();
         };
 
-        // make automorphism from colorings
-        static void color_diff_automorphism(int n, const int *vertex_to_col, const int *col_to_vertex,
-                                            int *automorphism_map, work_list *automorphism_supp) {
-            for (int v1 = 0; v1 < n; ++v1) {
+        /**
+         * Create an automorphism from two discrete vertex colorings.
+         *
+         * @param domain_size Size of the underlying domain (i.e., number of vertices of the graph).
+         * @param vertex_to_col Vertex-to-color mapping of the first coloring, i.e., vertex `i` is mapped to color
+         * `vertex_to_col[i]`.
+         * @param col_to_vertex Color-to-vertex mapping of the second coloring, i.e., the color i contains the vertex
+         * `col_to_vertex[i]` (since the colorings are assumed to be discrete, every `i` must be a distinct color).
+         * @param automorphism Dense notation for the automorphism to be written. Assumed to be the identity upon calling
+         * the method.
+         * @param support Support for the automorphism \p automorphism.
+         */
+        static void color_diff_automorphism(int domain_size, const int *vertex_to_col, const int *col_to_vertex,
+                                            int *automorphism, work_list *support) {
+            for (int v1 = 0; v1 < domain_size; ++v1) {
                 const int col = vertex_to_col[v1];
                 const int v2  = col_to_vertex[col];
                 if (v1 != v2) {
-                    automorphism_map[v1] = v2;
-                    automorphism_supp->push_back(v1);
+                    automorphism[v1] = v2;
+                    support->push_back(v1);
                 }
             }
         }
@@ -67,10 +83,12 @@ namespace dejavu {
             }
 
             /**
-             * Create automorphism from two given vertex colorings.
+             * Create automorphism from two discrete vertex colorings.
              *
-             * @param vertex_to_col a vertex-to-color mapping which describes the first coloring
-             * @param col_to_vertex a color-to-vertex mapping which describes the second coloring
+             * @param vertex_to_col Vertex-to-color mapping of the first coloring, i.e., vertex `i` is mapped to color
+             * `vertex_to_col[i]`.
+             * @param col_to_vertex Color-to-vertex mapping of the second coloring, i.e., the color i contains the vertex
+             * `col_to_vertex[i]` (since the colorings are assumed to be discrete, every `i` must be a distinct color).
              */
             void write_color_diff(const int *vertex_to_col, const int *col_to_vertex) {
                 color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
@@ -78,16 +96,8 @@ namespace dejavu {
             }
 
             /**
-             * Apply another automorphism to the stored automorphism. Closely follows the implementation in nauty / Traces.
-             *
-             * @param other
-             * @param pwr
+             * Updates the support using the internal dense notation.
              */
-            void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
-                       automorphism_workspace *other, int pwr = 1) {
-                apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
-            }
-
             void __attribute__ ((noinline)) update_support() {
                 // rewrite support
                 if (!support01) {
@@ -107,10 +117,33 @@ namespace dejavu {
             }
 
             /**
-             * Apply another automorphism to the stored automorphism. Closely follows the implementation in nauty / Traces.
+             * Apply another automorphism to the stored automorphism. To be more precise, `other^pwr` is applied to
+             * the automorphism stored in this object.
              *
-             * @param other
-             * @param pwr
+             * Closely follows the implementation in nauty / Traces.
+             *
+             * @param scratch_apply1 Auxiliary workspace used for the operation.
+             * @param scratch_apply2 Auxiliary workspace used for the operation.
+             * @param scratch_apply3 Auxiliary workspace used for the operation.
+             * @param other Automorphism in sparse notation that is applied to this automorphism in.
+             * @param pwr Power with which \p other is applied to this automorphism.
+             */
+            void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
+                       automorphism_workspace *other, int pwr = 1) {
+                apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
+            }
+
+            /**
+             * Apply another automorphism to the stored automorphism. To be more precise, `other^pwr` is applied to
+             * the automorphism stored in this object.
+             *
+             * Closely follows the implementation in nauty / Traces.
+             *
+             * @param scratch_apply1 Auxiliary workspace used for the operation.
+             * @param scratch_apply2 Auxiliary workspace used for the operation.
+             * @param scratch_apply3 Auxiliary workspace used for the operation.
+             * @param other Automorphism in dense notation that is applied to this automorphism.
+             * @param pwr Power with which \p other is applied to this automorphism.
              */
             void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
                   const int *p, int pwr = 1) {
@@ -180,7 +213,7 @@ namespace dejavu {
 
             /**
              * Create automorphism from two canonically-ordered vectors of singletons. The resulting automorphism maps
-             * \p singletons1[i] to \p singletons2[i] for i in \p pos_start, ..., \p pos_end.
+             * `singletons1[i]` to `singletons2[i]` for `i` in `pos_start, ..., pos_end`.
              *
              * @param singletons1 first vector of singletons
              * @param singletons2 second vector of singletons
@@ -535,41 +568,35 @@ namespace dejavu {
         };
 
         /**
-         * \brief Workspace used for Schreier computations
+         * \brief Auxiliary workspace used for Schreier computations
          *
-         * A global (thread local) state used for computations in Schreier structures.
+         * A global (thread local) state used for computations in Schreier structures. Used such that auxiliary space
+         * does not have to be allocated or re-allocated for every single operation, but only once. Also, the same space
+         * is used across different operations.
          */
         class schreier_workspace {
         public:
             /**
              * Initialize this workspace.
              *
-             * @param domain_size
-             * @param R only used for debug purposes
-             * @param g only used for debug purposes
+             * @param domain_size Size of the underlying domain (i.e., number of vertices of the graph).
              */
-            schreier_workspace(int domain_size, refinement *R, sgraph *g) : scratch_auto(domain_size) {
+            schreier_workspace(int domain_size) : scratch_auto(domain_size) {
                 scratch1.initialize(domain_size);
                 scratch2.initialize(domain_size);
                 scratch_apply1.initialize(domain_size);
                 scratch_apply2.initialize(domain_size);
                 scratch_apply3.initialize(domain_size);
-                this->R = R;
-                this->g = g;
             }
 
-            dense_sparse_arbiter loader;
+            dense_sparse_arbiter loader; /**< used for indiscriminate loading of dense and sparse automorphisms */
 
-            mark_set scratch1;
-            mark_set scratch2;
-            work_list scratch_apply1;
-            work_list scratch_apply2;
-            mark_set scratch_apply3;
-            automorphism_workspace scratch_auto;
-
-            // TODO debug
-            refinement *R;
-            sgraph *g;
+            mark_set scratch1; /**< auxiliary space */
+            mark_set scratch2; /**< auxiliary space */
+            work_list scratch_apply1; /**< auxiliary space used for `apply` operations */
+            work_list scratch_apply2; /**< auxiliary space used for `apply` operations */
+            mark_set scratch_apply3;  /**< auxiliary space used for `apply` operations */
+            automorphism_workspace scratch_auto; /**< used to store a sparse automorphism*/
         };
 
         /**
@@ -641,7 +668,7 @@ namespace dejavu {
          *
          * Can be used across multiple threads.
          */
-        class transversal {
+        class shared_transversal {
             enum stored_transversal_type {
                 STORE_DENSE, STORE_SPARSE
             };
@@ -659,24 +686,49 @@ namespace dejavu {
 
             stored_transversal_type store_type = STORE_SPARSE; /**< whether above structures are stored dense or sparse */
 
+            /**
+             * We load the stored orbit to a given schreier_workspace to unlock O(1) access.
+             *
+             * @param w The schreier_workspace to which the orbit is loaded.
+             */
             void __attribute__ ((noinline)) load_orbit_to_scratch(schreier_workspace &w) {
                 for (int i = 0; i < fixed_orbit.size(); ++i) {
                     w.scratch1.set(fixed_orbit[i]);
                 }
             }
 
+            /**
+             * Add \p vertex to the orbit of vertex \a fixed. Store in the transversal that we begin mapping \p vertex
+             * to \a fixed by applying `perm^pwr` (further applications of permutations might be necessary, the
+             * transversal stores a Schreier vector).
+             *
+             * @param vertex Vertex added to orbit of \a fixed.
+             * @param perm Corresponding permutation used in Schreier vector stored in the transversal.
+             * @param pwr Corresponding power used in Schreier vector stored in the transversal.
+             */
             void add_to_fixed_orbit(const int vertex, const int perm, const int pwr) {
-                //std::cout << "add " << vertex << ", " << perm << ", " << pwr << std::endl;
                 fixed_orbit.push_back(vertex);
                 fixed_orbit_to_perm.push_back(perm);
                 fixed_orbit_to_pwr.push_back(pwr);
             }
 
-
+            /**
+             * The method performs two operations: first, it loads the generator \p gen_num of the generating set
+             * \p generators. We denote the generator with \p gen.
+             *
+             * Second, it applies \p gen with power \p pwr (i.e., `gen^pwr`) to the permutation stored in \p automorphism.
+             *
+             *
+             * @param w Schreier workspace used as auxiliary space for computations.
+             * @param automorphism The automorphism to which the permutation is applied.
+             * @param generators A generating set.
+             * @param gen_num The number of the generator in \p generators, which is applied to \p automorphism.
+             * @param pwr A power that is applied to the generator first.
+             */
             void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
-                       generating_set &generators, const int perm, const int pwr) {
+                       generating_set &generators, const int gen_num, const int pwr) {
                 // load perm into workspace
-                auto generator = generators.get_generator(perm);
+                auto generator = generators.get_generator(gen_num);
 
                 // apply generator
                 if (pwr < 0) { // use inverse
@@ -758,6 +810,8 @@ namespace dejavu {
              * @param sz_upb Upper bound for the size of transversal (e.g., color class size in combinatorial base).
              */
             void initialize(const int fixed_vertex, const int level, const int sz_upb) {
+                assert(fixed_vertex >= 0);
+                assert(level >= 0);
                 fixed = fixed_vertex;
                 this->level = level;
                 this->sz_upb = sz_upb;
@@ -782,25 +836,15 @@ namespace dejavu {
                 // TODO how this is performed precisely should depend on fixed_orbit size versus support of generator
                 int gen_num = -1;
 
-                int self_apply_after = 0;
-
                 for (int i = 0; i < fixed_orbit.size(); ++i) {
                     int j = automorphism.perm()[fixed_orbit[i]];
                     if (w.scratch1.get(j))
                         continue;
 
                     int ipwr = 0; // inverted power
-                    int npwr = 1; //non-inverted power
                     int jj;
                     for (jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) ++ipwr;
-                    //bool reversible = (jj == fixed_orbit[i]) && (ipwr > 100);
 
-                    /*if(!w.scratch1.get(j) && reversible && i == 0) {
-                        assert(fixed_orbit[i] == fixed);
-                        self_apply_after = ipwr;
-                    }*/
-
-                    //int pwr = 1;
                     while (!w.scratch1.get(j)) {
                         // we change this traversal
                         changed = true;
@@ -809,28 +853,16 @@ namespace dejavu {
                         if (gen_num == -1) gen_num = generators.add_generator(w, automorphism);
 
                         // add entry to traversal
-                        //if(ipwr <= npwr || !reversible) {
                         add_to_fixed_orbit(j, gen_num, ipwr);
-                        // } else {
-                        //    add_to_fixed_orbit(j, gen_num, -npwr);
-                        // }
                         w.scratch1.set(j);
 
                         // we check out the entire cycle of j now
                         j = automorphism.perm()[j];
                         --ipwr;
-                        ++npwr;
                     }
                 }
 
-                /*if(self_apply_after > 0) {
-                    assert(changed);
-                    assert(gen_num >= 0);
-                    apply_perm(w, automorphism, generators, gen_num, self_apply_after);
-                    assert(automorphism.perm()[fixed] == fixed);
-                }*/
-
-                if (sz_upb == fixed_orbit.size() && !finished) {
+                if (sz_upb == (int) fixed_orbit.size() && !finished) {
                     finished = true;
                 }
 
@@ -868,18 +900,16 @@ namespace dejavu {
          * in a safe manner, i.e., the structure can lock appropriate parts of itself.
          *
          */
-        class schreier {
+        class shared_schreier {
             // TODO could use color sizes for memory allocation, predicting dense/sparse?
-            // TODO using inverses to reduce pwr seems like low-hanging fruit
-
-            int domain_size;
+        private:
+            int domain_size    = -1;
             int finished_up_to = -1;
 
             generating_set generators;
-            work_list_t<transversal *> transversals;
+            work_list_t<shared_transversal *> transversals;
 
         public:
-
             /**
              * @return Number of stored generators using a sparse data structure.
              */
@@ -899,6 +929,7 @@ namespace dejavu {
              * later on.
              *
              * @param base the base
+             * @param base_sizes upper bounds for the size of transversals
              * @param stop integer which indicates to stop reading the base at this position
              */
             void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop) {
@@ -908,26 +939,25 @@ namespace dejavu {
                 transversals.initialize(stop);
                 transversals.set_size(stop);
                 for (int i = 0; i < stop; ++i) {
-                    transversals[i] = new transversal();
+                    transversals[i] = new shared_transversal();
                     transversals[i]->initialize(base[i], i, base_sizes[i]);
                 }
             }
 
             /**
-             * Set up this Schreier structure using the given base. The base is then fixed and can not be adjusted
-             * later on.
+             * Reset up this Schreier structure with a new base.
              *
-             * @param base the base
+             * @param new_base the new base
+             * @param new_base_sizes upper bounds for the size of transversals
              * @param stop integer which indicates to stop reading the base at this position
+             * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
             bool reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old) {
-                // TODO compare with stored base, keep whatever is possible
-                // TODO resift old generators if desired
-                //generators.initialize(domain_size);
 
                 const int old_size = transversals.size();
                 const int new_size = stop;
 
+                // compare with stored base, keep whatever is possible
                 int keep_until = 0;
                 if(keep_old) {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
@@ -944,14 +974,22 @@ namespace dejavu {
 
                 for (int i = keep_until; i < stop; ++i) {
                     if(i < old_size) delete transversals[i];
-                    transversals[i] = new transversal();
+                    transversals[i] = new shared_transversal();
                     transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
                 }
+
+                // TODO resift old generators if desired
 
                 return true;
             }
 
-            // TODO: need to use root coloring instead!
+            /**
+             * Returns a vertex to individualize for each color of \p root_coloring that matches in size a corresponding
+             * transversal.
+             *
+             * @param save_to_individualize Vector in which vertices deemed save to individualize are pushed.
+             * @param root_coloring The coloring with which the stored transversals are compared.
+             */
             void determine_save_to_individualize(std::vector<std::pair<int, int>>* save_to_individualize, coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;

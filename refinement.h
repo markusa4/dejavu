@@ -534,7 +534,7 @@ public:
     void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
                          const std::function<type_worklist_color_hook>& worklist_hook = nullptr
-                                 ,const std::function<type_additional_info_hook>& add_hook = nullptr
+                                 //,const std::function<type_additional_info_hook>& add_hook = nullptr
                                  ) {
         singleton_hint.reset();
         assure_initialized(g);
@@ -579,7 +579,7 @@ public:
             if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                                    &color_class_splits, add_hook);
+                                                    &color_class_splits);
             } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
@@ -590,7 +590,7 @@ public:
                 }
             } else { // sparse
                 refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                          &color_class_splits, add_hook);
+                                          &color_class_splits);
             }
 
             // add all new classes except for the first, largest one
@@ -1257,8 +1257,9 @@ private:
 
     bool refine_color_class_sparse(sgraph  *g, coloring *c,
                                    int color_class, int class_size,
-                                   work_list_pair_bool* color_class_split_worklist,
-                                   const std::function<type_additional_info_hook>& add_hook = nullptr) {
+                                   work_list_pair_bool* color_class_split_worklist
+                                   //const std::function<type_additional_info_hook>& add_hook = nullptr
+                                           ) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
@@ -1278,8 +1279,8 @@ private:
 
         end_cc = color_class + class_size;
         acc_in = 0;
-        singleton_inv1 = 0;
-        singleton_inv2 = 0;
+        //singleton_inv1 = 0;
+        //singleton_inv2 = 0;
         while(cc < end_cc) { // increment value of neighbours of vc by 1
             const int vc = lab[cc];
             const int pe = g->v[vc];
@@ -1288,8 +1289,8 @@ private:
                 const int v   = g->e[i];
                 const int col = vertex_to_col[v];
                 if(ptn[col] == 0) {
-                    singleton_inv1 += MASH2(col*3);
-                    singleton_inv2 += (col + 3) * (723732 - (col + 2));
+                    //singleton_inv1 += MASH2(col*3);
+                    //singleton_inv2 += (col + 3) * (723732 - (col + 2));
                     continue;
                 }
                 neighbours.inc_nr(v);
@@ -1299,7 +1300,7 @@ private:
                     scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
                     if(!scratch_set.get(col)) {
                         old_color_classes.push_back(col);
-                        acc_in += MASH3(col);
+                        //acc_in += MASH3(col);
                         scratch_set.set(col);
                     }
                 }
@@ -1307,9 +1308,9 @@ private:
             cc += 1;
         }
 
-        if(add_hook) add_hook(singleton_inv1);
-        if(add_hook) add_hook(singleton_inv2);
-        if(add_hook) add_hook(acc_in);
+        //if(add_hook) add_hook(singleton_inv1);
+        //if(add_hook) add_hook(singleton_inv2);
+        //if(add_hook) add_hook(acc_in);
         // early out before sorting color classes
         /*if(!comp) {
             while(!old_color_classes.empty()) {
@@ -1350,7 +1351,7 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                     if(add_hook) add_hook(v_degree);
+                     //if(add_hook) add_hook(v_degree);
                     //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                     //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
@@ -1714,7 +1715,7 @@ private:
     void refine_color_class_singleton(sgraph  *g, coloring *c,
                                       int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist
-                                      ,const std::function<type_additional_info_hook>& add_hook = nullptr
+                                      //,const std::function<type_additional_info_hook>& add_hook = nullptr
                                               ) {
         bool comp;
         int i, cc, deg1_write_pos, deg1_read_pos;
@@ -1726,7 +1727,7 @@ private:
         vertex_worklist.reset();
         old_color_classes.reset();
 
-        int singleton_inv = 0;
+        //int singleton_inv = 0;
 
         const int vc = c->lab[cc];
         const int pe = g->v[vc];
@@ -1737,7 +1738,7 @@ private:
 
             if(c->ptn[col] == 0) {
                 // if full invariant, sort -- else use a hash value
-                singleton_inv += MASH5(col);
+                //singleton_inv += MASH5(col);
                 continue;
             }
 
@@ -1752,17 +1753,17 @@ private:
             neighbours.inc_nr(col); // we reset neighbours later, since old_color_classes for reset
         }
 
-        singleton_inv += old_color_classes.cur_pos;
-        if(add_hook) (add_hook)(singleton_inv);
+        //singleton_inv += old_color_classes.cur_pos;
+        //if(add_hook) (add_hook)(singleton_inv);
 
         old_color_classes.sort();
 
         // write invariant first...
-        for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
+        //for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
             //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-            if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
+            //if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
             // contains information about color degree (= 1)
-        }
+        //}
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();
@@ -2299,7 +2300,7 @@ public:
     void refine_coloring(dejavu::graph *g, coloring *c, int init_color = -1, int color_limit = -1,
                          const std::function<type_split_color_hook>& split_hook = nullptr,
                          const std::function<type_worklist_color_hook>& worklist_hook = nullptr
-            ,const std::function<type_additional_info_hook>& add_hook = nullptr
+            //,const std::function<type_additional_info_hook>& add_hook = nullptr
     ) {
         singleton_hint.reset();
         assure_initialized(g);
@@ -2346,7 +2347,7 @@ public:
             if(next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                 // singleton
                 refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                             &color_class_splits, add_hook);
+                                             &color_class_splits);
             } else if(g->dense) {
                 if(dense_dense) { // dense-dense
                     refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
@@ -2357,7 +2358,7 @@ public:
                 }
             } else { // sparse
                 refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                          &color_class_splits, add_hook);
+                                          &color_class_splits);
             }
 
             /*deviation_expander -= (!comp);
@@ -3001,8 +3002,9 @@ private:
 
     bool refine_color_class_sparse(dejavu::graph  *g, coloring *c,
                                    int color_class, int class_size,
-                                   work_list_pair_bool* color_class_split_worklist,
-                                   const std::function<type_additional_info_hook>& add_hook = nullptr) {
+                                   work_list_pair_bool* color_class_split_worklist
+                                   //const std::function<type_additional_info_hook>& add_hook = nullptr
+                                           ) {
         // for all vertices of the color class...
         bool comp, mark_as_largest;
         int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
@@ -3022,8 +3024,8 @@ private:
 
         end_cc = color_class + class_size;
         acc_in = 0;
-        singleton_inv1 = 0;
-        singleton_inv2 = 0;
+        //singleton_inv1 = 0;
+        //singleton_inv2 = 0;
         while(cc < end_cc) { // increment value of neighbours of vc by 1
             const int vc = lab[cc];
             const int pe = g->v(vc);
@@ -3032,8 +3034,8 @@ private:
                 const int v   = g->e[i];
                 const int col = vertex_to_col[v];
                 if(ptn[col] == 0) {
-                    singleton_inv1 += MASH2(col*3);
-                    singleton_inv2 += (col + 3) * (723732 - (col + 2));
+                    //singleton_inv1 += MASH2(col*3);
+                    //singleton_inv2 += (col + 3) * (723732 - (col + 2));
                     continue;
                 }
                 neighbours.inc_nr(v);
@@ -3043,7 +3045,7 @@ private:
                     scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
                     if(!scratch_set.get(col)) {
                         old_color_classes.push_back(col);
-                        acc_in += MASH3(col);
+                        //acc_in += MASH3(col);
                         scratch_set.set(col);
                     }
                 }
@@ -3051,9 +3053,9 @@ private:
             cc += 1;
         }
 
-        if(add_hook) add_hook(singleton_inv1);
-        if(add_hook) add_hook(singleton_inv2);
-        if(add_hook) add_hook(acc_in);
+        //if(add_hook) add_hook(singleton_inv1);
+        //if(add_hook) add_hook(singleton_inv2);
+        //if(add_hook) add_hook(acc_in);
         // early out before sorting color classes
         /*if(!comp) {
             while(!old_color_classes.empty()) {
@@ -3094,7 +3096,7 @@ private:
                     acc += val;
                     const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                     const int v_degree = i;
-                    if(add_hook) add_hook(v_degree);
+                    //if(add_hook) add_hook(v_degree);
                     //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                     //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                     if(__col != _col)
@@ -3458,7 +3460,7 @@ private:
     void refine_color_class_singleton(dejavu::graph  *g, coloring *c,
                                       int color_class, int class_size,
                                       work_list_pair_bool *color_class_split_worklist
-            ,const std::function<type_additional_info_hook>& add_hook = nullptr
+            //,const std::function<type_additional_info_hook>& add_hook = nullptr
     ) {
         bool comp;
         int i, cc, deg1_write_pos, deg1_read_pos;
@@ -3470,7 +3472,7 @@ private:
         vertex_worklist.reset();
         old_color_classes.reset();
 
-        int singleton_inv = 0;
+        //int singleton_inv = 0;
 
         const int vc = c->lab[cc];
         const int pe = g->v(vc);
@@ -3481,7 +3483,7 @@ private:
 
             if(c->ptn[col] == 0) {
                 // if full invariant, sort -- else use a hash value
-                singleton_inv += MASH5(col);
+                //singleton_inv += MASH5(col);
                 continue;
             }
 
@@ -3496,17 +3498,17 @@ private:
             neighbours.inc_nr(col); // we reset neighbours later, since old_color_classes for reset
         }
 
-        singleton_inv += old_color_classes.cur_pos;
-        if(add_hook) (add_hook)(singleton_inv);
+        //singleton_inv += old_color_classes.cur_pos;
+        //if(add_hook) (add_hook)(singleton_inv);
 
         old_color_classes.sort();
 
         // write invariant first...
-        for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
+        //for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
             //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-            if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
+            //if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
             // contains information about color degree (= 1)
-        }
+        //}
 
         while(!old_color_classes.empty()) {
             const int deg0_col    = old_color_classes.pop_back();

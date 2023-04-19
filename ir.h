@@ -255,12 +255,20 @@ namespace dejavu {
                 h_deviation_inc_active = deviation_inc_active;
             }
 
-            // TODO incomplete state save for BFS & random reset
+            /**
+             * Save a partial state of this controller.
+             *
+             * @param state A reference to the reduced_save in which the state will be stored.
+             */
             void save_reduced_state(reduced_save &state) {
                 state.set_state(base_vertex, *c, T->get_hash(), T->get_position(), base_pos);
             }
 
-            // TODO incomplete state load for BFS & random reset
+            /**
+             * Load a partial state into this controller.
+             *
+             * @param state A reference to the reduced_save from which the state will be loaded.
+             */
             void __attribute__ ((noinline)) load_reduced_state(reduced_save &state) {
                 bool partial_base = false;
                 /*if(state.get_base().size() <= base_vertex.size()) {
@@ -353,7 +361,7 @@ namespace dejavu {
                         }
 
                         // record split into trace invariant, unless we are individualizing
-                        if (!h_individualize) T->op_refine_cell_record(new_color, new_color_sz, 1);
+                        if (!h_individualize && old_color != new_color) T->op_refine_cell_record(new_color, new_color_sz, 1);
 
                         const bool cont = !h_trace_early_out || T->trace_equal();
                         h_deviation_inc_current += (!cont);
@@ -447,8 +455,7 @@ namespace dejavu {
 
                 if (mode == IR_MODE_RECORD_TRACE) {
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
-                                       my_worklist_hook, nullptr
-                                       );
+                                       my_worklist_hook);
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
 
@@ -459,7 +466,7 @@ namespace dejavu {
                     // T->trace_equal()?compare_base_cells[base_pos - 1]:-1
 
                     R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
-                                       my_worklist_hook, nullptr);
+                                       my_worklist_hook);
                     assert(T->trace_equal()?c->cells==compare_base_cells[base_pos-1]:true);
                     if (T && T->trace_equal()) {T->skip_to_individualization();}
                 }
