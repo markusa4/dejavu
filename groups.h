@@ -1,8 +1,6 @@
 #ifndef DEJAVU_GROUPS_H
 #define DEJAVU_GROUPS_H
 
-#include "refinement.h"
-#include "bijection.h"
 #include "coloring.h"
 #include "sgraph.h"
 #include "trace.h"
@@ -1054,10 +1052,11 @@ namespace dejavu {
             /**
              * Sift automorphism into the Schreier structure.
              *
+             * @param w Auxiliary workspace used for procedures.
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool __attribute__ ((noinline)) sift(schreier_workspace &w, sgraph *g, refinement *R, automorphism_workspace &automorphism) {
+            bool __attribute__ ((noinline)) sift(schreier_workspace &w, automorphism_workspace &automorphism) {
                 bool changed = false;
 
                 automorphism.set_support01(true);

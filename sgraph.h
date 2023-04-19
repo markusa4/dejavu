@@ -2,7 +2,6 @@
 #define DEJAVU_SGRAPH_H
 
 #include <vector>
-#include "bijection.h"
 #include "coloring.h"
 #include <algorithm>
 #include <assert.h>
@@ -199,77 +198,6 @@ public:
         c->ptn[0] = v_size - 1;
         c->ptn[v_size - 1] = 0;
         c->cells = 1;
-    }
-
-    // certify that a permutation is an automorphism of the sgraph
-    bool certify_automorphism(bijection p) {
-        assert(p.map_sz == v_size);
-
-        std::set<int> image_neighbours_of_i;
-        for(int i = 0; i < v_size; ++i) {
-            int image_i = p.map_vertex(i);
-            if(d[i] != d[image_i]) // degrees must be equal
-                return false;
-
-            image_neighbours_of_i.clear();
-            // automorphism must preserve neighbours
-            for(int j = v[i]; j < v[i] + d[i]; ++j) {
-                int vertex_j = e[j];
-                int image_j  = p.map_vertex(vertex_j);
-                image_neighbours_of_i.insert(image_j);
-            }
-            for(int j = v[image_i]; j < v[image_i] + d[image_i]; ++j) {
-                int vertex_j = e[j];
-                if(image_neighbours_of_i.find(vertex_j) == image_neighbours_of_i.end()) {
-                    return false;
-                }
-                image_neighbours_of_i.erase(image_neighbours_of_i.find(vertex_j));
-            }
-            if(!image_neighbours_of_i.empty()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void permute_graph(sgraph* ng, bijection* p) {
-        ng->initialize(v_size, e_size);
-        ng->v_size = v_size;
-        ng->e_size = e_size;
-        ng->max_degree = max_degree;
-
-        bijection p_inv;
-        p_inv.initialize_empty(p->map_sz);
-        p_inv.copy(p);
-        p_inv.inverse();
-
-        std::set<int> vertices_hit;
-
-        int epos = 0;
-        for(int i = 0; i < v_size; ++i) {
-            int mapped_v = p->map_vertex(i);
-            assert(p_inv.map_vertex(mapped_v) == i);
-            assert(mapped_v < v_size);
-            vertices_hit.insert(mapped_v);
-            ng->d[i] = d[mapped_v];
-            ng->v[i] = epos;
-            for(int j = v[mapped_v]; j < v[mapped_v] + d[mapped_v]; j++) {
-                assert(j < e_size);
-                ng->e[epos] = p_inv.map_vertex(e[j]);
-                epos += 1;
-            }
-            //epos += ng->d[i];
-        }
-
-        //assert(v_size == vertices_hit.size());
-
-        assert(ng->v_size == v_size);
-        assert(ng->e_size == e_size);
-        std::cout << epos << ", " << ng->e_size << std::endl;
-        assert(epos == ng->e_size);
-
-        return;
     }
 
     void sanity_check() {

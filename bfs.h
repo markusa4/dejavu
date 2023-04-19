@@ -22,7 +22,7 @@ namespace dejavu {
             int s_total_kept      = 0;
 
         public:
-            void do_a_level(refinement* R, sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
+            void do_a_level(ir::refinement* R, sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
 
                 s_deviation_prune = 0;
@@ -94,7 +94,7 @@ namespace dejavu {
                 return !deviation_done || deviation_map.contains(hash);
             }
 
-            void compute_node(refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
+            void compute_node(ir::refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
                 auto next_node_save = node->get_save();
 
                 // node is already pruned
@@ -161,7 +161,7 @@ namespace dejavu {
                 }
             }
 
-            void work_on_todo(refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
+            void work_on_todo(ir::refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
                 ir::reduced_save* last_load = nullptr;
                 while(!ir_tree->queue_missing_node_empty()) {
                     const auto todo = ir_tree->queue_missing_node_pop();

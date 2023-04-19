@@ -211,15 +211,8 @@ int commandline_mode(int argc, char **argv) {
     p.parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
-        std::cout << "Permuting graph..." << std::endl;
-        bijection pr;
-        bijection::random_bijection(&pr, g->v_size, seed);
-        g->permute_graph(_g, &pr); // permute graph
-        int* rmap = pr.extract_map();
-        if(colmap != nullptr)
-            permute_colmap(&colmap, g->v_size, rmap);
-        delete g;
-        delete[] rmap;
+        std::cout << "Permuting graph (not implemented)" << std::endl;
+        _g = g;
     } else {
         _g = g;
     }

@@ -4,7 +4,6 @@
 #include <random>
 #include <chrono>
 #include "refinement.h"
-#include "bijection.h"
 #include "coloring.h"
 #include "sgraph.h"
 #include "trace.h"
@@ -29,7 +28,7 @@ namespace dejavu {
         class dfs_ir {
             int fail_cnt = 0;
             int threads = 1;
-            refinement   *R = nullptr;
+            ir::refinement   *R = nullptr;
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
             ir::trace compare_T; // TODO should not be inside dfs_ir
             double h_recent_cost_snapshot_limit = 0.25;
@@ -44,7 +43,7 @@ namespace dejavu {
              * @param threads number of threads we are allowed to dispatch
              * @param R refinement workspace
              */
-            void setup(int threads, refinement *R, double recent_cost_snapshot_limit = 0.25) {
+            void setup(int threads, ir::refinement *R, double recent_cost_snapshot_limit = 0.25) {
                 this->R = R;
                 this->threads = threads;
                 grp_sz_man = 1.0;

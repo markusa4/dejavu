@@ -54,7 +54,7 @@ namespace dejavu {
         search_strategy::random_ir m_rand; /**< randomized search */
 
         // utility tools used by other modules
-        refinement           m_refinement;/**< workspace for color refinement and other utilities */
+        ir::refinement       m_refinement;/**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
         groups::shared_schreier*    m_schreier = nullptr;  /**< Schreier-Sims algorithm */
         ir::shared_tree m_tree;           /**< IR-shared_tree */

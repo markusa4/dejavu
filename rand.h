@@ -6,7 +6,8 @@
 
 namespace dejavu {
     namespace search_strategy {
-        static void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
+        // TODO: this should be a method of local_state?
+        static void specific_walk(ir::refinement &R, std::vector<int>& base_vertex, sgraph *g,
                            ir::controller &local_state, ir::reduced_save &start_from) {
             local_state.load_reduced_state(start_from);
 
@@ -34,7 +35,7 @@ namespace dejavu {
                 }
             }
 
-            void load_state(refinement &R, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
+            void load_state(ir::refinement &R, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
                 specific_walk(R, base, g, local_state, start_from);
             }
 
@@ -204,7 +205,7 @@ namespace dejavu {
                 return leaf_storage.s_leaves;
             }
 
-            void specific_walk(refinement &R, std::vector<int>& base_vertex, sgraph *g,
+            void specific_walk(ir::refinement &R, std::vector<int>& base_vertex, sgraph *g,
                                groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save &start_from) {
                 local_state.load_reduced_state(start_from);
 
@@ -227,7 +228,7 @@ namespace dejavu {
             // TODO implement dejavu strategy, more simple
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
-            void random_walks(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
+            void random_walks(ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
                               groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
                 groups::automorphism_workspace automorphism(g->v_size);
                 groups::schreier_workspace w(g->v_size);
@@ -323,7 +324,7 @@ namespace dejavu {
                             //std::cout << "certified" << local_state.T->get_hash() << std::endl;
                             h_rolling_success = (9.0*h_rolling_success + 1.0) / 10.0;
                             //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
-                            const bool sift = group.sift(w, g, &R, automorphism);
+                            const bool sift = group.sift(w, automorphism);
                             if(uniform) record_sift_result(sift);
                         } else {
                             //std::cout << "testing" << local_state.T->get_hash() << std::endl;
@@ -338,7 +339,7 @@ namespace dejavu {
             // TODO implement dejavu strategy, more simple
             // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
             // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
-            void __attribute__ ((noinline)) random_walks_from_tree(refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
+            void __attribute__ ((noinline)) random_walks_from_tree(ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
                                                                    groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree &ir_tree) {
                 groups::automorphism_workspace automorphism(g->v_size);
                 groups::schreier_workspace w(g->v_size);
@@ -412,7 +413,7 @@ namespace dejavu {
                                 //std::cout << "cert success" << hash_c << std::endl;
                                 h_rolling_success = (9.0 * h_rolling_success + 1.0) / 10.0;
                                 //std::cout << "found automorphism, hash " << local_state.T->get_hash() << " support " << automorphism.nsupport() << std::endl;
-                                const bool sift = group.sift(w, g, &R, automorphism);
+                                const bool sift = group.sift(w, automorphism);
                                 record_sift_result(sift);
                                 automorphism.reset();
                                 break;

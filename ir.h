@@ -2,7 +2,6 @@
 #define DEJAVU_IR_H
 
 #include "refinement.h"
-#include "bijection.h"
 #include "coloring.h"
 #include "sgraph.h"
 #include "trace.h"
