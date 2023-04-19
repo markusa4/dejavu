@@ -227,10 +227,10 @@ namespace dejavu {
                 T  = &_T1;
                 cT = &_T2;
 
-                workspace.initialize(c->lab_sz);
+                workspace.allocate(c->lab_sz);
                 touched_color.initialize(c->lab_sz);
-                touched_color_list.initialize(c->lab_sz);
-                prev_color_list.initialize(c->lab_sz);
+                touched_color_list.allocate(c->lab_sz);
+                prev_color_list.allocate(c->lab_sz);
 
                 touch_initial_colors();
 
@@ -376,19 +376,16 @@ namespace dejavu {
             }
 
             void __attribute__ ((noinline)) write_strong_invariant(sgraph* g) {
-                //T->op_additional_info(1);
                 for(int l = 0; l < g->v_size/2; ++l) { // "half of them should be enough"...
                     const int v = c->lab[l];
-                    int inv = 0;
-                    for(int pt = g->v[v]; pt < g->v[v] + g->d[v]; ++pt) {
+                    unsigned int inv1 = 0;
+                    const int start_pt = g->v[v];
+                    const int end_pt   = start_pt + g->d[v];
+                    for(int pt = start_pt; pt < end_pt; ++pt) {
                         const int other_v = g->e[pt];
-                        inv += MASH2(c->vertex_to_col[other_v]);
+                        inv1 += hash((unsigned int) c->vertex_to_col[other_v]);
                     }
-                    //workspace.sort();
-                    //for(int j = 0; j < workspace.size(); ++j) {
-                    T->op_additional_info(inv);
-                    //}
-                    workspace.reset();
+                    T->op_additional_info((int) inv1);
                 }
             }
 

@@ -103,8 +103,8 @@ namespace dejavu {
         }
 
     public:
-        long double grp_sz_man = 1.0; /**< group size mantissa, see also \a grp_sz_exp */
-        int         grp_sz_exp = 0;   /**< group size exponent, see also \a grp_sz_man  */
+        long double grp_sz_man = 1.0; /**< group size mantissa, group size is `grp_sz_man^grp_sz_exp` \sa grp_sz_exp */
+        int         grp_sz_exp = 0;   /**< group size exponent, group size is `grp_sz_man^grp_sz_exp` \sa grp_sz_man  */
 
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
@@ -114,6 +114,7 @@ namespace dejavu {
          * @param colmap The vertex coloring of \p g. A null pointer is admissible as the trivial coloring.
          * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
          *
+         * \sa A description of the graph format can be found in sgraph.
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
             // TODO high-level strategy
@@ -239,9 +240,10 @@ namespace dejavu {
 
                     // depth-first search starting from the computed leaf in local_state
                     // TODO I think there should be no setup functions at all
-                    m_dfs.setup(0, &m_refinement, h_large_base?0.33:0.25);
+                    m_dfs.h_setup(h_large_base ? 0.33 : 0.25);
 
-                    const int dfs_reached_level = m_dfs.do_dfs(g, root_save.get_coloring(), local_state, &save_to_individualize);
+                    const int dfs_reached_level = m_dfs.do_dfs(&m_refinement, g, root_save.get_coloring(),
+                                                               local_state, &save_to_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                    "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                     add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);

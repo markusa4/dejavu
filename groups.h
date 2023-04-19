@@ -73,10 +73,10 @@ namespace dejavu {
              * @param domain_size Size of the domain on which automorphisms operate
              */
             automorphism_workspace(int domain_size) {
-                automorphism.initialize(domain_size);
+                automorphism.allocate(domain_size);
                 for (int i = 0; i < domain_size; ++i)
                     automorphism[i] = i;
-                automorphism_supp.initialize(domain_size);
+                automorphism_supp.allocate(domain_size);
                 this->domain_size = domain_size;
             }
 
@@ -405,9 +405,9 @@ namespace dejavu {
             void initialize(int domain_size) {
                 sz = domain_size;
                 touched.initialize(domain_size);
-                reset_arr.initialize(domain_size);
-                map_arr.initialize(domain_size);
-                orb_sz.initialize(domain_size);
+                reset_arr.allocate(domain_size);
+                map_arr.allocate(domain_size);
+                orb_sz.allocate(domain_size);
                 for(int i = 0; i < domain_size; ++i) {
                     map_arr.push_back(i);
                     orb_sz.push_back(1);
@@ -542,7 +542,7 @@ namespace dejavu {
                     store_type = STORE_SPARSE;
                     helper.reset();
 
-                    data.initialize(support);
+                    data.allocate(support);
                     for (int i = 0; i < domain_size; ++i) {
                         if (automorphism.perm()[i] == i) continue;
                         const int j = i;
@@ -561,7 +561,7 @@ namespace dejavu {
                     assert(data.size() == support);
                 } else {
                     store_type = STORE_DENSE;
-                    data.initialize(domain_size);
+                    data.allocate(domain_size);
                     data.set_size(domain_size);
                     memcpy(data.get_array(), automorphism.perm(), domain_size * sizeof(int));
                     assert(data.size() == domain_size);
@@ -586,8 +586,8 @@ namespace dejavu {
             schreier_workspace(int domain_size) : scratch_auto(domain_size) {
                 scratch1.initialize(domain_size);
                 scratch2.initialize(domain_size);
-                scratch_apply1.initialize(domain_size);
-                scratch_apply2.initialize(domain_size);
+                scratch_apply1.allocate(domain_size);
+                scratch_apply2.allocate(domain_size);
                 scratch_apply3.initialize(domain_size);
             }
 
@@ -938,7 +938,7 @@ namespace dejavu {
                 assert(base.size() >= stop);
                 this->domain_size = domain_size;
                 generators.initialize(domain_size);
-                transversals.initialize(stop);
+                transversals.allocate(stop);
                 transversals.set_size(stop);
                 for (int i = 0; i < stop; ++i) {
                     transversals[i] = new shared_transversal();

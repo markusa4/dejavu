@@ -32,7 +32,7 @@ namespace dejavu {
                 this->full_save = full_save;
                 if(full_save) {
                     //store_c.copy(&c);
-                    lab.initialize(c.lab_sz);
+                    lab.allocate(c.lab_sz);
                     memcpy(lab.get_array(), c.lab, c.lab_sz * sizeof(int));
                 } else {
                     this->base = base;

@@ -30,32 +30,38 @@ namespace dejavu {
          * Due to the search not back-tracking, this module can not deal with difficult parts of combinatorial graphs.
          */
         class dfs_ir {
-            int fail_cnt = 0;
-            int threads = 1;
-            ir::refinement   *R = nullptr;
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
-            ir::trace compare_T; // TODO should not be inside dfs_ir
             double h_recent_cost_snapshot_limit = 0.25;
 
         public:
-            long double grp_sz_man = 1.0; /**< group size mantissa */
-            int         grp_sz_exp = 0;   /**< group size exponent */
+            long double grp_sz_man = 1.0; /**< group size mantissa, total group size is `grp_sz_man^grp_sz_exp`*/
+            int         grp_sz_exp = 0;   /**< group size exponent, total group size is `grp_sz_man^grp_sz_exp`*/
 
             /**
-             * Setup the DFS module.
+             * Setup heuristics of the DFS module.
              *
-             * @param threads number of threads we are allowed to dispatch
-             * @param R refinement workspace
+             * @param recent_cost_snapshot_limit A float in the range [0-1]. Limits continuation of DFS search to whether
+             * computing recent elements only cost this fraction of the cost of an entire root-to-leaf walk.
              */
-            void setup(int threads, ir::refinement *R, double recent_cost_snapshot_limit = 0.25) {
-                this->R = R;
-                this->threads = threads;
-                grp_sz_man = 1.0;
-                grp_sz_exp = 0;
+            void h_setup(double recent_cost_snapshot_limit = 0.25) {
                 h_recent_cost_snapshot_limit = recent_cost_snapshot_limit;
             }
 
-            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state,
+            /**
+             * Recurses to an equal leaf (according to trace compared to within \p state), unless backtracking is
+             * necessary.
+             *
+             * @param g The graph.
+             * @param initial_colors The initial coloring of the graph \p g.
+             * @param state IR controller used for computations. On successful return, \p state will be in a leaf of the
+             * IR tree equal to the stored trace.
+             * @param automorphism If an equal leaf is found, \p automorphism might contain an automorphism mapping the
+             * found leaf to the stored leaf.
+             * @return
+             *
+             * @todo should just always certify the leaf...
+             */
+            std::pair<bool, bool> recurse_to_equal_leaf(ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller *state,
                                                         groups::automorphism_workspace &automorphism) {
                 bool prev_fail = false;
                 int prev_fail_pos = -1;
@@ -69,9 +75,10 @@ namespace dejavu {
                     const int ind_v = state->c->lab[col];
 
                     state->move_to_child(R, g, ind_v);
+                    const int pos_start = state->base_singleton_pt[state->base_singleton_pt.size() - 1];
+                    const int pos_end   = (int) state->singletons.size();
                     automorphism.write_singleton(&state->compare_singletons, &state->singletons,
-                                                 state->base_singleton_pt[state->base_singleton_pt.size() - 1],
-                                                 state->singletons.size());
+                                                 pos_start, pos_end);
                     //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
                     //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
@@ -123,7 +130,11 @@ namespace dejavu {
              * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
              * @return The level up to which DFS succeeded.
              */
-            int do_dfs(sgraph *g, coloring *initial_colors, ir::controller &local_state, std::vector<std::pair<int, int>>* save_to_individualize) {
+            int do_dfs(ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller &local_state,
+                       std::vector<std::pair<int, int>>* save_to_individualize) {
+                grp_sz_man = 1.0;
+                grp_sz_exp = 0;
+
                 // orbit algorithm structure
                 groups::orbit orbs;
                 orbs.initialize(g->v_size);
@@ -181,7 +192,8 @@ namespace dejavu {
 
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
-                            auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors, &local_state, pautomorphism);
+                            auto rec_succeeded = recurse_to_equal_leaf(R, g, initial_colors,
+                                                                       &local_state, pautomorphism);
                             found_auto = (rec_succeeded.first && rec_succeeded.second);
                             if (rec_succeeded.first && !rec_succeeded.second) {
                                 pautomorphism.reset();

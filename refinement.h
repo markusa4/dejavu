@@ -761,10 +761,10 @@ assert(c->cells == actual_cells);
                     // reducing contention on heap allocator through bulk allocation...
                     workspace_int = new int[n];
 
-                    vertex_worklist.initialize(n * 2);
+                    vertex_worklist.allocate(n * 2);
                     //singletons.initialize(n);
-                    singleton_hint.initialize(n);
-                    old_color_classes.initialize(n);
+                    singleton_hint.allocate(n);
+                    old_color_classes.allocate(n);
                     neighbours.initialize(n);
                     neighbour_sizes.initialize(n);
                     queue_pointer.initialize(n);
@@ -774,7 +774,7 @@ assert(c->cells == actual_cells);
                     //scratch_set.initialize_from_array(workspace_int + n, n);
                     scratch_set.initialize(n);
 
-                    color_class_splits.initialize(n);
+                    color_class_splits.allocate(n);
                     cell_todo.initialize(n * 2);
 
                     memset(scratch, 0, n * sizeof(int));
@@ -2430,10 +2430,10 @@ assert(c->cells == actual_cells);
                     // reducing contention on heap allocator through bulk allocation...
                     workspace_int = new int[n];
 
-                    vertex_worklist.initialize(n * 2);
+                    vertex_worklist.allocate(n * 2);
                     //singletons.initialize(n);
-                    singleton_hint.initialize(n);
-                    old_color_classes.initialize(n);
+                    singleton_hint.allocate(n);
+                    old_color_classes.allocate(n);
                     neighbours.initialize(n);
                     neighbour_sizes.initialize(n);
                     queue_pointer.initialize(n);
@@ -2443,7 +2443,7 @@ assert(c->cells == actual_cells);
                     //scratch_set.initialize_from_array(workspace_int + n, n);
                     scratch_set.initialize(n);
 
-                    color_class_splits.initialize(n);
+                    color_class_splits.allocate(n);
                     cell_todo.initialize(n * 2);
 
                     memset(scratch, 0, n * sizeof(int));

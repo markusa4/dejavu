@@ -1,3 +1,7 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef DEJAVU_DS_H
 #define DEJAVU_DS_H
 
@@ -9,12 +13,21 @@
 #include <cassert>
 
 namespace dejavu {
+
     /**
      * \brief General-purpose datastructures.
      *
      */
     namespace ds {
-        // sorting utilizing minimal sorting networks for n <= 6
+
+        /**
+         * Sorting utilizing minimal sorting networks for arrays of size `sz <= 6`, falling back to `std::sort` for
+         * `sz > 0`.
+         *
+         * @tparam T Template parameter for the type of array elements.
+         * @param arr Array of elements of type \p T.
+         * @param sz Length of the array \p arr.
+         */
         template<class T>
         void sort_t(T *arr, int sz) {
 #define min(x, y) (x<y?x:y)
@@ -69,28 +82,51 @@ namespace dejavu {
 #undef max
         }
 
+        /**
+         * \brief Shared queue datastructure
+         *
+         * A queue which can be accessed across multiple threads.
+         *
+         * @tparam T Type of elements stored in the queue.
+         */
         template<class T>
         class shared_queue_t {
         private:
             std::mutex lock;
             std::vector<T> queue;
         public:
+            /**
+             * Add an element \p t to the queue.
+             * @param t Element to be added.
+             */
             void add(T &t) {
                 lock.lock();
                 queue.emplace_back(t);
                 lock.unlock();
             }
 
+            /**
+             * Reserve space for at least \n elements.
+             * @param n Space to be reserved.
+             */
             void reserve(int n) {
                 lock.lock();
                 queue.reserve(n);
                 lock.unlock();
             }
 
+            /**
+             * @return Whether the queue is empty.
+             */
             bool empty() {
                 return queue.empty();
             }
 
+            /**
+             * Pop an element from the queue and return it.
+             *
+             * @return The element popped from the queue.
+             */
             T pop() {
                 lock.lock();
                 auto element = queue.back();
@@ -100,23 +136,48 @@ namespace dejavu {
             }
         };
 
-        // work list / stack with fixed size limitation
+        /**
+         * \brief Fixed-size array
+         *
+         * An array of fixed size, with some further convenience functions.
+         *
+         * @tparam T The type of array elements.
+         */
         template<class T>
         class work_list_t {
         private:
+            /**
+             * Allocate an array of size \p size.
+             * @param size Space to allocate.
+             */
             void alloc(const int size) {
                 arr = (T *) malloc(sizeof(T) * size);
                 arr_sz = size;
             }
 
         public:
+            /**
+             * Default constructor, does not allocate any memory.
+             */
             work_list_t() {};
 
+            /**
+             * Constructor that allocates the internal array with size \p size. The allocated memory is not
+             * initialized.
+             *
+             * @param size Size to allocate.
+             */
             work_list_t(int size) {
-                initialize(size);
+                allocate(size);
             }
 
-            void initialize(int size) {
+            /**
+             * Allocates the internal array with size \p size. The allocated memory is not
+             * initialized. Initializes the internal position \a cur_pos of the array at 0.
+             *
+             * @param size Size to allocate.
+             */
+            void allocate(int size) {
                 assert(!init);
                 //arr     = new T[size];
                 alloc(size);
@@ -124,37 +185,73 @@ namespace dejavu {
                 cur_pos = 0;
             }
 
+            /**
+             * Push back an element at position \a cur_pos. Increments the internal position \a cur_pos.
+             *
+             * @param value Element to push back.
+             */
             void push_back(T value) {
                 assert(cur_pos >= 0 && cur_pos < arr_sz);
                 arr[cur_pos] = value;
                 cur_pos += 1;
             }
 
+            /**
+             * Pop an element at position \a cur_pos. Decreases the internal position \a cur_pos. There is no safeguard
+             * in place if `cur_pos <= 0`.
+             *
+             * @return Element popped at \a cur_pos.
+             *
+             * \sa The function empty() tests whether `cur_pos == 0`.
+             */
             T pop_back() {
                 assert(cur_pos > 0);
                 return arr[--cur_pos];
             }
 
+            /**
+             * @return Element at \a cur_pos.
+             */
             T *last() {
                 return &arr[cur_pos - 1];
             }
 
+            /**
+             * @return Whether `cur_pos == 0`.
+             */
             bool empty() {
                 return cur_pos == 0;
             }
 
+            /**
+             * Sets \a cur_pos to \p size.
+             *
+             * @param size Value to set \a cur_pos to.
+             */
             void set_size(const int size) {
                 cur_pos = size;
             }
 
+            /**
+             * @return The current position \a cur_pos.
+             */
             int size() {
                 return cur_pos;
             }
 
+            /**
+             * Sets \a cur_pos to `0`.
+             */
             void reset() {
                 cur_pos = 0;
             }
 
+            /**
+             * Resizes the internal array to `size`. Copies the contents of the old array into the new one. If the new
+             * size is larger than the old one, the new space is only allocated and not initialized.
+             *
+             * @param size New size to allocate the array to.
+             */
             void resize(const int size) {
                 if (init && size <= arr_sz) return;
                 T *old_arr = nullptr;
@@ -169,6 +266,9 @@ namespace dejavu {
                 }
             }
 
+            /**
+             * Deallocates the internal array.
+             */
             ~work_list_t() {
                 if (init) {
                     //delete[] arr;
@@ -176,14 +276,26 @@ namespace dejavu {
                 }
             }
 
+            /**
+             * Sort the internal array up to position \a cur_pos.
+             */
             void sort() {
                 sort_t<T>(arr, cur_pos);
             }
 
+            /**
+             * @return A pointer to the internal memory.
+             */
             T *get_array() {
                 return arr;
             }
 
+            /**
+             * Access element \p index in the internal array \p arr.
+             *
+             * @param index Index of the internal array.
+             * @return The element `arr[index]`.
+             */
             T &operator[](int index) {
                 assert(index >= 0);
                 assert(index < arr_sz);
@@ -206,15 +318,16 @@ namespace dejavu {
                 std::sort(arr, arr + cur_pos, c);
             }
 
-            int cur_pos = 0;
-            bool init = false;
+            int cur_pos = 0; /**< current position */
         private:
-            T *arr = nullptr;
-            int arr_sz = -1;
+            T *arr     = nullptr; /**< internal array */
+            int arr_sz = -1;      /**< size to which \a arr is currently allocated*/
+            bool init  = false;   /** whether \a arr is currently allocated */
         };
 
-        typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
+        // frequently used types
         typedef work_list_t<int> work_list;
+        typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
 
         // queue with fixed size limitation
         class work_queue {

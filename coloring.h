@@ -1,6 +1,9 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef DEJAVU_COLORING_H
 #define DEJAVU_COLORING_H
-
 
 #include <vector>
 #include <cassert>

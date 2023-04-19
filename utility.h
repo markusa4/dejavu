@@ -1,3 +1,7 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #include <atomic>
 #include <iostream>
 #include <mutex>
@@ -31,6 +35,14 @@
 
 #define PRINT(str) std::cout << str << std::endl;
 //#define PRINT(str) (void)0;
+
+// TODO maybe can be done faster
+unsigned int hash(unsigned int x) {
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = ((x >> 16) ^ x) * 0x45d9f3b;
+    x = (x >> 16) ^ x;
+    return x;
+}
 
 inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
