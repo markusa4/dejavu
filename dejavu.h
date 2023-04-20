@@ -51,12 +51,6 @@ namespace dejavu {
      */
     class dejavu2 {
     private:
-        // high-level modules of the algorithm
-        sassy::preprocessor m_prep;        /**< preprocessor */
-        search_strategy::dfs_ir    m_dfs;  /**< depth-first search */
-        search_strategy::bfs_ir    m_bfs;  /**< breadth-first search */
-        search_strategy::random_ir m_rand; /**< randomized search */
-
         // utility tools used by other modules
         ir::refinement       m_refinement;/**< workspace for color refinement and other utilities */
         ir::selector_factory m_selectors; /**< cell selector creation */
@@ -128,6 +122,8 @@ namespace dejavu {
             //      - weigh variables for earlier individualization in restarts (maybe just non-sense, have to see how well
             //        restarts work out first anyway) -- could weigh variables more that turn out conflicting in fails
 
+            sassy::preprocessor m_prep;        /**< preprocessor */
+
             // control values
             int h_limit_leaf = 0;
             int h_limit_fail = 0;
@@ -153,6 +149,10 @@ namespace dejavu {
             add_to_group_size(m_prep.base, m_prep.exp);
             if(gg.v_size > 0) {
                 transfer_sassy_sgraph_to_sgraph(g, &gg);
+
+                search_strategy::dfs_ir    m_dfs;                        /**< depth-first search */
+                search_strategy::bfs_ir    m_bfs;                        /**< breadth-first search */
+                search_strategy::random_ir m_rand(g->v_size); /**< randomized search */
 
                 std::cout << std::endl << "solving..." << std::endl;
                 progress_print_header();
@@ -254,7 +254,7 @@ namespace dejavu {
                     // set up schreier structure
                     if(m_schreier)  {
                         const bool reset_prob = m_schreier->reset(base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed);
-                        if(reset_prob) {m_rand.reset_prob();}
+                        if(reset_prob) {m_schreier->reset_probabilistic_criterion();}
                     } else {
                         m_schreier = new groups::shared_schreier(); // TODO bad memory leak, make a reset function
                         m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
@@ -284,7 +284,7 @@ namespace dejavu {
                     bool fail = false;
 
                     // TODO find a better way to add canonical leaf to leaf store
-                    m_rand.specific_walk(m_refinement, base, g, *m_schreier, local_state, root_save);
+                    m_rand.specific_walk(m_refinement, base, g, local_state, root_save);
 
                     //if(save_to_individualize.size() > 10) fail = true;
 
@@ -292,7 +292,7 @@ namespace dejavu {
 
                     leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
                     while (!fail) {
-                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, 0.1, (m_rand.get_rolling_first_level_success_rate() > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
+                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, (m_rand.get_rolling_first_level_success_rate() > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
 
                         // TODO: if no node was pruned, use m_rand.random_walks instead of "from BFS"! should fix CFI
 
@@ -318,7 +318,7 @@ namespace dejavu {
                         progress_print("schreier", "s" + std::to_string(m_schreier->stat_sparsegen()) + "/d" +
                                                    std::to_string(m_schreier->stat_densegen()), "_");
 
-                        if (m_rand.deterministic_abort_criterion(*m_schreier) || m_rand.probabilistic_abort_criterion()) {
+                        if (m_schreier->deterministic_abort_criterion() || m_schreier->probabilistic_abort_criterion()) {
                             //std::cout << m_rand.deterministic_abort_criterion(*m_schreier) << ", " << m_rand.probabilistic_abort_criterion() << std::endl;
                             fail = false;
                             break;

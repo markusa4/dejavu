@@ -633,8 +633,6 @@ namespace dejavu {
                 lock_generators.lock();
                 generators.emplace_back(new stored_automorphism);
                 const int num = generators.size() - 1;
-                assert(w.R->certify_automorphism_sparse(w.g, automorphism.perm(), automorphism.nsupport(),
-                                                        automorphism.support()));
                 generators[num]->store(domain_size, automorphism, w.scratch2);
                 lock_generators.unlock();
 
@@ -912,6 +910,9 @@ namespace dejavu {
             work_list_t<shared_transversal *> transversals;
 
         public:
+            int s_consecutive_success = 0; /**< track repeated sifts for probabilistic abort criterion */
+            int s_error_bound         = 5; /**< determines error probability                           */
+
             /**
              * @return Number of stored generators using a sparse data structure.
              */
@@ -934,12 +935,13 @@ namespace dejavu {
              * @param base_sizes upper bounds for the size of transversals
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop) {
+            void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop, int error_bound  = 10) {
                 assert(base.size() >= stop);
                 this->domain_size = domain_size;
                 generators.initialize(domain_size);
                 transversals.allocate(stop);
                 transversals.set_size(stop);
+                s_error_bound = error_bound;
                 for (int i = 0; i < stop; ++i) {
                     transversals[i] = new shared_transversal();
                     transversals[i]->initialize(base[i], i, base_sizes[i]);
@@ -1060,7 +1062,8 @@ namespace dejavu {
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool __attribute__ ((noinline)) sift(schreier_workspace &w, automorphism_workspace &automorphism) {
+            bool __attribute__ ((noinline)) sift(schreier_workspace &w, automorphism_workspace &automorphism,
+                                                 bool uniform = false) {
                 bool changed = false;
 
                 automorphism.set_support01(true);
@@ -1080,10 +1083,43 @@ namespace dejavu {
                 automorphism.update_support();
                 automorphism.reset();
 
-                //std::cout << "sift " << changed << std::endl;
+                if(uniform) record_sift_result(changed);
 
-                //std::cout << generators.size() << ", " << finished_up_to << "/" << transversals.size() << std::endl;
                 return changed;
+            }
+
+            /**
+             * Records a sift result for the probabilistic abort criterion.
+             *
+             * @param changed Whether the sift was successful or not.
+             */
+            void record_sift_result(const bool changed) {
+                if(!changed) {
+                    ++s_consecutive_success;
+                } else {
+                    if(s_consecutive_success > 0) {
+                        ++s_error_bound;
+                        s_consecutive_success = 0;
+                    }
+                }
+            }
+
+            void reset_probabilistic_criterion() {
+                s_consecutive_success = 0;
+            }
+
+            /**
+             * @return Whether the probabilistic abort criterion allows termination or not.
+             */
+            bool probabilistic_abort_criterion() {
+                return (s_consecutive_success > s_error_bound);
+            }
+
+            /**
+             * @return Whether the deterministic abort criterion allows termination or not.
+             */
+            bool deterministic_abort_criterion() {
+                return (finished_up_to_level() + 1 == base_size());
             }
 
             /**

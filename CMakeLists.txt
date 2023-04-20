@@ -11,4 +11,4 @@ add_definitions(-DDEJAVU_STANDALONE)
 add_definitions(-g)
 set(CMAKE_CXX_STANDARD_LIBRARIES -lpthread)
 
-add_executable(dejavu-auto dejavu_auto.cpp sgraph.h refinement.h coloring.h parser.h bijection.h configuration.h)
+add_executable(dejavu-auto dejavu_auto.cpp sgraph.h refinement.h coloring.h parser.h)

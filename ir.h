@@ -110,6 +110,9 @@ namespace dejavu {
             trace _T1;
             trace _T2;
 
+            refinement* R;
+
+
             mark_set touched_color;
             work_list touched_color_list;
             work_list prev_color_list;

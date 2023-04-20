@@ -206,11 +206,10 @@ int commandline_mode(int argc, char **argv) {
         return 1;
     }
 
-    parser p;
     sgraph *g = new sgraph;
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    p.parse_dimacs_file_fast(filename, g, &colmap);
+    parse_dimacs_file_fast(filename, g, &colmap);
     sgraph *_g = new sgraph;
     if(permute_graph) {
         std::cout << "Permuting graph (not implemented)" << std::endl;
