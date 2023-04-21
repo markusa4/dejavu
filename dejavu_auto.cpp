@@ -7,7 +7,6 @@
 #include <thread>
 #include "sassy/preprocessor.h"
 #include "dejavu.h"
-#include "graph.h"
 #include <cassert>
 #include <chrono>
 #include <string>

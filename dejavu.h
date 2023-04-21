@@ -379,7 +379,7 @@ namespace dejavu {
                             break;
 
                         // want to inprocess if BFS was successfull in pruning
-                        if(ir_tree.get_finished_up_to() == 0 && ir_tree.get_level_size(ir_tree.get_finished_up_to()) < bfs_cost_estimate / 2) {
+                        if(ir_tree.get_finished_up_to() == 1 && ir_tree.get_level_size(ir_tree.get_finished_up_to()) < bfs_cost_estimate / 2) {
                             fail = true;
                             break;
                         }
