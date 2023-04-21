@@ -133,16 +133,15 @@ namespace dejavu {
             sassy::preprocessor m_prep;        /**< preprocessor */
 
             // control values
-            int h_limit_leaf = 0;
-            int h_limit_fail = 0;
-            int h_error_prob = 10;
-            int h_restarts   = -1;
-            int h_budget     = 1;
-            int h_cost       = 0;
-            int h_budget_inc_fact = 5;
-            bool h_large_base = false;
-            bool h_short_base = false;
-
+            int h_limit_leaf        = 0;
+            int h_limit_fail        = 0;
+            int h_error_prob        = 10;
+            int h_restarts          = -1;
+            int h_budget            = 1;
+            int h_cost              = 0;
+            int h_budget_inc_fact   = 5;
+            bool h_large_base       = false;
+            bool h_short_base       = false;
             int h_leaves_added_this_restart = 0;
 
             bool inprocessed = false;
@@ -155,9 +154,11 @@ namespace dejavu {
             transfer_sgraph_to_sassy_sgraph(g, &gg);
             m_prep.reduce(&gg, colmap, hook);
             add_to_group_size(m_prep.base, m_prep.exp);
+
             if(gg.v_size > 0) {
                 transfer_sassy_sgraph_to_sgraph(g, &gg);
 
+                // high-level search strategies
                 search_strategy::dfs_ir    m_dfs;                        /**< depth-first search */
                 search_strategy::bfs_ir    m_bfs;                        /**< breadth-first search */
                 search_strategy::random_ir m_rand(g->v_size); /**< randomized search */
@@ -300,7 +301,7 @@ namespace dejavu {
 
                     leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
                     while (!fail) {
-                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, (m_rand.get_rolling_first_level_success_rate() > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
+                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, (m_rand.s_rolling_first_level_success > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
 
                         // TODO: if no node was pruned, use m_rand.random_walks instead of "from BFS"! should fix CFI
 
@@ -322,9 +323,9 @@ namespace dejavu {
                         // TODO: we should pass m_refinement in the constructor of the other modules
                         // TODO: if everything has reset functions, we could pass the other structures as well...
                         progress_print("urandom", m_rand.stat_leaves(),
-                                       m_rand.get_rolling_sucess_rate());
-                        progress_print("schreier", "s" + std::to_string(m_schreier->stat_sparsegen()) + "/d" +
-                                                   std::to_string(m_schreier->stat_densegen()), "_");
+                                       m_rand.s_rolling_success);
+                        progress_print("schreier", "s" + std::to_string(m_schreier->s_sparsegen()) + "/d" +
+                                                   std::to_string(m_schreier->s_densegen()), "_");
 
                         if (m_schreier->deterministic_abort_criterion() || m_schreier->probabilistic_abort_criterion()) {
                             //std::cout << m_rand.deterministic_abort_criterion(*m_schreier) << ", " << m_rand.probabilistic_abort_criterion() << std::endl;
@@ -341,21 +342,21 @@ namespace dejavu {
                         }
                         // TODO: if rolling sucess very high, and base large, should start skipping levels to fill Schreier faster! (CFI)
 
-                        if(m_rand.get_rolling_first_level_success_rate() > 0.99) h_skip_random_paths = false;
+                        if(m_rand.s_rolling_first_level_success > 0.99) h_skip_random_paths = false;
 
-                        if(h_short_base && h_regular && m_rand.get_rolling_sucess_rate() < 0.01) h_skip_random_paths = true;
+                        if(h_short_base && h_regular && m_rand.s_rolling_success < 0.01) h_skip_random_paths = true;
                         else if (!(((bfs_cost_estimate <= g->v_size ||
-                              bfs_cost_estimate * m_rand.get_rolling_first_level_success_rate() < 12)) && m_rand.get_rolling_first_level_success_rate() < 0.99) && leaf_store_limit <= (bfs_cost_estimate*m_rand.get_rolling_first_level_success_rate())/2) {
-                            if (m_rand.get_rolling_sucess_rate() > 0.1 && !h_skip_random_paths) {
+                              bfs_cost_estimate * m_rand.s_rolling_first_level_success < 12)) && m_rand.s_rolling_first_level_success < 0.99) && leaf_store_limit <= (bfs_cost_estimate*m_rand.s_rolling_first_level_success)/2) {
+                            if (m_rand.s_rolling_success > 0.1 && !h_skip_random_paths) {
                                 leaf_store_limit *= 2;
                                 continue;
                             }
-                            if (m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate > leaf_store_limit &&
+                            if (m_rand.s_rolling_first_level_success * bfs_cost_estimate > leaf_store_limit &&
                                 !h_skip_random_paths) {
                                 //std::cout << "increased here " << m_rand.get_rolling_first_level_success_rate() << ", "
                                 //          << bfs_cost_estimate << std::endl;
                                 leaf_store_limit = std::min(std::max(
-                                        (int) m_rand.get_rolling_first_level_success_rate() * bfs_cost_estimate,
+                                        (int) m_rand.s_rolling_first_level_success * bfs_cost_estimate,
                                         ((int) (1.5 * (leaf_store_limit + 1.0)))), h_budget+1);
                                 continue;
                             }

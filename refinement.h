@@ -141,6 +141,8 @@ namespace dejavu {
         };
 
 /**
+ * \brief Color refinement and related algorithms
+ *
  * Class that is used to preserve a workspace for color refinement, automorphism certification, and other miscellaneous
  * tasks. Once initialized to a certain size, the workspace can not be enlargened and methods can only be used for
  * graphs of the initial size, or smaller.

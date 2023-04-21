@@ -19,10 +19,7 @@ dejavu::ir::refinement test_r;
 sgraph _test_graph;
 int*   _test_col;
 
-//configstruct config;
 volatile int dejavu_kill_request = 0;
-//thread_local int numnodes;
-//thread_local int colorcost;
 
 bool finished = false;
 
@@ -37,18 +34,9 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void empty_hook(int n, const int * p, int support, const int *) {
-    /*bijection<int> test_p;
-    test_p.read_from_array(p, n);
-    const bool test_auto = test_R.certify_automorphism(&test_graph, &test_p); // TODO: sparse automorphism certification?
-    assert(test_auto);*/
-    //std::cout << "automorphism support " << support << std::endl;
-    return;
-}
+void empty_hook(int n, const int * p, int support, const int *) {}
 
 void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
-    test_graph.copy_graph(g);
-
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
     auto empty_hook_func = sassy::sassy_hook(empty_hook);
@@ -71,29 +59,6 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-
-
-    /*dejavu::graph new_graph;
-    new_graph.copy_graph(g);
-    {
-        refinement_new_graph R_test2;
-        coloring   c_test2;
-        new_graph.initialize_coloring(&c_test2, colmap);
-
-        Clock::time_point timer = Clock::now();
-        R_test2.refine_coloring_first(&new_graph, &c_test2);
-        std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count())/ 1000000.0 << std::endl;
-    }
-
-    {
-        refinement R_test1;
-        coloring   c_test1;
-        g->initialize_coloring(&c_test1, colmap);
-
-        Clock::time_point timer = Clock::now();
-        R_test1.refine_coloring_first(g, &c_test1);
-        std::cout << (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count())/ 1000000.0 << std::endl;
-    }*/
 
      finished = true;
     if(del) free(colmap);

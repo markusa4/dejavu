@@ -123,7 +123,7 @@ namespace dejavu {
                 //std::cout << local_state.T->get_position() << std::endl;
                 // do computation
                 local_state.reset_trace_equal();
-                if(g->v_size >= 2000) local_state.use_limited_reversible_for_next();
+                if(g->v_size >= 2000) local_state.use_reversible_for_next();
                 local_state.use_trace_early_out(true);
                 local_state.move_to_child(R, g, v);
 

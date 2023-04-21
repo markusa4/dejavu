@@ -950,14 +950,14 @@ namespace dejavu {
             /**
              * @return Number of stored generators using a sparse data structure.
              */
-            int stat_sparsegen() {
+            int s_sparsegen() {
                 return generators.s_stored_sparse;
             }
 
             /**
              * @return Number of stored generators using a dense data structure.
              */
-            int stat_densegen() {
+            int s_densegen() {
                 return generators.s_stored_dense;
             }
 
@@ -1125,6 +1125,13 @@ namespace dejavu {
                 return changed;
             }
 
+            /**
+             * Generate a (semi-)random element from the generators.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism Random element is saved in this automorphism_workspace.
+             * @param rn_generator Random number generator used for the generation.
+             */
             void generate_random(schreier_workspace& w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
                 automorphism.reset();
 
@@ -1145,11 +1152,11 @@ namespace dejavu {
             }
 
             /**
-             * Sift automorphism into the Schreier structure.
+             * Sift a (semi-)randomly generated element into the Schreier structure.
              *
              * @param w Auxiliary workspace used for procedures.
-             * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
-             * @return Whether automorphism was added to the Schreier structure or not.
+             * @param automorphism An automorphism_workspace used to store the randomly generated element.
+             * @return Whether the generated automorphism was added to the Schreier structure or not.
              */
             bool __attribute__ ((noinline)) sift_random(schreier_workspace &w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
                 automorphism.set_support01(true);
@@ -1173,6 +1180,9 @@ namespace dejavu {
                 }
             }
 
+            /**
+             * Reset the probabilistic abort criterion.
+             */
             void reset_probabilistic_criterion() {
                 s_consecutive_success = 0;
             }

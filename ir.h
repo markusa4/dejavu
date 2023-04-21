@@ -103,19 +103,24 @@ namespace dejavu {
          * Has different modes (managed by \a mode) depending on whether color refinement should be reversible or not.
          */
         struct controller {
-            coloring      *c  = nullptr;
-            trace         *T  = nullptr;
+        private:
             trace         *cT = nullptr;
-
             trace _T1;
             trace _T2;
 
-            refinement* R;
-
-
-            mark_set touched_color;
+            mark_set  touched_color;
             work_list touched_color_list;
             work_list prev_color_list;
+
+            std::function<type_split_color_hook>     my_split_hook;
+            std::function<type_worklist_color_hook>  my_worklist_hook;
+            std::function<type_additional_info_hook> my_add_hook;
+        public:
+            coloring      *c  = nullptr;
+            trace         *T  = nullptr;
+
+            refinement* R;
+
             std::vector<int> singletons;
             std::vector<int> base_vertex;
             std::vector<int> base_color;
@@ -131,10 +136,6 @@ namespace dejavu {
 
             coloring leaf_color;
 
-            std::function<type_split_color_hook> my_split_hook;
-            std::function<type_worklist_color_hook> my_worklist_hook;
-            std::function<type_additional_info_hook> my_add_hook;
-
             work_list workspace;
 
             // settings
@@ -142,7 +143,7 @@ namespace dejavu {
 
             // heuristics
             bool h_last_refinement_singleton_only = true;
-            int h_hint_color = -1;
+            int  h_hint_color = -1;
             bool h_hint_color_is_singleton_now = true;
             bool h_cell_active = false;
             bool h_individualize = false;
@@ -186,11 +187,17 @@ namespace dejavu {
             }
 
             void mode_bfs() {
-
+                mode = ir::IR_MODE_COMPARE_TRACE;
             }
 
             void mode_random_walk() {
+                mode = ir::IR_MODE_RECORD_HASH_IRREVERSIBLE;
+                use_trace_early_out(false);
+            }
 
+            void mode_random_walk_abort() {
+                mode = ir::IR_MODE_RECORD_HASH_IRREVERSIBLE;
+                use_trace_early_out(true);
             }
 
             void flip_trace() {
@@ -242,7 +249,7 @@ namespace dejavu {
                 my_add_hook   = self_add_hook();
             }
 
-            void use_limited_reversible_for_next() {
+            void use_reversible_for_next() {
                 reset_touched();
                 mode = IR_MODE_COMPARE_TRACE;
             }
@@ -932,7 +939,14 @@ namespace dejavu {
 
         typedef std::pair<ir::tree_node*, int> missing_node;
 
-        // TODO shared_tree structure for BFS + random walk
+        /**
+         * \brief IR tree structure
+         *
+         * Datastructure to explicitly store parts of an IR tree, such as a level-wise store, leaf store, as well as
+         * further information used for pruning in BFS.
+         *
+         * Can be used across multiple threads.
+         */
         class shared_tree {
             shared_queue_t<missing_node>         missing_nodes;
             std::vector<tree_node*>              tree_data;
