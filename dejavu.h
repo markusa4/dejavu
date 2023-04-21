@@ -10,7 +10,15 @@
 #include "rand.h"
 #include "sassy/preprocessor.h"
 
+extern dejavu::ir::refinement test_r;
+extern sgraph _test_graph;
+extern int*   _test_col;
+
 namespace dejavu {
+    void test_hook(int n, const int *p, int nsupp, const int *supp) {
+        std::cout << "certifying..." << std::endl;
+        assert(test_r.certify_automorphism_sparse(&_test_graph, _test_col, p, nsupp, supp));
+    }
 
     static void progress_print_split() {
         PRINT("______________________________________________________________");
@@ -242,7 +250,7 @@ namespace dejavu {
                     // TODO I think there should be no setup functions at all
                     m_dfs.h_setup(h_large_base ? 0.33 : 0.25);
 
-                    const int dfs_reached_level = m_dfs.do_dfs(&m_refinement, g, root_save.get_coloring(),
+                    const int dfs_reached_level = m_dfs.do_dfs(hook, &m_refinement, g, root_save.get_coloring(),
                                                                local_state, &save_to_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                    "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
@@ -301,10 +309,10 @@ namespace dejavu {
                         const int leaves_pre = m_rand.stat_leaves();
                         if (ir_tree.get_finished_up_to() == 0) {
                             // random automorphisms, single origin
-                            m_rand.random_walks(m_refinement, current_selector, g, *m_schreier, local_state, &root_save);
+                            m_rand.random_walks(hook, m_refinement, current_selector, g, *m_schreier, local_state, &root_save);
                         } else {
                             // random automorphisms, sampled from shared_tree
-                            m_rand.random_walks_from_tree(m_refinement, current_selector, g, *m_schreier,
+                            m_rand.random_walks_from_tree(hook, m_refinement, current_selector, g, *m_schreier,
                                                           local_state,ir_tree);
                         }
                         h_leaves_added_this_restart = m_rand.stat_leaves() - leaves_pre;
@@ -361,6 +369,7 @@ namespace dejavu {
 
                         h_skip_random_paths = false;
 
+                        bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
                         m_bfs.do_a_level(&m_refinement, g, ir_tree, local_state, current_selector);
                         progress_print("bfs", "0-" + std::to_string(ir_tree.get_finished_up_to()) + "(" +
                                               std::to_string(bfs_cost_estimate) + ")",
@@ -368,6 +377,12 @@ namespace dejavu {
 
                         if (ir_tree.get_finished_up_to() == base_size)
                             break;
+
+                        // want to inprocess if BFS was successfull in pruning
+                        if(ir_tree.get_finished_up_to() == 0 && ir_tree.get_level_size(ir_tree.get_finished_up_to()) < bfs_cost_estimate / 2) {
+                            fail = true;
+                            break;
+                        }
 
                         bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
                         leaf_store_limit += ir_tree.get_level_size(ir_tree.get_finished_up_to());
@@ -424,6 +439,8 @@ namespace dejavu {
                                            std::to_string(local_state.c->cells));
                             save_to_individualize.clear();
                         }
+
+                        save_to_individualize.clear();
 
                         local_state.save_reduced_state(root_save);
                         // TODO use orbit partition for 1 individualization

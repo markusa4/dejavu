@@ -16,6 +16,9 @@ typedef std::chrono::high_resolution_clock Clock;
 
 thread_local bool bulk_domain_reset = false;
 
+dejavu::ir::refinement test_r;
+sgraph _test_graph;
+int*   _test_col;
 
 //configstruct config;
 volatile int dejavu_kill_request = 0;
@@ -57,7 +60,17 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
         colmap = (int*) calloc(g->v_size, sizeof(int));
         del = true;
     }
+
+#ifndef NDEBUG
+    auto test_hook_func = sassy::sassy_hook(dejavu::test_hook);
+    _test_graph.copy_graph(g);
+    _test_col = (int*) calloc(g->v_size, sizeof(int));
+    memcpy(_test_col, colmap, sizeof(int) * g->v_size);
+    d.automorphisms(g, colmap, &test_hook_func);
+    free(_test_col);
+#else
     d.automorphisms(g, colmap, &empty_hook_func);
+#endif
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
 
 

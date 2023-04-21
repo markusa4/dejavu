@@ -206,6 +206,7 @@ namespace dejavu {
                         }
                     }
                     for (int i = 0; i < domain_size; ++i) automorphism[i] = scratch_apply2[automorphism[i]];
+                    scratch_apply3.reset();
                 }
 
                 // rewrite support
@@ -487,6 +488,7 @@ namespace dejavu {
                     }
                     loader.load(automorphism.perm(), nullptr);
                 } else {
+                    // store_type == STORE_DENSE
                     loader.load(data.get_array(), nullptr);
                 }
             }
@@ -558,6 +560,7 @@ namespace dejavu {
                         assert(map_j == j);
                         data.push_back(-(j + 1));
                     }
+                    helper.reset();
                     assert(data.size() == support);
                 } else {
                     store_type = STORE_DENSE;
@@ -597,7 +600,7 @@ namespace dejavu {
             mark_set scratch2; /**< auxiliary space */
             work_list scratch_apply1; /**< auxiliary space used for `apply` operations */
             work_list scratch_apply2; /**< auxiliary space used for `apply` operations */
-            mark_set scratch_apply3;  /**< auxiliary space used for `apply` operations */
+            mark_set  scratch_apply3; /**< auxiliary space used for `apply` operations */
             automorphism_workspace scratch_auto; /**< used to store a sparse automorphism*/
         };
 
@@ -655,11 +658,26 @@ namespace dejavu {
                 return generators[num];
             }
 
+            stored_automorphism *operator[](const int num) {
+                return get_generator(num);
+            }
+
             /**
              * @return number of stored generators
              */
             int size() {
                 return generators.size();
+            }
+
+            void clear() {
+                for(int i = 0; i < generators.size(); ++i) {
+                    delete generators[i];
+                }
+                generators.clear();
+            }
+
+            ~generating_set() {
+                clear();
             }
         };
 
@@ -692,6 +710,7 @@ namespace dejavu {
              * @param w The schreier_workspace to which the orbit is loaded.
              */
             void __attribute__ ((noinline)) load_orbit_to_scratch(schreier_workspace &w) {
+                w.scratch1.reset();
                 for (int i = 0; i < fixed_orbit.size(); ++i) {
                     w.scratch1.set(fixed_orbit[i]);
                 }
@@ -728,17 +747,19 @@ namespace dejavu {
             void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
                        generating_set &generators, const int gen_num, const int pwr) {
                 // load perm into workspace
-                auto generator = generators.get_generator(gen_num);
+                auto generator = generators[gen_num];
 
                 // apply generator
                 if (pwr < 0) { // use inverse
                     generator->load_inverse(w.loader, w.scratch_auto);
                     // multiply
                     automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), abs(pwr));
+                    w.scratch_auto.reset();
                 } else if (pwr > 0) { // use generator
                     generator->load(w.loader, w.scratch_auto);
                     // multiply
                     automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
+                    w.scratch_auto.reset();
                 }
             }
 
@@ -751,6 +772,16 @@ namespace dejavu {
                 return fixed_orbit.size();
             }
 
+            /**
+             * @return Size of the transversal.
+             */
+            int size_upper_bound() {
+                return sz_upb;
+            }
+
+            void set_size_upper_bound(const int new_sz_upb) {
+                sz_upb = new_sz_upb;
+            }
             /**
              * Check whether a point \p p is contained in transversal.
              *
@@ -827,8 +858,9 @@ namespace dejavu {
              */
             bool extend_with_automorphism(schreier_workspace &w, generating_set &generators,
                                           automorphism_workspace &automorphism) {
-                if (finished)
-                    return false;
+                if (finished) return false;
+
+                //if(finished) std::cout << "transversal " << level << " is finished " << fixed_orbit.size() << "/" << sz_upb << std::endl;
 
                 load_orbit_to_scratch(w);
                 bool changed = false;
@@ -866,6 +898,8 @@ namespace dejavu {
                     finished = true;
                 }
 
+                assert(sz_upb >= fixed_orbit.size());
+
                 w.scratch1.reset();
                 return changed;
             }
@@ -880,6 +914,7 @@ namespace dejavu {
                 int fixed_map = automorphism.perm()[fixed];
                 while (fixed != fixed_map) {
                     const int pos = find_point(fixed_map);
+                    assert(pos >= 0);
                     const int perm = fixed_orbit_to_perm[pos];
                     const int pwr = fixed_orbit_to_pwr[pos];
                     apply_perm(w, automorphism, generators, perm, pwr);
@@ -901,7 +936,6 @@ namespace dejavu {
          *
          */
         class shared_schreier {
-            // TODO could use color sizes for memory allocation, predicting dense/sparse?
         private:
             int domain_size    = -1;
             int finished_up_to = -1;
@@ -957,7 +991,6 @@ namespace dejavu {
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
             bool reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old) {
-
                 const int old_size = transversals.size();
                 const int new_size = stop;
 
@@ -967,6 +1000,8 @@ namespace dejavu {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
                         if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
                     }
+                } else {
+                    generators.clear();
                 }
 
                 if(keep_until == new_size && new_size == old_size) return false;
@@ -976,6 +1011,10 @@ namespace dejavu {
                 transversals.resize(new_size);
                 transversals.set_size(new_size);
 
+
+                for(int i = 0; i < keep_until; ++i) {
+                    transversals[i]->set_size_upper_bound(new_base_sizes[i]);
+                }
                 for (int i = keep_until; i < stop; ++i) {
                     if(i < old_size) delete transversals[i];
                     transversals[i] = new shared_transversal();
@@ -1068,14 +1107,12 @@ namespace dejavu {
 
                 automorphism.set_support01(true);
                 for (int level = 0; level < transversals.size(); ++level) {
-                    //std::cout << "extending transversal..." << std::endl;
                     changed = transversals[level]->extend_with_automorphism(w, generators, automorphism) || changed;
 
                     if (finished_up_to == level - 1 && transversals[level]->is_finished()) {
                         ++finished_up_to;
                     }
 
-                    //std::cout << "fixing automorphism..." << std::endl;
                     const bool is_identity = transversals[level]->fix_automorphism(w, generators, automorphism);
                     if (is_identity) break;
                 }
@@ -1086,6 +1123,38 @@ namespace dejavu {
                 if(uniform) record_sift_result(changed);
 
                 return changed;
+            }
+
+            void generate_random(schreier_workspace& w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
+                automorphism.reset();
+
+                const int num_mult = 1 + (rn_generator() % 7);
+                for(int i = 0; i < num_mult; ++i) {
+                    // load generator
+                    const int next_gen_num = (rn_generator() % generators.size());
+                    assert(next_gen_num >= 0);
+                    assert(next_gen_num < generators.size());
+                    auto next_gen = generators[next_gen_num];
+                    assert(next_gen != nullptr);
+                    next_gen->load(w.loader, w.scratch_auto);
+
+                    // multiply
+                    automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), 1);
+                    w.scratch_auto.reset();
+                }
+            }
+
+            /**
+             * Sift automorphism into the Schreier structure.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
+             * @return Whether automorphism was added to the Schreier structure or not.
+             */
+            bool __attribute__ ((noinline)) sift_random(schreier_workspace &w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
+                automorphism.set_support01(true);
+                generate_random(w, automorphism, rn_generator);
+                return sift(w, automorphism, false);
             }
 
             /**
@@ -1136,9 +1205,12 @@ namespace dejavu {
             std::pair<long double, int> compute_group_size() {
                 long double grp_sz_man = 1;
                 int         grp_sz_exp = 0;
+
+                // multiply the sizes of the individual levels in the Schreier table
                 for (int level = 0; level < transversals.size(); ++level) {
                     grp_sz_man *= transversals[level]->size();
-                    //std::cout << transversals[level]->size() << std::endl;
+
+                    // normalize man / exp
                     while (grp_sz_man > 10) {
                         grp_sz_exp += 1;
                         grp_sz_man = grp_sz_man / 10;

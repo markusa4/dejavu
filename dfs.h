@@ -130,7 +130,7 @@ namespace dejavu {
              * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
              * @return The level up to which DFS succeeded.
              */
-            int do_dfs(ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller &local_state,
+            int do_dfs(dejavu_hook* hook, ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller &local_state,
                        std::vector<std::pair<int, int>>* save_to_individualize) {
                 grp_sz_man = 1.0;
                 grp_sz_exp = 0;
@@ -213,6 +213,7 @@ namespace dejavu {
                         // if we found automorphism, add to orbit, (and TODO: call hook)
                         if (found_auto) {
                             assert(pautomorphism.perm()[vert] == ind_v);
+                            if(hook) (*hook)(0, pautomorphism.perm(), pautomorphism.nsupport(), pautomorphism.support());
                             orbs.add_automorphism_to_orbit(pautomorphism);
                         }
                         pautomorphism.reset();
