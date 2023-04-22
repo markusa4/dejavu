@@ -34,8 +34,8 @@ namespace dejavu {
             double h_recent_cost_snapshot_limit = 0.25;
 
         public:
-            long double grp_sz_man = 1.0; /**< group size mantissa, total group size is `grp_sz_man^grp_sz_exp`*/
-            int         grp_sz_exp = 0;   /**< group size exponent, total group size is `grp_sz_man^grp_sz_exp`*/
+            long double grp_sz_man = 1.0; /**< group size mantissa, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
+            int         grp_sz_exp = 0;   /**< group size exponent, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
 
             /**
              * Setup heuristics of the DFS module.
@@ -67,14 +67,14 @@ namespace dejavu {
                 int prev_fail_pos = -1;
                 int cert_pos = 0;
 
-                while ((size_t) state->base_pos < state->compare_base_color.size()) {
-                    const int col = state->compare_base_color[state->base_pos];
+                while ((size_t) state->s_base_pos < state->compare_base_color.size()) {
+                    const int col = state->compare_base_color[state->s_base_pos];
                     const int col_sz = state->c->ptn[col] + 1;
                     if (col_sz < 2)
                         return {false, false};
                     const int ind_v = state->c->lab[col];
 
-                    state->move_to_child(R, g, ind_v);
+                    state->move_to_child(g, ind_v);
                     const int pos_start = state->base_singleton_pt[state->base_singleton_pt.size() - 1];
                     const int pos_end   = (int) state->singletons.size();
                     automorphism.write_singleton(&state->compare_singletons, &state->singletons,
@@ -84,14 +84,14 @@ namespace dejavu {
 
                     bool prev_cert = true;
 
-                    //assert(state->h_hint_color_is_singleton_now ? state->h_last_refinement_singleton_only : true);
+                    //assert(state->s_hint_color_is_singleton_now ? state->s_last_refinement_singleton_only : true);
 
-                    if (prev_fail && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                    if (prev_fail && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
                         prev_cert = R->check_single_failure(g, initial_colors->vertex_to_col, automorphism.perm(), prev_fail_pos);
                     }
 
                     //if(state->c->cells == g->v_size) {
-                    if (prev_cert && state->h_last_refinement_singleton_only && state->h_hint_color_is_singleton_now) {
+                    if (prev_cert && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
                         // TODO: add better heuristic to not always do this check, too expensive!
                         auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
                                                                                           automorphism.perm(),
@@ -146,21 +146,21 @@ namespace dejavu {
                 cost_snapshot = local_state.T->get_position();
 
                 // tell the controller we are performing DFS now
-                local_state.mode_dfs();
+                local_state.mode_compare_base();
 
                 // abort criteria
                 double recent_cost_snapshot = 0;
                 bool   fail = false;
 
                 // loop that serves to optimize Tinhofer graphs
-                while (recent_cost_snapshot < h_recent_cost_snapshot_limit && local_state.base_pos > 0 && !fail) {
+                while (recent_cost_snapshot < h_recent_cost_snapshot_limit && local_state.s_base_pos > 0 && !fail) {
                     // backtrack one level
                     local_state.move_to_parent();
 
                     // remember which color we are individualizing
-                    const int col = local_state.base_color[local_state.base_pos];
+                    const int col = local_state.base_color[local_state.s_base_pos];
                     const int col_sz = local_state.c->ptn[col] + 1;
-                    const int vert = local_state.base_vertex[local_state.base_pos]; // base vertex
+                    const int vert = local_state.base_vertex[local_state.s_base_pos]; // base vertex
 
                     // iterate over current color class
                     for (int i = col_sz - 1; i >= 0; --i) {
@@ -174,9 +174,9 @@ namespace dejavu {
                         const int cost_start = local_state.T->get_position();
 
                         // perform individualization-refinement
-                        const int prev_base_pos = local_state.base_pos;
+                        const int prev_base_pos = local_state.s_base_pos;
                         local_state.T->reset_trace_equal();
-                        local_state.move_to_child(R, g, ind_v);
+                        local_state.move_to_child(g, ind_v);
 
                         // write singleton diff into automorphism...
                         const int wr_pos_st = local_state.base_singleton_pt[local_state.base_singleton_pt.size() - 1];
@@ -219,7 +219,7 @@ namespace dejavu {
                         pautomorphism.reset();
 
                         // move state back up where we started in this iteration
-                        while (prev_base_pos < local_state.base_pos) {
+                        while (prev_base_pos < local_state.s_base_pos) {
                             local_state.move_to_parent();
                         }
 
@@ -251,7 +251,7 @@ namespace dejavu {
                 }
 
                 // if DFS failed on current level, we did not finish the current level -- has to be accounted for
-                return local_state.base_pos + (fail);
+                return local_state.s_base_pos + (fail);
             }
         };
     }

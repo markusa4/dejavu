@@ -165,7 +165,7 @@ namespace dejavu {
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                                  const std::function<type_split_color_hook> &split_hook = nullptr,
                                  const std::function<type_worklist_color_hook> &worklist_hook = nullptr
-                    //,const std::function<type_additional_info_hook>& add_hook = nullptr
+                    //,const std::function<type_additional_info_hook>& write_to_trace = nullptr
             ) {
                 singleton_hint.reset();
                 assure_initialized(g);
@@ -786,7 +786,7 @@ assert(c->cells == actual_cells);
             bool refine_color_class_sparse(sgraph *g, coloring *c,
                                            int color_class, int class_size,
                                            work_list_pair_bool *color_class_split_worklist
-                    //const std::function<type_additional_info_hook>& add_hook = nullptr
+                    //const std::function<type_additional_info_hook>& write_to_trace = nullptr
             ) {
                 // for all vertices of the color class...
                 bool comp, mark_as_largest;
@@ -836,9 +836,9 @@ assert(c->cells == actual_cells);
                     cc += 1;
                 }
 
-                //if(add_hook) add_hook(singleton_inv1);
-                //if(add_hook) add_hook(singleton_inv2);
-                //if(add_hook) add_hook(acc_in);
+                //if(add_hook) write_to_trace(singleton_inv1);
+                //if(add_hook) write_to_trace(singleton_inv2);
+                //if(add_hook) write_to_trace(acc_in);
                 // early out before sorting color classes
                 /*if(!comp) {
                 while(!old_color_classes.empty()) {
@@ -879,7 +879,7 @@ assert(c->cells == actual_cells);
                             acc += val;
                             const int __col = _col + _col_sz - (neighbour_sizes.get(i));
                             const int v_degree = i;
-                            //if(add_hook) add_hook(v_degree);
+                            //if(add_hook) write_to_trace(v_degree);
                             //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                             //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
                             if (__col != _col)
@@ -1243,7 +1243,7 @@ assert(c->cells == actual_cells);
             void refine_color_class_singleton(sgraph *g, coloring *c,
                                               int color_class, int class_size,
                                               work_list_pair_bool *color_class_split_worklist
-                    //,const std::function<type_additional_info_hook>& add_hook = nullptr
+                    //,const std::function<type_additional_info_hook>& write_to_trace = nullptr
             ) {
                 bool comp;
                 int i, cc, deg1_write_pos, deg1_read_pos;
@@ -1282,14 +1282,14 @@ assert(c->cells == actual_cells);
                 }
 
                 //singleton_inv += old_color_classes.cur_pos;
-                //if(add_hook) (add_hook)(singleton_inv);
+                //if(add_hook) (write_to_trace)(singleton_inv);
 
                 old_color_classes.sort();
 
                 // write invariant first...
                 //for(i = 0; i < old_color_classes.cur_pos && comp; ++i) {
                 //comp = comp && I->write_top_and_compare(old_color_classes.arr[i]); // color class
-                //if(add_hook) (add_hook)(neighbours.get(old_color_classes[i]));
+                //if(write_to_trace) (add_hook)(neighbours.get(old_color_classes[i]));
                 // contains information about color degree (= 1)
                 //}
 

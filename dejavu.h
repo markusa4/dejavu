@@ -59,11 +59,9 @@ namespace dejavu {
      */
     class dejavu2 {
     private:
-        // utility tools used by other modules
-        ir::refinement       m_refinement;/**< workspace for color refinement and other utilities */
-        ir::selector_factory m_selectors; /**< cell selector creation */
-        groups::shared_schreier*    m_schreier = nullptr;  /**< Schreier-Sims algorithm */
-        ir::shared_tree m_tree;           /**< IR-shared_tree */
+        // shared modules
+        groups::shared_schreier* m_schreier = nullptr;  /**< Schreier-Sims algorithm */
+        ir::shared_tree          m_tree;           /**< IR-shared_tree */
 
         // TODO: should not be necessary in the end!
         void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
@@ -84,9 +82,9 @@ namespace dejavu {
         }
 
         void man_to_exp_group_size() {
-            while(grp_sz_man >= 10.0) {
-                grp_sz_exp += 1;
-                grp_sz_man = grp_sz_man / 10;
+            while(s_grp_sz_man >= 10.0) {
+                s_grp_sz_exp += 1;
+                s_grp_sz_man = s_grp_sz_man / 10;
             }
         }
 
@@ -96,17 +94,27 @@ namespace dejavu {
 
         void add_to_group_size(long double add_grp_sz_man, int add_grp_sz_exp) {
             while (add_grp_sz_man >= 10.0) {
-                grp_sz_exp += 1;
+                s_grp_sz_exp += 1;
                 add_grp_sz_man = add_grp_sz_man / 10;
             }
-            grp_sz_exp += add_grp_sz_exp;
-            grp_sz_man *= add_grp_sz_man;
+            s_grp_sz_exp += add_grp_sz_exp;
+            s_grp_sz_man *= add_grp_sz_man;
             man_to_exp_group_size();
         }
 
     public:
-        long double grp_sz_man = 1.0; /**< group size mantissa, group size is `grp_sz_man^grp_sz_exp` \sa grp_sz_exp */
-        int         grp_sz_exp = 0;   /**< group size exponent, group size is `grp_sz_man^grp_sz_exp` \sa grp_sz_man  */
+        // TODO outward-facing, global settings and statistics of solver go here, feed to-and-from sub-modules
+        // settings
+        int h_error_prob        = 10; /**< error probability is below `(1/2)^h_error_prob`, default value of 10 thus
+                                       * misses an automorphism with probabiltiy at most (1/2)^10 < 0.098% */
+        int h_limit_leaf        = 0;  /**< limit for the amount of IR leaves to be stored*/
+        int h_limit_fail        = 0;  /**< limit for the amount of backtracking allowed*/
+
+        // statistics
+        long double s_grp_sz_man = 1.0; /**< group size mantissa, group size is `s_grp_sz_man^s_grp_sz_exp`
+                                          * \sa s_grp_sz_exp */
+        int         s_grp_sz_exp = 0;   /**< group size exponent, group size is `s_grp_sz_man^s_grp_sz_exp`
+                                          * \sa s_grp_sz_man  */
 
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
@@ -133,9 +141,6 @@ namespace dejavu {
             sassy::preprocessor m_prep;        /**< preprocessor */
 
             // control values
-            int h_limit_leaf        = 0;
-            int h_limit_fail        = 0;
-            int h_error_prob        = 10;
             int h_restarts          = -1;
             int h_budget            = 1;
             int h_cost              = 0;
@@ -158,10 +163,14 @@ namespace dejavu {
             if(gg.v_size > 0) {
                 transfer_sassy_sgraph_to_sgraph(g, &gg);
 
+                // local modules, to be used by other modules
+                ir::refinement       m_refinement;/*< workspace for color refinement and other utilities */
+                ir::selector_factory m_selectors; /*< cell selector creation */
+
                 // high-level search strategies
-                search_strategy::dfs_ir    m_dfs;                        /**< depth-first search */
-                search_strategy::bfs_ir    m_bfs;                        /**< breadth-first search */
-                search_strategy::random_ir m_rand(g->v_size); /**< randomized search */
+                search_strategy::dfs_ir    m_dfs;                        /*< depth-first search */
+                search_strategy::bfs_ir    m_bfs;                        /*< breadth-first search */
+                search_strategy::random_ir m_rand(g->v_size); /*< randomized search */
 
                 std::cout << std::endl << "solving..." << std::endl;
                 progress_print_header();
@@ -173,7 +182,7 @@ namespace dejavu {
                 bool h_regular = local_coloring.cells == 1;
 
                 // set up a local state for IR computations
-                ir::controller local_state(&local_coloring);
+                ir::controller local_state(&m_refinement, &local_coloring);
 
                 // save root state for random and BFS search, as fwell as restarts
                 ir::reduced_save root_save;
@@ -215,19 +224,19 @@ namespace dejavu {
 
                     std::vector<std::pair<int, int>> save_to_individualize;
 
-                    grp_sz_man = 1.0;
-                    grp_sz_exp = 0;
+                    s_grp_sz_man = 1.0;
+                    s_grp_sz_exp = 0;
                     add_to_group_size(m_prep.base, m_prep.exp);
 
                     // find a selector, moves local_state to a leaf of IR shared_tree
                     m_selectors.find_base(h_restarts, &m_refinement, g, &local_state);
                     //m_selectors.find_sparse_optimized_base(&m_refinement, g, &local_state);
                     std::function<ir::type_selector_hook> *current_selector = m_selectors.get_selector_hook();
-                    progress_print("selector" + std::to_string(h_restarts), std::to_string(local_state.base_pos),
+                    progress_print("selector" + std::to_string(h_restarts), std::to_string(local_state.s_base_pos),
                                    std::to_string(local_state.T->get_position()));
-                    int base_size = local_state.base_pos;
+                    int base_size = local_state.s_base_pos;
                     if (base_size > 5 * last_base_size) {
-                        progress_print("skip" + std::to_string(h_restarts), std::to_string(local_state.base_pos),
+                        progress_print("skip" + std::to_string(h_restarts), std::to_string(local_state.s_base_pos),
                                        std::to_string(last_base_size));
                         continue; // TODO: re-consider this
                     }
@@ -256,7 +265,7 @@ namespace dejavu {
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                    "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                     add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
-                    //std::cout << "dfs:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
+                    //std::cout << "dfs:#symmetries: " << std::to_string(s_grp_sz_man) << "*10^" << s_grp_sz_exp << std::endl;
 
                     if (dfs_reached_level == 0) break;
 
@@ -418,7 +427,7 @@ namespace dejavu {
                             progress_print("inproc_bfs", std::to_string(cell_prev),
                                            std::to_string(cell_after));
                             if (cell_after != cell_prev) {
-                                local_state.refine(&m_refinement, g);
+                                local_state.refine(g);
                                 progress_print("inproc_ref", std::to_string(cell_after),
                                                std::to_string(local_state.c->cells));
                             }
@@ -434,7 +443,7 @@ namespace dejavu {
                                 const int ind_col = local_state.c->vertex_to_col[ind_v];
                                 assert(test_col_sz == local_state.c->ptn[ind_col]+1);
                                 m_prep.multiply_to_group_size(local_state.c->ptn[ind_col]+1);
-                                local_state.move_to_child_no_trace(&m_refinement, g, ind_v);
+                                local_state.move_to_child_no_trace(g, ind_v);
                             }
                             progress_print("inproc_ind", "_",
                                            std::to_string(local_state.c->cells));
@@ -452,11 +461,11 @@ namespace dejavu {
                 }
                 if(m_schreier) {
                     add_to_group_size(m_schreier->compute_group_size());
-                    //std::cout << "schreier:#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
+                    //std::cout << "schreier:#symmetries: " << std::to_string(s_grp_sz_man) << "*10^" << s_grp_sz_exp << std::endl;
                 }
             }
 
-            std::cout << "#symmetries: " << std::to_string(grp_sz_man) << "*10^" << grp_sz_exp << std::endl;
+            std::cout << "#symmetries: " << std::to_string(s_grp_sz_man) << "*10^" << s_grp_sz_exp << std::endl;
         }
     };
 }

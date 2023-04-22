@@ -21,6 +21,7 @@ namespace dejavu {
             bool deviation_done = false;
             // TODO: bfs_ir should be workspace for local thread, and not a shared structure!
 
+            // statistics
             int s_deviation_prune = 0;
             int s_total_prune     = 0;
             int s_total_kept      = 0;
@@ -112,37 +113,38 @@ namespace dejavu {
 
                 // do efficient loading if parent is the same as previous load
                 if(next_node_save != last_load || g->v_size < 2000) { // TODO heuristic to check how much has changed
+                    local_state.use_reversible(false); // potentially loads more efficiently
                     local_state.load_reduced_state(*next_node_save);
                 } else {
                     local_state.move_to_parent();
-                    local_state.load_reduced_state_without_coloring(*next_node_save);
+                    //local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
                 }
 
-                if(local_state.base_pos > 0) local_state.use_increase_deviation_hash(true);
+                if(local_state.s_base_pos > 0) local_state.use_increase_deviation(true);
 
                 //std::cout << local_state.T->get_position() << std::endl;
                 // do computation
                 local_state.reset_trace_equal();
-                if(g->v_size >= 2000) local_state.use_reversible_for_next();
+                local_state.use_reversible(g->v_size >= 2000);
                 local_state.use_trace_early_out(true);
-                local_state.move_to_child(R, g, v);
+                local_state.move_to_child(g, v);
 
                 // we want to keep track of whether we are on the base or not
                 const bool parent_is_base = node->get_base();
-                const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.base_pos-1]);
+                const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.s_base_pos - 1]);
 
-                //std::cout << "is_base " << is_base << ", " << local_state.base_pos << std::endl;
+                //std::cout << "is_base " << is_base << ", " << local_state.s_base_pos << std::endl;
 
                 if(local_state.T->trace_equal()) { // TODO: what if leaf?
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
                     //std::cout << local_state.T->get_position() << std::endl;
-                    ir_tree->add_node(local_state.base_pos, new_save, is_base);
+                    ir_tree->add_node(local_state.s_base_pos, new_save, is_base);
                 } else {
                     assert(!is_base);
                     // deviation map
-                    if(local_state.base_pos > 1) {
+                    if(local_state.s_base_pos > 1) {
                         ++s_total_prune;
                         if (parent_is_base) add_deviation(local_state.T->get_hash());
                         else {
@@ -157,7 +159,7 @@ namespace dejavu {
                 }
 
                 // keep track how many we computed for deviation map
-                if(parent_is_base && local_state.base_pos > 1) {
+                if(parent_is_base && local_state.s_base_pos > 1) {
                     computed_for_base += 1;
                     if(computed_for_base == expected_for_base) {
                         finish_deviation();

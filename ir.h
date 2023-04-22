@@ -26,11 +26,11 @@ namespace dejavu {
          *
          */
         enum ir_mode {
-            IR_MODE_COMPARE_TRACE, IR_MODE_RECORD_TRACE, IR_MODE_RECORD_HASH_IRREVERSIBLE
+            IR_MODE_RECORD_TRACE, IR_MODE_COMPARE_TRACE_REVERSIBLE, IR_MODE_COMPARE_TRACE_IRREVERSIBLE
         };
 
         /**
-         * int type_selector_hook(coloring* c, const int base_pos);
+         * int type_selector_hook(coloring* c, const int s_base_pos);
          */
         typedef int type_selector_hook(const coloring *, const int);
 
@@ -103,23 +103,9 @@ namespace dejavu {
          * Has different modes (managed by \a mode) depending on whether color refinement should be reversible or not.
          */
         struct controller {
-        private:
-            trace         *cT = nullptr;
-            trace _T1;
-            trace _T2;
-
-            mark_set  touched_color;
-            work_list touched_color_list;
-            work_list prev_color_list;
-
-            std::function<type_split_color_hook>     my_split_hook;
-            std::function<type_worklist_color_hook>  my_worklist_hook;
-            std::function<type_additional_info_hook> my_add_hook;
         public:
             coloring      *c  = nullptr;
             trace         *T  = nullptr;
-
-            refinement* R;
 
             std::vector<int> singletons;
             std::vector<int> base_vertex;
@@ -138,23 +124,41 @@ namespace dejavu {
 
             work_list workspace;
 
+            // statistics
+            int   s_base_pos = 0;                          /**< how large the base of the current IR node is*/
+            bool  s_last_refinement_singleton_only = true; /**< whether in the last refinement, only singleton cells
+                                                            * appeared*/
+            int   s_hint_color                     = -1;   /**< a color that was not singleton in last refinement*/
+            bool  s_hint_color_is_singleton_now    = true; /**< whether the \a s_hint_color is singleton now */
+
+            // settings for heuristics
+            int   h_deviation_inc = 48; /**< how many additional splits to wait before terminating whenever
+                                         * use_increase_deviation is used  */
+        private:
+            refinement* R;
+            trace *cT = nullptr;
+            trace _T1;
+            trace _T2;
+
+            mark_set  touched_color;
+            work_list touched_color_list;
+            work_list prev_color_list;
+
+            std::function<type_split_color_hook>     my_split_hook;
+            std::function<type_worklist_color_hook>  my_worklist_hook;
+            std::function<type_additional_info_hook> my_add_hook;
+
             // settings
             ir_mode mode = IR_MODE_RECORD_TRACE;
 
-            // heuristics
-            bool h_last_refinement_singleton_only = true;
-            int  h_hint_color = -1;
-            bool h_hint_color_is_singleton_now = true;
-            bool h_cell_active = false;
-            bool h_individualize = false;
+            // internal flags for heuristics
+            bool h_cell_active     = false;
+            bool h_individualize   = false;
             bool h_trace_early_out = false;
 
             bool  h_deviation_inc_active  = false;
-            int   h_deviation_inc         = 48;
             int   h_deviation_inc_current = 0;
 
-            int base_pos = 0;
-        private:
             void touch_initial_colors() {
                 int i = 0;
                 while (i < c->lab_sz) {
@@ -170,9 +174,114 @@ namespace dejavu {
                 touch_initial_colors();
             }
 
-        public:
+            void flip_trace() {
+                trace* t_flip = T;
+                T  = cT;
+                cT = t_flip;
+            }
 
-            void mode_search_for_base() {
+            bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
+                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
+                    // update some heuristic values
+                    if (new_color_sz > 1) {
+                        s_last_refinement_singleton_only = false;
+                        s_hint_color = new_color;
+                        s_hint_color_is_singleton_now = false;
+                    } else if (new_color == s_hint_color && new_color_sz == 1) {
+                        s_hint_color_is_singleton_now = true;
+                    }
+
+                    // write singletons to singleton list
+                    if (new_color_sz == 1) {
+                        singletons.push_back(c->lab[new_color]);
+                    }
+
+                    // record colors that were changed
+                    if (!touched_color.get(new_color)) {
+                        touched_color.set(new_color);
+                        prev_color_list.push_back(old_color);
+                        touched_color_list.push_back(new_color);
+                    }
+                }
+
+                // record split into trace invariant, unless we are individualizing
+                if (!h_individualize && old_color != new_color) T->op_refine_cell_record(new_color, new_color_sz, 1);
+
+                const bool cont = !h_trace_early_out || T->trace_equal();
+                h_deviation_inc_current += (!cont);
+                const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
+
+                // TODO: should this be in split hook, or in color refinement?
+                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[s_base_pos - 1] == c->cells);
+                //const bool ndone = true;
+                return ndone && (cont || deviation_override);
+            }
+
+            std::function<type_split_color_hook> self_split_hook() {
+                return std::bind(&controller::split_hook, this, std::placeholders::_1, std::placeholders::_2,
+                                 std::placeholders::_3);
+            }
+
+            bool worklist_hook(const int color, const int color_sz) {
+                if (h_cell_active) {
+                    T->op_refine_cell_end();
+                    h_cell_active = false;
+                }
+
+                // update some heuristic values
+                // TODO: only activate blueprints on first few restarts!
+                if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
+                    T->blueprint_skip_to_next_cell();
+                    return false;
+                }
+
+                T->op_refine_cell_start(color);
+                if (!h_individualize) T->op_additional_info(color_sz);
+
+                h_cell_active = true;
+                return true;
+            }
+
+            std::function<type_worklist_color_hook> self_worklist_hook() {
+                return std::bind(&controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
+            }
+
+            std::function<type_additional_info_hook> self_add_hook() {
+                return std::bind(&controller::write_to_trace, this, std::placeholders::_1);
+            }
+
+        public:
+            /**
+             * Initialize this controller using a refinement and a graph coloring for the initial state.
+             *
+             * @param R The refinement workspace to use.
+             * @param c The initial coloring.
+             */
+            controller(refinement* R, coloring *c) {
+                this->c = c;
+                this->R = R;
+
+                T  = &_T1;
+                cT = &_T2;
+
+                workspace.allocate(c->lab_sz);
+                touched_color.initialize(c->lab_sz);
+                touched_color_list.allocate(c->lab_sz);
+                prev_color_list.allocate(c->lab_sz);
+
+                touch_initial_colors();
+
+                my_split_hook = self_split_hook();
+                my_worklist_hook = self_worklist_hook();
+                my_add_hook   = self_add_hook();
+            }
+
+            /**
+             * Sets internal trace into recording mode. We write a trace which we might want to compare to later.
+             *
+             * Always reversible (see also \a use_reversible).
+             */
+            void mode_write_base() {
                 T->reset();
                 cT->reset();
 
@@ -182,31 +291,22 @@ namespace dejavu {
                 T->set_record(true);
             }
 
-            void mode_dfs() {
-                mode = ir::IR_MODE_COMPARE_TRACE;
+            /**
+             * We compare to a pre-existing trace, recorded earlier using mode_write_base. Must use \a compare_to_this or
+             * provide a comparison trace in another manner before being able to use this mode in the intended manner.
+             */
+            void mode_compare_base() {
+                mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
 
-            void mode_bfs() {
-                mode = ir::IR_MODE_COMPARE_TRACE;
-            }
-
-            void mode_random_walk() {
-                mode = ir::IR_MODE_RECORD_HASH_IRREVERSIBLE;
-                use_trace_early_out(false);
-            }
-
-            void mode_random_walk_abort() {
-                mode = ir::IR_MODE_RECORD_HASH_IRREVERSIBLE;
-                use_trace_early_out(true);
-            }
-
-            void flip_trace() {
-                trace* t_flip = T;
-                T  = cT;
-                cT = t_flip;
-            }
-
+            /**
+             * Compare all following computations to this IR node. The \a mode must be set to `IR_MODE_RECORD_TRACE`
+             * (using \a mode_write_base) to call this function. Changes the \a mode to `IR_MODE_COMPARE_TRACE_REVERSIBLE`
+             * (i.e., such as calling \a mode_compare_base).
+             */
             void compare_to_this() {
+                assert(mode == ir::IR_MODE_RECORD_TRACE);
+
                 cT->set_compare(true);
                 cT->set_record(false);
                 cT->set_compare_trace(T);
@@ -228,44 +328,54 @@ namespace dejavu {
 
                 leaf_color.copy_force(c);
 
-                mode = ir::IR_MODE_COMPARE_TRACE;
+                mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
 
-            controller(coloring *c) {
-                this->c = c;
-
-                T  = &_T1;
-                cT = &_T2;
-
-                workspace.allocate(c->lab_sz);
-                touched_color.initialize(c->lab_sz);
-                touched_color_list.allocate(c->lab_sz);
-                prev_color_list.allocate(c->lab_sz);
-
-                touch_initial_colors();
-
-                my_split_hook = self_split_hook();
-                my_worklist_hook = self_worklist_hook();
-                my_add_hook   = self_add_hook();
+            /**
+             * Enables or disables whether following \a move_to_child calls will be reversible using \a move_to_parent,
+             * or not. Using non-reversible calls to \a move_to_child is faster.
+             *
+             * When recording a trace using \a mode_write_base, computations are always reversible and calling this
+             * function will have no effect.
+             * @param reversible
+             */
+            void use_reversible(const bool reversible) {
+                if(mode == IR_MODE_RECORD_TRACE) return;
+                if(reversible) {
+                    reset_touched();
+                    mode = IR_MODE_COMPARE_TRACE_REVERSIBLE;
+                } else {
+                    mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
+                }
             }
 
-            void use_reversible_for_next() {
-                reset_touched();
-                mode = IR_MODE_COMPARE_TRACE;
+            /**
+             * Whether to terminate color refinement whenever a deviation to its comparison trace is found.
+             *
+             * @param trace_early_out Flag that determines whether the early out is used.
+             */
+            void use_trace_early_out(bool trace_early_out) {
+                this->h_trace_early_out = trace_early_out;
+                if(!trace_early_out) use_increase_deviation(false);
             }
 
+            /**
+             * Whether to record additional deviation information once a deviation from the comparison trace is found.
+             * Only applicable when \a use_trace_early_out is set. Essentially delays the termination of color refinement
+             * to record more information into the trace invariant.
+             *
+             * @param deviation_inc_active Whether increased deviation is recorded or not.
+             */
+            void use_increase_deviation(bool deviation_inc_active) {
+                h_deviation_inc_active = deviation_inc_active;
+            }
+
+            /**
+             * Resets whether the trace is deemed equal to its comparison trace.
+             */
             void reset_trace_equal() {
                 T->reset_trace_equal();
                 h_deviation_inc_current = 0;
-            }
-
-            void use_trace_early_out(bool trace_early_out) {
-                this->h_trace_early_out = trace_early_out;
-                if(!trace_early_out) use_increase_deviation_hash(false);
-            }
-
-            void use_increase_deviation_hash(bool deviation_inc_active) {
-                h_deviation_inc_active = deviation_inc_active;
             }
 
             /**
@@ -274,7 +384,7 @@ namespace dejavu {
              * @param state A reference to the reduced_save in which the state will be stored.
              */
             void save_reduced_state(reduced_save &state) {
-                state.set_state(base_vertex, *c, T->get_hash(), T->get_position(), base_pos);
+                state.set_state(base_vertex, *c, T->get_hash(), T->get_position(), s_base_pos);
             }
 
             /**
@@ -300,7 +410,7 @@ namespace dejavu {
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
                 T->set_compare(true);
-                base_pos = state.get_base_position();
+                s_base_pos = state.get_base_position();
                 base_vertex = state.get_base();
 
                 // these become meaningless
@@ -310,16 +420,17 @@ namespace dejavu {
                 base_touched_color_list_pt.clear();
                 base_cells.clear();
 
-                // deactivate reversability
-                mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
+                // if reversible, need to reset touched colors
+                if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
             }
 
+            // TODO: hopefully can be deprecated
             void load_reduced_state_without_coloring(reduced_save &state) {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
                 T->set_compare(true);
-                base_pos = state.get_base_position();
+                s_base_pos = state.get_base_position();
                 base_vertex = state.get_base();
 
                 // these become meaningless
@@ -330,7 +441,7 @@ namespace dejavu {
                 base_cells.clear();
 
                 // deactivate reversability
-                mode = IR_MODE_RECORD_HASH_IRREVERSIBLE;
+                mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
             }
 
             coloring *get_coloring() {
@@ -338,55 +449,26 @@ namespace dejavu {
             }
 
             int get_base_pos() {
-                return base_pos;
+                return s_base_pos;
             }
 
-            void set_base_pos(int pos) {
-                base_pos = pos;
+            /**
+             * Write additional information into the internal trace. Care must be taken that the written data is
+             * isomorphism-invariant.
+             *
+             * @param d Data to be written to the trace.
+             */
+            void write_to_trace(const int d) {
+                T->op_additional_info(d);
             }
 
-            void add_hook(const long d) {
-                if (T) T->op_additional_info(d);
-            }
-
-            bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
-                        if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
-                            // update some heuristic values
-                            if (new_color_sz > 1) {
-                                h_last_refinement_singleton_only = false;
-                                h_hint_color = new_color;
-                                h_hint_color_is_singleton_now = false;
-                            }
-                            if (new_color == h_hint_color && new_color_sz == 1) {
-                                h_hint_color_is_singleton_now = true;
-                            }
-                            // write singletons to singleton list
-                            if (new_color_sz == 1) {
-                                singletons.push_back(c->lab[new_color]);
-                            }
-
-                            // record colors that were changed
-                            if (!touched_color.get(new_color)) {
-                                touched_color.set(new_color);
-                                prev_color_list.push_back(old_color);
-                                touched_color_list.push_back(new_color);
-                            }
-                        }
-
-                        // record split into trace invariant, unless we are individualizing
-                        if (!h_individualize && old_color != new_color) T->op_refine_cell_record(new_color, new_color_sz, 1);
-
-                        const bool cont = !h_trace_early_out || T->trace_equal();
-                        h_deviation_inc_current += (!cont);
-                        const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
-
-                        //const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[base_pos - 1] == c->cells);
-                        const bool ndone = true;
-                        return ndone && (cont || deviation_override);
-            }
-
-            void __attribute__ ((noinline)) write_strong_invariant(sgraph* g) {
-                for(int l = 0; l < g->v_size/2; ++l) { // "half of them should be enough"...
+            /**
+             * Writes a stronger invariant using the internal coloring and graph to the trace.
+             *
+             * @param g The graph.
+             */
+            void write_strong_invariant(sgraph* g) {
+                for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
                     const int v = c->lab[l];
                     unsigned int inv1 = 0;
                     const int start_pt = g->v[v];
@@ -399,39 +481,6 @@ namespace dejavu {
                 }
             }
 
-            bool worklist_hook(const int color, const int color_sz) {
-                if (h_cell_active) {
-                    T->op_refine_cell_end();
-                    h_cell_active = false;
-                }
-
-                // update some heuristic values
-                // TODO: only activate blueprints on first few restarts!
-                if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
-                    T->blueprint_skip_to_next_cell();
-                    return false;
-                }
-
-                T->op_refine_cell_start(color);
-                if (!h_individualize) T->op_additional_info(color_sz);
-
-                h_cell_active = true;
-                return true;
-            }
-
-            std::function<type_split_color_hook> self_split_hook() {
-                return std::bind(&controller::split_hook, this, std::placeholders::_1, std::placeholders::_2,
-                                 std::placeholders::_3);
-            }
-
-            std::function<type_worklist_color_hook> self_worklist_hook() {
-                return std::bind(&controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
-            }
-
-            std::function<type_additional_info_hook> self_add_hook() {
-                return std::bind(&controller::add_hook, this, std::placeholders::_1);
-            }
-
             /**
              * Move IR node kept in this controller to a child, specified by a vertex to be individualized.
              *
@@ -439,11 +488,11 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void move_to_child(refinement *R, sgraph *g, int v) {
-                ++base_pos;
+            void move_to_child(sgraph *g, int v) {
+                ++s_base_pos;
                 base_vertex.push_back(v); // always keep track of base (needed for BFS)
 
-                if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) {
+                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
                     base_singleton_pt.push_back(singletons.size());
                     base_color.push_back(c->vertex_to_col[v]);
                     base_color_sz.push_back(c->ptn[c->vertex_to_col[v]] + 1);
@@ -457,7 +506,7 @@ namespace dejavu {
                 const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
                 if (T) T->op_individualize(prev_col, c->vertex_to_col[v]);
                 h_individualize = false;
-                h_last_refinement_singleton_only = true;
+                s_last_refinement_singleton_only = true;
 
                 if (T) T->op_refine_start();
 
@@ -466,22 +515,18 @@ namespace dejavu {
                                        my_worklist_hook);
                     if (T && h_cell_active) T->op_refine_cell_end();
                     if (T) T->op_refine_end();
-
-                    //std::cout << T->get_position() <<  ", " << c->cells << std::endl;
                 } else {
-                    // TODO compare_base_cells not necessarily applicable
-                    // compare_base_cells[base_pos - 1]
-                    // T->trace_equal()?compare_base_cells[base_pos - 1]:-1
-
-                    R->refine_coloring(g, c, init_color_class, T->trace_equal()?compare_base_cells[base_pos - 1]:-1, my_split_hook,
+                    // TODO compare_base_cells currently implemented in split hook, could reconsider this...
+                    // T->trace_equal()?compare_base_cells[s_base_pos - 1]:-1
+                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
                                        my_worklist_hook);
-                    assert(T->trace_equal()?c->cells==compare_base_cells[base_pos-1]:true);
+                    assert(T->trace_equal() ?c->cells==compare_base_cells[s_base_pos - 1] : true);
                     if (T && T->trace_equal()) {T->skip_to_individualization();}
                 }
 
                 h_cell_active = false;
 
-                if (mode != IR_MODE_RECORD_HASH_IRREVERSIBLE) base_cells.push_back(c->cells);
+                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) base_cells.push_back(c->cells);
             }
 
             /**
@@ -491,12 +536,17 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void move_to_child_no_trace(refinement *R, sgraph *g, int v) {
+            void move_to_child_no_trace(sgraph *g, int v) {
                 const int init_color_class = R->individualize_vertex(c, v);
                 R->refine_coloring_first(g, c, init_color_class);
             }
 
-            void refine(refinement *R, sgraph *g) {
+            /**
+             * Perform color refinement on the internal coloring based on the given graph.
+             *
+             * @param g The graph.
+             */
+            void refine(sgraph *g) {
                 R->refine_coloring_first(g, c);
             }
 
@@ -504,12 +554,13 @@ namespace dejavu {
              * Move IR node kept in this controller back to its parent.
              */
             void move_to_parent() {
-                assert(mode != IR_MODE_RECORD_HASH_IRREVERSIBLE);
+                assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
+                assert(base_touched_color_list_pt.size() > 0);
 
                 // unwind invariant
                 if (T) T->rewind_to_individualization();
 
-                --base_pos;
+                --s_base_pos;
                 while (prev_color_list.cur_pos > base_touched_color_list_pt[base_touched_color_list_pt.size()-1]) {
                     const int old_color = prev_color_list.pop_back();
                     const int new_color = touched_color_list.pop_back();
@@ -521,8 +572,8 @@ namespace dejavu {
                     c->ptn[new_color] = 1;
 
                     if (c->ptn[old_color] > 0) {
-                        h_hint_color = old_color;
-                        h_hint_color_is_singleton_now = false;
+                        s_hint_color = old_color;
+                        s_hint_color_is_singleton_now = false;
                     }
 
                     for (int j = 0; j < new_color_sz; ++j) {
@@ -625,7 +676,7 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_sparse_optimized_base(refinement *R, sgraph *g, controller *state) {
-                state->mode_search_for_base();
+                state->mode_write_base();
 
                 std::vector<int> candidates;
                 test_set.initialize(g->v_size);
@@ -690,14 +741,14 @@ namespace dejavu {
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
                     prev_color = best_color;
-                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
 
                 saved_color_base = state->base_color;
             }
 
             void find_test_base(refinement *R, sgraph *g, controller *state) {
-                state->mode_search_for_base();
+                state->mode_write_base();
 
                 std::vector<int> candidates;
                 candidates.reserve(locked_lim);
@@ -746,7 +797,7 @@ namespace dejavu {
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
                     prev_color = best_color;
-                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
 
                 saved_color_base = state->base_color;
@@ -761,7 +812,7 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_small_optimized_base(refinement *R, sgraph *g, controller *state) {
-                state->mode_search_for_base();
+                state->mode_write_base();
 
                 std::vector<int> candidates;
                 test_set.initialize(g->v_size);
@@ -802,7 +853,7 @@ namespace dejavu {
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
                     prev_color = best_color;
-                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
 
                 saved_color_base = state->base_color;
@@ -817,7 +868,7 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_combinatorial_optimized_base(refinement *R, sgraph *g, controller *state) {
-                state->mode_search_for_base();
+                state->mode_write_base();
 
                 std::vector<int> candidates;
                 test_set.initialize(g->v_size);
@@ -862,7 +913,7 @@ namespace dejavu {
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
-                    state->move_to_child(R, g, state->get_coloring()->lab[best_color]);
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
 
                 saved_color_base = state->base_color;

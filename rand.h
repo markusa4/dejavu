@@ -15,8 +15,8 @@ namespace dejavu::search_strategy {
         local_state.load_reduced_state(start_from);
 
         while (g->v_size != local_state.c->cells) {
-            int v = base_vertex[local_state.base_pos];
-            local_state.move_to_child(&R, g, v);
+            int v = base_vertex[local_state.s_base_pos];
+            local_state.move_to_child(g, v);
         }
     }
 
@@ -301,29 +301,33 @@ namespace dejavu::search_strategy {
             }
         }
 
+        // TODO I should have one random_walk method that is used by the methods below, i think
+        // TODO random_walks_from_tree should be the only outward facing method? base_aligned should just happen automatically, or flag
+
         void random_walks(dejavu_hook* hook, ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
                           groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
-            local_state.mode_random_walk();
+            local_state.use_reversible(false);
+            local_state.use_trace_early_out(false);
             ir::reduced_save my_own_save;
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
                   && (leaf_storage.s_leaves <= h_leaf_limit || (h_almost_done(group) && leaf_storage.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
-                local_state.load_reduced_state(*start_from);
+                local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
 
                 int could_start_from = group.finished_up_to_level();
                 //int could_start_from = 0;
-                if(local_state.base_pos < could_start_from) {
-                    while (local_state.base_pos <= could_start_from) {
-                        //std::cout << local_state.base_pos << ", " << group.base_point(local_state.base_pos) << std::endl;
-                        local_state.move_to_child(&R, g, group.base_point(local_state.base_pos));
+                if(local_state.s_base_pos < could_start_from) {
+                    while (local_state.s_base_pos <= could_start_from) {
+                        //std::cout << local_state.s_base_pos << ", " << group.base_point(local_state.s_base_pos) << std::endl;
+                        local_state.move_to_child(g, group.base_point(local_state.s_base_pos));
                     }
                     assert(local_state.T->trace_equal());
                     local_state.save_reduced_state(my_own_save);
                     start_from = &my_own_save;
                 }
 
-                const int start_from_base_pos = local_state.base_pos;
-                int base_pos                  = local_state.base_pos;
+                const int start_from_base_pos = local_state.s_base_pos;
+                int base_pos                  = local_state.s_base_pos;
 
                 bool base_aligned = true;
                 bool uniform      = true;
@@ -344,20 +348,20 @@ namespace dejavu::search_strategy {
                         if(!heuristic_reroll.empty()) {
                             const int rand = ((int) generator()) % heuristic_reroll.size();
                             v = heuristic_reroll[rand];
-                            //std::cout << group.is_finished(base_pos) << "re-roll!"
-                            //          << group.is_in_base_orbit(base_pos, v) << std::endl;
+                            //std::cout << group.is_finished(s_base_pos) << "re-roll!"
+                            //          << group.is_in_base_orbit(s_base_pos, v) << std::endl;
                         }
                     }
 
                     if(group.is_in_base_orbit(base_pos, v) && base_aligned && leaf_storage.s_leaves <= 1) {
-                        v = group.base_point(local_state.base_pos);
+                        v = group.base_point(local_state.s_base_pos);
                         assert(local_state.c->vertex_to_col[v] == col);
                         uniform = false;
                     } else {
                         base_aligned = false;
                     }
                     assert(local_state.c->vertex_to_col[v] == col);
-                    local_state.move_to_child(&R, g, v);
+                    local_state.move_to_child(g, v);
 
                     if(base_pos == start_from_base_pos) {
                         s_rolling_first_level_success =
@@ -378,7 +382,8 @@ namespace dejavu::search_strategy {
         // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
         void __attribute__ ((noinline)) random_walks_from_tree(dejavu_hook* hook, ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
                                                                groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree &ir_tree) {
-            local_state.mode_random_walk();
+            local_state.use_reversible(false);
+            local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
 
@@ -390,7 +395,7 @@ namespace dejavu::search_strategy {
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                 local_state.load_reduced_state(*node->get_save());
 
-                int base_pos                  = local_state.base_pos;
+                int base_pos                  = local_state.s_base_pos;
                 const int start_from_base_pos = base_pos;
 
                 while (g->v_size != local_state.c->cells) {
@@ -399,7 +404,7 @@ namespace dejavu::search_strategy {
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
-                    local_state.move_to_child(&R, g, v);
+                    local_state.move_to_child(g, v);
 
                     if(base_pos == start_from_base_pos) {
                         s_rolling_first_level_success =

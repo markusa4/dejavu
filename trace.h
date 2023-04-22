@@ -26,10 +26,10 @@ namespace dejavu {
          * skipping of non-splitting cells in the stored trace.
         */
         class trace {
-            // the trace
-        protected:
-            std::vector<int> data; /**< keeps all the data of the trace */
         private:
+            // the trace
+            std::vector<int> data; /**< keeps all the data of the trace */
+
             trace *compare_trace = nullptr; /**< link to a stored trace to compare to */
             long hash = 0; /**< hash value to summarize all operations performed on this trace */
 

@@ -1058,11 +1058,11 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether a vertex \p v is contained in the traversal at position \p base_pos.
+             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
              *
              * @param base_pos Position in base.
              * @param v Vertex to check.
-             * @return Bool indicating whether \p v is contained in the traversal at position \p base_pos.
+             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
                 if (base_pos >= transversals.size()) return false;
@@ -1074,7 +1074,7 @@ namespace dejavu {
 
             /**
              * Reduces a vector of vertices \p selection to contain only points not contained in transversal at position
-             * \p base_pos in Schreier structure.
+             * \p s_base_pos in Schreier structure.
              *
              * @param w A Schreier workspace.
              * @param selection Vector to be reduced.
@@ -1085,10 +1085,10 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether the traversal at position \p base_pos matches its size upper bound.
+             * Checks whether the traversal at position \p s_base_pos matches its size upper bound.
              *
              * @param base_pos Position in base.
-             * @return Bool that indicates whether the traversal at position \p base_pos matches its size upper bound.
+             * @return Bool that indicates whether the traversal at position \p s_base_pos matches its size upper bound.
              */
             bool is_finished(const int base_pos) {
                 return transversals[base_pos]->is_finished();
