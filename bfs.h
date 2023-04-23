@@ -117,7 +117,7 @@ namespace dejavu {
                     local_state.load_reduced_state(*next_node_save);
                 } else {
                     local_state.move_to_parent();
-                    //local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
+                    local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
                 }
 
                 if(local_state.s_base_pos > 0) local_state.use_increase_deviation(true);

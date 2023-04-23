@@ -467,7 +467,7 @@ namespace dejavu {
              *
              * @param g The graph.
              */
-            void write_strong_invariant(sgraph* g) {
+            void write_strong_invariant(const sgraph* g) const {
                 for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
                     const int v = c->lab[l];
                     unsigned int inv1 = 0;
@@ -596,6 +596,15 @@ namespace dejavu {
                 base_singleton_pt.pop_back();
 
                 T->reset_trace_equal();
+            }
+
+            void walk(sgraph *g, ir::reduced_save &start_from, std::vector<int>& vertices) {
+                load_reduced_state(start_from);
+
+                while (s_base_pos < (int) vertices.size()) {
+                    int v = vertices[s_base_pos];
+                    move_to_child(g, v);
+                }
             }
         };
 
@@ -949,6 +958,128 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief An IR leaf
+         *
+         * A stored leaf of an IR tree. The leaf can be stored in a dense manner (coloring of the leaf), or a sparse
+         * manner (base of the walk that leads to this leaf).
+         */
+        class stored_leaf {
+        public:
+            enum stored_leaf_type { STORE_LAB, ///< stores coloring of the leaf
+                STORE_BASE ///< stores only base of the leaf
+            };
+
+            stored_leaf(int* arr, int arr_sz, stored_leaf_type store_type) : store_type(store_type) {
+                lab_or_base.allocate(arr_sz);
+                memcpy(lab_or_base.get_array(), arr, arr_sz * sizeof(int));
+                lab_or_base.set_size(arr_sz);
+            }
+
+            stored_leaf(std::vector<int>& arr, stored_leaf_type store_type) : store_type(store_type) {
+                lab_or_base.allocate(arr.size());
+                std::copy(arr.begin(), arr.end(), lab_or_base.get_array());
+                lab_or_base.set_size(arr.size());
+            }
+
+            const int* get_lab_or_base() {
+                return lab_or_base.get_array();
+            }
+
+            int get_lab_or_base_size() {
+                return lab_or_base.size();
+            }
+
+            [[nodiscard]] stored_leaf_type get_store_type() const {
+                return store_type;
+            }
+
+        private:
+            work_list lab_or_base;
+            stored_leaf_type store_type;
+        };
+
+        /**
+         * \brief Collection of leaves
+         *
+         * Can be used across multiple threads.
+         *
+         */
+        class shared_leaves {
+            std::mutex lock;
+            std::unordered_multimap<long, stored_leaf*> leaf_store;
+            std::vector<stored_leaf*> garbage_collector;
+
+        public:
+            int s_leaves = 0; /**< number of leaves stored */
+
+            /**
+             * Free up all memory.
+             */
+            ~shared_leaves() {
+                for(int i = 0; i < garbage_collector.size(); ++i) {
+                    delete garbage_collector[i];
+                }
+            }
+
+            /**
+             * Lookup whether a leaf with the given hash already exists.
+             *
+             * @param hash
+             * @return
+             */
+            stored_leaf* lookup_leaf(long hash) {
+                lock.lock();
+                auto find = leaf_store.find(hash);
+                if(find != leaf_store.end()) {
+                    auto result = find->second;
+                    lock.unlock();
+                    return result;
+                } else {
+                    lock.unlock();
+                    return nullptr;
+                }
+            }
+
+            /**
+             * Add leaf with the given hash. Does not add the leaf, if a leaf with the given hash already exists.
+             *
+             * @param hash
+             * @param ptr
+             */
+            void add_leaf(long hash, coloring& c, std::vector<int>& base) {
+                lock.lock();
+
+                // check whether hash already exists
+                if(leaf_store.contains(hash)) {
+                    lock.unlock();
+                    return;
+                }
+
+                // if not, add the leaf
+                if(s_leaves < 100) {
+
+                } else {
+
+                }
+                const bool full_save = s_leaves < 100;
+                auto type = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
+                auto new_leaf = full_save?new stored_leaf(c.lab,c.lab_sz, type):new stored_leaf(base, type);
+                leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
+                garbage_collector.push_back(new_leaf);
+                ++s_leaves;
+                lock.unlock();
+            }
+
+            /**
+             * Empty this leaf container.
+             */
+            void clear() {
+                s_leaves = 0;
+                leaf_store.clear();
+            }
+        };
+
         class tree_node {
             std::mutex    lock;
             reduced_save* data;
@@ -1003,25 +1134,70 @@ namespace dejavu {
             std::vector<tree_node*>              tree_data;
             std::vector<std::vector<tree_node*>> tree_data_jump_map;
             std::vector<int>        tree_level_size;
+            std::vector<tree_node*> garbage_collector;
             int                     finished_up_to = 0;
+
+            std::vector<int> current_base;
 
             std::vector<long>       node_invariant;
         public:
+            shared_leaves stored_leaves;
 
             std::vector<long>* get_node_invariant() {
                 return &node_invariant;
             }
 
-            void initialize(int base_size, ir::reduced_save* root) {
-                tree_data.resize(base_size + 1);
-                tree_level_size.resize(base_size + 1);
-                tree_data_jump_map.resize(base_size + 1);
+            void initialize(std::vector<int> &base, ir::reduced_save* root) {
+                tree_data.resize(base.size() + 1);
+                tree_level_size.resize(base.size() + 1);
+                tree_data_jump_map.resize(base.size() + 1);
                 add_node(0, root, true);
                 node_invariant.resize(root->get_coloring()->lab_sz);
+
+                current_base = base;
             }
 
-            void reset(int new_base_size, ir::reduced_save* root, int keep_level) {
+            void clear_leaves() {
+                stored_leaves.clear();
+            }
 
+            /**
+             * @return How many leaves were stored during random search.
+             */
+            int stat_leaves() {
+                return stored_leaves.s_leaves;
+            }
+
+            bool reset(std::vector<int> &new_base, ir::reduced_save* root, bool keep_old) {
+                const int old_size = current_base.size();
+                const int new_size = new_base.size();
+
+                // compare with stored base, keep whatever is possible
+                int keep_until = 0;
+                if(keep_old) {
+                    for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
+                        if (current_base[keep_until] != new_base[keep_until]) break;
+                    }
+                } else {
+                }
+
+                if(keep_until == new_size && new_size == old_size) return false;
+                finished_up_to = std::min(keep_until, finished_up_to);
+
+                tree_data.resize(new_size + 1);
+                tree_level_size.resize(new_size + 1);
+                tree_data_jump_map.resize(new_size + 1);
+
+                for (int i = keep_until; i < old_size; ++i) {
+                    tree_level_size[i] = 0;
+                    tree_data_jump_map[i].clear();
+                    tree_data[i] = nullptr;
+                }
+
+                if(keep_until == 0) add_node(0, root, true);
+                assert(missing_nodes.empty());
+
+                return true;
             }
 
 
@@ -1062,11 +1238,14 @@ namespace dejavu {
                     tree_level_size[level] = 0;
                     tree_data[level] = new tree_node(data, nullptr);
                     tree_data[level]->set_next(tree_data[level]);
+
+                    garbage_collector.push_back( tree_data[level]);
                     if(is_base) tree_data[level]->base();
                 } else {
                     tree_node* a_node    = tree_data[level];
                     tree_node* next_node = a_node->get_next();
                     auto       new_node  = new tree_node(data, next_node);
+                    garbage_collector.push_back( new_node);
                     if(is_base) new_node->base();
                     a_node->set_next(new_node);
                     tree_data[level] = new_node;
@@ -1111,7 +1290,7 @@ namespace dejavu {
             }
 
             ~shared_tree() {
-                //TODO: write this
+                for(int i = 0; i < garbage_collector.size(); ++i) delete garbage_collector[i];
             };
         };
     }

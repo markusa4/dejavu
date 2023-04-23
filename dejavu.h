@@ -61,7 +61,7 @@ namespace dejavu {
     private:
         // shared modules
         groups::shared_schreier* m_schreier = nullptr;  /**< Schreier-Sims algorithm */
-        ir::shared_tree          m_tree;           /**< IR-shared_tree */
+        ir::shared_tree*         m_tree     = nullptr;  /**< IR-shared_tree */
 
         // TODO: should not be necessary in the end!
         void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
@@ -141,13 +141,13 @@ namespace dejavu {
             sassy::preprocessor m_prep;        /**< preprocessor */
 
             // control values
-            int h_restarts          = -1;
-            int h_budget            = 1;
-            int h_cost              = 0;
-            int h_budget_inc_fact   = 5;
+            int  h_restarts         = -1;
+            int  h_budget           = 1;
+            int  h_cost             = 0;
+            int  h_budget_inc_fact  = 5;
             bool h_large_base       = false;
             bool h_short_base       = false;
-            int h_leaves_added_this_restart = 0;
+            int  h_leaves_added_this_restart = 0;
 
             bool inprocessed = false;
 
@@ -184,7 +184,7 @@ namespace dejavu {
                 // set up a local state for IR computations
                 ir::controller local_state(&m_refinement, &local_coloring);
 
-                // save root state for random and BFS search, as fwell as restarts
+                // save root state for random and BFS search, as well as restarts
                 ir::reduced_save root_save;
                 local_state.save_reduced_state(root_save);
 
@@ -203,7 +203,7 @@ namespace dejavu {
                         }
                         h_cost = 0;
 
-                        if(inprocessed) m_rand.clear_leaves();
+                        if(inprocessed && m_tree) m_tree->clear_leaves();
                         m_rand.reset();
 
                         h_leaves_added_this_restart = 0;
@@ -280,14 +280,19 @@ namespace dejavu {
                     // set up IR shared_tree
                     // TODO: make a reset function -- maybe make the reset function smart and have it consider the base
                     // TODO: also consider saving older trees...
-                    ir::shared_tree ir_tree;
-                    ir_tree.initialize(base_size, &root_save);
-
+                    //ir::shared_tree ir_tree;
+                    //ir_tree.initialize(base_size, &root_save);
+                    if(m_tree) {
+                        m_tree->reset(base, &root_save, (h_restarts >= 3) && !inprocessed);
+                    } else {
+                        m_tree = new ir::shared_tree();
+                        m_tree->initialize(base, &root_save);
+                    }
                     inprocessed = false;
 
                     int bfs_cost_estimate;
                     int leaf_store_limit;
-                    bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
+                    bfs_cost_estimate = m_bfs.next_level_estimate(*m_tree, current_selector);
                     leaf_store_limit = std::min(1 + bfs_cost_estimate / 20, h_budget);
                     //std::cout << bfs_cost_estimate << ", " << leaf_store_limit << std::endl;
 
@@ -302,36 +307,37 @@ namespace dejavu {
                     bool fail = false;
 
                     // TODO find a better way to add canonical leaf to leaf store
-                    m_rand.specific_walk(m_refinement, base, g, local_state, root_save);
+                    m_rand.specific_walk(base, g, local_state, *m_tree);
 
                     //if(save_to_individualize.size() > 10) fail = true;
 
-                    const int flat_leaf_store_inc = m_rand.stat_leaves();
+                    const int flat_leaf_store_inc = m_tree->stat_leaves();
 
                     leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
                     while (!fail) {
-                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit, (m_rand.s_rolling_first_level_success > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
+                        m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit,
+                                     (m_rand.s_rolling_first_level_success > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
 
                         // TODO: if no node was pruned, use m_rand.random_walks instead of "from BFS"! should fix CFI
 
                         //std::cout << "budget: " << h_budget << " leafs: " << flat_leaf_store_inc << " add " << leaf_store_limit << std::endl;
 
-                        const int leaves_pre = m_rand.stat_leaves();
-                        if (ir_tree.get_finished_up_to() == 0) {
+                        const int leaves_pre = m_tree->stat_leaves();
+                        if (m_tree->get_finished_up_to() == 0) {
                             // random automorphisms, single origin
-                            m_rand.random_walks(hook, m_refinement, current_selector, g, *m_schreier, local_state, &root_save);
+                            m_rand.random_walks(hook, m_refinement, current_selector, g, *m_schreier, local_state, *m_tree);
                         } else {
                             // random automorphisms, sampled from shared_tree
                             m_rand.random_walks_from_tree(hook, m_refinement, current_selector, g, *m_schreier,
-                                                          local_state,ir_tree);
+                                                          local_state,*m_tree);
                         }
-                        h_leaves_added_this_restart = m_rand.stat_leaves() - leaves_pre;
+                        h_leaves_added_this_restart = m_tree->stat_leaves() - leaves_pre;
 
                         // TODO: random walks should record how many "would fail" on first next level to get better bfs_cost_estimate
                         // TODO: leaf store should not be in m_rand, but m_rand can contain the schreier workspace! (m_rand is a local workspace, such as the other modules)
                         // TODO: we should pass m_refinement in the constructor of the other modules
                         // TODO: if everything has reset functions, we could pass the other structures as well...
-                        progress_print("urandom", m_rand.stat_leaves(),
+                        progress_print("urandom", m_tree->stat_leaves(),
                                        m_rand.s_rolling_success);
                         progress_print("schreier", "s" + std::to_string(m_schreier->s_sparsegen()) + "/d" +
                                                    std::to_string(m_schreier->s_densegen()), "_");
@@ -379,23 +385,23 @@ namespace dejavu {
 
                         h_skip_random_paths = false;
 
-                        bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
-                        m_bfs.do_a_level(&m_refinement, g, ir_tree, local_state, current_selector);
-                        progress_print("bfs", "0-" + std::to_string(ir_tree.get_finished_up_to()) + "(" +
+                        bfs_cost_estimate = m_bfs.next_level_estimate(*m_tree, current_selector);
+                        m_bfs.do_a_level(&m_refinement, g, *m_tree, local_state, current_selector);
+                        progress_print("bfs", "0-" + std::to_string(m_tree->get_finished_up_to()) + "(" +
                                               std::to_string(bfs_cost_estimate) + ")",
-                                       std::to_string(ir_tree.get_level_size(ir_tree.get_finished_up_to())));
+                                       std::to_string(m_tree->get_level_size(m_tree->get_finished_up_to())));
 
-                        if (ir_tree.get_finished_up_to() == base_size)
+                        if (m_tree->get_finished_up_to() == base_size)
                             break;
 
                         // want to inprocess if BFS was successfull in pruning
-                        if(ir_tree.get_finished_up_to() == 1 && ir_tree.get_level_size(ir_tree.get_finished_up_to()) < bfs_cost_estimate / 2) {
+                        if(m_tree->get_finished_up_to() == 1 && m_tree->get_level_size(m_tree->get_finished_up_to()) < bfs_cost_estimate / 2) {
                             fail = true;
                             break;
                         }
 
-                        bfs_cost_estimate = m_bfs.next_level_estimate(ir_tree, current_selector);
-                        leaf_store_limit += ir_tree.get_level_size(ir_tree.get_finished_up_to());
+                        bfs_cost_estimate = m_bfs.next_level_estimate(*m_tree, current_selector);
+                        leaf_store_limit += m_tree->get_level_size(m_tree->get_finished_up_to());
                     }
                     // breadth-first search & random automorphisms
 
@@ -405,19 +411,19 @@ namespace dejavu {
                         local_state.load_reduced_state(root_save);
                         const int cell_prev = root_save.get_coloring()->cells;
 
-                        if(ir_tree.get_finished_up_to() >= 1) {
+                        if(m_tree->get_finished_up_to() >= 1) {
                             // TODO: improve saving hash for pruned nodes, then propagate this to first level
                             // TODO: could fix "usr" maybe?
                             // TODO: use "pruned" flag, etc.
                             // TODO: hashing actually makes this worse!
                             work_list hash(g->v_size);
                             mark_set  is_pruned(g->v_size);
-                            ir_tree.mark_first_level(is_pruned);
+                            m_tree->mark_first_level(is_pruned);
 
                             for (int i = 0; i < g->v_size; ++i) {
                                 if(is_pruned.get(i)) hash[i] = 1;
                                 else                      hash[i] = 0;
-                                hash[i] += (int) (*ir_tree.get_node_invariant())[i] % 16;
+                                hash[i] += (int) (*m_tree->get_node_invariant())[i] % 16;
                             }
                             for (int i = 0; i < g->v_size; ++i) {
                                 hash[i] = 17 * local_state.c->vertex_to_col[i] + hash[i];

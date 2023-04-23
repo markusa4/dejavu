@@ -425,15 +425,9 @@ namespace dejavu {
          */
         class dense_sparse_arbiter {
             int *loaded_automorphism;
-            std::function<type_unload_hook> *unload_hook;
         public:
-            void load(int *automorphism, std::function<type_unload_hook> *unload_hook) {
+            void load(int *automorphism) {
                 loaded_automorphism = automorphism;
-                this->unload_hook = unload_hook;
-            }
-
-            void unload() {
-                if (unload_hook) (*unload_hook)();
             }
 
             int *p() {
@@ -468,28 +462,29 @@ namespace dejavu {
              * Load this stored automorphism into workspace.
              *
              * @param loader Store a pointer to permutation of automorphism in the arbiter.
-             * @param automorphism Auxiliary space used if loaded automorphism is sparse.
+             * @param space Auxiliary space that may or may not be used, depending on whether the loaded automorphism is
+             *              sparse. Should only be reset once \p loader is not used anymore.
              */
-            void load(dense_sparse_arbiter &loader, automorphism_workspace &automorphism) {
+            void load(dense_sparse_arbiter &loader, automorphism_workspace &space) {
                 if (store_type == STORE_SPARSE) {
-                    automorphism.reset();
+                    space.reset();
                     int first_of_cycle = 0;
                     for (int i = 0; i < data.size(); ++i) {
                         const int j = abs(data[i]) - 1;
                         const bool is_last = data[i] < 0;
                         assert(i == data.size() - 1 ? is_last : true);
                         if (is_last) {
-                            automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
+                            space.write_single_map(j, abs(data[first_of_cycle]) - 1);
                             first_of_cycle = i + 1;
                         } else {
                             assert(i + 1 < data.size());
-                            automorphism.write_single_map(j, abs(data[i + 1]) - 1);
+                            space.write_single_map(j, abs(data[i + 1]) - 1);
                         }
                     }
-                    loader.load(automorphism.perm(), nullptr);
+                    loader.load(space.perm());
                 } else {
                     // store_type == STORE_DENSE
-                    loader.load(data.get_array(), nullptr);
+                    loader.load(data.get_array());
                 }
             }
 
@@ -497,33 +492,33 @@ namespace dejavu {
              * Load inverse of stored automorphism into workspace.
              *
              * @param loader Store a pointer to permutation of automorphism in the arbiter.
-             * @param automorphism Auxiliary space used if loaded automorphism is sparse.
+             * @param space Auxiliary space that may or may not be used, depending on whether the loaded automorphism is
+             *              sparse. Should only be reset once \p loader is not used anymore.
              */
-            void load_inverse(dense_sparse_arbiter &loader, automorphism_workspace &automorphism) {
+            void load_inverse(dense_sparse_arbiter &loader, automorphism_workspace &space) {
                 if (store_type == STORE_SPARSE) {
-                    automorphism.reset();
+                    space.reset();
                     int first_of_cycle = data.size() - 1;
                     for (int i = data.size() - 1; i >= 0; --i) {
-                        if (data[i] < 0)
-                            first_of_cycle = i;
+                        if (data[i] < 0) first_of_cycle = i;
 
                         const int j = abs(data[i]) - 1;
                         const bool is_last = i == 0 || (data[i - 1] < 0);
                         if (is_last) {
-                            automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
+                            space.write_single_map(j, abs(data[first_of_cycle]) - 1);
                         } else {
-                            automorphism.write_single_map(j, abs(data[i - 1]) - 1);
+                            space.write_single_map(j, abs(data[i - 1]) - 1);
                         }
                     }
-                    loader.load(automorphism.perm(), nullptr);
+                    loader.load(space.perm());
                 } else {
-                    automorphism.reset();
+                    space.reset();
                     for (int i = 0; i < domain_size; ++i) {
                         if (i != data[i]) {
-                            automorphism.write_single_map(data[i], i);
+                            space.write_single_map(data[i], i);
                         }
                     }
-                    loader.load(automorphism.perm(), nullptr);
+                    loader.load(space.perm());
                 }
             }
 

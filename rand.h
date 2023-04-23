@@ -9,139 +9,6 @@
 #include "groups.h"
 
 namespace dejavu::search_strategy {
-    // TODO: this should be a method of local_state?
-    static void specific_walk(ir::refinement &R, std::vector<int>& base_vertex, sgraph *g,
-                       ir::controller &local_state, ir::reduced_save &start_from) {
-        local_state.load_reduced_state(start_from);
-
-        while (g->v_size != local_state.c->cells) {
-            int v = base_vertex[local_state.s_base_pos];
-            local_state.move_to_child(g, v);
-        }
-    }
-
-    /**
-     * \brief An IR leaf
-     *
-     * A stored leaf of an IR tree. The leaf can be stored in a dense manner (coloring of the leaf), or a sparse
-     * manner (base of the walk that leads to this leaf).
-     */
-    class stored_leaf {
-        work_list lab;
-        std::vector<int> base;
-        bool full_save;
-    public:
-        /**
-         * Initialize this stored leaf.
-         *
-         * @param c Coloring of the leaf.
-         * @param base Base which leads to this leaf.
-         * @param full_save Whether to store \p c or \p base.
-         */
-        stored_leaf(coloring& c, std::vector<int>& base, bool full_save = true) {
-            // TODO make the stored leaf more properly
-            this->full_save = full_save;
-            if(full_save) {
-                //store_c.copy(&c);
-                lab.allocate(c.lab_sz);
-                memcpy(lab.get_array(), c.lab, c.lab_sz * sizeof(int));
-            } else {
-                this->base = base;
-            }
-        }
-
-        /**
-         * Loads the leaf into the \p local_state. Only works if base of leaf was stored, i.e., whenever
-         * `full_save = false` was used in the constructor.
-         *
-         * @param R Refinement workspace.
-         * @param g The graph.
-         * @param local_state Local state in which the leaf will be stored.
-         * @param start_from State from which the walk to the leaf must be performed.
-         */
-        void load_state(ir::refinement &R, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
-            specific_walk(R, base, g, local_state, start_from);
-        }
-
-        /**
-         * If `full_save = true` was used in the constructor, we can load the vertex coloring of this leaf.
-         * @return Vertex coloring (a `lab` array) of this leaf.
-         */
-        int* get_lab_if_possible() {
-            if(full_save) return lab.get_array();
-            return nullptr;
-        }
-    };
-
-    /**
-     * \brief Collection of leaves
-     *
-     * Can be used across multiple threads.
-     *
-     */
-    class shared_leaves {
-        std::mutex lock;
-        std::unordered_multimap<long, stored_leaf*> leaf_store;
-        std::vector<stored_leaf*> garbage_collector;
-
-    public:
-        int s_leaves = 0; /**< number of leaves stored */
-
-        /**
-         * Free up all memory.
-         */
-        ~shared_leaves() {
-            for(int i = 0; i < garbage_collector.size(); ++i) {
-                delete garbage_collector[i];
-            }
-        }
-
-        /**
-         * Lookup whether a leaf with the given hash already exists.
-         *
-         * @param hash
-         * @return
-         */
-        stored_leaf* lookup_leaf(long hash) {
-            lock.lock();
-            auto find = leaf_store.find(hash);
-            if(find != leaf_store.end()) {
-                auto result = find->second;
-                lock.unlock();
-                return result;
-            } else {
-                lock.unlock();
-                return nullptr;
-            }
-        }
-
-        /**
-         * Add leaf with the given hash. Does not add the leaf, if a leaf with the given hash already exists.
-         *
-         * @param hash
-         * @param ptr
-         */
-        void add_leaf(long hash, coloring& c, std::vector<int>& base) {
-            lock.lock();
-            if(!leaf_store.contains(hash)) {
-                auto new_leaf = new stored_leaf(c, base, s_leaves < 100);
-                leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
-                garbage_collector.push_back(new_leaf);
-                ++s_leaves;
-                lock.unlock();
-            } else {
-                lock.unlock();
-            }
-        }
-
-        /**
-         * Empty this leaf container.
-         */
-        void clear() {
-            s_leaves = 0;
-            leaf_store.clear();
-        }
-    };
 
     /**
      * \brief IR search using random walks.
@@ -156,13 +23,29 @@ namespace dejavu::search_strategy {
      * for statistics of the search.
      */
     class random_ir {
-        shared_leaves leaf_storage; /**< stores all the leaves */
-
+        //shared_leaves leaf_storage; /**< stores all the leaves */
         std::default_random_engine generator; /**< random number generator */
 
         groups::automorphism_workspace automorphism;
         groups::schreier_workspace     w;
         std::vector<int>               heuristic_reroll;
+
+        /**
+         * Loads the leaf into the \p local_state. Only works if base of leaf was stored, i.e., whenever
+         * `full_save = false` was used in the constructor.
+         *
+         * @param leaf The leaf.
+         * @param g The graph.
+         * @param local_state Local state in which the leaf will be stored.
+         * @param start_from State from which the walk to the leaf is performed.
+         */
+        void load_state_from_leaf(ir::stored_leaf* leaf, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
+            assert(leaf->get_store_type() == ir::stored_leaf::STORE_BASE);
+            std::vector<int> base;
+            base.reserve(leaf->get_lab_or_base_size());
+            for(int i = 0; i < leaf->get_lab_or_base_size(); ++i) base.push_back(leaf->get_lab_or_base()[i]);
+            local_state.walk(g, start_from, base);
+        }
 
         /**
          * Co-routine which adds a leaf to leaf_storage, and sifts it into a given group.
@@ -176,9 +59,11 @@ namespace dejavu::search_strategy {
          * @param uniform
          * @return
          */
-        bool add_leaf_to_storage_and_group(dejavu_hook* hook, ir::refinement& R, sgraph* g, shared_leaves& leaf_storage, groups::shared_schreier &group,
+        bool add_leaf_to_storage_and_group(dejavu_hook* hook, ir::refinement& R, sgraph* g, ir::shared_leaves& leaf_storage, groups::shared_schreier &group,
                                            ir::controller& local_state, ir::reduced_save& root_save, bool uniform) {
             bool used_load = false;
+
+            assert(g->v_size == local_state.c->cells);
 
             // Outer loop to handle hash collisions -- at most h_hash_col_limit will be checked and stored
             for(int hash_offset = 0; hash_offset < h_hash_col_limit; ++hash_offset) {
@@ -186,7 +71,7 @@ namespace dejavu::search_strategy {
                 if(hash_offset == 1) local_state.write_strong_invariant(g); // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do this before the loop if that flag is set
 
                 // First, test whether leaf with same hash has already been stored
-                long hash_c = local_state.T->get_hash() + hash_offset; // '+hash_offset' is for hash collisions
+                const long hash_c = local_state.T->get_hash() + hash_offset; // '+hash_offset' is for hash collisions
                 auto other_leaf = leaf_storage.lookup_leaf(hash_c);
 
                 // If not, add leaf to leaf_storage
@@ -200,13 +85,13 @@ namespace dejavu::search_strategy {
                 automorphism.reset();
 
                 // Sometimes, a lab array is already stored for the leaf
-                int* lab = other_leaf->get_lab_if_possible();
-                if(lab != nullptr) {
+                if(other_leaf->get_store_type() == ir::stored_leaf::STORE_LAB) {
+                    const int* lab = other_leaf->get_lab_or_base();
                     automorphism.write_color_diff(local_state.c->vertex_to_col, lab);
                 } else {
                     // If not, we need to use a more involved loading procedure which changes the local_state
                     memcpy(w.scratch_apply1.get_array(), local_state.c->vertex_to_col, g->v_size * sizeof(int));
-                    other_leaf->load_state(R, g, local_state, root_save);
+                    load_state_from_leaf(other_leaf, g, local_state, root_save);
                     automorphism.write_color_diff(w.scratch_apply1.get_array(), local_state.c->lab);
                     used_load = true;
                 }
@@ -235,7 +120,7 @@ namespace dejavu::search_strategy {
                     automorphism.reset();
                     return sift;
                 } else {
-                    if(hash_offset > 0) std::cout << "cert fail " << std::endl;
+                    if(hash_offset > 0) std::cout << "cert fail " << other_leaf->get_store_type() << "/" << ir::stored_leaf::STORE_LAB << std::endl;
                     // If we used the more involved loading procedure, break for now
                     if(used_load) break; // TODO maybe there is better fix here...
                     continue;
@@ -277,27 +162,16 @@ namespace dejavu::search_strategy {
             s_rolling_first_level_success  = 1.0;
         }
 
-        void clear_leaves() {
-            leaf_storage.clear();
-        }
-
         bool h_almost_done(groups::shared_schreier &group) {
             return group.s_consecutive_success >= 1;
         }
 
-        /**
-         * @return How many leaves were stored during random search.
-         */
-        int stat_leaves() {
-            return leaf_storage.s_leaves;
-        }
-
-        void specific_walk(ir::refinement &R, std::vector<int>& base_vertex, sgraph *g, ir::controller &local_state,
-                           ir::reduced_save &start_from) {
-            search_strategy::specific_walk(R, base_vertex, g, local_state, start_from);
-            auto other_leaf = leaf_storage.lookup_leaf(local_state.T->get_hash());
+        void specific_walk(std::vector<int>& base_vertex, sgraph *g, ir::controller &local_state,
+                           ir::shared_tree &ir_tree) {
+            local_state.walk(g, *ir_tree.pick_node_from_level(0,0)->get_save(), base_vertex);
+            auto other_leaf = ir_tree.stored_leaves.lookup_leaf(local_state.T->get_hash());
             if(other_leaf == nullptr) {
-                leaf_storage.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
+                ir_tree.stored_leaves.add_leaf(local_state.T->get_hash(), *local_state.c, local_state.base_vertex);
             }
         }
 
@@ -305,20 +179,23 @@ namespace dejavu::search_strategy {
         // TODO random_walks_from_tree should be the only outward facing method? base_aligned should just happen automatically, or flag
 
         void random_walks(dejavu_hook* hook, ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                          groups::shared_schreier &group, ir::controller &local_state, ir::reduced_save* start_from) {
+                          groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree& ir_tree) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             ir::reduced_save my_own_save;
 
+            ir::reduced_save* root_save  = ir_tree.pick_node_from_level(0,0)->get_save();
+            ir::reduced_save* start_from = root_save;
+
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
-                  && (leaf_storage.s_leaves <= h_leaf_limit || (h_almost_done(group) && leaf_storage.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
+                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
                 local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
 
                 int could_start_from = group.finished_up_to_level();
-                //int could_start_from = 0;
+
+                // can start from below the root if we finished Schreier table at the current root
                 if(local_state.s_base_pos < could_start_from) {
                     while (local_state.s_base_pos <= could_start_from) {
-                        //std::cout << local_state.s_base_pos << ", " << group.base_point(local_state.s_base_pos) << std::endl;
                         local_state.move_to_child(g, group.base_point(local_state.s_base_pos));
                     }
                     assert(local_state.T->trace_equal());
@@ -329,17 +206,18 @@ namespace dejavu::search_strategy {
                 const int start_from_base_pos = local_state.s_base_pos;
                 int base_pos                  = local_state.s_base_pos;
 
+                // track whether current walk is base-aligned and/or uniform
                 bool base_aligned = true;
                 bool uniform      = true;
 
+                //walk down the tree as long as we are not in a leaf
                 while (g->v_size != local_state.c->cells) {
-                    //std::cout << local_state.T->get_position() <<  ", " << local_state.c->cells << ", " << local_state.T->trace_equal() << std::endl;
                     const int col = (*selector)(local_state.c, base_pos);
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
 
-                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && leaf_storage.s_leaves <= 1) {
+                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && ir_tree.stored_leaves.s_leaves <= 1) {
                         heuristic_reroll.clear();
                         for(int i = 0; i < col_sz; ++i) {
                             heuristic_reroll.push_back(local_state.c->lab[col + i]);
@@ -348,12 +226,10 @@ namespace dejavu::search_strategy {
                         if(!heuristic_reroll.empty()) {
                             const int rand = ((int) generator()) % heuristic_reroll.size();
                             v = heuristic_reroll[rand];
-                            //std::cout << group.is_finished(s_base_pos) << "re-roll!"
-                            //          << group.is_in_base_orbit(s_base_pos, v) << std::endl;
                         }
                     }
 
-                    if(group.is_in_base_orbit(base_pos, v) && base_aligned && leaf_storage.s_leaves <= 1) {
+                    if(group.is_in_base_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
                         v = group.base_point(local_state.s_base_pos);
                         assert(local_state.c->vertex_to_col[v] == col);
                         uniform = false;
@@ -373,23 +249,25 @@ namespace dejavu::search_strategy {
 
                 ++s_paths;
 
-                add_leaf_to_storage_and_group(hook, R, g, leaf_storage, group, local_state,*start_from, uniform);
+                add_leaf_to_storage_and_group(hook, R, g, ir_tree.stored_leaves, group, local_state,*root_save, uniform);
             }
         }
 
         // TODO implement dejavu strategy, more simple
         // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
         // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
-        void __attribute__ ((noinline)) random_walks_from_tree(dejavu_hook* hook, ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                                                               groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree &ir_tree) {
+        void random_walks_from_tree(dejavu_hook* hook, ir::refinement &R,
+                                    std::function<ir::type_selector_hook> *selector, sgraph *g,
+                                    groups::shared_schreier &group, ir::controller &local_state,
+                                    ir::shared_tree &ir_tree) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
-                  && (leaf_storage.s_leaves <= h_leaf_limit || (h_almost_done(group) && leaf_storage.s_leaves <= 2*h_leaf_limit))
-                  && (leaf_storage.s_leaves <= h_leaf_limit/4 || s_rolling_success > 0.001 || s_rolling_first_level_success > 0.1) // re-consider...
+                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))
+                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit/4 || s_rolling_success > 0.001 || s_rolling_first_level_success > 0.1) // re-consider...
                   && s_rolling_first_level_success > 0.001) { //  * s_rolling_first_level_success
 
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
@@ -420,7 +298,7 @@ namespace dejavu::search_strategy {
                     continue;
                 }
 
-                add_leaf_to_storage_and_group(hook, R, g, leaf_storage, group, local_state,
+                add_leaf_to_storage_and_group(hook, R, g, ir_tree.stored_leaves, group, local_state,
                         *ir_tree.pick_node_from_level(0,0)->get_save(), true);
             }
         }

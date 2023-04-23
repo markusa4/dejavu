@@ -166,7 +166,7 @@ namespace dejavu {
                     data[cell_act_spot] = true;
             }
 
-            void op_additional_info(long d) {
+            void op_additional_info(int d) {
                 write_compare(d);
             }
 
