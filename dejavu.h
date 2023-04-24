@@ -260,8 +260,8 @@ namespace dejavu {
                     // TODO I think there should be no setup functions at all
                     m_dfs.h_setup(h_large_base ? 0.33 : 0.25);
 
-                    const int dfs_reached_level = m_dfs.do_dfs(hook, &m_refinement, g, root_save.get_coloring(),
-                                                               local_state, &save_to_individualize);
+                    const int dfs_reached_level = m_dfs.do_dfs(hook, g, root_save.get_coloring(),local_state,
+                                                               &save_to_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_reached_level),
                                    "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                     add_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
@@ -274,14 +274,11 @@ namespace dejavu {
                         const bool reset_prob = m_schreier->reset(base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed);
                         if(reset_prob) {m_schreier->reset_probabilistic_criterion();}
                     } else {
-                        m_schreier = new groups::shared_schreier(); // TODO bad memory leak, make a reset function
+                        m_schreier = new groups::shared_schreier();
                         m_schreier->initialize(g->v_size, base, base_sizes, dfs_reached_level);
                     }
+
                     // set up IR shared_tree
-                    // TODO: make a reset function -- maybe make the reset function smart and have it consider the base
-                    // TODO: also consider saving older trees...
-                    //ir::shared_tree ir_tree;
-                    //ir_tree.initialize(base_size, &root_save);
                     if(m_tree) {
                         m_tree->reset(base, &root_save, (h_restarts >= 3) && !inprocessed);
                     } else {
@@ -307,7 +304,7 @@ namespace dejavu {
                     bool fail = false;
 
                     // TODO find a better way to add canonical leaf to leaf store
-                    m_rand.specific_walk(base, g, local_state, *m_tree);
+                    m_rand.specific_walk(g, *m_tree, local_state, base);
 
                     //if(save_to_individualize.size() > 10) fail = true;
 
@@ -325,11 +322,12 @@ namespace dejavu {
                         const int leaves_pre = m_tree->stat_leaves();
                         if (m_tree->get_finished_up_to() == 0) {
                             // random automorphisms, single origin
-                            m_rand.random_walks(hook, m_refinement, current_selector, g, *m_schreier, local_state, *m_tree);
+                            m_rand.random_walks(g, hook, current_selector,
+                                                *m_tree, *m_schreier, local_state);
                         } else {
                             // random automorphisms, sampled from shared_tree
-                            m_rand.random_walks_from_tree(hook, m_refinement, current_selector, g, *m_schreier,
-                                                          local_state,*m_tree);
+                            m_rand.random_walks_from_tree(g, hook, current_selector,
+                                                          *m_tree, *m_schreier, local_state);
                         }
                         h_leaves_added_this_restart = m_tree->stat_leaves() - leaves_pre;
 
@@ -386,7 +384,7 @@ namespace dejavu {
                         h_skip_random_paths = false;
 
                         bfs_cost_estimate = m_bfs.next_level_estimate(*m_tree, current_selector);
-                        m_bfs.do_a_level(&m_refinement, g, *m_tree, local_state, current_selector);
+                        m_bfs.do_a_level(g, *m_tree, local_state, current_selector);
                         progress_print("bfs", "0-" + std::to_string(m_tree->get_finished_up_to()) + "(" +
                                               std::to_string(bfs_cost_estimate) + ")",
                                        std::to_string(m_tree->get_level_size(m_tree->get_finished_up_to())));
@@ -442,7 +440,7 @@ namespace dejavu {
                         m_schreier->determine_save_to_individualize(&save_to_individualize, local_state.get_coloring());
 
                         if(!save_to_individualize.empty()) {
-                            for (int i = 0; i < save_to_individualize.size(); ++i) {
+                            for (size_t i = 0; i < save_to_individualize.size(); ++i) {
                                 const int ind_v   = save_to_individualize[i].first;
                                 const int test_col_sz = save_to_individualize[i].second;
                                 //std::cout << test_col_sz << std::endl;
@@ -467,8 +465,9 @@ namespace dejavu {
                 }
                 if(m_schreier) {
                     add_to_group_size(m_schreier->compute_group_size());
-                    //std::cout << "schreier:#symmetries: " << std::to_string(s_grp_sz_man) << "*10^" << s_grp_sz_exp << std::endl;
+                    delete m_schreier;
                 }
+                if(m_tree) delete m_tree;
             }
 
             std::cout << "#symmetries: " << std::to_string(s_grp_sz_man) << "*10^" << s_grp_sz_exp << std::endl;

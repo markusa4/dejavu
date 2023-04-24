@@ -525,8 +525,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph, sparse
-            bool __attribute__ ((noinline))
-            certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
+            bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
                 int i, found;
 
                 assure_initialized(g);
@@ -836,20 +835,6 @@ assert(c->cells == actual_cells);
                     cc += 1;
                 }
 
-                //if(add_hook) write_to_trace(singleton_inv1);
-                //if(add_hook) write_to_trace(singleton_inv2);
-                //if(add_hook) write_to_trace(acc_in);
-                // early out before sorting color classes
-                /*if(!comp) {
-                while(!old_color_classes.empty()) {
-                    const int _col = old_color_classes.pop_back();
-                    for(i = 0; i < color_vertices_considered.get(_col) + 1; ++i)
-                        neighbours.set(scratch[_col + i], -1);
-                    color_vertices_considered.set(_col, -1);
-                }
-                return comp;
-            }*/
-
                 // sort split color classes
                 old_color_classes.sort();
 
@@ -872,13 +857,13 @@ assert(c->cells == actual_cells);
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
-                        const int i = vertex_worklist.pop_back();
-                        const int val = neighbour_sizes.get(i) + 1;
+                        const int k = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(k) + 1;
                         if (val >= 1) {
-                            neighbour_sizes.set(i, val + acc);
+                            neighbour_sizes.set(k, val + acc);
                             acc += val;
-                            const int __col = _col + _col_sz - (neighbour_sizes.get(i));
-                            const int v_degree = i;
+                            const int __col = _col + _col_sz - (neighbour_sizes.get(k));
+                            const int v_degree = k;
                             //if(add_hook) write_to_trace(v_degree);
                             //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
                             //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
@@ -888,35 +873,6 @@ assert(c->cells == actual_cells);
                     }
 
                     const int vcount = color_vertices_considered.get(_col);
-
-                    // early out
-                    /*if(!comp) {
-                    bool hard_reset = false;
-                    if(2 * vcount > g->v_size) {
-                        neighbours.reset_hard();
-                        hard_reset = true;
-                    } else {
-                        j = 0;
-                        while (j < vcount + 1) {
-                            const int v = scratch[_col + j];
-                            neighbours.set(v, -1);
-                            ++j;
-                        }
-                    }
-                    color_vertices_considered.set(_col, -1);
-                    while (!old_color_classes.empty()) {
-                        const int __col = old_color_classes.pop_back();
-                        if(!hard_reset) {
-                            for (i = 0; i < color_vertices_considered.get(__col) + 1; ++i)
-                                neighbours.set(scratch[__col + i], -1);
-                        }
-                        color_vertices_considered.set(__col, -1);
-                    }
-                    neighbour_sizes.reset();
-                    vertex_worklist.reset();
-                    color_vertices_considered.reset();
-                    return comp;
-                }*/
 
                     vertex_worklist.reset();
                     j = 0;

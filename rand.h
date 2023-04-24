@@ -39,7 +39,8 @@ namespace dejavu::search_strategy {
          * @param local_state Local state in which the leaf will be stored.
          * @param start_from State from which the walk to the leaf is performed.
          */
-        void load_state_from_leaf(ir::stored_leaf* leaf, sgraph *g, ir::controller &local_state, ir::reduced_save &start_from) {
+        static void load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::reduced_save &start_from,
+                                  ir::stored_leaf *leaf) {
             assert(leaf->get_store_type() == ir::stored_leaf::STORE_BASE);
             std::vector<int> base;
             base.reserve(leaf->get_lab_or_base_size());
@@ -48,19 +49,20 @@ namespace dejavu::search_strategy {
         }
 
         /**
-         * Co-routine which adds a leaf to leaf_storage, and sifts it into a given group.
+         * Co-routine which adds a leaf to leaf_storage, and sifts resulting automorphism into a given group.
          *
-         * @param R
          * @param g
-         * @param leaf_storage
+         * @param hook
          * @param group
+         * @param leaf_storage
          * @param local_state
          * @param root_save
          * @param uniform
          * @return
          */
-        bool add_leaf_to_storage_and_group(dejavu_hook* hook, ir::refinement& R, sgraph* g, ir::shared_leaves& leaf_storage, groups::shared_schreier &group,
-                                           ir::controller& local_state, ir::reduced_save& root_save, bool uniform) {
+        bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::shared_schreier &group,
+                                           ir::shared_leaves &leaf_storage, ir::controller &local_state,
+                                           ir::reduced_save &root_save, bool uniform) {
             bool used_load = false;
 
             assert(g->v_size == local_state.c->cells);
@@ -91,15 +93,13 @@ namespace dejavu::search_strategy {
                 } else {
                     // If not, we need to use a more involved loading procedure which changes the local_state
                     memcpy(w.scratch_apply1.get_array(), local_state.c->vertex_to_col, g->v_size * sizeof(int));
-                    load_state_from_leaf(other_leaf, g, local_state, root_save);
+                    load_state_from_leaf(g, local_state, root_save, other_leaf);
                     automorphism.write_color_diff(w.scratch_apply1.get_array(), local_state.c->lab);
                     used_load = true;
                 }
 
 
-                const bool cert = R.certify_automorphism_sparse(g, automorphism.perm(),
-                                                                automorphism.nsupport(),
-                                                                automorphism.support());
+                const bool cert = local_state.certify_automorphism(g, automorphism);
 
                 if (cert) {
                     // We found an automorphism!
@@ -143,7 +143,7 @@ namespace dejavu::search_strategy {
         int       h_leaf_limit = 0;                       /**< limit to how many leaves can be stored         */
         bool      h_look_close = false;                   /**< whether to use trace early out on first level  */
         const int h_hash_col_limit = 32;                  /**< limit for how many hash collisions are allowed */
-        bool      h_sift_random= true;
+        bool      h_sift_random     = true;
         int       h_sift_random_lim = 128;
 
         random_ir(const int domain_size) : automorphism(domain_size), w(domain_size) {}
@@ -154,7 +154,6 @@ namespace dejavu::search_strategy {
         }
 
         void reset() {
-            //generator.seed(2);
             s_paths      = 0;
             s_paths_fail =
             h_leaf_limit = 0;
@@ -166,8 +165,8 @@ namespace dejavu::search_strategy {
             return group.s_consecutive_success >= 1;
         }
 
-        void specific_walk(std::vector<int>& base_vertex, sgraph *g, ir::controller &local_state,
-                           ir::shared_tree &ir_tree) {
+        void
+        specific_walk(sgraph *g, ir::shared_tree &ir_tree, ir::controller &local_state, std::vector<int> &base_vertex) {
             local_state.walk(g, *ir_tree.pick_node_from_level(0,0)->get_save(), base_vertex);
             auto other_leaf = ir_tree.stored_leaves.lookup_leaf(local_state.T->get_hash());
             if(other_leaf == nullptr) {
@@ -178,8 +177,8 @@ namespace dejavu::search_strategy {
         // TODO I should have one random_walk method that is used by the methods below, i think
         // TODO random_walks_from_tree should be the only outward facing method? base_aligned should just happen automatically, or flag
 
-        void random_walks(dejavu_hook* hook, ir::refinement &R, std::function<ir::type_selector_hook> *selector, sgraph *g,
-                          groups::shared_schreier &group, ir::controller &local_state, ir::shared_tree& ir_tree) {
+        void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
+                          ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             ir::reduced_save my_own_save;
@@ -249,17 +248,16 @@ namespace dejavu::search_strategy {
 
                 ++s_paths;
 
-                add_leaf_to_storage_and_group(hook, R, g, ir_tree.stored_leaves, group, local_state,*root_save, uniform);
+                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state, *root_save, uniform);
             }
         }
 
         // TODO implement dejavu strategy, more simple
         // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
         // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
-        void random_walks_from_tree(dejavu_hook* hook, ir::refinement &R,
-                                    std::function<ir::type_selector_hook> *selector, sgraph *g,
-                                    groups::shared_schreier &group, ir::controller &local_state,
-                                    ir::shared_tree &ir_tree) {
+        void random_walks_from_tree(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
+                                    ir::shared_tree &ir_tree, groups::shared_schreier &group,
+                                    ir::controller &local_state) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
@@ -298,8 +296,8 @@ namespace dejavu::search_strategy {
                     continue;
                 }
 
-                add_leaf_to_storage_and_group(hook, R, g, ir_tree.stored_leaves, group, local_state,
-                        *ir_tree.pick_node_from_level(0,0)->get_save(), true);
+                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state,
+                                              *ir_tree.pick_node_from_level(0, 0)->get_save(), true);
             }
         }
     };

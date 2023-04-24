@@ -253,7 +253,7 @@ namespace dejavu {
             /**
              * @return Integer array \p p describing the stored automorphism, where point v is mapped to \p p[v].
              */
-            int *perm() {
+            int *perm() const {
                 return automorphism.get_array();
             }
 
@@ -1153,7 +1153,8 @@ namespace dejavu {
              * @param automorphism An automorphism_workspace used to store the randomly generated element.
              * @return Whether the generated automorphism was added to the Schreier structure or not.
              */
-            bool __attribute__ ((noinline)) sift_random(schreier_workspace &w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
+            bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
+                if(generators.size() <= 0) return false;
                 automorphism.set_support01(true);
                 generate_random(w, automorphism, rn_generator);
                 return sift(w, automorphism, false);

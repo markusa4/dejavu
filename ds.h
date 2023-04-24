@@ -286,7 +286,7 @@ namespace dejavu {
             /**
              * @return A pointer to the internal memory.
              */
-            T *get_array() {
+            T *get_array() const {
                 return arr;
             }
 

@@ -61,7 +61,7 @@ namespace dejavu {
              *
              * @todo should just always certify the leaf...
              */
-            std::pair<bool, bool> recurse_to_equal_leaf(ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller *state,
+            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state,
                                                         groups::automorphism_workspace &automorphism) {
                 bool prev_fail = false;
                 int prev_fail_pos = -1;
@@ -87,24 +87,18 @@ namespace dejavu {
                     //assert(state->s_hint_color_is_singleton_now ? state->s_last_refinement_singleton_only : true);
 
                     if (prev_fail && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
-                        prev_cert = R->check_single_failure(g, initial_colors->vertex_to_col, automorphism.perm(), prev_fail_pos);
+                        prev_cert = state->check_single_failure(g, initial_colors->vertex_to_col, automorphism, prev_fail_pos);
                     }
 
                     //if(state->c->cells == g->v_size) {
                     if (prev_cert && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
                         // TODO: add better heuristic to not always do this check, too expensive!
-                        auto cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
-                                                                                          automorphism.perm(),
-                                                                                          automorphism.nsupport(),
-                                                                                          automorphism.support(),
-                                                                                          cert_pos);
+                        auto cert_res = state->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
+                                                                                          automorphism,cert_pos);
                         cert_pos = std::get<2>(cert_res);
                         if (std::get<0>(cert_res)) {
-                            cert_res = R->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
-                                                                                         automorphism.perm(),
-                                                                                         automorphism.nsupport(),
-                                                                                         automorphism.support(),
-                                                                                         0);
+                            cert_res = state->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
+                                                                                         automorphism, 0);
                         }
 
                         if (std::get<0>(cert_res)) {
@@ -130,7 +124,7 @@ namespace dejavu {
              * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
              * @return The level up to which DFS succeeded.
              */
-            int do_dfs(dejavu_hook* hook, ir::refinement *R, sgraph *g, coloring *initial_colors, ir::controller &local_state,
+            int do_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &local_state,
                        std::vector<std::pair<int, int>>* save_to_individualize) {
                 grp_sz_man = 1.0;
                 grp_sz_exp = 0;
@@ -185,23 +179,18 @@ namespace dejavu {
                         // ... and then check whether this implies a (sparse) automorphism
                         pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
                                                       wr_pos_st,wr_pos_end);
-                        bool found_auto = R->certify_automorphism_sparse(g, initial_colors->vertex_to_col, pautomorphism.perm(),
-                                                                    pautomorphism.nsupport(),
-                                                                    pautomorphism.support());
+                        bool found_auto = local_state.certify_automorphism(g, pautomorphism);
                         assert(pautomorphism.perm()[vert] == ind_v);
 
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
-                            auto rec_succeeded = recurse_to_equal_leaf(R, g, initial_colors,
-                                                                       &local_state, pautomorphism);
+                            auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors,&local_state,
+                                                                       pautomorphism);
                             found_auto = (rec_succeeded.first && rec_succeeded.second);
                             if (rec_succeeded.first && !rec_succeeded.second) {
                                 pautomorphism.reset();
                                 pautomorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                                found_auto = R->certify_automorphism_sparse(g, initial_colors->vertex_to_col,
-                                                                            pautomorphism.perm(),
-                                                                            pautomorphism.nsupport(),
-                                                                            pautomorphism.support());
+                                found_auto = local_state.certify_automorphism(g, pautomorphism);
                             }
                         }
 

@@ -218,8 +218,9 @@ namespace dejavu {
             }
 
             std::function<type_split_color_hook> self_split_hook() {
-                return std::bind(&controller::split_hook, this, std::placeholders::_1, std::placeholders::_2,
-                                 std::placeholders::_3);
+                return [this](auto && PH1, auto && PH2, auto && PH3) { return
+                        split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                std::forward<decltype(PH3)>(PH3)); };
             }
 
             bool worklist_hook(const int color, const int color_sz) {
@@ -243,11 +244,11 @@ namespace dejavu {
             }
 
             std::function<type_worklist_color_hook> self_worklist_hook() {
-                return std::bind(&controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
+                return [this](auto && PH1, auto && PH2) { return worklist_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); };
             }
 
             std::function<type_additional_info_hook> self_add_hook() {
-                return std::bind(&controller::write_to_trace, this, std::placeholders::_1);
+                return [this](auto && PH1) { write_to_trace(std::forward<decltype(PH1)>(PH1)); };
             }
 
         public:
@@ -444,7 +445,7 @@ namespace dejavu {
                 mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
             }
 
-            coloring *get_coloring() {
+            coloring *get_coloring() const {
                 return c;
             }
 
@@ -458,7 +459,7 @@ namespace dejavu {
              *
              * @param d Data to be written to the trace.
              */
-            void write_to_trace(const int d) {
+            void write_to_trace(const int d) const {
                 T->op_additional_info(d);
             }
 
@@ -605,6 +606,36 @@ namespace dejavu {
                     int v = vertices[s_base_pos];
                     move_to_child(g, v);
                 }
+            }
+
+            /**
+             * Certifies whether the provided \p automorphism is indeed an automorphism of the graph \p g. Runs in
+             * time roughly in the support of \p automorphism.
+             *
+             * Uses internal workspace to perform this operation efficiently.
+             *
+             * @param g The graph.
+             * @param automorphism The automorphism.
+             * @return Whether \p automorphism is an automorphism of \p g.
+             */
+            bool certify_automorphism(sgraph* g, groups::automorphism_workspace& automorphism) {
+                return R->certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(),
+                                                      automorphism.support());
+            }
+
+            std::tuple<bool, int, int>
+            certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int *colmap,
+                                                           groups::automorphism_workspace& automorphism, int pos_start) {
+                return R->certify_automorphism_sparse_report_fail_resume(g, colmap,
+                                                                         automorphism.perm(),
+                                                                         automorphism.nsupport(),
+                                                                         automorphism.support(),
+                                                                         pos_start);
+            }
+
+            bool check_single_failure(const sgraph *g, const int *colmap, const groups::automorphism_workspace& automorphism,
+                                      int failure) {
+                return R->check_single_failure(g, colmap, automorphism.perm(), failure);
             }
         };
 
@@ -958,6 +989,44 @@ namespace dejavu {
             }
         };
 
+
+        class deviation_map {
+        private:
+            std::unordered_set<long> deviation_map;
+            int computed_for_base = 0;
+            int expected_for_base = 0;
+            bool deviation_done = false;
+
+            void check_finished() {
+                if(computed_for_base == expected_for_base) deviation_done = true;
+                assert(computed_for_base <= expected_for_base);
+            }
+
+        public:
+            void start(const int h_expected_for_base) {
+                computed_for_base = 0;
+                expected_for_base = h_expected_for_base;
+
+                deviation_map.clear();
+                deviation_done = false;
+            }
+
+            void record_deviation(long deviation) {
+                deviation_map.insert(deviation);
+                ++computed_for_base;
+                check_finished();
+            }
+
+            void record_no_deviation() {
+                ++computed_for_base;
+                check_finished();
+            }
+
+            bool check_deviation(long deviation) {
+                return !deviation_done || deviation_map.contains(deviation);
+            }
+        };
+
         /**
          * \brief An IR leaf
          *
@@ -1142,6 +1211,7 @@ namespace dejavu {
             std::vector<long>       node_invariant;
         public:
             shared_leaves stored_leaves;
+            deviation_map stored_deviation;
 
             std::vector<long>* get_node_invariant() {
                 return &node_invariant;

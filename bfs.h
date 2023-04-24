@@ -14,20 +14,13 @@ namespace dejavu {
          * \brief Breadth-first search.
          */
         class bfs_ir {
-            // TODO deviation map should go into shared_tree as well!
-            std::unordered_set<long> deviation_map;
-            int computed_for_base = 0;
-            int expected_for_base = 0;
-            bool deviation_done = false;
-            // TODO: bfs_ir should be workspace for local thread, and not a shared structure!
-
             // statistics
             int s_deviation_prune = 0;
             int s_total_prune     = 0;
             int s_total_kept      = 0;
 
         public:
-            void do_a_level(ir::refinement* R, sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
+            void do_a_level(sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
 
                 s_deviation_prune = 0;
@@ -35,9 +28,8 @@ namespace dejavu {
                 s_total_kept      = 0;
 
                 queue_up_level(selector, ir_tree, current_level);
-                work_on_todo(R, g, &ir_tree, local_state);
+                work_on_todo(g, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
-                //std::cout << s_deviation_prune << "/" << s_total_prune << " - " << s_total_kept << std::endl;
             }
 
             int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
@@ -61,7 +53,6 @@ namespace dejavu {
                 const auto level_size = ir_tree.get_level_size(base_pos);
                 auto next_node = start_node;
                 bool reserve = false;
-                reset_deviation_map();
 
                 do {
                     auto next_node_save = next_node->get_save();
@@ -69,7 +60,8 @@ namespace dejavu {
                     auto base_pos    = next_node_save->get_base_position();
                     int col = (*selector)(c, base_pos);
                     if(!reserve && col >= 0) {
-                        expected_for_base = c->ptn[col] + 1;
+                        //expected_for_base = c->ptn[col] + 1;
+                        ir_tree.stored_deviation.start(c->ptn[col] + 1);
                         ir_tree.queue_reserve((c->ptn[col] + 1) * level_size);
                         reserve = true;
                     }
@@ -81,25 +73,7 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
-            void reset_deviation_map() {
-                deviation_map.clear();
-                computed_for_base = 0;
-                deviation_done = false;
-            }
-
-            void add_deviation(long hash) {
-                deviation_map.insert(hash);
-            }
-
-            void finish_deviation() {
-                deviation_done = true;
-            }
-
-            bool check_deviation(long hash) {
-                return !deviation_done || deviation_map.contains(hash);
-            }
-
-            void compute_node(ir::refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
+            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
                 auto next_node_save = node->get_save();
 
                 // node is already pruned
@@ -146,9 +120,9 @@ namespace dejavu {
                     // deviation map
                     if(local_state.s_base_pos > 1) {
                         ++s_total_prune;
-                        if (parent_is_base) add_deviation(local_state.T->get_hash());
+                        if (parent_is_base) ir_tree->stored_deviation.record_deviation(local_state.T->get_hash());
                         else {
-                            if (!check_deviation(local_state.T->get_hash())) {
+                            if (!ir_tree->stored_deviation.check_deviation(local_state.T->get_hash())) {
                                 assert(!parent_is_base);
                                 node->prune();
                             }
@@ -159,19 +133,16 @@ namespace dejavu {
                 }
 
                 // keep track how many we computed for deviation map
-                if(parent_is_base && local_state.s_base_pos > 1) {
-                    computed_for_base += 1;
-                    if(computed_for_base == expected_for_base) {
-                        finish_deviation();
-                    }
+                if(parent_is_base && local_state.s_base_pos > 1 && local_state.T->trace_equal()) {
+                    ir_tree->stored_deviation.record_no_deviation();
                 }
             }
 
-            void work_on_todo(ir::refinement* R, sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
+            void work_on_todo(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
                 ir::reduced_save* last_load = nullptr;
                 while(!ir_tree->queue_missing_node_empty()) {
                     const auto todo = ir_tree->queue_missing_node_pop();
-                    compute_node(R, g, ir_tree, local_state, todo.first, todo.second, last_load);
+                    compute_node(g, ir_tree, local_state, todo.first, todo.second, last_load);
                     last_load = todo.first->get_save();
                 }
             }
