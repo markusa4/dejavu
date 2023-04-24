@@ -293,7 +293,7 @@ namespace dejavu {
                     if(m_tree) {
                         m_tree->reset(base, &root_save, (h_restarts >= 3) && !inprocessed);
                     } else {
-                        m_tree = new ir::shared_tree();
+                        m_tree = new ir::shared_tree(g->v_size);
                         m_tree->initialize(base, &root_save);
                     }
                     inprocessed = false;
@@ -401,7 +401,12 @@ namespace dejavu {
                                        std::to_string(m_tree->get_level_size(m_tree->get_finished_up_to())));
 
                         if (m_tree->get_finished_up_to() == base_size) {
-                            add_to_group_size(m_tree->get_level_size(m_tree->get_finished_up_to()), 0);
+                           //add_to_group_size(m_bfs.top_level_orbit.orbit_size(base[0]), 0);
+                           if(base_size == 2) {
+                               add_to_group_size(m_tree->h_bfs_top_level_orbit.orbit_size(base[0])*m_tree->h_bfs_automorphism_pw, 0);
+                           } else {
+                               add_to_group_size(m_tree->get_level_size(m_tree->get_finished_up_to()), 0);
+                           }
                             break;
                         }
 

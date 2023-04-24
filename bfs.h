@@ -14,17 +14,20 @@ namespace dejavu {
          * \brief Breadth-first search.
          */
         class bfs_ir {
+        public:
+
+            // TODO some of this has to go into shared_tree
             // statistics
             int s_deviation_prune = 0;
             int s_total_prune     = 0;
             int s_total_kept      = 0;
-
+            int s_total_automorphism_prune = 0;
+            int s_total_leaves = 0;
             groups::automorphism_workspace automorphism;
 
         public:
 
             bfs_ir(sgraph* g) : automorphism(g->v_size) {
-
             }
 
             void do_a_level(sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
@@ -33,6 +36,8 @@ namespace dejavu {
                 s_deviation_prune = 0;
                 s_total_prune     = 0;
                 s_total_kept      = 0;
+                s_total_automorphism_prune = 0;
+                s_total_leaves = 0;
 
                 queue_up_level(selector, ir_tree, current_level);
                 work_on_todo(g, &ir_tree, local_state);
@@ -92,6 +97,15 @@ namespace dejavu {
                     return;
                 }
 
+                // special code for automorphism pruning on base size 2
+                const int parent_node_base_pos  = node->get_save()->get_base_position()-1;
+                const int parent_node_base_vert = parent_node_base_pos>=0?node->get_save()->get_base()[parent_node_base_pos]:-1;
+                const int vert_on_base          = parent_node_base_pos>=0?local_state.compare_base[parent_node_base_pos]:-1;
+                if(parent_node_base_pos == 0 && !ir_tree->h_bfs_top_level_orbit.represents_orbit(parent_node_base_vert)) {
+                    ++s_total_automorphism_prune;
+                    return;
+                }
+
                 // do efficient loading if parent is the same as previous load
                 if(next_node_save != last_load || g->v_size < 2000) { // TODO heuristic to check how much has changed
                     local_state.use_reversible(false); // potentially loads more efficiently
@@ -118,9 +132,12 @@ namespace dejavu {
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
                     automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
                     cert = local_state.certify_automorphism(g, automorphism);
+                    ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(automorphism);
                     // TODO call hook
-                    // TODO do "forward pruning"
+                    ++s_total_leaves;
                     automorphism.reset();
+
+                    if(parent_node_base_pos == 0 && vert_on_base == parent_node_base_vert) ++ir_tree->h_bfs_automorphism_pw;
                 }
 
                 // TODO work on control flow below

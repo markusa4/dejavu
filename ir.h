@@ -1215,8 +1215,14 @@ namespace dejavu {
 
             std::vector<long>       node_invariant;
         public:
+            groups::orbit h_bfs_top_level_orbit;
+            int h_bfs_automorphism_pw = 0;
             shared_leaves stored_leaves; /**< stores leaves of the IR tree */
             deviation_map stored_deviation; /**< stores trace deviations of the current BFS level*/
+
+            shared_tree(int domain_size) {
+                h_bfs_top_level_orbit.initialize(domain_size);
+            };
 
             std::vector<long>* get_node_invariant() {
                 return &node_invariant;
