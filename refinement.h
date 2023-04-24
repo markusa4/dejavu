@@ -274,6 +274,8 @@ namespace dejavu {
                     }
 
                     if (early_out) {
+                        color_class_splits.reset();
+                        cell_todo.reset(&queue_pointer);
                         break;
                     }
 

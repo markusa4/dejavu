@@ -19,7 +19,14 @@ namespace dejavu {
             int s_total_prune     = 0;
             int s_total_kept      = 0;
 
+            groups::automorphism_workspace automorphism;
+
         public:
+
+            bfs_ir(sgraph* g) : automorphism(g->v_size) {
+
+            }
+
             void do_a_level(sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
 
@@ -96,7 +103,6 @@ namespace dejavu {
 
                 if(local_state.s_base_pos > 0) local_state.use_increase_deviation(true);
 
-                //std::cout << local_state.T->get_position() << std::endl;
                 // do computation
                 local_state.reset_trace_equal();
                 local_state.use_reversible(g->v_size >= 2000);
@@ -107,13 +113,21 @@ namespace dejavu {
                 const bool parent_is_base = node->get_base();
                 const bool is_base = parent_is_base && (v == local_state.compare_base[local_state.s_base_pos - 1]);
 
-                //std::cout << "is_base " << is_base << ", " << local_state.s_base_pos << std::endl;
+                bool cert = true;
 
-                if(local_state.T->trace_equal()) { // TODO: what if leaf?
+                if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
+                    automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
+                    cert = local_state.certify_automorphism(g, automorphism);
+                    // TODO call hook
+                    // TODO do "forward pruning"
+                    automorphism.reset();
+                }
+
+                // TODO work on control flow below
+                if(local_state.T->trace_equal() && cert) { // TODO: what if leaf?
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
-                    //std::cout << local_state.T->get_position() << std::endl;
                     ir_tree->add_node(local_state.s_base_pos, new_save, is_base);
                 } else {
                     assert(!is_base);

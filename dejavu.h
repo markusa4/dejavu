@@ -15,6 +15,10 @@ extern sgraph _test_graph;
 extern int*   _test_col;
 
 namespace dejavu {
+    static bool set_first = false;
+    static std::chrono::high_resolution_clock::time_point first    = std::chrono::high_resolution_clock::now();
+    static std::chrono::high_resolution_clock::time_point previous = std::chrono::high_resolution_clock::now();
+
     void test_hook(int n, const int *p, int nsupp, const int *supp) {
         std::cout << "certifying..." << std::endl;
         assert(test_r.certify_automorphism_sparse(&_test_graph, _test_col, p, nsupp, supp));
@@ -33,9 +37,11 @@ namespace dejavu {
 
     static void progress_print(const std::string
                                proc, const std::string p1, const std::string p2) {
-        static std::chrono::high_resolution_clock::time_point first    = std::chrono::high_resolution_clock::now();
-        static std::chrono::high_resolution_clock::time_point previous = std::chrono::high_resolution_clock::now();
-
+        if(!set_first) {
+            first     = std::chrono::high_resolution_clock::now();
+            previous  = first;
+            set_first = true;
+        }
         auto now = std::chrono::high_resolution_clock::now();
         PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
         previous = now;
@@ -43,8 +49,11 @@ namespace dejavu {
 
     static void progress_print(const std::string
                                  proc, const double p1, const double p2) {
-        static std::chrono::high_resolution_clock::time_point first    = std::chrono::high_resolution_clock::now();
-        static std::chrono::high_resolution_clock::time_point previous = std::chrono::high_resolution_clock::now();
+        if(!set_first) {
+            first     = std::chrono::high_resolution_clock::now();
+            previous  = first;
+            set_first = true;
+        }
 
         auto now = std::chrono::high_resolution_clock::now();
         PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
@@ -161,6 +170,8 @@ namespace dejavu {
             add_to_group_size(m_prep.base, m_prep.exp);
 
             if(gg.v_size > 0) {
+                std::vector<int> global_fixed_points;
+
                 transfer_sassy_sgraph_to_sgraph(g, &gg);
 
                 // local modules, to be used by other modules
@@ -169,7 +180,7 @@ namespace dejavu {
 
                 // high-level search strategies
                 search_strategy::dfs_ir    m_dfs;                        /*< depth-first search */
-                search_strategy::bfs_ir    m_bfs;                        /*< breadth-first search */
+                search_strategy::bfs_ir    m_bfs(g);                        /*< breadth-first search */
                 search_strategy::random_ir m_rand(g->v_size); /*< randomized search */
 
                 std::cout << std::endl << "solving..." << std::endl;
@@ -203,12 +214,11 @@ namespace dejavu {
                         }
                         h_cost = 0;
 
-                        if(inprocessed && m_tree) m_tree->clear_leaves();
+                        if(inprocessed && m_tree) m_tree->clear_leaves(); // TODO if I link up the corresponding root to each leaf, I can keep using them... also "from BFS" would be more efficient in leaf recovery?
                         m_rand.reset();
 
                         h_leaves_added_this_restart = 0;
 
-                        // TODO: notice similarities to previous base, don't throw away bfs etc. if same up to certain point!
                         // TODO: inprocess, sift previous automorphisms if graph hard and we got some, make use of restarts more
                         // TODO: record what happens during a run, make next choices based on that -- prevent "obvious"
                         //       bad choices (bases that are much larger, etc. ...)
@@ -271,7 +281,8 @@ namespace dejavu {
 
                     // set up schreier structure
                     if(m_schreier)  {
-                        const bool reset_prob = m_schreier->reset(base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed);
+                        groups::schreier_workspace w(g->v_size);
+                        const bool reset_prob = m_schreier->reset(w, base, base_sizes, dfs_reached_level, (h_restarts >= 3) && !inprocessed, global_fixed_points);
                         if(reset_prob) {m_schreier->reset_probabilistic_criterion();}
                     } else {
                         m_schreier = new groups::shared_schreier();
@@ -309,8 +320,8 @@ namespace dejavu {
                     //if(save_to_individualize.size() > 10) fail = true;
 
                     const int flat_leaf_store_inc = m_tree->stat_leaves();
-
                     leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
+
                     while (!fail) {
                         m_rand.setup(h_error_prob, flat_leaf_store_inc+leaf_store_limit,
                                      (m_rand.s_rolling_first_level_success > 0.5) && !h_short_base); // TODO: look_close does not seem worth it
@@ -383,14 +394,16 @@ namespace dejavu {
 
                         h_skip_random_paths = false;
 
-                        bfs_cost_estimate = m_bfs.next_level_estimate(*m_tree, current_selector);
+                        bfs_cost_estimate = m_tree->get_finished_up_to() < base_size?m_bfs.next_level_estimate(*m_tree, current_selector):-1;
                         m_bfs.do_a_level(g, *m_tree, local_state, current_selector);
                         progress_print("bfs", "0-" + std::to_string(m_tree->get_finished_up_to()) + "(" +
                                               std::to_string(bfs_cost_estimate) + ")",
                                        std::to_string(m_tree->get_level_size(m_tree->get_finished_up_to())));
 
-                        if (m_tree->get_finished_up_to() == base_size)
+                        if (m_tree->get_finished_up_to() == base_size) {
+                            add_to_group_size(m_tree->get_level_size(m_tree->get_finished_up_to()), 0);
                             break;
+                        }
 
                         // want to inprocess if BFS was successfull in pruning
                         if(m_tree->get_finished_up_to() == 1 && m_tree->get_level_size(m_tree->get_finished_up_to()) < bfs_cost_estimate / 2) {
@@ -448,6 +461,7 @@ namespace dejavu {
                                 assert(test_col_sz == local_state.c->ptn[ind_col]+1);
                                 m_prep.multiply_to_group_size(local_state.c->ptn[ind_col]+1);
                                 local_state.move_to_child_no_trace(g, ind_v);
+                                global_fixed_points.push_back(ind_v);
                             }
                             progress_print("inproc_ind", "_",
                                            std::to_string(local_state.c->cells));

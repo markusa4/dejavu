@@ -642,6 +642,37 @@ namespace dejavu {
                 return num;
             }
 
+            void remove_generator(size_t num) {
+                assert(num >= 0);
+                assert(num < generators.size());
+                delete generators[num];
+                generators[num] = nullptr;
+            }
+
+            void filter(schreier_workspace& w, std::vector<int> &global_fixed_points) {
+                for(size_t i = 0; i < global_fixed_points.size(); ++i) {
+                    const int test_pt = global_fixed_points[i];
+                    for(size_t j = 0; j < generators.size(); ++j) {
+                        auto gen = generators[j];
+                        if(gen == nullptr) continue;
+                        gen->load(w.loader, w.scratch_auto);
+                        if(w.loader.p()[test_pt] != test_pt) remove_generator(j);
+                        w.scratch_auto.reset();
+                    }
+                }
+                compact_generators();
+            }
+
+            void compact_generators() {
+                std::vector<stored_automorphism *> new_gens;
+                for(size_t i = 0; i < generators.size(); ++i) {
+                    if(generators[i]) {
+                        new_gens.push_back(generators[i]);
+                    }
+                }
+                generators.swap(new_gens);
+            }
+
             /**
              * Retrieve a generator from the stored generating set.
              *
@@ -649,7 +680,6 @@ namespace dejavu {
              * @return A pointer to the generator which corresponds to the identifier.
              */
             stored_automorphism *get_generator(const int num) {
-                // TODO locks...
                 return generators[num];
             }
 
@@ -985,7 +1015,7 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
-            bool reset(std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old) {
+            bool reset(schreier_workspace& w, std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old, std::vector<int> &global_fixed_points) {
                 const int old_size = transversals.size();
                 const int new_size = stop;
 
@@ -996,7 +1026,8 @@ namespace dejavu {
                         if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
                     }
                 } else {
-                    generators.clear();
+                    //generators.clear();
+                    generators.filter(w, global_fixed_points);
                 }
 
                 if(keep_until == new_size && new_size == old_size) return false;

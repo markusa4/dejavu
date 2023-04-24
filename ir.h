@@ -653,9 +653,10 @@ namespace dejavu {
 
             std::vector<int> saved_color_base;
             std::function<type_selector_hook> dynamic_seletor;
+            mark_set test_set;
+            std::vector<int> candidates;
 
         public:
-            mark_set test_set;
 
             // TODO: save the base of state for blueprint selection
             void save_base(controller *state) {
@@ -718,8 +719,8 @@ namespace dejavu {
             void find_sparse_optimized_base(refinement *R, sgraph *g, controller *state) {
                 state->mode_write_base();
 
-                std::vector<int> candidates;
                 test_set.initialize(g->v_size);
+                candidates.clear();
                 candidates.reserve(locked_lim);
                 int prev_color = -1;
 
@@ -790,7 +791,7 @@ namespace dejavu {
             void find_test_base(refinement *R, sgraph *g, controller *state) {
                 state->mode_write_base();
 
-                std::vector<int> candidates;
+                candidates.clear();
                 candidates.reserve(locked_lim);
                 int prev_color = -1;
 
@@ -854,8 +855,8 @@ namespace dejavu {
             void find_small_optimized_base(refinement *R, sgraph *g, controller *state) {
                 state->mode_write_base();
 
-                std::vector<int> candidates;
                 test_set.initialize(g->v_size);
+                candidates.clear();
                 candidates.reserve(locked_lim);
                 int prev_color = -1;
 
@@ -910,8 +911,8 @@ namespace dejavu {
             void find_combinatorial_optimized_base(refinement *R, sgraph *g, controller *state) {
                 state->mode_write_base();
 
-                std::vector<int> candidates;
                 test_set.initialize(g->v_size);
+                candidates.clear();
                 candidates.reserve(locked_lim);
 
                 mark_set neighbour_color;
@@ -975,11 +976,11 @@ namespace dejavu {
                 return state->get_coloring()->ptn[color] * non_triv_col_d;
             }
 
-            int color_score_size(sgraph *g, controller *state, int color) {
+            static int color_score_size(sgraph *g, controller *state, int color) {
                 return state->get_coloring()->ptn[color];
             }
 
-            int color_score_anti_size(sgraph *g, controller *state, int color) {
+            static int color_score_anti_size(sgraph *g, controller *state, int color) {
                 return INT32_MAX - state->get_coloring()->ptn[color];
             }
 
@@ -1081,6 +1082,10 @@ namespace dejavu {
 
         public:
             int s_leaves = 0; /**< number of leaves stored */
+
+            shared_leaves() {
+                leaf_store.reserve(20);
+            }
 
             /**
              * Free up all memory.
@@ -1210,8 +1215,8 @@ namespace dejavu {
 
             std::vector<long>       node_invariant;
         public:
-            shared_leaves stored_leaves;
-            deviation_map stored_deviation;
+            shared_leaves stored_leaves; /**< stores leaves of the IR tree */
+            deviation_map stored_deviation; /**< stores trace deviations of the current BFS level*/
 
             std::vector<long>* get_node_invariant() {
                 return &node_invariant;
@@ -1251,20 +1256,27 @@ namespace dejavu {
                 } else {
                 }
 
+
                 if(keep_until == new_size && new_size == old_size) return false;
+
                 finished_up_to = std::min(keep_until, finished_up_to);
 
                 tree_data.resize(new_size + 1);
                 tree_level_size.resize(new_size + 1);
                 tree_data_jump_map.resize(new_size + 1);
 
-                for (int i = keep_until; i < old_size; ++i) {
+                for (int i = keep_until+1; i < old_size; ++i) {
                     tree_level_size[i] = 0;
                     tree_data_jump_map[i].clear();
                     tree_data[i] = nullptr;
                 }
 
-                if(keep_until == 0) add_node(0, root, true);
+                if(keep_until == 0) {
+                    tree_level_size[0] = 0;
+                    tree_data_jump_map[0].clear();
+                    tree_data[0] = nullptr;
+                    add_node(0, root, true);
+                }
                 assert(missing_nodes.empty());
 
                 return true;

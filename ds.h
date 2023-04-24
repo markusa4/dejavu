@@ -517,6 +517,8 @@ namespace dejavu {
 
             void initialize(int size) {
                 //s = new int[size];
+                if(init && sz == size) return;
+                if(init) free(s);
                 s = (int*) calloc(size, sizeof(int));
                 sz = size;
                 init = true;
