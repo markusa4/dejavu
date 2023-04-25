@@ -59,7 +59,7 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-
+    std::cout << "#symmetries: " << std::to_string(d.s_grp_sz_man) << "*10^" << d.s_grp_sz_exp << std::endl;
      finished = true;
     if(del) free(colmap);
 }

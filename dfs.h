@@ -31,22 +31,20 @@ namespace dejavu {
          */
         class dfs_ir {
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
-            double h_recent_cost_snapshot_limit = 0.25;
+
+            groups::automorphism_workspace* gws_automorphism;
 
         public:
+            double h_recent_cost_snapshot_limit = 0.25; /**< A float in the range [0-1]. Limits continuation of DFS
+                                                          * search to whethercomputing recent elements only cost this
+                                                          * fraction of the cost of an entire root-to-leaf walk. */
             long double grp_sz_man = 1.0; /**< group size mantissa, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
             int         grp_sz_exp = 0;   /**< group size exponent, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
 
-            /**
-             * Setup heuristics of the DFS module.
-             *
-             * @param recent_cost_snapshot_limit A float in the range [0-1]. Limits continuation of DFS search to whether
-             * computing recent elements only cost this fraction of the cost of an entire root-to-leaf walk.
-             */
-            void h_setup(double recent_cost_snapshot_limit = 0.25) {
-                h_recent_cost_snapshot_limit = recent_cost_snapshot_limit;
-            }
 
+            void link_to_workspace(groups::automorphism_workspace* automorphism) {
+                gws_automorphism = automorphism;
+            }
             /**
              * Recurses to an equal leaf (according to trace compared to within \p state), unless backtracking is
              * necessary.
@@ -134,7 +132,7 @@ namespace dejavu {
                 orbs.initialize(g->v_size);
 
                 // automorphism workspace
-                groups::automorphism_workspace pautomorphism(g->v_size);
+                //groups::automorphism_workspace pautomorphism(g->v_size);
 
                 // we want to terminate if things become to costly, we save the current trace position to track cost
                 cost_snapshot = local_state.T->get_position();
@@ -177,20 +175,20 @@ namespace dejavu {
                         const int wr_pos_end= (int) local_state.singletons.size();
 
                         // ... and then check whether this implies a (sparse) automorphism
-                        pautomorphism.write_singleton(&local_state.compare_singletons, &local_state.singletons,
+                        gws_automorphism->write_singleton(&local_state.compare_singletons, &local_state.singletons,
                                                       wr_pos_st,wr_pos_end);
-                        bool found_auto = local_state.certify_automorphism(g, pautomorphism);
+                        bool found_auto = local_state.certify_automorphism(g, *gws_automorphism);
                         assert(pautomorphism.perm()[vert] == ind_v);
 
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
                             auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors,&local_state,
-                                                                       pautomorphism);
+                                                                       *gws_automorphism);
                             found_auto = (rec_succeeded.first && rec_succeeded.second);
                             if (rec_succeeded.first && !rec_succeeded.second) {
-                                pautomorphism.reset();
-                                pautomorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                                found_auto = local_state.certify_automorphism(g, pautomorphism);
+                                gws_automorphism->reset();
+                                gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
+                                found_auto = local_state.certify_automorphism(g, *gws_automorphism);
                             }
                         }
 
@@ -202,10 +200,10 @@ namespace dejavu {
                         // if we found automorphism, add to orbit, (and TODO: call hook)
                         if (found_auto) {
                             assert(pautomorphism.perm()[vert] == ind_v);
-                            if(hook) (*hook)(0, pautomorphism.perm(), pautomorphism.nsupport(), pautomorphism.support());
-                            orbs.add_automorphism_to_orbit(pautomorphism);
+                            if(hook) (*hook)(0, gws_automorphism->perm(), gws_automorphism->nsupport(), gws_automorphism->support());
+                            orbs.add_automorphism_to_orbit(*gws_automorphism);
                         }
-                        pautomorphism.reset();
+                        gws_automorphism->reset();
 
                         // move state back up where we started in this iteration
                         while (prev_base_pos < local_state.s_base_pos) {

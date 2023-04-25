@@ -1131,11 +1131,6 @@ namespace dejavu {
                 }
 
                 // if not, add the leaf
-                if(s_leaves < 100) {
-
-                } else {
-
-                }
                 const bool full_save = s_leaves < 100;
                 auto type = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
                 auto new_leaf = full_save?new stored_leaf(c.lab,c.lab_sz, type):new stored_leaf(base, type);

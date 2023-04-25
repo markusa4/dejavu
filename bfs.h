@@ -23,11 +23,11 @@ namespace dejavu {
             int s_total_kept      = 0;
             int s_total_automorphism_prune = 0;
             int s_total_leaves = 0;
-            groups::automorphism_workspace automorphism;
+            groups::automorphism_workspace* gws_automorphism;
 
         public:
-
-            bfs_ir(sgraph* g) : automorphism(g->v_size) {
+            void link_to_workspace(groups::automorphism_workspace* automorphism) {
+                gws_automorphism = automorphism;
             }
 
             void do_a_level(sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
@@ -130,12 +130,12 @@ namespace dejavu {
                 bool cert = true;
 
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
-                    automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                    cert = local_state.certify_automorphism(g, automorphism);
-                    ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(automorphism);
+                    gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
+                    cert = local_state.certify_automorphism(g, *gws_automorphism);
+                    ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
                     // TODO call hook
                     ++s_total_leaves;
-                    automorphism.reset();
+                    gws_automorphism->reset();
 
                     if(parent_node_base_pos == 0 && vert_on_base == parent_node_base_vert) ++ir_tree->h_bfs_automorphism_pw;
                 }
