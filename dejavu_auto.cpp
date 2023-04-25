@@ -5,9 +5,7 @@
 #include <iostream>
 #include "parser.h"
 #include <thread>
-#include "sassy/preprocessor.h"
 #include "dejavu.h"
-#include <cassert>
 #include <chrono>
 #include <string>
 

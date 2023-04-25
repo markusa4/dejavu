@@ -23,9 +23,9 @@ namespace dejavu::search_strategy {
      * for statistics of the search.
      */
     class random_ir {
-        //shared_leaves leaf_storage; /**< stores all the leaves */
+    private:
         std::default_random_engine generator; /**< random number generator */
-        std::vector<int>               heuristic_reroll;
+        std::vector<int> heuristic_reroll;
 
         groups::schreier_workspace*     gws_schreierw;
         groups::automorphism_workspace* gws_automorphism;
