@@ -106,6 +106,7 @@ namespace dejavu::search_strategy {
                 if (cert) {
                     // We found an automorphism!
                     s_rolling_success = (9.0 * s_rolling_success + 1.0) / 10.0;
+                    ++s_succeed;
 
                     // Output automorphism
                     if(hook) (*hook)(0, gws_automorphism->perm(), gws_automorphism->nsupport(), gws_automorphism->support());
@@ -145,8 +146,8 @@ namespace dejavu::search_strategy {
         int       s_paths         = 0;                       /**< how many total paths have been computed */
         int       s_paths_fail1   = 0;                       /**< how many total paths failed on first level */
         int       s_paths_failany = 0;
+        int       s_succeed       = 0;
         int       s_leaves     = 0;                       /**< how many leaves were added */
-        int       s_first_level_cost = 0;                 /**< accumulated cost on first level */
 
         // settings for heuristics
         int       h_leaf_limit = 0;                       /**< limit to how many leaves can be stored         */
@@ -172,7 +173,7 @@ namespace dejavu::search_strategy {
             s_trace_cost1      = 0;
             s_paths_failany    = 0;
             s_leaves           = 0;
-            s_first_level_cost = 0;
+            s_succeed          = 0;
             s_rolling_success = 0;
             s_rolling_first_level_success  = 1.0;
         }

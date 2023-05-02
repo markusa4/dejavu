@@ -206,6 +206,8 @@ namespace dejavu {
                     s_leaves_added_this_restart = 0;
                 }
 
+                const bool s_hard = h_budget > 10000; /* graph is "hard" */
+
                 // keep vertices which are save to individualize for in-processing
                 m_inprocess.inproc_can_individualize.clear();
 
@@ -215,6 +217,8 @@ namespace dejavu {
                 auto selector = m_selectors.get_selector_hook();
                 progress_print("selector", local_state.s_base_pos,local_state.T->get_position());
                 int base_size = local_state.s_base_pos;
+
+                // TODO if base sizes are equal, we should always prefer the one with smallest number of IR leaves
 
                 // determine whether base is "large", or "short"
                 s_long_base  = base_size >  sqrt(g->v_size);  /*< a "long"  base  */
@@ -343,10 +347,13 @@ namespace dejavu {
                     }
 
                     // we override the above decision in specific cases...
-                    if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0) h_next_routine = bfs_ir; /*< surely BFS will help */
                     if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart               */
+                    if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
+                       s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0) h_next_routine = bfs_ir; /*< surely BFS will help */
                     /* ... unless we are "almost done"... then stretch the budget! */
-                    if(m_rand.s_rolling_success > 0.2 && s_cost <= h_budget * 2) h_next_routine = random_ir;
+                    if(m_rand.h_almost_done(*sh_schreier)) h_next_routine = random_ir; /* we commit to this base! */
+                    if(m_rand.s_rolling_success > 0.2 && s_cost <= h_budget * 2)   h_next_routine = random_ir;
+                    if(s_hard && m_rand.s_succeed >= 1 && s_cost <= h_budget * 10) h_next_routine = random_ir;
                     // inprocess if BFS was successful in pruning on the first level
                     if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;/* inprocess*/
 
