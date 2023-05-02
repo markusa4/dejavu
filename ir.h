@@ -724,6 +724,13 @@ namespace dejavu {
                 candidates.reserve(locked_lim);
                 int prev_color = -1;
 
+                assert(state->s_base_pos == 0);
+                assert(state->base_vertex.size() == 0);
+                assert(state->base_color.size() == 0);
+                assert(state->base_cells.size() == 0);
+                assert(state->base_touched_color_list_pt.size() == 0);
+                assert(state->base_singleton_pt.size() == 0);
+
                 mark_set neighbour_color;
                 neighbour_color.initialize(g->v_size);
 
@@ -732,7 +739,6 @@ namespace dejavu {
 
                     // pick previous color if possible
                     if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
-                        //std::cout << "previous color" << std::endl;
                         best_color = prev_color;
                     } else if (prev_color >= 0) { // pick neighbour of previous color if possible
                         const int test_vertex = state->get_coloring()->lab[prev_color];
@@ -740,7 +746,6 @@ namespace dejavu {
                             const int other_vertex = g->e[g->v[test_vertex] + i];
                             const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
                             if (state->get_coloring()->ptn[other_color] > 0) {
-                                //std::cout << "neighbour color" << std::endl;
                                 neighbour_color.set(other_color);
                                 best_color = other_color;
                                 //break;
@@ -1249,7 +1254,6 @@ namespace dejavu {
             bool reset(std::vector<int> &new_base, ir::reduced_save* root, bool keep_old) {
                 if(!init) {
                     initialize(new_base, root);
-                    init = true;
                     return false;
                 }
 
@@ -1274,10 +1278,10 @@ namespace dejavu {
                 tree_level_size.resize(new_size + 1);
                 tree_data_jump_map.resize(new_size + 1);
 
-                for (int i = keep_until+1; i < old_size; ++i) {
+                for (int i = keep_until+1; i < new_size+1; ++i) {
+                    tree_data[i] = nullptr;
                     tree_level_size[i] = 0;
                     tree_data_jump_map[i].clear();
-                    tree_data[i] = nullptr;
                 }
 
                 if(keep_until == 0) {
@@ -1287,6 +1291,8 @@ namespace dejavu {
                     add_node(0, root, true);
                 }
                 assert(missing_nodes.empty());
+
+                current_base = new_base;
 
                 return true;
             }
@@ -1374,6 +1380,14 @@ namespace dejavu {
 
             tree_node* get_level(int level) {
                 return tree_data[level];
+            }
+
+            int get_current_level_size() {
+                return tree_level_size[finished_up_to];
+            }
+
+            int get_current_level_tracepos() {
+                return tree_data[finished_up_to]->get_save()->get_trace_position();
             }
 
             int get_level_size(int level) {

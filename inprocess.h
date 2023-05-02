@@ -42,6 +42,8 @@ namespace dejavu {
                 local_state.load_reduced_state(root_save);
                 const int cell_prev = root_save.get_coloring()->cells;
 
+                bool touched_coloring = false;
+
                 if (tree->get_finished_up_to() >= 1) {
                     // TODO: improve saving hash for pruned nodes, then propagate this to first level
                     // TODO: could fix "usr" maybe?
@@ -88,9 +90,11 @@ namespace dejavu {
                 }
 
                 inproc_can_individualize.clear();
-                local_state.save_reduced_state(root_save);
-
-                return cell_prev != local_state.c->cells;
+                if(cell_prev != local_state.c->cells) {
+                    local_state.save_reduced_state(root_save);
+                    touched_coloring = true;
+                }
+                return touched_coloring;
             }
         };
     }

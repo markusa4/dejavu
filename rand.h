@@ -141,6 +141,7 @@ namespace dejavu::search_strategy {
         double    s_rolling_first_level_success  = 1.0;   /**< rolling probability how many random paths succeed on the
                                                             *  first level*/
 
+        long      s_trace_cost1   = 0;
         int       s_paths         = 0;                       /**< how many total paths have been computed */
         int       s_paths_fail1   = 0;                       /**< how many total paths failed on first level */
         int       s_paths_failany = 0;
@@ -168,6 +169,7 @@ namespace dejavu::search_strategy {
         void reset_statistics() {
             s_paths            = 0;
             s_paths_fail1      = 0;
+            s_trace_cost1      = 0;
             s_paths_failany    = 0;
             s_leaves           = 0;
             s_first_level_cost = 0;
@@ -253,10 +255,13 @@ namespace dejavu::search_strategy {
                         base_aligned = false;
                     }
                     assert(local_state.c->vertex_to_col[v] == col);
+                    const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                     local_state.move_to_child(g, v);
 
                     if(base_pos == start_from_base_pos) {
+                        s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
+                        s_paths_fail1 += !local_state.T->trace_equal();
                         s_rolling_first_level_success =
                                 (9.0 * s_rolling_first_level_success + (local_state.T->trace_equal())) / 10.0;
                         if(!h_look_close && !local_state.T->trace_equal()) break;
@@ -268,7 +273,6 @@ namespace dejavu::search_strategy {
                 ++s_paths;
                 if(base_pos == start_from_base_pos) {
                     ++s_paths_failany;
-                    ++s_paths_fail1;
                     continue;
                 }
 
@@ -304,10 +308,13 @@ namespace dejavu::search_strategy {
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
+                    const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                     local_state.move_to_child(g, v);
 
                     if(base_pos == start_from_base_pos) {
+                        s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
+                        s_paths_fail1 += !local_state.T->trace_equal();
                         s_rolling_first_level_success =
                                 (9.0 * s_rolling_first_level_success + (local_state.T->trace_equal())) / 10.0;
                         if(!h_look_close && !local_state.T->trace_equal()) break;
@@ -318,7 +325,6 @@ namespace dejavu::search_strategy {
                 ++s_paths;
                 if(base_pos == start_from_base_pos) {
                     ++s_paths_failany;
-                    ++s_paths_fail1;
                     continue;
                 }
 

@@ -140,6 +140,7 @@ namespace dejavu {
             bool s_long_base        = false; /*< flag for bases that are considered very long  */
             bool s_short_base       = false; /*< flag for bases that are considered very short */
             bool s_few_cells        = false;
+            bool s_many_cells       = false;
             int  s_leaves_added_this_restart = 0;
             bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph in the last restart */
             int  s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
@@ -195,6 +196,7 @@ namespace dejavu {
                     local_state.load_reduced_state(root_save); /*< start over from root */
                     progress_print_split();
                     const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2;
+                    if(s_inprocessed) h_budget = 1;
                     h_budget *= increase_fac;
                     s_cost = 0;
 
@@ -207,13 +209,25 @@ namespace dejavu {
                 // keep vertices which are save to individualize for in-processing
                 m_inprocess.inproc_can_individualize.clear();
 
+
                 // find a selector, moves local_state to a leaf of IR shared_tree
                 m_selectors.find_base(g, &local_state, s_restarts);
                 auto selector = m_selectors.get_selector_hook();
                 progress_print("selector", local_state.s_base_pos,local_state.T->get_position());
                 int base_size = local_state.s_base_pos;
+
+                // determine whether base is "large", or "short"
+                s_long_base  = base_size >  sqrt(g->v_size);  /*< a "long"  base  */
+                s_short_base = base_size <= 2;                   /*< a "short" base  */
+                s_few_cells  = root_save.get_coloring()->cells <= 2;                  /*< "few"  cells in initial  */
+                s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial  */
+
+                const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
+                const bool s_too_long_long   = s_long_base && (base_size >  1.25 * s_last_base_size);
+                const bool s_too_long        = s_too_long_anyway || s_too_long_long;
+
                 // immediately discard this base if deemed too large, unless we are discarding too often
-                if (base_size > h_base_max_diff * s_last_base_size && s_consecutive_discard < 3) {
+                if (s_too_long && s_consecutive_discard < 3) {
                     progress_print("skip", local_state.s_base_pos,s_last_base_size);
                     ++s_consecutive_discard;
                     continue;
@@ -221,14 +235,11 @@ namespace dejavu {
                 s_consecutive_discard = 0;    /*< reset counter since we are not discarding this one   */
                 s_last_base_size = base_size; /*< also reset `s_last_base_size` to current `base_size` */
 
-                // determine whether base is "large", or "short"
-                s_long_base  = base_size >  sqrt(g->v_size);  /*< a "long"  base  */
-                s_short_base = base_size <= 2;                   /*< a "short" base  */
-
                 // make snapshot of trace and leaf, used by following search strategies
                 local_state.compare_to_this();
                 base       = local_state.base_vertex;   // we want to keep this for later
                 base_sizes = local_state.base_color_sz; // used for upper bounds in Schreier structure
+                const int s_trace_full_cost = local_state.T->get_position(); /*< total trace cost of this base */
 
                 // we first perform a depth-first search, starting from the computed leaf in local_state
                 m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
@@ -238,6 +249,7 @@ namespace dejavu {
                 progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
                 if (dfs_level == 0) break; // DFS finished the graph -- we are done!
+                const bool s_dfs_backtrack = m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
 
                 // next, we go into the random path + BFS algorithm, so we set up a Schreier structure and IR tree for
                 // the given base
@@ -248,7 +260,8 @@ namespace dejavu {
                         sh_schreier->reset(g->v_size, schreierw, base, base_sizes, dfs_level, can_keep_previous,
                                            m_inprocess.inproc_fixed_points);
                 if(reset_prob) sh_schreier->reset_probabilistic_criterion(); /*< need to reset probabilistic abort
-                                                                             *  criterion*/
+                                                                             *  criterion after inprocessing          */
+                if(s_inprocessed) m_rand.reset_statistics();
 
                 // then, we set up the shared IR tree, which contains computed BFS levels, stored leaves, as well as
                 // further gathered data for heuristics
@@ -261,17 +274,11 @@ namespace dejavu {
                 m_rand.specific_walk(g, *sh_tree, local_state, base);
                 // TODO find a better way to add canonical leaf to leaf store
 
-                // TODO continue refactor here
-
-                int bfs_cost_estimate = m_bfs.next_level_estimate(*sh_tree, selector);
-
-                const int flat_leaf_store_inc = sh_tree->stat_leaves();
-                //leaf_store_limit = std::max(std::min(leaf_store_limit, h_budget/2), 2);
-
+                s_last_bfs_pruned = false;
+                int s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
                 int s_iterations = 0;
-                int h_rand_allowed_fails = 0;
-                s_few_cells = root_save.get_coloring()->cells <= 2; /*< flag to tune heuristics */
-                if(s_inprocessed) m_rand.reset_statistics();
+                int h_rand_allowed_fails_total = 0;
+                int h_rand_allowed_fails_now   = 0;
 
                 // in the following, we will always decide between 3 different strategies: random paths, BFS, or
                 // inprocessing followed by a restart
@@ -282,99 +289,108 @@ namespace dejavu {
                 bool do_a_restart        = false; /*< we want to do a full restart */
                 bool finished_symmetries = false; /*< we found all the symmetries  */
 
+                h_rand_allowed_fails_now = 4;
+
                 while (!do_a_restart && !finished_symmetries) {
-                    // TODO decision heuristic goes here!
-                    // update some estimations
-                    bfs_cost_estimate = m_bfs.next_level_estimate(*sh_tree, selector);
+                    // What do we do next? Random search, BFS, or a restart?
+                    // Here are our decision heuristics (AKA dark magic)
 
-                    h_next_routine = restart;
+                    // first, we update our estimations / statistics
+                    s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
 
-                    bool   s_have_estimate    = (m_rand.s_paths >= 5);
-                    bool no_first_level_success = false;
-                    double first_level_success = 1;
-                    if(s_have_estimate) {
-                        no_first_level_success = (m_rand.s_paths_fail1 == m_rand.s_paths);
-                        first_level_success = (m_rand.s_paths_fail1*1.0) / (m_rand.s_paths*1.0);
+                    const bool s_have_rand_estimate   = (m_rand.s_paths >= 4);  /*< for some estimations, we need a few
+                                                                                 *  random paths */
+                    double s_path_fail1_avg  = 0;
+                    double s_trace_cost1_avg = s_trace_full_cost;
+
+                    int s_random_path_trace_cost = s_trace_full_cost - sh_tree->get_current_level_tracepos();
+                    if(s_have_rand_estimate) {
+                        s_path_fail1_avg    = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
+                        s_trace_cost1_avg   = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
                     }
 
-                    // main decision procedure
+                    double s_bfs_cost_estimate = s_trace_cost1_avg * s_bfs_next_level_nodes;
+
                     const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
-                    if(h_look_close) h_next_routine = bfs_ir;
-                    if(first_level_success < 0.1) h_next_routine = bfs_ir;
 
+                    // using this data, we now make a decision
+                    h_next_routine = restart; /*< undecided? do a restart */
 
-                    // decision overrides
-                    if(s_iterations == 0) {
+                    if(!s_have_rand_estimate) { /*< don't have an estimate, so let's poke a bit with random! */
                         h_next_routine = random_ir; /*< need to gather more information */
-                        h_rand_allowed_fails += 5;
+                    } else {
+                        // now that we have some data, we attempt to model how effective and costly random search and
+                        // BFS is, to then make an informed decision of what to do next
+
+                        // we do so by negatively scoring each method: higher score, worse technique
+                        double score_rand = s_trace_full_cost  * h_rand_allowed_fails_now * (1-m_rand.s_rolling_success);
+                        double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
+
+                        // we make some adjustments to try to model effect of techniques better
+                        // increase BFS score if BFS does not prune nodes on the next level -- we want to be somewhat
+                        // reluctant to perform BFS in this case
+                        if(s_path_fail1_avg < 0.01) score_bfs *= 2;
+
+                        // we quadratically decrease the BFS score if we are beyond the first level, in the hope that
+                        // this models the effect of deviation maps
+                        if(sh_tree->get_finished_up_to() >= 1) score_bfs *= (1-s_path_fail1_avg); /* hope for deviation*/
+
+                        //std::cout << score_rand << " vs. " << score_bfs << std::endl;
+
+                        h_next_routine    = (score_rand < score_bfs)? random_ir : bfs_ir;
+                        h_rand_allowed_fails_now = h_next_routine == random_ir?
+                                                   2*h_rand_allowed_fails_now : h_rand_allowed_fails_now;
                     }
-                    if(s_cost > h_budget) h_next_routine = restart;
 
-                    /*
-                     *
-                     *                         if (m_rand.s_rolling_first_level_success > 0.99) s_few_cells = false;
-                        if (s_short_base && s_regular && m_rand.s_rolling_success < 0.01) s_few_cells = true;
-                        else if (!(((bfs_cost_estimate <= g->v_size ||
-                                     bfs_cost_estimate * m_rand.s_rolling_first_level_success < 12)) &&
-                                   m_rand.s_rolling_first_level_success < 0.99) &&
-                                 leaf_store_limit <= (bfs_cost_estimate * m_rand.s_rolling_first_level_success) / 2) {
-                            if (m_rand.s_rolling_success > 0.1 && !s_few_cells) {
-                                leaf_store_limit *= 2;
-                                continue;
-                            }
-                            if (m_rand.s_rolling_first_level_success * bfs_cost_estimate > leaf_store_limit &&
-                                !s_few_cells) {
-                                leaf_store_limit = std::min(std::max(
-                                        (int) m_rand.s_rolling_first_level_success * bfs_cost_estimate,
-                                        ((int) (1.5 * (leaf_store_limit + 1.0)))), h_budget + 1);
-                                continue;
-                            }
-                        }
-
-                        if (s_restarts < 2 && s_cost + bfs_cost_estimate > h_budget && !s_few_cells) {
-                            do_a_restart = true;
-                            progress_print("restart", std::to_string(s_cost), std::to_string(h_budget));
-                            break;
-                        }
-                        s_few_cells = false;
-                     */
+                    // we override the above decision in specific cases...
+                    if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0) h_next_routine = bfs_ir; /*< surely BFS will help */
+                    if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart               */
+                    /* ... unless we are "almost done"... then stretch the budget! */
+                    if(m_rand.s_rolling_success > 0.2 && s_cost <= h_budget * 2) h_next_routine = random_ir;
+                    // inprocess if BFS was successful in pruning on the first level
+                    if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;/* inprocess*/
 
                     switch(h_next_routine) {
                         case random_ir: {
+                            h_rand_allowed_fails_total += h_rand_allowed_fails_now;
                             m_rand.setup(h_look_close); // TODO: look_close does not seem worth it
 
                             const int leaves_pre = sh_tree->stat_leaves();
                             if (sh_tree->get_finished_up_to() == 0) {
                                 // random automorphisms, single origin
-                                m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state, h_rand_allowed_fails);
+                                m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
+                                                    h_rand_allowed_fails_total);
                             } else {
                                 // random automorphisms, sampled from shared_tree
-                                m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier, local_state, h_rand_allowed_fails);
+                                m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier, local_state,
+                                                              h_rand_allowed_fails_total);
                             }
                             s_leaves_added_this_restart = sh_tree->stat_leaves() - leaves_pre;
 
                             progress_print("urandom", sh_tree->stat_leaves(), m_rand.s_rolling_success);
-                            progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
-                                                       std::to_string(sh_schreier->s_densegen()), "_");
+                            if(sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
+                                progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
+                                                           std::to_string(sh_schreier->s_densegen()), "_");
+                            }
 
                             if (sh_schreier->deterministic_abort_criterion() ||
                                 sh_schreier->probabilistic_abort_criterion()) {
                                 finished_symmetries = true;
                             }
-                            s_cost += s_leaves_added_this_restart; // TODO: should only add diff
+                            s_cost += h_rand_allowed_fails_now;
                         }
                         break;
                         case bfs_ir: {
-                            bfs_cost_estimate = sh_tree->get_finished_up_to() < base_size?
-                                                m_bfs.next_level_estimate(*sh_tree,selector) : -1;
+                            // perform one level of BFS
                             m_bfs.do_a_level(g, *sh_tree, local_state, selector);
                             progress_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
-                                                  std::to_string(bfs_cost_estimate) + ")",
+                                                  std::to_string(s_bfs_next_level_nodes) + ")",
                                            std::to_string(sh_tree->get_level_size(sh_tree->get_finished_up_to())));
 
-                            // A bit of a mess here! Manage correct group size whenever BFS finishes the graph. A bit complicated
-                            // because of the special code for `base_size == 2`, which can perform automorphism pruning. The
-                            // removed automorphisms must be accounted for when calculating the group size.
+                            // A bit of a mess here! Manage correct group size whenever BFS finishes the graph. A bit
+                            // complicated because of the special code for `base_size == 2`, which can perform
+                            // automorphism pruning. (The removed automorphisms must be accounted for when calculating
+                            // the group size.)
                             if (sh_tree->get_finished_up_to() == base_size) {
                                 finished_symmetries = true;
                                 if (base_size == 2) { /*< case for the special code */
@@ -388,14 +404,9 @@ namespace dejavu {
                             }
 
                             // if there are less remaining nodes than we expected, we pruned some nodes
-                            s_last_bfs_pruned =
-                                    sh_tree->get_level_size(sh_tree->get_finished_up_to()) < bfs_cost_estimate;
-
-                            // TODO this should go into decision code?
-                            // probably want to inprocess if BFS was successful in pruning on the first level
-                            if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) {
-                                do_a_restart = true;
-                            }
+                            s_last_bfs_pruned = sh_tree->get_current_level_size() < s_bfs_next_level_nodes;
+                            m_rand.reset_statistics();
+                            s_cost += sh_tree->get_current_level_size();
                         }
                         break;
                         case restart:
@@ -411,6 +422,7 @@ namespace dejavu {
 
                 // If not done, we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
+                //if(s_inprocessed) h_budget = 1;
             }
 
             // We are done! Let's add up the total group size from all the different modules.
@@ -419,10 +431,9 @@ namespace dejavu {
             multiply_to_group_size(m_inprocess.s_grp_sz_man, m_inprocess.s_grp_sz_exp);
             multiply_to_group_size(m_prep.base, m_prep.exp);
             multiply_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
-            if(sh_schreier) {
-                multiply_to_group_size(sh_schreier->compute_group_size());
-                delete sh_schreier; /*< also, clean up allocated schreier structure*/
-            }
+            multiply_to_group_size(sh_schreier->compute_group_size());
+
+            delete sh_schreier; /*< also, clean up allocated schreier structure*/
             delete sh_tree;  /*< ... and also the shared IR tree */
         }
     };

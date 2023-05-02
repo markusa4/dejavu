@@ -39,6 +39,8 @@ namespace dejavu {
                 s_total_automorphism_prune = 0;
                 s_total_leaves = 0;
 
+                assert(ir_tree.get_current_level_size() > 0);
+
                 queue_up_level(selector, ir_tree, current_level);
                 work_on_todo(g, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
@@ -47,6 +49,7 @@ namespace dejavu {
             int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
                 const int base_pos = ir_tree.get_finished_up_to();
                 const auto start_node = ir_tree.get_level(base_pos);
+                assert(start_node != nullptr);
                 const auto level_size = ir_tree.get_level_size(base_pos);
                 auto next_node_save = start_node->get_save();
                 auto c = next_node_save->get_coloring();
@@ -57,6 +60,7 @@ namespace dejavu {
 
             void queue_up_level(std::function<ir::type_selector_hook> *selector, ir::shared_tree& ir_tree, int base_pos) {
                 auto start_node = ir_tree.get_level(base_pos);
+                assert(start_node != nullptr);
                 while(!start_node->get_base()) {
                     start_node = start_node->get_next();
                 }
@@ -69,8 +73,8 @@ namespace dejavu {
                 do {
                     auto next_node_save = next_node->get_save();
                     auto c = next_node_save->get_coloring();
-                    auto base_pos    = next_node_save->get_base_position();
-                    int col = (*selector)(c, base_pos);
+                    auto this_base_pos    = next_node_save->get_base_position();
+                    int col = (*selector)(c, this_base_pos);
                     if(!reserve && col >= 0) {
                         //expected_for_base = c->ptn[col] + 1;
                         ir_tree.stored_deviation.start(c->ptn[col] + 1);
@@ -79,7 +83,9 @@ namespace dejavu {
                     }
 
                     if(col >= 0) {
-                        for (int i = 0; i < c->ptn[col] + 1; ++i) ir_tree.queue_missing_node({next_node, c->lab[col + i]});
+                        for (int i = 0; i < c->ptn[col] + 1; ++i) {
+                            ir_tree.queue_missing_node({next_node, c->lab[col + i]});
+                        }
                     }
                     next_node = next_node->get_next();
                 } while(next_node != start_node);
@@ -141,7 +147,7 @@ namespace dejavu {
                 }
 
                 // TODO work on control flow below
-                if(local_state.T->trace_equal() && cert) { // TODO: what if leaf?
+                if(local_state.T->trace_equal() && cert) {
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);

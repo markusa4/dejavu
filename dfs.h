@@ -35,6 +35,9 @@ namespace dejavu {
             groups::automorphism_workspace* gws_automorphism;
 
         public:
+            enum termination_reason {r_none, r_fail, r_cost};
+            termination_reason s_termination = r_none;
+
             double h_recent_cost_snapshot_limit = 0.25; /**< A float in the range [0-1]. Limits continuation of DFS
                                                           * search to whethercomputing recent elements only cost this
                                                           * fraction of the cost of an entire root-to-leaf walk. */
@@ -133,6 +136,7 @@ namespace dejavu {
 
                 // automorphism workspace
                 //groups::automorphism_workspace pautomorphism(g->v_size);
+                gws_automorphism->reset();
 
                 // we want to terminate if things become to costly, we save the current trace position to track cost
                 cost_snapshot = local_state.T->get_position();
@@ -159,7 +163,7 @@ namespace dejavu {
                         const int ind_v = local_state.leaf_color.lab[col + i];
 
                         // only consider every orbit once
-                        if (ind_v == vert || !orbs.represents_orbit(ind_v)) continue;
+                        if (ind_v == vert || !orbs.represents_orbit(ind_v))  continue;
                         if (orbs.are_in_same_orbit(ind_v, vert))        continue;
 
                         // track cost of this refinement for whatever is to come
@@ -236,6 +240,9 @@ namespace dejavu {
                         }
                     }
                 }
+
+                // set reason for termination
+                s_termination = fail? r_fail : r_cost;
 
                 // if DFS failed on current level, we did not finish the current level -- has to be accounted for
                 return local_state.s_base_pos + (fail);

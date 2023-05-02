@@ -226,7 +226,7 @@ namespace dejavu {
             void write_singleton(std::vector<int> *singletons1, std::vector<int> *singletons2, int pos_start, int pos_end) {
                 for (int i = pos_start; i < pos_end; ++i) {
                     const int from = (*singletons1)[i];
-                    const int to = (*singletons2)[i];
+                    const int to   = (*singletons2)[i];
                     assert(automorphism[from] == from);
                     if (from != to) {
                         automorphism_supp.push_back(from);
