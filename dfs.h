@@ -178,7 +178,7 @@ namespace dejavu {
                         gws_automorphism->write_singleton(&local_state.compare_singletons, &local_state.singletons,
                                                       wr_pos_st,wr_pos_end);
                         bool found_auto = local_state.certify_automorphism(g, *gws_automorphism);
-                        assert(pautomorphism.perm()[vert] == ind_v);
+                        assert(gws_automorphism->perm()[vert] == ind_v);
 
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
@@ -199,7 +199,7 @@ namespace dejavu {
 
                         // if we found automorphism, add to orbit, (and TODO: call hook)
                         if (found_auto) {
-                            assert(pautomorphism.perm()[vert] == ind_v);
+                            assert(gws_automorphism->perm()[vert] == ind_v);
                             if(hook) (*hook)(0, gws_automorphism->perm(), gws_automorphism->nsupport(), gws_automorphism->support());
                             orbs.add_automorphism_to_orbit(*gws_automorphism);
                         }

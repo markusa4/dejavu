@@ -695,16 +695,16 @@ namespace dejavu {
             }
 
 
-            void find_base(const int m_choose, refinement *R, sgraph *g, controller *state) {
-                switch(m_choose % 3) {
+            void find_base(sgraph *g, controller *state, const int h_choose) {
+                switch(h_choose % 3) {
                     case 0:
-                        find_sparse_optimized_base(R, g, state);
+                        find_sparse_optimized_base(g, state);
                         break;
                     case 1:
-                        find_combinatorial_optimized_base(R, g, state);
+                        find_combinatorial_optimized_base(g, state);
                         break;
                     case 2:
-                        find_small_optimized_base(R, g, state);
+                        find_small_optimized_base(g, state);
                         break;
                 }
             }
@@ -716,7 +716,7 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_sparse_optimized_base(refinement *R, sgraph *g, controller *state) {
+            void find_sparse_optimized_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
                 test_set.initialize(g->v_size);
@@ -788,7 +788,7 @@ namespace dejavu {
                 saved_color_base = state->base_color;
             }
 
-            void find_test_base(refinement *R, sgraph *g, controller *state) {
+            void find_test_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
                 candidates.clear();
@@ -852,7 +852,7 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_small_optimized_base(refinement *R, sgraph *g, controller *state) {
+            void find_small_optimized_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
                 test_set.initialize(g->v_size);
@@ -908,7 +908,7 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_combinatorial_optimized_base(refinement *R, sgraph *g, controller *state) {
+            void find_combinatorial_optimized_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
                 test_set.initialize(g->v_size);
@@ -1209,6 +1209,8 @@ namespace dejavu {
             std::vector<int> current_base;
 
             std::vector<long>       node_invariant;
+
+            bool init = false;
         public:
             groups::orbit h_bfs_top_level_orbit;
             int h_bfs_automorphism_pw = 0;
@@ -1229,8 +1231,8 @@ namespace dejavu {
                 tree_data_jump_map.resize(base.size() + 1);
                 add_node(0, root, true);
                 node_invariant.resize(root->get_coloring()->lab_sz);
-
                 current_base = base;
+                init = true;
             }
 
             void clear_leaves() {
@@ -1245,6 +1247,12 @@ namespace dejavu {
             }
 
             bool reset(std::vector<int> &new_base, ir::reduced_save* root, bool keep_old) {
+                if(!init) {
+                    initialize(new_base, root);
+                    init = true;
+                    return false;
+                }
+
                 const int old_size = current_base.size();
                 const int new_size = new_base.size();
 

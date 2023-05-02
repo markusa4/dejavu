@@ -79,6 +79,7 @@ namespace dejavu::search_strategy {
                 // If not, add leaf to leaf_storage
                 if (other_leaf == nullptr) {
                     ++s_leaves;
+                    ++s_paths_failany;
                     s_rolling_success = (9.0 * s_rolling_success + 0.0) / 10.0;
                     leaf_storage.add_leaf(hash_c, *local_state.c, local_state.base_vertex);
                     return false;
@@ -123,7 +124,10 @@ namespace dejavu::search_strategy {
                 } else {
                     if(hash_offset > 0) std::cout << "cert fail " << other_leaf->get_store_type() << "/" << ir::stored_leaf::STORE_LAB << std::endl;
                     // If we used the more involved loading procedure, break for now
-                    if(used_load) break; // TODO maybe there is better fix here...
+                    if(used_load) {
+                        ++s_paths_failany;
+                        break; // TODO maybe there is better fix here...
+                    }
                     continue;
                 }
             }
@@ -137,8 +141,9 @@ namespace dejavu::search_strategy {
         double    s_rolling_first_level_success  = 1.0;   /**< rolling probability how many random paths succeed on the
                                                             *  first level*/
 
-        int       s_paths      = 0;                       /**< how many total paths have been computed */
-        int       s_paths_fail = 0;                       /**< how many total paths failed on first level */
+        int       s_paths         = 0;                       /**< how many total paths have been computed */
+        int       s_paths_fail1   = 0;                       /**< how many total paths failed on first level */
+        int       s_paths_failany = 0;
         int       s_leaves     = 0;                       /**< how many leaves were added */
         int       s_first_level_cost = 0;                 /**< accumulated cost on first level */
 
@@ -149,8 +154,9 @@ namespace dejavu::search_strategy {
         bool      h_sift_random     = true;
         int       h_sift_random_lim = 8;  // was 128
 
-        void setup(int error, int leaf_store_limit, bool look_close = false) {
-            h_leaf_limit = leaf_store_limit;
+        void setup(bool look_close = false) {
+            //h_leaf_limit = leaf_store_limit;
+            //h_fail_limit = fail_limit;
             h_look_close = look_close;
         }
 
@@ -159,17 +165,17 @@ namespace dejavu::search_strategy {
             gws_schreierw    = schreier;
         }
 
-        void reset() {
+        void reset_statistics() {
             s_paths            = 0;
-            s_paths_fail       = 0;
+            s_paths_fail1      = 0;
+            s_paths_failany    = 0;
             s_leaves           = 0;
             s_first_level_cost = 0;
-            h_leaf_limit = 0;
             s_rolling_success = 0;
             s_rolling_first_level_success  = 1.0;
         }
 
-        bool h_almost_done(groups::shared_schreier &group) {
+        static bool h_almost_done(groups::shared_schreier &group) {
             return group.s_consecutive_success >= 1;
         }
 
@@ -186,7 +192,8 @@ namespace dejavu::search_strategy {
         // TODO random_walks_from_tree should be the only outward facing method? base_aligned should just happen automatically, or flag
 
         void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
-                          ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state) {
+                          ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state,
+                          int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             ir::reduced_save my_own_save;
@@ -194,8 +201,10 @@ namespace dejavu::search_strategy {
             ir::reduced_save* root_save  = ir_tree.pick_node_from_level(0,0)->get_save();
             ir::reduced_save* start_from = root_save;
 
-            while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
-                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
+            //while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
+            //      && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
+            while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
+                    s_paths_failany < fail_limit) {
                 local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
 
                 int could_start_from = group.finished_up_to_level();
@@ -258,7 +267,8 @@ namespace dejavu::search_strategy {
 
                 ++s_paths;
                 if(base_pos == start_from_base_pos) {
-                    ++s_paths_fail;
+                    ++s_paths_failany;
+                    ++s_paths_fail1;
                     continue;
                 }
 
@@ -271,17 +281,18 @@ namespace dejavu::search_strategy {
         // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
         void random_walks_from_tree(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                                     ir::shared_tree &ir_tree, groups::shared_schreier &group,
-                                    ir::controller &local_state) {
+                                    ir::controller &local_state, int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
 
-            while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
+           /* while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
                   && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))
                   && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit/4 || s_rolling_success > 0.001 || s_rolling_first_level_success > 0.1) // re-consider...
-                  && s_rolling_first_level_success > 0.001) { //  * s_rolling_first_level_success
-
+                  && s_rolling_first_level_success > 0.001) { //  * s_rolling_first_level_success*/
+            while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
+                    s_paths_failany < fail_limit) {
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                 local_state.load_reduced_state(*node->get_save());
 
@@ -306,7 +317,8 @@ namespace dejavu::search_strategy {
 
                 ++s_paths;
                 if(base_pos == start_from_base_pos) {
-                    ++s_paths_fail;
+                    ++s_paths_failany;
+                    ++s_paths_fail1;
                     continue;
                 }
 

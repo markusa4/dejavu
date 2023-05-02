@@ -618,6 +618,7 @@ namespace dejavu {
              */
             void initialize(int domain_size) {
                 this->domain_size = domain_size;
+                assert(this->domain_size > 0);
             }
 
             /**
@@ -968,9 +969,11 @@ namespace dejavu {
             generating_set generators;
             work_list_t<shared_transversal *> transversals;
 
+            bool init = false;
+
         public:
-            int s_consecutive_success = 0; /**< track repeated sifts for probabilistic abort criterion */
-            int s_error_bound         = 5; /**< determines error probability                           */
+            int s_consecutive_success = 0;  /**< track repeated sifts for probabilistic abort criterion */
+            int h_error_bound         = 10; /**< determines error probability                           */
 
             /**
              * @return Number of stored generators using a sparse data structure.
@@ -994,17 +997,18 @@ namespace dejavu {
              * @param base_sizes upper bounds for the size of transversals
              * @param stop integer which indicates to stop reading the base at this position
              */
-            void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop, int error_bound  = 10) {
+            void initialize(const int domain_size, std::vector<int> &base, std::vector<int> &base_sizes, const int stop) {
                 assert(base.size() >= stop);
                 this->domain_size = domain_size;
+                assert(this->domain_size > 0);
                 generators.initialize(domain_size);
                 transversals.allocate(stop);
                 transversals.set_size(stop);
-                s_error_bound = error_bound;
                 for (int i = 0; i < stop; ++i) {
                     transversals[i] = new shared_transversal();
                     transversals[i]->initialize(base[i], i, base_sizes[i]);
                 }
+                init = true;
             }
 
             /**
@@ -1015,7 +1019,13 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
-            bool reset(schreier_workspace& w, std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old, std::vector<int> &global_fixed_points) {
+            bool reset(int domain_size, schreier_workspace& w, std::vector<int> &new_base,
+                       std::vector<int> &new_base_sizes, const int stop, bool keep_old,
+                       std::vector<int> &global_fixed_points) {
+                if(!init) {
+                    initialize(domain_size, new_base, new_base_sizes, stop);
+                    return false;
+                }
                 const int old_size = transversals.size();
                 const int new_size = stop;
 
@@ -1201,7 +1211,7 @@ namespace dejavu {
                     ++s_consecutive_success;
                 } else {
                     if(s_consecutive_success > 0) {
-                        ++s_error_bound;
+                        ++h_error_bound;
                         s_consecutive_success = 0;
                     }
                 }
@@ -1218,7 +1228,7 @@ namespace dejavu {
              * @return Whether the probabilistic abort criterion allows termination or not.
              */
             bool probabilistic_abort_criterion() {
-                return (s_consecutive_success > s_error_bound);
+                return (s_consecutive_success > h_error_bound);
             }
 
             /**
