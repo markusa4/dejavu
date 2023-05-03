@@ -128,6 +128,8 @@ namespace dejavu {
             // we first need to set up quite a few datastructures and modules
             // we start by transferring the graph
             transfer_sassy_sgraph_to_sgraph(g, &gg);
+
+            // flag to denote which color refinement version is used
             g->dense = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
 
             // settings of heuristics
@@ -135,16 +137,16 @@ namespace dejavu {
             int  h_budget_inc_fact  = 5;  /*< factor used when increasing the budget */
 
             // statistics used to steer heuristics
-            int  s_restarts         = -1;    /*< number of restarts performed                  */
-            int  s_cost             = 0;     /*< cost induced by current restart iteration     */
-            bool s_long_base        = false; /*< flag for bases that are considered very long  */
-            bool s_short_base       = false; /*< flag for bases that are considered very short */
+            int  s_restarts         = 0;    /*< number of restarts performed                     */
+            int  s_cost             = 0;     /*< cost induced so far by current restart iteration */
+            bool s_long_base        = false; /*< flag for bases that are considered very long     */
+            bool s_short_base       = false; /*< flag for bases that are considered very short    */
             bool s_few_cells        = false;
             bool s_many_cells       = false;
-            bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph in the last restart */
+            bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph since last restart */
             int  s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                              *  case where all searchable bases became much larger due to BFS or other
-                                             *  changes*/
+                                             *  changes */
             bool s_last_bfs_pruned = false; /*< keep track of whether last BFS calculation pruned some nodes */
 
             // some data we want to keep track of
@@ -250,11 +252,12 @@ namespace dejavu {
                                            can_keep_previous,m_inprocess.inproc_fixed_points);
                 if(reset_prob) sh_schreier->reset_probabilistic_criterion(); /*< need to reset probabilistic abort
                                                                              *  criterion after inprocessing          */
-                if(s_inprocessed) m_rand.reset_statistics();
+                m_rand.reset_statistics();
 
                 // then, we set up the shared IR tree, which contains computed BFS levels, stored leaves, as well as
                 // further gathered data for heuristics
                 sh_tree->reset(base, &root_save, can_keep_previous);
+                if(s_inprocessed) sh_tree->clear_leaves();
 
                 s_inprocessed = false; /*< tracks whether we changed the root of IR tree since we've initialized BFS and
                                         *   Schreier last time */
@@ -266,8 +269,8 @@ namespace dejavu {
                 s_last_bfs_pruned = false;
                 int s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
                 int s_iterations = 0;
-                int h_rand_allowed_fails_total = 0;
-                int h_rand_allowed_fails_now   = 0;
+                int h_rand_fail_lim_total = 0;
+                int h_rand_fail_lim_now   = 0;
 
                 // in the following, we will always decide between 3 different strategies: random paths, BFS, or
                 // inprocessing followed by a restart
@@ -278,11 +281,11 @@ namespace dejavu {
                 bool do_a_restart        = false; /*< we want to do a full restart */
                 bool finished_symmetries = false; /*< we found all the symmetries  */
 
-                h_rand_allowed_fails_now = 4;
+                h_rand_fail_lim_now = 4;
 
                 while (!do_a_restart && !finished_symmetries) {
                     // What do we do next? Random search, BFS, or a restart?
-                    // Here are our decision heuristics (AKA dark magic)
+                    // here are our decision heuristics (AKA dark magic)
 
                     // first, we update our estimations / statistics
                     s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
@@ -312,26 +315,25 @@ namespace dejavu {
                         // BFS is, to then make an informed decision of what to do next
 
                         // we do so by negatively scoring each method: higher score, worse technique
-                        double score_rand = s_trace_full_cost * h_rand_allowed_fails_now * (1-m_rand.s_rolling_success);
+                        double score_rand = s_trace_full_cost * h_rand_fail_lim_now * (1-m_rand.s_rolling_success);
                         double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
 
                         // we make some adjustments to try to model effect of techniques better
                         // increase BFS score if BFS does not prune nodes on the next level -- we want to be somewhat
-                        // reluctant to perform BFS in this case
+                        // more reluctant to perform BFS in this case
                         if(s_path_fail1_avg < 0.01) score_bfs *= 2;
 
-                        // we quadratically decrease the BFS score if we are beyond the first level, in the hope that
-                        // this models the effect of deviation maps
-                        if(sh_tree->get_finished_up_to() >= 1) score_bfs *= (1-s_path_fail1_avg); /* hope for deviation*/
+                        // we decrease the BFS score if we are beyond the first level, in the hope that this models
+                        // the effect of trace deviation maps
+                        if(sh_tree->get_finished_up_to() >= 1) score_bfs *= (1-s_path_fail1_avg);
 
                         //std::cout << score_rand << " vs. " << score_bfs << std::endl;
 
-                        h_next_routine    = (score_rand < score_bfs)? random_ir : bfs_ir;
-                        h_rand_allowed_fails_now = h_next_routine == random_ir?
-                                                   2*h_rand_allowed_fails_now : h_rand_allowed_fails_now;
+                        h_next_routine    = (score_rand < score_bfs)? random_ir : bfs_ir; /*< the decision! */
+                        h_rand_fail_lim_now = h_next_routine == random_ir? 2*h_rand_fail_lim_now : h_rand_fail_lim_now;
                     }
 
-                    // we override the above decision in specific cases...
+                    // we override the above decisions in specific cases...
                     if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
                     if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                        s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
@@ -347,17 +349,17 @@ namespace dejavu {
 
                     switch(h_next_routine) {
                         case random_ir: {
-                            h_rand_allowed_fails_total += h_rand_allowed_fails_now;
+                            h_rand_fail_lim_total += h_rand_fail_lim_now;
                             m_rand.setup(h_look_close); // TODO: look_close does not seem worth it
 
                             if (sh_tree->get_finished_up_to() == 0) {
                                 // random automorphisms, single origin
                                 m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
-                                                    h_rand_allowed_fails_total);
+                                                    h_rand_fail_lim_total);
                             } else {
                                 // random automorphisms, sampled from shared_tree
                                 m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
-                                                              local_state,h_rand_allowed_fails_total);
+                                                              local_state, h_rand_fail_lim_total);
                             }
 
                             progress_print("urandom", sh_tree->stat_leaves(), m_rand.s_rolling_success);
@@ -368,7 +370,7 @@ namespace dejavu {
 
                             finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
                                                   sh_schreier->probabilistic_abort_criterion();
-                            s_cost += h_rand_allowed_fails_now;
+                            s_cost += h_rand_fail_lim_now;
                         }
                         break;
                         case bfs_ir: {
@@ -414,10 +416,10 @@ namespace dejavu {
                 // Are we done or just restarting?
                 if (finished_symmetries) break; // we are done
 
-                // If not done, we are restarting -- so we try to inprocess using the gathered data
+                // we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
 
-                // Now, we manage the restart....
+                // now, we manage the restart....
                 ++s_restarts; /*< increase the restart counter */
                 local_state.load_reduced_state(root_save); /*< start over from root */
                 progress_print_split();
@@ -425,10 +427,6 @@ namespace dejavu {
                 if(s_inprocessed) h_budget = 1;          /*< if we inprocessed, we hope that the graph is easy again */
                 h_budget *= increase_fac;                                                   /*< increase the budget! */
                 s_cost = 0;                                                                        /* reset the cost */
-
-                // Reset some of the shared structures
-                if(s_inprocessed && sh_tree) sh_tree->clear_leaves();
-                m_rand.reset_statistics();
             }
 
             // We are done! Let's add up the total group size from all the different modules.
@@ -439,8 +437,8 @@ namespace dejavu {
             multiply_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
             multiply_to_group_size(sh_schreier->compute_group_size());
 
-            delete sh_schreier; /*< also, clean up allocated schreier structure*/
-            delete sh_tree;  /*< ... and also the shared IR tree */
+            delete sh_schreier; /*< clean up allocated schreier structure */
+            delete sh_tree;     /*< ... and also the shared IR tree       */
         }
     };
 }
