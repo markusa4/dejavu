@@ -141,7 +141,6 @@ namespace dejavu {
             bool s_short_base       = false; /*< flag for bases that are considered very short */
             bool s_few_cells        = false;
             bool s_many_cells       = false;
-            int  s_leaves_added_this_restart = 0;
             bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph in the last restart */
             int  s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                              *  case where all searchable bases became much larger due to BFS or other
@@ -191,21 +190,6 @@ namespace dejavu {
             // loop for restarts
             while (true) {
                 // "Dry land is not a myth, I've seen it!"
-                ++s_restarts;
-                if (s_restarts >= 1) { /* no need for this on first iteration of loop */
-                    local_state.load_reduced_state(root_save); /*< start over from root */
-                    progress_print_split();
-                    const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2;
-                    if(s_inprocessed) h_budget = 1;
-                    h_budget *= increase_fac;
-                    s_cost = 0;
-
-                    if(s_inprocessed && sh_tree) sh_tree->clear_leaves(); // TODO if I link up the corresponding root to each leaf, I can keep using them... also "from BFS" would be more efficient in leaf recovery?
-                    m_rand.reset_statistics();
-
-                    s_leaves_added_this_restart = 0;
-                }
-
                 const bool s_hard = h_budget > 10000; /* graph is "hard" */
 
                 // keep vertices which are save to individualize for in-processing
@@ -228,7 +212,8 @@ namespace dejavu {
 
                 const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                 const bool s_too_long_long   = s_long_base && (base_size >  1.25 * s_last_base_size);
-                const bool s_too_long        = s_too_long_anyway || s_too_long_long;
+                const bool s_too_long_hard   = s_hard && !s_inprocessed && (base_size > s_last_base_size);
+                const bool s_too_long        = s_too_long_anyway || s_too_long_long || s_too_long_hard;
 
                 // immediately discard this base if deemed too large, unless we are discarding too often
                 if (s_too_long && s_consecutive_discard < 3) {
@@ -261,8 +246,8 @@ namespace dejavu {
                 // first, the schreier structure
                 const bool can_keep_previous = (s_restarts >= 3) && !s_inprocessed;
                 const bool reset_prob =
-                        sh_schreier->reset(g->v_size, schreierw, base, base_sizes, dfs_level, can_keep_previous,
-                                           m_inprocess.inproc_fixed_points);
+                        sh_schreier->reset(g->v_size, schreierw, base, base_sizes, dfs_level,
+                                           can_keep_previous,m_inprocess.inproc_fixed_points);
                 if(reset_prob) sh_schreier->reset_probabilistic_criterion(); /*< need to reset probabilistic abort
                                                                              *  criterion after inprocessing          */
                 if(s_inprocessed) m_rand.reset_statistics();
@@ -327,7 +312,7 @@ namespace dejavu {
                         // BFS is, to then make an informed decision of what to do next
 
                         // we do so by negatively scoring each method: higher score, worse technique
-                        double score_rand = s_trace_full_cost  * h_rand_allowed_fails_now * (1-m_rand.s_rolling_success);
+                        double score_rand = s_trace_full_cost * h_rand_allowed_fails_now * (1-m_rand.s_rolling_success);
                         double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
 
                         // we make some adjustments to try to model effect of techniques better
@@ -347,32 +332,33 @@ namespace dejavu {
                     }
 
                     // we override the above decision in specific cases...
-                    if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart               */
+                    if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
                     if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
-                       s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0) h_next_routine = bfs_ir; /*< surely BFS will help */
-                    /* ... unless we are "almost done"... then stretch the budget! */
-                    if(m_rand.h_almost_done(*sh_schreier)) h_next_routine = random_ir; /* we commit to this base! */
-                    if(m_rand.s_rolling_success > 0.2 && s_cost <= h_budget * 2)   h_next_routine = random_ir;
+                       s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
+                        h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
+
+                    // ... unless we are "almost done"... then we stretch the budget!
+                    if(m_rand.h_almost_done(*sh_schreier)) h_next_routine = random_ir; /* full commit to this base!*/
+                    if(m_rand.s_rolling_success > 0.1 && s_cost <= h_budget * 2) h_next_routine = random_ir;
                     if(s_hard && m_rand.s_succeed >= 1 && s_cost <= h_budget * 10) h_next_routine = random_ir;
-                    // inprocess if BFS was successful in pruning on the first level
-                    if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;/* inprocess*/
+
+                    // immediately inprocess if BFS was successful in pruning on the first level
+                    if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;
 
                     switch(h_next_routine) {
                         case random_ir: {
                             h_rand_allowed_fails_total += h_rand_allowed_fails_now;
                             m_rand.setup(h_look_close); // TODO: look_close does not seem worth it
 
-                            const int leaves_pre = sh_tree->stat_leaves();
                             if (sh_tree->get_finished_up_to() == 0) {
                                 // random automorphisms, single origin
                                 m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
                                                     h_rand_allowed_fails_total);
                             } else {
                                 // random automorphisms, sampled from shared_tree
-                                m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier, local_state,
-                                                              h_rand_allowed_fails_total);
+                                m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
+                                                              local_state,h_rand_allowed_fails_total);
                             }
-                            s_leaves_added_this_restart = sh_tree->stat_leaves() - leaves_pre;
 
                             progress_print("urandom", sh_tree->stat_leaves(), m_rand.s_rolling_success);
                             if(sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
@@ -380,10 +366,8 @@ namespace dejavu {
                                                            std::to_string(sh_schreier->s_densegen()), "_");
                             }
 
-                            if (sh_schreier->deterministic_abort_criterion() ||
-                                sh_schreier->probabilistic_abort_criterion()) {
-                                finished_symmetries = true;
-                            }
+                            finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
+                                                  sh_schreier->probabilistic_abort_criterion();
                             s_cost += h_rand_allowed_fails_now;
                         }
                         break;
@@ -404,6 +388,9 @@ namespace dejavu {
                                     m_prep.multiply_to_group_size(
                                             (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base[0]) *
                                             sh_tree->h_bfs_automorphism_pw, 0);
+                                } else if (base_size == 1) {
+                                    m_prep.multiply_to_group_size(
+                                            (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base[0]), 0);
                                 } else { /*< base case which just multiplies the remaining elements of the level */
                                     m_prep.multiply_to_group_size(
                                             (double) sh_tree->get_level_size(sh_tree->get_finished_up_to()), 0);
@@ -429,7 +416,19 @@ namespace dejavu {
 
                 // If not done, we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
-                //if(s_inprocessed) h_budget = 1;
+
+                // Now, we manage the restart....
+                ++s_restarts; /*< increase the restart counter */
+                local_state.load_reduced_state(root_save); /*< start over from root */
+                progress_print_split();
+                const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2; /*<factor to increase the budget */
+                if(s_inprocessed) h_budget = 1;          /*< if we inprocessed, we hope that the graph is easy again */
+                h_budget *= increase_fac;                                                   /*< increase the budget! */
+                s_cost = 0;                                                                        /* reset the cost */
+
+                // Reset some of the shared structures
+                if(s_inprocessed && sh_tree) sh_tree->clear_leaves();
+                m_rand.reset_statistics();
             }
 
             // We are done! Let's add up the total group size from all the different modules.

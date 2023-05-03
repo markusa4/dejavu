@@ -618,9 +618,13 @@ namespace dejavu {
              * @param automorphism The automorphism.
              * @return Whether \p automorphism is an automorphism of \p g.
              */
-            bool certify_automorphism(sgraph* g, groups::automorphism_workspace& automorphism) {
-                return R->certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(),
-                                                      automorphism.support());
+            bool __attribute__ ((noinline)) certify_automorphism(sgraph* g, groups::automorphism_workspace& automorphism) {
+                if(automorphism.nsupport() > g->v_size/4) {
+                    return R->certify_automorphism(g, automorphism.perm());
+                } else {
+                    return R->certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(),
+                                                          automorphism.support());
+                }
             }
 
             std::tuple<bool, int, int>

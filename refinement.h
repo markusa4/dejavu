@@ -449,7 +449,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph
-            bool certify_automorphism(sgraph *g, const int *p) {
+            bool __attribute__ ((noinline)) certify_automorphism(sgraph *g, const int *p) {
                 int i, found;
 
                 assure_initialized(g);
@@ -458,8 +458,6 @@ assert(c->cells == actual_cells);
                     const int image_i = p[i];
                     if (image_i == i)
                         continue;
-                    if (g->d[i] != g->d[image_i]) // degrees must be equal
-                        return false;
 
                     scratch_set.reset();
                     // automorphism must preserve neighbours
@@ -527,7 +525,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph, sparse
-            bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
+            bool __attribute__ ((noinline)) certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
                 int i, found;
 
                 assure_initialized(g);

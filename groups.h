@@ -92,7 +92,7 @@ namespace dejavu {
              * @param col_to_vertex Color-to-vertex mapping of the second coloring, i.e., the color i contains the vertex
              * `col_to_vertex[i]` (since the colorings are assumed to be discrete, every `i` must be a distinct color).
              */
-            void write_color_diff(const int *vertex_to_col, const int *col_to_vertex) {
+            void __attribute__ ((noinline)) write_color_diff(const int *vertex_to_col, const int *col_to_vertex) {
                 color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
                                         &automorphism_supp);
             }

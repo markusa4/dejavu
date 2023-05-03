@@ -94,6 +94,8 @@ namespace dejavu {
             void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
                 auto next_node_save = node->get_save();
 
+                // TODO consider base size 1 and top-level automorphisms
+
                 // node is already pruned
                 const bool is_pruned = node->get_prune();
                 if(is_pruned) {
@@ -107,7 +109,14 @@ namespace dejavu {
                 const int parent_node_base_pos  = node->get_save()->get_base_position()-1;
                 const int parent_node_base_vert = parent_node_base_pos>=0?node->get_save()->get_base()[parent_node_base_pos]:-1;
                 const int vert_on_base          = parent_node_base_pos>=0?local_state.compare_base[parent_node_base_pos]:-1;
+                const int vert_on_base_sl       = parent_node_base_pos==-1?local_state.compare_base[0]:-1;
                 if(parent_node_base_pos == 0 && !ir_tree->h_bfs_top_level_orbit.represents_orbit(parent_node_base_vert)) {
+                    ++s_total_automorphism_prune;
+                    return;
+                }
+
+                if(parent_node_base_pos == -1 && v != vert_on_base_sl &&
+                   ir_tree->h_bfs_top_level_orbit.are_in_same_orbit(v, vert_on_base_sl)) {
                     ++s_total_automorphism_prune;
                     return;
                 }
