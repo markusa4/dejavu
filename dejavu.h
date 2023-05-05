@@ -138,6 +138,7 @@ namespace dejavu {
 
             // statistics used to steer heuristics
             int  s_restarts         = -1;    /*< number of restarts performed                     */
+            int  s_inproc_success   = 0;     /*< how many times inprocessing succeeded            */
             int  s_cost             = 0;     /*< cost induced so far by current restart iteration */
             bool s_long_base        = false; /*< flag for bases that are considered very long     */
             bool s_short_base       = false; /*< flag for bases that are considered very short    */
@@ -386,6 +387,7 @@ namespace dejavu {
                         break;
                         case bfs_ir: {
                             // perform one level of BFS
+                            m_bfs.h_use_deviation_pruning = !((s_inproc_success >= 2) && s_path_fail1_avg > 0.1);
                             m_bfs.do_a_level(g, *sh_tree, local_state, selector);
                             progress_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
                                                   std::to_string(s_bfs_next_level_nodes) + ")",
@@ -429,6 +431,12 @@ namespace dejavu {
 
                 // we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
+                s_inproc_success += s_inprocessed;
+
+                if(root_save.get_coloring()->cells == g->v_size) {
+                    finished_symmetries = true;
+                    break;
+                }
             }
 
             // We are done! Let's add up the total group size from all the different modules.

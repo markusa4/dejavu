@@ -1163,18 +1163,24 @@ namespace dejavu {
             std::mutex    lock;
             reduced_save* data;
             tree_node*    next;
+            tree_node*    parent;
             bool          is_base = false;
             bool          is_pruned = false;
+            long          hash = 0;
         public:
-            tree_node(reduced_save* data, tree_node* next) {
+            tree_node(reduced_save* data, tree_node* next, tree_node* parent) {
                 this->data = data;
                 this->next = next;
                 if(next == nullptr) {
                     next = this;
                 }
+                this->parent = parent;
             }
             tree_node* get_next() {
                 return next;
+            }
+            tree_node* get_parent() {
+                return parent;
             }
             void set_next(tree_node* next) {
                 this->next = next;
@@ -1188,6 +1194,13 @@ namespace dejavu {
             }
             bool get_prune() {
                 return is_pruned;
+            }
+            void add_hash(long add) {
+                this->hash += add;
+            }
+
+            long get_hash() {
+                return hash;
             }
 
             void base() {
@@ -1218,7 +1231,7 @@ namespace dejavu {
 
             std::vector<int> current_base;
 
-            std::vector<long>       node_invariant;
+            std::vector<unsigned long> node_invariant;
 
             bool init = false;
         public:
@@ -1231,7 +1244,26 @@ namespace dejavu {
                 h_bfs_top_level_orbit.initialize(domain_size);
             };
 
-            std::vector<long>* get_node_invariant() {
+            void make_node_invariant() {
+                if(finished_up_to > 1) {
+                    for(int j = finished_up_to; j >= 1; --j) {
+                        finish_level(j);
+                        for(int i = 0; i < tree_data_jump_map[j].size(); ++i) {
+                            auto node = tree_data_jump_map[j][i];
+                            //node->get_parent()->add_hash(node->get_hash() + 1);
+                            const int v = node->get_save()->get_base()[0];
+                            node_invariant[v] += 1;//+node->get_hash();
+                        }
+                    }
+                    /*for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
+                        auto node = tree_data_jump_map[1][i];
+                        const int v = node->get_save()->get_base()[0];
+                        node_invariant[v] += node->get_hash();
+                    }*/
+                }
+            }
+
+            std::vector<unsigned long>* get_node_invariant() {
                 return &node_invariant;
             }
 
@@ -1239,7 +1271,7 @@ namespace dejavu {
                 tree_data.resize(base.size() + 1);
                 tree_level_size.resize(base.size() + 1);
                 tree_data_jump_map.resize(base.size() + 1);
-                add_node(0, root, true);
+                add_node(0, root, nullptr, true);
                 node_invariant.resize(root->get_coloring()->lab_sz);
                 current_base = base;
                 init = true;
@@ -1293,7 +1325,7 @@ namespace dejavu {
                     tree_level_size[0] = 0;
                     tree_data_jump_map[0].clear();
                     tree_data[0] = nullptr;
-                    add_node(0, root, true);
+                    add_node(0, root, nullptr, true);
                 }
                 assert(missing_nodes.empty());
 
@@ -1334,11 +1366,15 @@ namespace dejavu {
                 node_invariant[v] = inv;
             }
 
-            void add_node(int level, reduced_save* data, bool is_base = false) {
+            void record_add_invariant(int v, long inv) {
+                node_invariant[v] += inv;
+            }
+
+            void add_node(int level, reduced_save* data, tree_node* parent, bool is_base = false) {
                 // TODO use locks
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;
-                    tree_data[level] = new tree_node(data, nullptr);
+                    tree_data[level] = new tree_node(data, nullptr, parent);
                     tree_data[level]->set_next(tree_data[level]);
 
                     garbage_collector.push_back( tree_data[level]);
@@ -1346,7 +1382,7 @@ namespace dejavu {
                 } else {
                     tree_node* a_node    = tree_data[level];
                     tree_node* next_node = a_node->get_next();
-                    auto       new_node  = new tree_node(data, next_node);
+                    auto       new_node  = new tree_node(data, next_node, parent);
                     garbage_collector.push_back( new_node);
                     if(is_base) new_node->base();
                     a_node->set_next(new_node);
