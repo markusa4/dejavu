@@ -137,7 +137,7 @@ namespace dejavu {
             int  h_budget_inc_fact  = 5;  /*< factor used when increasing the budget */
 
             // statistics used to steer heuristics
-            int  s_restarts         = 0;    /*< number of restarts performed                     */
+            int  s_restarts         = -1;    /*< number of restarts performed                     */
             int  s_cost             = 0;     /*< cost induced so far by current restart iteration */
             bool s_long_base        = false; /*< flag for bases that are considered very long     */
             bool s_short_base       = false; /*< flag for bases that are considered very short    */
@@ -193,6 +193,17 @@ namespace dejavu {
             while (true) {
                 // "Dry land is not a myth, I've seen it!"
                 const bool s_hard = h_budget > 10000; /* graph is "hard" */
+
+                ++s_restarts; /*< increase the restart counter */
+                if(s_restarts > 0) {
+                    // now, we manage the restart....
+                    local_state.load_reduced_state(root_save); /*< start over from root */
+                    progress_print_split();
+                    const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2; /*<factor to increase the budget */
+                    if(s_inprocessed) h_budget = 1;          /*< if we inprocessed, we hope that the graph is easy again */
+                    h_budget *= increase_fac;                                                   /*< increase the budget! */
+                    s_cost = 0;                                                                        /* reset the cost */
+                }
 
                 // keep vertices which are save to individualize for in-processing
                 m_inprocess.inproc_can_individualize.clear();
@@ -418,15 +429,6 @@ namespace dejavu {
 
                 // we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
-
-                // now, we manage the restart....
-                ++s_restarts; /*< increase the restart counter */
-                local_state.load_reduced_state(root_save); /*< start over from root */
-                progress_print_split();
-                const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2; /*<factor to increase the budget */
-                if(s_inprocessed) h_budget = 1;          /*< if we inprocessed, we hope that the graph is easy again */
-                h_budget *= increase_fac;                                                   /*< increase the budget! */
-                s_cost = 0;                                                                        /* reset the cost */
             }
 
             // We are done! Let's add up the total group size from all the different modules.

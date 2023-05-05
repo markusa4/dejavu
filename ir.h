@@ -677,7 +677,8 @@ namespace dejavu {
              * @param base_pos Current position in base.
              */
             int dynamic_selector_first(const coloring *c, const int base_pos) {
-                if (base_pos >= 0 && base_pos < saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0) {
+                if (base_pos >= 0 && base_pos < saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0 &&
+                    c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos]) {
                     return saved_color_base[base_pos];
                 }
                 for (int i = 0; i < c->ptn_sz;) {
