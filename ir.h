@@ -521,8 +521,8 @@ namespace dejavu {
                     // T->trace_equal()?compare_base_cells[s_base_pos - 1]:-1
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
                                        my_worklist_hook);
-                    assert(T->trace_equal() ?c->cells==compare_base_cells[s_base_pos - 1] : true);
-                    if (T && T->trace_equal()) {T->skip_to_individualization();}
+                    //assert(T->trace_equal() ?c->cells==compare_base_cells[s_base_pos - 1] : true);
+                    if (T && T->trace_equal() && c->cells==compare_base_cells[s_base_pos - 1]) {T->skip_to_individualization();}
                 }
 
                 h_cell_active = false;

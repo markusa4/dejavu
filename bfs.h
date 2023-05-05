@@ -16,6 +16,8 @@ namespace dejavu {
         class bfs_ir {
         public:
 
+            bool h_use_deviation_pruning = true;
+
             // TODO some of this has to go into shared_tree
             // statistics
             int s_deviation_prune = 0;
@@ -98,7 +100,7 @@ namespace dejavu {
 
                 // node is already pruned
                 const bool is_pruned = node->get_prune();
-                if(is_pruned) {
+                if(is_pruned && h_use_deviation_pruning) {
                     ++s_total_prune;
                     ++s_deviation_prune;
                     assert(!node->get_base());
@@ -160,11 +162,15 @@ namespace dejavu {
                     ++s_total_kept;
                     auto new_save = new ir::reduced_save();
                     local_state.save_reduced_state(*new_save);
-                    ir_tree->add_node(local_state.s_base_pos, new_save, is_base);
+                    ir_tree->add_node(local_state.s_base_pos, new_save, node, is_base);
                 } else {
                     assert(!is_base);
                     // deviation map
                     if(local_state.s_base_pos > 1) {
+                        if(!h_use_deviation_pruning) {
+                            const int first_level_v = node->get_save()->get_base()[0];
+                            ir_tree->record_add_invariant(first_level_v, local_state.T->get_hash());
+                        }
                         ++s_total_prune;
                         if (parent_is_base) ir_tree->stored_deviation.record_deviation(local_state.T->get_hash());
                         else {

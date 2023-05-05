@@ -53,6 +53,8 @@ namespace dejavu {
                     mark_set is_pruned(g->v_size);
                     tree->mark_first_level(is_pruned);
 
+                    tree->make_node_invariant();
+
                     for (int i = 0; i < g->v_size; ++i) {
                         if (is_pruned.get(i)) hash[i] = 1;
                         else hash[i] = 0;

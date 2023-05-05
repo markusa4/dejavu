@@ -47,6 +47,8 @@ namespace sassy {
 
         bool layers_melded = false;
 
+        bool skipped_preprocessing = false;
+
         mark_set del;
         mark_set del_e;
 
@@ -4708,6 +4710,7 @@ namespace sassy {
 
             if(i == g->v_size) {
                 // graph is regular
+                skipped_preprocessing = true;
                 PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "regular" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                 return;
             }
@@ -4993,8 +4996,13 @@ namespace sassy {
         // dejavu usage specific: (TODO!)
         static inline void dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
+            if(p->skipped_preprocessing) {
+                if(p->saved_hook != nullptr) {
+                    (*p->saved_hook)(n, aut, nsupp, supp);
+                }
+                return;
+            }
             p->pre_hook_buffered(n, (const int *) aut, nsupp, supp, p->saved_hook);
-            return;
         }
     };
 }

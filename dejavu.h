@@ -20,6 +20,8 @@ extern int*   _test_col;
 namespace dejavu {
     void test_hook(int n, const int *p, int nsupp, const int *supp) {
         std::cout << "certifying..." << std::endl;
+        assert(test_r.certify_automorphism_sparse(&_test_graph, p, nsupp, supp));
+        assert(test_r.certify_automorphism(&_test_graph, _test_col, p));
         assert(test_r.certify_automorphism_sparse(&_test_graph, _test_col, p, nsupp, supp));
     }
 
@@ -119,7 +121,8 @@ namespace dejavu {
 
             // if the preprocessor changed the vertex set of the graph, need to use reverse translation
             dejavu_hook dhook = sassy::preprocessor::dejavu_hook;
-            if(g->v_size != gg.v_size) hook = &dhook; /*< change hook to sassy hook*/
+            //if(g->v_size != gg.v_size)
+            hook = &dhook; /*< change hook to sassy hook*/
 
             // print that we are solving now...
             PRINT(std::endl << "solving..." << std::endl);
@@ -230,7 +233,7 @@ namespace dejavu {
                 const bool s_too_long        = s_too_long_anyway || s_too_long_long || s_too_long_hard;
 
                 // immediately discard this base if deemed too large, unless we are discarding too often
-                if (s_too_long && s_consecutive_discard < 3) {
+                if (s_too_long && s_inproc_success < 2 && s_consecutive_discard < 3) {
                     progress_print("skip", local_state.s_base_pos,s_last_base_size);
                     ++s_consecutive_discard;
                     continue;

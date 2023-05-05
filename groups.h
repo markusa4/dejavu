@@ -1072,7 +1072,7 @@ namespace dejavu {
             void determine_save_to_individualize(std::vector<std::pair<int, int>>* save_to_individualize, coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
-                    if(transversals[i]->size() == corresponding_root_color_sz) {
+                    if(transversals[i]->size() == corresponding_root_color_sz && corresponding_root_color_sz > 1) {
                         save_to_individualize->push_back({transversals[i]->fixed_point(), corresponding_root_color_sz});
                     }
                 }
