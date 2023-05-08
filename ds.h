@@ -159,7 +159,7 @@ namespace dejavu {
             /**
              * Default constructor, does not allocate any memory.
              */
-            work_list_t() {};
+            work_list_t() = default;
 
             /**
              * Constructor that allocates the internal array with size \p size. The allocated memory is not
@@ -167,7 +167,7 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            work_list_t(int size) {
+            explicit work_list_t(int size) {
                 allocate(size);
             }
 
@@ -219,7 +219,7 @@ namespace dejavu {
             /**
              * @return Whether `cur_pos == 0`.
              */
-            bool empty() {
+            [[nodiscard]] bool empty() const {
                 return cur_pos == 0;
             }
 
@@ -235,7 +235,7 @@ namespace dejavu {
             /**
              * @return The current position \a cur_pos.
              */
-            int size() {
+            [[nodiscard]]int size() const {
                 return cur_pos;
             }
 
@@ -306,7 +306,7 @@ namespace dejavu {
                 struct comparator_map {
                     T *map;
 
-                    comparator_map(T *map) {
+                    explicit comparator_map(T *map) {
                         this->map = map;
                     }
 
@@ -341,21 +341,18 @@ namespace dejavu {
             }
 
             void push(int val) {
-                //assert(init);
                 assert(pos != sz);
                 queue[pos] = val;
                 pos++;
             }
 
             int pop() {
-                //assert(init);
                 assert(pos > 0);
                 pos--;
                 return queue[pos];
             }
 
-            bool empty() {
-                //assert(init);
+            [[nodiscard]] bool empty() const {
                 return (pos == 0);
             }
 
@@ -369,19 +366,11 @@ namespace dejavu {
                 pos = 0;
             }
 
-            void initialize_from_array(int *arr, int size) {
-                assert(!init);
-                sz = size;
-                pos = 0;
-                queue = arr;
-                init = false;
-            }
-
         private:
-            int *queue;
-            int pos;
-            bool init = false;
-            int sz;
+            int *queue = nullptr;
+            int pos    = 0;
+            bool init  = false;
+            int sz     = 0;
         };
 
         // work set with arbitrary type
@@ -395,16 +384,6 @@ namespace dejavu {
                 memset(s, -1, size * sizeof(T)); // TODO should use calloc
 
                 init = true;
-                sz = size;
-            }
-
-            void initialize_from_array(T *arr, int size) {
-                s = arr;
-                reset_queue.initialize_from_array(arr + size, size);
-
-                memset(s, -1, size * sizeof(T));
-
-                init = false;
                 sz = size;
             }
 
@@ -451,87 +430,31 @@ namespace dejavu {
             work_queue reset_queue;
         private:
             bool init = false;
-            T *s;
-            int sz;
+            T   *s = nullptr;
+            int sz = 0;
         };
 
         typedef work_set_t<int> work_set_int;
-        typedef work_set_t<char> work_set_char;
-
-        // ring queue for pairs of integers
-        class ring_pair {
-        public:
-            void initialize(int size) {
-                arr = new std::pair<int, int>[size];
-                arr_sz = size;
-                back_pos = 0;
-                front_pos = 0;
-                init = true;
-            }
-
-            void push_back(std::pair<int, int> value) {
-                arr[back_pos] = value;
-                back_pos = (back_pos + 1) % arr_sz;
-            }
-
-            std::pair<int, int> *front() {
-                return &arr[front_pos];
-            }
-
-            void pop() {
-                front_pos = (front_pos + 1) % arr_sz;
-            }
-
-            bool empty() {
-                return (front_pos == back_pos);
-            }
-
-            ~ring_pair() {
-                if (init)
-                    delete[] arr;
-            }
-
-            void reset() {
-                front_pos = back_pos;
-            }
-
-        private:
-            std::pair<int, int> *arr;
-            bool init = false;
-            int arr_sz = -1;
-            int front_pos = -1;
-            int back_pos = -1;
-        };
 
         // set specialized for quick resets
         class mark_set {
-            int mark = 0;
             int *s = nullptr;
+            int mark = 0;
             int sz = -1;
-            bool init = false;
         public:
-            mark_set() {};
-            mark_set(int size) {
+            mark_set() = default;
+            explicit mark_set(int size) {
                 initialize(size);
             }
 
             void initialize(int size) {
-                //s = new int[size];
-                if(init && sz == size) return;
-                if(init) free(s);
+                if(s && sz == size) return;
+                if(s) free(s);
                 s = (int*) calloc(size, sizeof(int));
                 sz = size;
-                init = true;
-                //memset(s, mark, sz * sizeof(int));
                 reset();
             }
-            /*void initialize_from_array(int* arr, int size) {
-                s  = arr;
-                sz = size;
-                init = false;
-                memset(s, mark, sz * sizeof(int));
-                reset();
-            }*/
+
             bool get(int pos) {
                 return s[pos] == mark;
             }
@@ -548,80 +471,7 @@ namespace dejavu {
                 ++mark;
             }
             ~mark_set() {
-                /*if(init)
-                    delete[] s;*/
-                if(init)
-                    free(s);
-            }
-        };
-
-        template<class T>
-        class concurrent_queue {
-            std::unique_ptr<std::mutex> lock;
-            std::deque<T> content;
-        public:
-            concurrent_queue() {
-                lock =  std::make_unique<std::mutex>();
-            }
-
-            void enqueue(T item) {
-                lock->lock();
-                content.emplace_back(item);
-                lock->unlock();
-            }
-
-            void enqueue_bulk(T* items, int size) {
-                lock->lock();
-                for(int i = 0; i < size; ++i) {
-                    content.emplace_back(items[i]);
-                }
-                lock->unlock();
-            }
-
-            T dequeue() {
-                lock->lock();
-                T item = content.front();
-                content.pop_front();
-                lock->unlock();
-                return item;
-            }
-
-            bool try_dequeue(T& item)  {
-                int i = 0;
-                lock->lock();
-                if(content.size() > 0) {
-                    item = content.front();
-                    content.pop_front();
-                    ++i;
-                }
-                lock->unlock();
-                return (i > 0);
-            }
-
-            int try_dequeue_bulk(T* arr, int chunk_size)  {
-                int i = 0;
-                lock->lock();
-                while(chunk_size - i > 0 && content.size() > 0) {
-                    arr[i] = content.front();
-                    content.pop_front();
-                    ++i;
-                }
-                lock->unlock();
-                return i;
-            }
-
-            void clear() {
-                lock->lock();
-                content.clear();
-                lock->unlock();
-            }
-
-            int size() {
-                int sz = 0;
-                lock->lock();
-                sz = content.size();
-                lock->unlock();
-                return sz;
+                if(s) free(s);
             }
         };
     }

@@ -36,7 +36,8 @@ namespace dejavu {
 
         public:
             enum termination_reason {r_none, r_fail, r_cost};
-            termination_reason s_termination = r_none;
+            termination_reason s_termination = r_none; /**< Why did we stop performing DFS? Cost too high, or did we
+                                                         *  have to backtrack? */
 
             double h_recent_cost_snapshot_limit = 0.25; /**< A float in the range [0-1]. Limits continuation of DFS
                                                           * search to whethercomputing recent elements only cost this

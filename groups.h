@@ -1088,7 +1088,7 @@ namespace dejavu {
             /**
              * @return Size of base of this Schreier structure.
              */
-            int base_size() {
+            int base_size() const {
                 return transversals.size();
             }
 
@@ -1226,7 +1226,7 @@ namespace dejavu {
             /**
              * @return Whether the probabilistic abort criterion allows termination or not.
              */
-            bool probabilistic_abort_criterion() {
+            [[nodiscard]] bool probabilistic_abort_criterion() const {
                 return (s_consecutive_success > h_error_bound);
             }
 

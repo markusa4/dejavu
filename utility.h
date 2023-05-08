@@ -49,6 +49,12 @@ extern volatile int dejavu_kill_request;
 
 namespace dejavu {
 
+    /**
+     * A simple class to store big, positive numbers. Consists of a \a mantissa and a \a exponent, where the value of
+     * the number is `mantissa^exponent`.
+     *
+     * Used to store group sizes.
+     */
     class big_number {
     public:
         long double mantissa = 1.0; /**< mantissa, number is `mantissa^exponent`
@@ -56,14 +62,29 @@ namespace dejavu {
         int         exponent = 0;   /**< exponent, number is `mantissa^exponent`
                                           * \sa mantissa  */
 
+        /**
+         * Multiply a \p number to this big_number.
+         * @param number The number to multiply.
+         */
         void multiply(int number) {
             multiply(number, 0);
         }
 
+        /**
+         * Multiply a \p number to this big_number.
+         * @param number The number to multiply.
+         */
         void multiply(big_number number) {
             multiply(number.mantissa, number.exponent);
         }
 
+
+        /**
+         * Multiply a number consistent of a mantissa (\p other_mantissa) and exponent (\p other_exponent) to this
+         * big_number.
+         * @param other_mantissa Mantissa of number to multiply.
+         * @param other_exponent Exponent of number to multiply.
+         */
         void multiply(long double other_mantissa, int other_exponent) {
             while (other_mantissa >= 10.0) {
                 exponent += 1;
