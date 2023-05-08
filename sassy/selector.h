@@ -12,7 +12,6 @@ namespace sassy {
     };
 
     struct strategy {
-        bijection<int> *leaf = nullptr;
         invariant *I = nullptr;
         selector_type cell_selector_type = SELECTOR_FIRST;
         int cell_selector_seed = 0;
@@ -22,33 +21,8 @@ namespace sassy {
 
         ~strategy() {
             if (init) {
-                delete leaf;
                 delete I;
             }
-        }
-
-        strategy(bijection<int> *leaf, invariant *I, selector_type cell_selector_type, int seed) {
-            this->leaf = leaf;
-            this->I = I;
-            this->cell_selector_type = cell_selector_type;
-            this->cell_selector_seed = seed;
-        }
-
-        void replace(strategy *s) {
-            if (init) {
-                delete leaf;
-                delete I;
-            }
-            leaf = new bijection<int>();
-            I = new invariant();
-            init = true;
-
-            leaf->copy(s->leaf);
-            *I = *s->I;
-            I->created = I;
-            s->I->created = nullptr;
-            cell_selector_type = s->cell_selector_type;
-            cell_selector_seed = s->cell_selector_seed;
         }
     };
 

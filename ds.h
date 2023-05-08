@@ -178,10 +178,10 @@ namespace dejavu {
              * @param size Size to allocate.
              */
             void allocate(int size) {
-                assert(!init);
+                assert(!arr);
                 //arr     = new T[size];
                 alloc(size);
-                init = true;
+                //init = true;
                 cur_pos = 0;
             }
 
@@ -190,7 +190,7 @@ namespace dejavu {
              *
              * @param value Element to push back.
              */
-            void push_back(T value) {
+            inline void push_back(T value) {
                 assert(cur_pos >= 0 && cur_pos < arr_sz);
                 arr[cur_pos] = value;
                 cur_pos += 1;
@@ -204,7 +204,7 @@ namespace dejavu {
              *
              * \sa The function empty() tests whether `cur_pos == 0`.
              */
-            T pop_back() {
+            inline T pop_back() {
                 assert(cur_pos > 0);
                 return arr[--cur_pos];
             }
@@ -212,7 +212,7 @@ namespace dejavu {
             /**
              * @return Element at \a cur_pos.
              */
-            T *last() {
+            inline T *last() const {
                 return &arr[cur_pos - 1];
             }
 
@@ -235,14 +235,14 @@ namespace dejavu {
             /**
              * @return The current position \a cur_pos.
              */
-            [[nodiscard]]int size() const {
+            [[nodiscard]] int size() const {
                 return cur_pos;
             }
 
             /**
              * Sets \a cur_pos to `0`.
              */
-            void reset() {
+            inline void reset() {
                 cur_pos = 0;
             }
 
@@ -253,12 +253,11 @@ namespace dejavu {
              * @param size New size to allocate the array to.
              */
             void resize(const int size) {
-                if (init && size <= arr_sz) return;
+                if (arr && size <= arr_sz) return;
                 T *old_arr = nullptr;
                 int old_arr_sz = arr_sz;
-                if (init) old_arr = arr;
+                if (arr) old_arr = arr;
                 alloc(size);
-                init = true;
                 if (old_arr != nullptr) {
                     int cp_pt = std::min(old_arr_sz, arr_sz);
                     memcpy(arr, old_arr, cp_pt * sizeof(T));
@@ -270,10 +269,7 @@ namespace dejavu {
              * Deallocates the internal array.
              */
             ~work_list_t() {
-                if (init) {
-                    //delete[] arr;
-                    free(arr);
-                }
+                if (arr) free(arr);
             }
 
             /**
@@ -286,7 +282,7 @@ namespace dejavu {
             /**
              * @return A pointer to the internal memory.
              */
-            T *get_array() const {
+            inline T *get_array() const {
                 return arr;
             }
 
@@ -296,7 +292,7 @@ namespace dejavu {
              * @param index Index of the internal array.
              * @return The element `arr[index]`.
              */
-            T &operator[](int index) const {
+            inline T &operator[](int index) const {
                 assert(index >= 0);
                 assert(index < arr_sz);
                 return arr[index];
@@ -320,9 +316,8 @@ namespace dejavu {
 
             int cur_pos = 0; /**< current position */
         private:
-            T *arr     = nullptr; /**< internal array */
             int arr_sz = -1;      /**< size to which \a arr is currently allocated*/
-            bool init  = false;   /** whether \a arr is currently allocated */
+            T *arr     = nullptr; /**< internal array */
         };
 
         // frequently used types
