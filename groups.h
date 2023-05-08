@@ -1248,21 +1248,14 @@ namespace dejavu {
             /**
              * @return Size of group described by this Schreier structure.
              */
-            std::pair<long double, int> compute_group_size() {
-                long double grp_sz_man = 1;
-                int         grp_sz_exp = 0;
+            big_number compute_group_size() {
+                big_number grp_sz;
 
                 // multiply the sizes of the individual levels in the Schreier table
                 for (int level = 0; level < transversals.size(); ++level) {
-                    grp_sz_man *= transversals[level]->size();
-
-                    // normalize man / exp
-                    while (grp_sz_man > 10) {
-                        grp_sz_exp += 1;
-                        grp_sz_man = grp_sz_man / 10;
-                    }
+                    grp_sz.multiply(transversals[level]->size());
                 }
-                return {grp_sz_man, grp_sz_exp};
+                return grp_sz;
             }
         };
     }

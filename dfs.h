@@ -41,8 +41,7 @@ namespace dejavu {
             double h_recent_cost_snapshot_limit = 0.25; /**< A float in the range [0-1]. Limits continuation of DFS
                                                           * search to whethercomputing recent elements only cost this
                                                           * fraction of the cost of an entire root-to-leaf walk. */
-            long double grp_sz_man = 1.0; /**< group size mantissa, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
-            int         grp_sz_exp = 0;   /**< group size exponent, total group size is `s_grp_sz_man^s_grp_sz_exp`*/
+            big_number s_grp_sz; /**< group size */
 
 
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
@@ -127,8 +126,8 @@ namespace dejavu {
              */
             int do_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &local_state,
                        std::vector<std::pair<int, int>>* save_to_individualize) {
-                grp_sz_man = 1.0;
-                grp_sz_exp = 0;
+                s_grp_sz.mantissa = 1.0;
+                s_grp_sz.exponent = 0;
 
                 // orbit algorithm structure
                 groups::orbit orbs;
@@ -233,11 +232,7 @@ namespace dejavu {
                             //std::cout << (initial_colors->vertex_to_col[initial_colors->lab[col]]  == col) << ", " << (initial_colors->ptn[col] + 1 == col_sz) << std::endl;
                         }
 
-                        grp_sz_man *= col_sz;
-                        while (grp_sz_man > 10) {
-                            grp_sz_man /= 10;
-                            grp_sz_exp += 1;
-                        }
+                        s_grp_sz.multiply(col_sz);
                     }
                 }
 

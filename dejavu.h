@@ -55,27 +55,6 @@ namespace dejavu {
             g->e_size = gg->e_size;
         }
 
-        void man_to_exp_group_size() {
-            while(s_grp_sz_man >= 10.0) {
-                s_grp_sz_exp += 1;
-                s_grp_sz_man = s_grp_sz_man / 10;
-            }
-        }
-
-        void multiply_to_group_size(std::pair<long double, int> add_grp_sz) {
-            multiply_to_group_size(add_grp_sz.first, add_grp_sz.second);
-        }
-
-        void multiply_to_group_size(long double add_grp_sz_man, int add_grp_sz_exp) {
-            while (add_grp_sz_man >= 10.0) {
-                s_grp_sz_exp += 1;
-                add_grp_sz_man = add_grp_sz_man / 10;
-            }
-            s_grp_sz_exp += add_grp_sz_exp;
-            s_grp_sz_man *= add_grp_sz_man;
-            man_to_exp_group_size();
-        }
-
     public:
         // settings
         int h_error_bound       = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
@@ -85,10 +64,8 @@ namespace dejavu {
                                        *  previous base */
 
         // statistics
-        long double s_grp_sz_man = 1.0; /**< group size mantissa, group size is `s_grp_sz_man^s_grp_sz_exp`
-                                          * \sa s_grp_sz_exp */
-        int         s_grp_sz_exp = 0;   /**< group size exponent, group size is `s_grp_sz_man^s_grp_sz_exp`
-                                          * \sa s_grp_sz_man  */
+        big_number s_grp_sz;
+        [[maybe_unused]] bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
 
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
@@ -111,8 +88,8 @@ namespace dejavu {
             sassy::sgraph gg;
             transfer_sgraph_to_sassy_sgraph(g, &gg);
             m_prep.reduce(&gg, colmap, hook); /*< reduces the graph */
-            multiply_to_group_size(m_prep.base, m_prep.exp); /*< group size needed if the
-                                                                                           *  early out below is used */
+            s_grp_sz.multiply(m_prep.base, m_prep.exp); /*< group size needed if the
+                                                                                    *  early out below is used */
 
             // early-out if preprocessor finished solving the graph
             if(gg.v_size <= 1) return;
@@ -213,7 +190,7 @@ namespace dejavu {
                 // find a selector, moves local_state to a leaf of IR shared_tree
                 m_selectors.find_base(g, &local_state, s_restarts);
                 auto selector = m_selectors.get_selector_hook();
-                progress_print("sel_fact", local_state.s_base_pos,local_state.T->get_position());
+                progress_print("sel", local_state.s_base_pos,local_state.T->get_position());
                 int base_size = local_state.s_base_pos;
 
                 // TODO if base sizes are equal, we should always prefer the one with smallest number of IR leaves
@@ -250,7 +227,7 @@ namespace dejavu {
                         m_dfs.do_dfs(hook, g, root_save.get_coloring(), local_state,
                                      &m_inprocess.inproc_can_individualize);
                 progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
-                               "~"+std::to_string((int)m_dfs.grp_sz_man) + "*10^" + std::to_string(m_dfs.grp_sz_exp));
+                               "~"+std::to_string((int)m_dfs.s_grp_sz.mantissa) + "*10^" + std::to_string(m_dfs.s_grp_sz.exponent));
                 if (dfs_level == 0) break; // DFS finished the graph -- we are done!
                 const bool s_dfs_backtrack = m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
 
@@ -381,6 +358,8 @@ namespace dejavu {
 
                             finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
                                                   sh_schreier->probabilistic_abort_criterion();
+                            s_deterministic_termination = !(sh_schreier->probabilistic_abort_criterion() &&
+                                                            !sh_schreier->deterministic_abort_criterion());
                             s_cost += h_rand_fail_lim_now;
                         }
                         break;
@@ -438,12 +417,12 @@ namespace dejavu {
             }
 
             // We are done! Let's add up the total group size from all the different modules.
-            s_grp_sz_man = 1.0;
-            s_grp_sz_exp = 0;
-            multiply_to_group_size(m_inprocess.s_grp_sz_man, m_inprocess.s_grp_sz_exp);
-            multiply_to_group_size(m_prep.base, m_prep.exp);
-            multiply_to_group_size(m_dfs.grp_sz_man, m_dfs.grp_sz_exp);
-            multiply_to_group_size(sh_schreier->compute_group_size());
+            s_grp_sz.mantissa = 1.0;
+            s_grp_sz.exponent = 0;
+            s_grp_sz.multiply(m_inprocess.s_grp_sz);
+            s_grp_sz.multiply(m_prep.base, m_prep.exp);
+            s_grp_sz.multiply(m_dfs.s_grp_sz);
+            s_grp_sz.multiply(sh_schreier->compute_group_size());
 
             delete sh_schreier; /*< clean up allocated schreier structure */
             delete sh_tree;     /*< ... and also the shared IR tree       */

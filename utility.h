@@ -48,6 +48,45 @@ typedef const std::function<void(int, const int *, int, const int *)> dejavu_hoo
 extern volatile int dejavu_kill_request;
 
 namespace dejavu {
+
+    class big_number {
+    public:
+        long double mantissa = 1.0; /**< mantissa, number is `mantissa^exponent`
+                                          * \sa exponent */
+        int         exponent = 0;   /**< exponent, number is `mantissa^exponent`
+                                          * \sa mantissa  */
+
+        void multiply(int number) {
+            multiply(number, 0);
+        }
+
+        void multiply(big_number number) {
+            multiply(number.mantissa, number.exponent);
+        }
+
+        void multiply(long double other_mantissa, int other_exponent) {
+            while (other_mantissa >= 10.0) {
+                exponent += 1;
+                other_mantissa = other_mantissa / 10;
+            }
+            exponent += other_exponent;
+            mantissa *= other_mantissa;
+            man_to_exp();
+        }
+
+    private:
+        void man_to_exp() {
+            while(mantissa >= 10.0) {
+                exponent += 1;
+                mantissa = mantissa / 10;
+            }
+        }
+    };
+
+    inline std::ostream& operator<<(std::ostream& out, big_number& number) {
+        return out << number.mantissa << "*10^" << number.exponent;
+    }
+
     thread_local  std::chrono::high_resolution_clock::time_point first;
     thread_local  std::chrono::high_resolution_clock::time_point previous;
     thread_local bool set_first = false;

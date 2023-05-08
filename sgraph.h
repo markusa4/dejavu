@@ -36,16 +36,14 @@ class sgraph {
     };
 public:
     bool initialized = false;
-    int* v;
-    int* d;
-    int* e;
+    int* v = nullptr;
+    int* d = nullptr;
+    int* e = nullptr;
 
-    int v_size;
-    int e_size;
+    int v_size = 0;
+    int e_size = 0;
 
     bool dense = false;
-
-    int max_degree;
 
     void initialize(int nv, int ne) {
         initialized = true;
@@ -191,20 +189,6 @@ public:
         c->cells = cells;
     }
 
-    void initialize_coloring_raw(coloring *c) {
-        c->alloc(this->v_size);
-
-        for(int i = 0; i < v_size; i++) {
-            c->lab[i] = i;
-            c->vertex_to_lab[i] = i;
-        }
-
-        std::memset(c->vertex_to_col, 0, sizeof(int) * v_size);
-        c->ptn[0] = v_size - 1;
-        c->ptn[v_size - 1] = 0;
-        c->cells = 1;
-    }
-
     void sanity_check() {
 #ifndef NDEBUG
         for(int i = 0; i < v_size; ++i) {
@@ -263,27 +247,14 @@ public:
         memcpy(e, g->e, g->e_size*sizeof(int));
         v_size = g->v_size;
         e_size = g->e_size;
-        max_degree = g->max_degree;
     }
 
-    void sort_edgelist() {
+    void sort_edgelist() const {
         for(int i = 0; i < v_size; ++i) {
             const int estart = v[i];
             const int eend   = estart + d[i];
             std::sort(e + estart, e + eend);
         }
-    }
-
-    void print() {
-        PRINT("[api] v_size: " << v_size);
-        PRINT("[api] e_size: " << e_size);
-        /*for(int i = 0; i < v_size; ++i) {
-            const int estart = v[i];
-            const int eend   = estart + d[i];
-            for(int j = estart; j < eend; ++j) {
-                PRINT("[api] (" << i << ", " << e[j] << ")")
-            }
-        }*/
     }
 
     ~sgraph() {
@@ -295,7 +266,7 @@ public:
     }
 };
 
-void permute_colmap(int** colmap, int colmap_sz, int* p) {
+void permute_colmap(int** colmap, int colmap_sz, const int* p) {
     int* new_colmap = new int[colmap_sz];
     for(int i = 0; i < colmap_sz; ++i) {
         new_colmap[i] = (*colmap)[p[i]];
@@ -304,7 +275,5 @@ void permute_colmap(int** colmap, int colmap_sz, int* p) {
     *colmap = new_colmap;
     delete[] old_colmap;
 }
-
-static sgraph test_graph;
 
 #endif //DEJAVU_SGRAPH_H

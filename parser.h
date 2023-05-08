@@ -104,8 +104,6 @@ static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int**
     g->v_size = nv;
     g->e_size = 2 * ne;
 
-    g->max_degree = maxd;
-
     std::cout << "Vertices: \t" << g->v_size << std::endl;
     std::cout << "Edges: \t\t" << g->e_size << std::endl;
     //std::cout << "Degrees: \t";

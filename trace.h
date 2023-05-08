@@ -139,7 +139,7 @@ namespace dejavu {
             void op_refine_cell_end() {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
-                //write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
+                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
             /**
@@ -180,7 +180,7 @@ namespace dejavu {
              */
             void blueprint_skip_to_next_cell() {
                 assert(compare_trace->data[position] == TRACE_MARKER_REFINE_CELL_START);
-                while (compare_trace->data[position] < TRACE_MARKER_REFINE_CELL_END) {
+                while (compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
                     assert(compare_trace->data.size() > (size_t) position);
                     ++position;
                 }
