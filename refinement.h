@@ -30,7 +30,6 @@ namespace dejavu {
 
 
         // worklist implementation for color refinement
-        template<class vertex_t>
         class cell_worklist {
         public:
             void initialize(int domain_size) {
@@ -125,11 +124,11 @@ namespace dejavu {
                 }
             }
 
-            bool empty() {
+            [[nodiscard]] bool empty() const {
                 return (cur_pos == 0);
             }
 
-            int size() {
+            [[nodiscard]] int size() const {
                 return cur_pos;
             }
 
@@ -191,10 +190,8 @@ namespace dejavu {
                         //singleton_hint.push_back(init_color);
                     }
                 }
-                int its = 0;
 
                 while (!cell_todo.empty()) {
-                    its += 1;
                     color_class_splits.reset();
                     const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
@@ -207,8 +204,7 @@ namespace dejavu {
 
                     if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                         // singleton
-                        refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
-                                                     &color_class_splits);
+                        refine_color_class_singleton(g, c, next_color_class,&color_class_splits);
                     } else if (g->dense) {
                         if (dense_dense) { // dense-dense
                             refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
@@ -223,8 +219,6 @@ namespace dejavu {
                     }
 
                     // add all new classes except for the first, largest one
-                    int skip = 0;
-
                     int latest_old_class = -1;
                     bool skipped_largest = false;
                     bool early_out = false;
@@ -253,7 +247,7 @@ namespace dejavu {
 
                         // management code for skipping largest class resulting from old_class
                         color_class_splits.pop_back();
-                        int new_class_sz = c->ptn[new_class] + 1;
+                        //int new_class_sz = c->ptn[new_class] + 1;
 
                         if (skipped_largest || !is_largest) {
                             cell_todo.add_cell(&queue_pointer, new_class);
@@ -261,7 +255,6 @@ namespace dejavu {
                             //singleton_hint.push_back(new_class);
                         } else {
                             skipped_largest = true;
-                            skip += 1;
 
                             // since old color class will always appear last, the queue pointer of old color class is still valid!
                             int i = queue_pointer.get(old_class);
@@ -367,8 +360,7 @@ namespace dejavu {
 
                     if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                         // singleton
-                        refine_color_class_singleton_first(g, c, next_color_class, next_color_class_sz,
-                                                           &color_class_splits);
+                        refine_color_class_singleton_first(g, c, next_color_class,&color_class_splits);
                     } else if (g->dense) {
                         if (dense_dense) { // dense-dense
                             refine_color_class_dense_dense_first(g, c, next_color_class, next_color_class_sz,
@@ -395,7 +387,6 @@ namespace dejavu {
 
                         c->cells += (old_class != new_class);
                         const int class_size = c->ptn[new_class] + 1;
-                        const int class_size_non_trivial = (class_size == 1) ? INT32_MAX : class_size;
                         c->smallest_cell_lower_bound = (class_size < c->smallest_cell_lower_bound) ?
                                                        class_size : c->smallest_cell_lower_bound;
 
@@ -633,9 +624,9 @@ assert(c->cells == actual_cells);
                     if (image_i == i)
                         continue;
                     if (g->d[i] != g->d[image_i]) // degrees must be equal
-                        return std::pair<bool, int>(false, -1);
+                        return {false, -1};
                     if (colmap[i] != colmap[image_i]) // colors must be equal
-                        return std::pair<bool, int>(false, -1);
+                        return {false, -1};
 
                     scratch_set.reset();
                     // automorphism must preserve neighbours
@@ -644,7 +635,7 @@ assert(c->cells == actual_cells);
                         const int vertex_j = g->e[j];
                         const int image_j = p[vertex_j];
                         if (colmap[vertex_j] != colmap[image_j])
-                            return std::pair<bool, int>(false, i);
+                            return {false, i};
                         scratch_set.set(image_j);
                         //scratch[image_j] = vertex_j;
                         found += 1;
@@ -652,17 +643,17 @@ assert(c->cells == actual_cells);
                     for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
                         const int vertex_j = g->e[j];
                         if (!scratch_set.get(vertex_j)) {
-                            return std::pair<bool, int>(false, i);
+                            return {false, i};
                         }
                         scratch_set.unset(vertex_j);
                         found -= 1;
                     }
                     if (found != 0) {
-                        return std::pair<bool, int>(false, i);
+                        return {false, i};
                     }
                 }
 
-                return std::pair<bool, int>(true, -1);
+                return {true, -1};
             }
 
             // certify an automorphism on a graph, sparse, report on which vertex failed
@@ -740,7 +731,7 @@ assert(c->cells == actual_cells);
         private:
             bool initialized = false;
             work_set_int queue_pointer;
-            cell_worklist<int> cell_todo;
+            cell_worklist cell_todo;
             mark_set scratch_set;
             work_list_t<int> vertex_worklist;
             work_set_t<int> color_vertices_considered;
@@ -789,7 +780,7 @@ assert(c->cells == actual_cells);
             ) {
                 // for all vertices of the color class...
                 bool comp, mark_as_largest;
-                int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
+                int i, j, cc, end_cc, largest_color_class_size, acc;
                 int *vertex_to_lab = c->vertex_to_lab;
                 int *lab = c->lab;
                 int *ptn = c->ptn;
@@ -805,9 +796,6 @@ assert(c->cells == actual_cells);
                 color_vertices_considered.reset();
 
                 end_cc = color_class + class_size;
-                acc_in = 0;
-                //singleton_inv1 = 0;
-                //singleton_inv2 = 0;
                 while (cc < end_cc) { // increment value of neighbours of vc by 1
                     const int vc = lab[cc];
                     const int pe = g->v[vc];
@@ -816,8 +804,6 @@ assert(c->cells == actual_cells);
                         const int v = g->e[i];
                         const int col = vertex_to_col[v];
                         if (ptn[col] == 0) {
-                            //singleton_inv1 += MASH2(col*3);
-                            //singleton_inv2 += (col + 3) * (723732 - (col + 2));
                             continue;
                         }
                         neighbours.inc_nr(v);
@@ -827,7 +813,6 @@ assert(c->cells == actual_cells);
                             scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
                             if (!scratch_set.get(col)) {
                                 old_color_classes.push_back(col);
-                                //acc_in += MASH3(col);
                                 scratch_set.set(col);
                             }
                         }
@@ -862,13 +847,9 @@ assert(c->cells == actual_cells);
                         if (val >= 1) {
                             neighbour_sizes.set(k, val + acc);
                             acc += val;
-                            const int __col = _col + _col_sz - (neighbour_sizes.get(k));
-                            const int v_degree = k;
-                            //if(add_hook) write_to_trace(v_degree);
-                            //comp = I->write_top_and_compare(__col + v_degree * g->v_size) && comp;
-                            //comp = I->write_top_and_compare(g->v_size * 7 + val + 1) && comp;
-                            if (__col != _col)
-                                ptn[__col] = -1;
+                            const int _ncol = _col + _col_sz - (neighbour_sizes.get(k));
+                            if (_ncol != _col)
+                                ptn[_ncol] = -1;
                         }
                     }
 
@@ -927,7 +908,7 @@ assert(c->cells == actual_cells);
                                           int color_class, int class_size,
                                           work_list_pair_bool *color_class_split_worklist) {
                 bool comp;
-                int i, cc, acc, largest_color_class_size, singleton_inv, pos;
+                int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
                 comp = true;
 
@@ -936,7 +917,6 @@ assert(c->cells == actual_cells);
                 old_color_classes.reset();
                 vertex_worklist.reset();
 
-                singleton_inv = 0;
                 const int end_cc = color_class + class_size;
 
                 // for all vertices of the color class...
@@ -1019,17 +999,13 @@ assert(c->cells == actual_cells);
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
-                        const int i = vertex_worklist.pop_back();
-                        const int val = neighbour_sizes.get(i) + 1;
+                        const int j = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(j) + 1;
                         if (val >= 1) {
-                            neighbour_sizes.set(i, val + acc);
+                            neighbour_sizes.set(j, val + acc);
                             acc += val;
-                            const int _col = col + col_sz - (neighbour_sizes.get(i));
+                            const int _col = col + col_sz - (neighbour_sizes.get(j));
                             c->ptn[_col] = -1; // this is val - 1, actually...
-
-                            const int v_degree = i;
-                            //comp = I->write_top_and_compare(_col + g->v_size * v_degree) && comp;
-                            //comp = I->write_top_and_compare(_col + val + 1) && comp;
                         }
                     }
 
@@ -1133,7 +1109,6 @@ assert(c->cells == actual_cells);
 
                     if (vertex_worklist.cur_pos == 1) {
                         // no split
-                        const int v_degree = neighbours.get(c->lab[col]);
                         continue;
                     }
 
@@ -1141,15 +1116,13 @@ assert(c->cells == actual_cells);
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
-                        const int i = vertex_worklist.pop_back();
-                        const int val = neighbour_sizes.get(i) + 1;
+                        const int k = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(k) + 1;
                         if (val >= 1) {
-                            neighbour_sizes.set(i, val + acc);
+                            neighbour_sizes.set(k, val + acc);
                             acc += val;
-                            const int _col = col + col_sz - (neighbour_sizes.get(i));
+                            const int _col = col + col_sz - (neighbour_sizes.get(k));
                             c->ptn[_col] = -1; // this is val - 1, actually...
-
-                            const int v_degree = i;
                         }
                     }
 
@@ -1197,14 +1170,11 @@ assert(c->cells == actual_cells);
             }
 
             void refine_color_class_singleton(sgraph *g, coloring *c,
-                                              int color_class, int class_size,
-                                              work_list_pair_bool *color_class_split_worklist
+                                              int color_class, work_list_pair_bool *color_class_split_worklist
                     //,const std::function<type_additional_info_hook>& write_to_trace = nullptr
             ) {
-                bool comp;
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 neighbours.reset();
                 scratch_set.reset();
@@ -1311,8 +1281,7 @@ assert(c->cells == actual_cells);
             }
 
             bool refine_color_class_singleton_first(sgraph *g, coloring *c,
-                                                    int color_class, int class_size,
-                                                    work_list_pair_bool *color_class_split_worklist) {
+                                                    int color_class, work_list_pair_bool *color_class_split_worklist) {
                 bool comp;
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
@@ -1463,12 +1432,12 @@ assert(c->cells == actual_cells);
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
-                        const int i = vertex_worklist.pop_back();
-                        const int val = neighbour_sizes.get(i) + 1;
+                        const int k = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(k) + 1;
                         if (val >= 1) {
-                            neighbour_sizes.set(i, val + acc);
+                            neighbour_sizes.set(k, val + acc);
                             acc += val;
-                            const int _col = col + col_sz - (neighbour_sizes.get(i));
+                            const int _col = col + col_sz - (neighbour_sizes.get(k));
                             c->ptn[_col] = -1; // this is val - 1, actually...
                         }
                     }
@@ -1571,12 +1540,12 @@ assert(c->cells == actual_cells);
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
-                        const int i = vertex_worklist.pop_back();
-                        const int val = neighbour_sizes.get(i) + 1;
+                        const int k = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(k) + 1;
                         if (val >= 1) {
-                            neighbour_sizes.set(i, val + acc);
+                            neighbour_sizes.set(k, val + acc);
                             acc += val;
-                            const int _col = col + col_sz - (neighbour_sizes.get(i));
+                            const int _col = col + col_sz - (neighbour_sizes.get(k));
                             c->ptn[_col] = -1;
                         }
                     }
@@ -1669,11 +1638,9 @@ assert(c->cells == actual_cells);
                     neighbour_sizes.reset();
                     vertex_worklist.reset();
 
-                    int total = 0;
                     for (int i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
                         const int v = scratch[_col + i];
                         int index = neighbours.get(v) + 1;
-                        total += 1;
                         if (neighbour_sizes.inc(index) == 0)
                             vertex_worklist.push_back(index);
                     }

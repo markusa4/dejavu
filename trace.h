@@ -15,15 +15,15 @@ namespace dejavu {
         /**
          * \brief The trace invariant.
          *
-         * Class that serves to store and compare the trace of a walk in an individualization-refinement shared_tree. The class
-         * provides several different modes in which information is recorded and/or compared.
+         * Class that serves to store and compare the trace of a walk in an individualization-refinement shared_tree.
+         * The class provides several different modes in which information is recorded and/or compared.
          *
-         * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a full
-         * trace and recording a hash invariant as soon as the new computation deviates from the stored trace (see also
-         * \ref ir_mode ).
+         * Specifically, it is possible to (1) record a full trace, (2) compare to a full trace, or (3) compare to a
+         * full trace and recording a hash invariant as soon as the new computation deviates from the stored trace (see
+         * also \ref ir_mode ).
          *
-         * While comparing to a stored trace (2, 3), the class facilitates the use of the blueprint heuristic, which enables
-         * skipping of non-splitting cells in the stored trace.
+         * While comparing to a stored trace (2, 3), the class facilitates the use of the blueprint heuristic, which
+         * enables skipping of non-splitting cells in the stored trace.
         */
         class trace {
         private:
@@ -35,7 +35,6 @@ namespace dejavu {
 
             // mode
             bool compare = false; /**< whether to compare operations to a stored trace*/
-            bool freeze = false;
             bool record = false; /**< whether to record a trace */
 
             // housekeeping
@@ -49,12 +48,10 @@ namespace dejavu {
             bool comp = true;
 
             void add_to_hash(int d) {
-                //hash += (d * (35237));
-                long ho = hash & 0xff00000000000000;    // extract high-order 8 bits from h
-                hash = hash << 8;                    // shift h left by 5 bits
-                hash = hash ^ (ho >> 56);     // move the highorder 5 bits to the low-order
-                //   end and XOR into h
-                hash = hash ^ d;
+                long ho = hash & 0xff00000000000000;    // extract high-order 8 bits from hash
+                hash    = hash << 8;                    // shift hash left by 5 bits
+                hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
+                hash    = hash ^ d;                     // XOR into hash
             }
 
             void write_compare(int d) {
@@ -68,7 +65,7 @@ namespace dejavu {
                 if (record)
                     data.push_back(d);
                 if (compare) {
-                    if(position < compare_trace->data.size()) {
+                    if(position < (int) compare_trace->data.size()) {
                         assert(compare_trace->data.size() > position);
                         comp = comp && compare_trace->data[position] == d;
                     } else {
@@ -85,36 +82,6 @@ namespace dejavu {
             }
 
         public:
-
-            void update_blueprint_hash() {
-                bool skipping_cell = false;
-                bool write_false_next = false;
-                hash = 0;
-                for (int i = 0; i < data.size(); ++i) {
-                    const int dt = data[i];
-                    if(dt == TRACE_MARKER_REFINE_END)
-                        continue;
-                    if (dt == TRACE_MARKER_REFINE_CELL_START) {
-                        if (data[i + 1] == false) {
-                            skipping_cell = true;
-                        } else {
-                            write_false_next = true;
-                        }
-                    }
-                    if (!skipping_cell) {
-                        if (write_false_next) {
-                            // uses write_skip_compare
-                            write_false_next = false;
-                        } else {
-                            add_to_hash(dt);
-                        }
-                    }
-                    if (dt == TRACE_MARKER_REFINE_CELL_END) {
-                        skipping_cell = false;
-                        write_false_next = false;
-                    }
-                }
-            }
 
             /**
              * Records an individualization.
@@ -146,7 +113,7 @@ namespace dejavu {
                 assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
                 cell_old_color = color;
-                cell_act_spot = data.size();
+                cell_act_spot = (int) data.size();
                 write_skip_compare(false);
                 assert_cell_act = true;
             }
@@ -154,14 +121,10 @@ namespace dejavu {
             /**
              * Records a that a new color appeared while refining with respect to a color.
              * @param new_color The new color that was refined.
-             * @param new_color_size The size of the new color.
-             * @param new_color_deg The color degree which lead to the new color class.
              */
-            void op_refine_cell_record(int new_color, int new_color_size, int new_color_deg) {
+            void op_refine_cell_record(int new_color) {
                 assert(!comp || assert_cell_act);
                 write_compare(new_color);
-                //write_compare(new_color_size);
-                //write_compare(new_color_deg);
                 if (new_color != cell_old_color && record)
                     data[cell_act_spot] = true;
             }
@@ -176,7 +139,7 @@ namespace dejavu {
             void op_refine_cell_end() {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
-                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
+                //write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
             /**
@@ -217,7 +180,7 @@ namespace dejavu {
              */
             void blueprint_skip_to_next_cell() {
                 assert(compare_trace->data[position] == TRACE_MARKER_REFINE_CELL_START);
-                while (compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
+                while (compare_trace->data[position] < TRACE_MARKER_REFINE_CELL_END) {
                     assert(compare_trace->data.size() > (size_t) position);
                     ++position;
                 }
@@ -229,7 +192,7 @@ namespace dejavu {
              */
             void rewind_to_individualization() {
                 if (record) {
-                    int read_pt = data.size() - 1;
+                    int read_pt = (int) data.size() - 1;
                     while (read_pt >= 0 && data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         --read_pt;
                     }
@@ -268,9 +231,8 @@ namespace dejavu {
              *
              * @param compare_trace
              */
-            void set_compare_trace(trace *compare_trace) {
-                this->compare_trace = compare_trace;
-                compare_trace->freeze = true;
+            void set_compare_trace(trace *new_compare_trace) {
+                this->compare_trace = new_compare_trace;
             }
 
             /**
@@ -279,14 +241,14 @@ namespace dejavu {
              *
              * @param compare
              */
-            void set_compare(bool compare) {
-                this->compare = compare;
+            void set_compare(bool new_compare) {
+                this->compare = new_compare;
             }
 
             /**
              * @return A hash value summarizing the operations recorded in this trace.
              */
-            long get_hash() {
+            [[nodiscard]] long get_hash() const {
                 return hash;
             }
 
@@ -294,14 +256,14 @@ namespace dejavu {
              * Sets the hash value to a pre-determined value.
              * @param hash The hash value.
              */
-            void set_hash(long hash) {
-                this->hash = hash;
+            void set_hash(long new_hash) {
+                this->hash = new_hash;
             }
 
             /**
              * @return Whether the recorded operations deviated from the stored trace in \a compare_trace.
              */
-            bool trace_equal() {
+            [[nodiscard]] bool trace_equal() const {
                 return comp;
             }
 
@@ -321,18 +283,18 @@ namespace dejavu {
             }
 
             // record to trace
-            void set_record(bool record) {
-                this->record = record;
+            void set_record(bool new_record) {
+                this->record = new_record;
             }
 
             // position the trace
-            void set_position(int position) {
+            void set_position(int new_position) {
                 assert_cell_act   = false;
                 assert_refine_act = false;
-                this->position = position;
+                this->position = new_position;
             }
 
-            int get_position() {
+            [[nodiscard]] int get_position() const {
                 return position;
             }
         };

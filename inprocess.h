@@ -45,9 +45,6 @@ namespace dejavu {
                 bool touched_coloring = false;
 
                 if (tree->get_finished_up_to() >= 1) {
-                    // TODO: improve saving hash for pruned nodes, then propagate this to first level
-                    // TODO: could fix "usr" maybe?
-                    // TODO: use "pruned" flag, etc.
                     // TODO: hashing actually makes this worse!
                     work_list hash(g->v_size);
                     mark_set is_pruned(g->v_size);
@@ -65,28 +62,27 @@ namespace dejavu {
                     }
                     g->initialize_coloring(local_state.c, hash.get_array());
                     const int cell_after = local_state.c->cells;
-                    progress_print("inproc_bfs", std::to_string(cell_prev),
+                    progress_print("inpr_bfs", std::to_string(cell_prev),
                                    std::to_string(cell_after));
                     if (cell_after != cell_prev) {
                         local_state.refine(g);
-                        progress_print("inproc_ref", std::to_string(cell_after),
+                        progress_print("inpr_ref", std::to_string(cell_after),
                                        std::to_string(local_state.c->cells));
                     }
                 }
 
-                group->determine_save_to_individualize(&inproc_can_individualize, local_state.get_coloring());
+                group->determine_potential_individualization(&inproc_can_individualize, local_state.get_coloring());
 
                 if (!inproc_can_individualize.empty()) {
                     for (auto &i: inproc_can_individualize) {
                         const int ind_v = i.first;
-                        const int test_col_sz = i.second;
                         const int ind_col = local_state.c->vertex_to_col[ind_v];
-                        assert(test_col_sz == local_state.c->ptn[ind_col] + 1);
+                        assert(i.second == local_state.c->ptn[ind_col] + 1);
                         multiply_to_group_size(local_state.c->ptn[ind_col] + 1, 0);
                         local_state.move_to_child_no_trace(g, ind_v);
                         inproc_fixed_points.push_back(ind_v);
                     }
-                    progress_print("inproc_ind", "_",
+                    progress_print("inpr_ind", "_",
                                    std::to_string(local_state.c->cells));
                     inproc_can_individualize.clear();
                 }

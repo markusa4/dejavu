@@ -28,13 +28,6 @@
 #define INV_MARK_STARTCELL (INT32_MAX - 6)
 #define INV_MARK_ENDCELL   (INT32_MAX - 7)
 
-#define MASH0(i) (i * (35235237 - i * 5))
-#define MASH1(i) (i * (352355 - i * 3))
-#define MASH2(i) ((i + 1) * (423733 - (i + 1)))
-#define MASH3(i) ((i + 1) * (423233 - (i + 1)))
-#define MASH4(i) ((i + 1) * (23524361 - i * 3))
-#define MASH5(i) ((i + 1) * (23524361 - i * 3))
-
 #define PRINT(str) std::cout << str << std::endl;
 //#define PRINT(str) (void)0;
 
@@ -65,9 +58,9 @@ namespace dejavu {
 
     static void progress_print_header() {
         progress_print_split();
-        PRINT(std::setw(9) << std::left <<"T (ms)" << std::setw(9) << "δ (ms)" << std::setw(16) << "proc"  << std::setw(16) << "P1"        << std::setw(16)        << "P2");
+        PRINT(std::setw(9) << std::left <<"T (ms)" << std::setw(9) << "δ (ms)" << std::setw(14) << "proc"  << std::setw(16) << "p1"        << std::setw(16)        << "p2");
         progress_print_split();
-        PRINT(std::setw(9) << std::left << 0 << std::setw(9) << 0 << std::setw(16) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
+        PRINT(std::setw(9) << std::left << 0 << std::setw(9) << 0 << std::setw(12) << "start" << std::setw(16) << "_" << std::setw(16) << "_" );
     }
 
     static void progress_print(const std::string
@@ -78,7 +71,7 @@ namespace dejavu {
             set_first = true;
         }
         auto now = std::chrono::high_resolution_clock::now();
-        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
         previous = now;
     }
 
@@ -91,7 +84,7 @@ namespace dejavu {
         }
 
         auto now = std::chrono::high_resolution_clock::now();
-        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(16) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+        PRINT(std::fixed << std::setprecision(2) << std::setw(9) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0  << std::setw(9) << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0  << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
         previous = now;
     }
 }

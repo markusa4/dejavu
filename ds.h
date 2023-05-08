@@ -29,7 +29,7 @@ namespace dejavu {
          * @param sz Length of the array \p arr.
          */
         template<class T>
-        void sort_t(T *arr, int sz) {
+        void inline sort_t(T *arr, int sz) {
 #define min(x, y) (x<y?x:y)
 #define max(x, y) (x<y?y:x)
 #define SWAP(x, y) { const T a = min(arr[x], arr[y]); \

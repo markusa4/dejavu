@@ -416,8 +416,6 @@ namespace dejavu {
             }
         };
 
-        typedef void type_unload_hook();
-
         /**
          * \brief Stores a link to an automorphism.
          *
@@ -591,8 +589,8 @@ namespace dejavu {
 
             dense_sparse_arbiter loader; /**< used for indiscriminate loading of dense and sparse automorphisms */
 
-            mark_set scratch1; /**< auxiliary space */
-            mark_set scratch2; /**< auxiliary space */
+            mark_set scratch1;        /**< auxiliary space */
+            mark_set scratch2;        /**< auxiliary space */
             work_list scratch_apply1; /**< auxiliary space used for `apply` operations */
             work_list scratch_apply2; /**< auxiliary space used for `apply` operations */
             mark_set  scratch_apply3; /**< auxiliary space used for `apply` operations */
@@ -696,8 +694,8 @@ namespace dejavu {
             }
 
             void clear() {
-                for(int i = 0; i < generators.size(); ++i) {
-                    delete generators[i];
+                for(auto & generator : generators) {
+                    delete generator;
                 }
                 generators.clear();
             }
@@ -737,8 +735,8 @@ namespace dejavu {
              */
             void __attribute__ ((noinline)) load_orbit_to_scratch(schreier_workspace &w) {
                 w.scratch1.reset();
-                for (int i = 0; i < fixed_orbit.size(); ++i) {
-                    w.scratch1.set(fixed_orbit[i]);
+                for (int i : fixed_orbit) {
+                    w.scratch1.set(i);
                 }
             }
 
@@ -815,9 +813,9 @@ namespace dejavu {
              * @return Position of point \p in transversal, or -1 if not contained.
              */
             int find_point(const int p) {
-                for (int i = 0; i < fixed_orbit.size(); ++i) {
+                for (size_t i = 0; i < fixed_orbit.size(); ++i) {
                     if (p == fixed_orbit[i]) {
-                        return i;
+                        return (int) i;
                     }
                 }
                 return -1;
@@ -1069,7 +1067,8 @@ namespace dejavu {
              * @param save_to_individualize Vector in which vertices deemed save to individualize are pushed.
              * @param root_coloring The coloring with which the stored transversals are compared.
              */
-            void determine_save_to_individualize(std::vector<std::pair<int, int>>* save_to_individualize, coloring* root_coloring) {
+            void determine_potential_individualization(std::vector<std::pair<int, int>>* save_to_individualize,
+                                                       coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
                     if(transversals[i]->size() == corresponding_root_color_sz && corresponding_root_color_sz > 1) {

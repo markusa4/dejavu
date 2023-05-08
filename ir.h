@@ -46,20 +46,23 @@ namespace dejavu {
             // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
 
             std::vector<int> base_vertex; /**< base of vertices of this IR node (optional) */
-            coloring c; /**< vertex coloring of this IR node */
-            long invariant = 0; /**< hash of invariant of this IR node */
+            coloring c;             /**< vertex coloring of this IR node */
+            long invariant = 0;     /**< hash of invariant of this IR node */
             int trace_position = 0; /**< position of trace of this IR node */
-            int base_position = 0; /**< length of base of this IR node */
+            int base_position = 0;  /**< length of base of this IR node */
         public:
-            void set_state(std::vector<int> &base_vertex, coloring &c, long invariant, int trace_position,
-                           int base_position) {
-                this->base_vertex = base_vertex;
-                this->c.copy_force(&c);
-                this->invariant = invariant;
-                this->trace_position = trace_position;
-                this->base_position = base_position;
+            void set_state(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
+                           int s_base_position) {
+                this->base_vertex = s_base_vertex;
+                this->c.copy_force(&s_c);
+                this->invariant = s_invariant;
+                this->trace_position = s_trace_position;
+                this->base_position = s_base_position;
             }
 
+            /**
+             * @return coloring of this IR node
+             */
             coloring *get_coloring() {
                 return &c;
             }
@@ -67,21 +70,21 @@ namespace dejavu {
             /**
              * @return hash of invariant of this IR node
              */
-            long get_invariant_hash() {
+            [[nodiscard]] long get_invariant_hash() const {
                 return invariant;
             }
 
             /**
              * @return position of trace of this IR node
              */
-            int get_trace_position() {
+            [[nodiscard]] int get_trace_position() const {
                 return trace_position;
             }
 
             /**
              * @return length of base of this IR node
              */
-            int get_base_position() {
+            [[nodiscard]] int get_base_position() const {
                 return base_position;
             }
 
@@ -137,8 +140,8 @@ namespace dejavu {
         private:
             refinement* R;
             trace *cT = nullptr;
-            trace _T1;
-            trace _T2;
+            trace internal_T1;
+            trace internal_T2;
 
             mark_set  touched_color;
             work_list touched_color_list;
@@ -146,18 +149,17 @@ namespace dejavu {
 
             std::function<type_split_color_hook>     my_split_hook;
             std::function<type_worklist_color_hook>  my_worklist_hook;
-            std::function<type_additional_info_hook> my_add_hook;
 
             // settings
             ir_mode mode = IR_MODE_RECORD_TRACE;
 
             // internal flags for heuristics
-            bool h_cell_active     = false;
-            bool h_individualize   = false;
-            bool h_trace_early_out = false;
+            bool s_cell_active     = false;
+            bool s_individualize   = false;
 
-            bool  h_deviation_inc_active  = false;
-            int   h_deviation_inc_current = 0;
+            bool h_trace_early_out = false;       /*< use trace early out                */
+            bool h_deviation_inc_active  = false; /*< use increased trace deviation      */
+            int  s_deviation_inc_current = 0;     /*< number of current trace deviations */
 
             void touch_initial_colors() {
                 int i = 0;
@@ -205,11 +207,11 @@ namespace dejavu {
                 }
 
                 // record split into trace invariant, unless we are individualizing
-                if (!h_individualize && old_color != new_color) T->op_refine_cell_record(new_color, new_color_sz, 1);
+                if (!s_individualize && old_color != new_color) T->op_refine_cell_record(new_color);
 
                 const bool cont = !h_trace_early_out || T->trace_equal();
-                h_deviation_inc_current += (!cont);
-                const bool deviation_override = h_deviation_inc_active && (h_deviation_inc_current <= h_deviation_inc);
+                s_deviation_inc_current += (!cont);
+                const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 // TODO: should this be in split hook, or in color refinement?
                 const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[s_base_pos - 1] == c->cells);
@@ -224,9 +226,9 @@ namespace dejavu {
             }
 
             bool worklist_hook(const int color, const int color_sz) {
-                if (h_cell_active) {
+                if (s_cell_active) {
                     T->op_refine_cell_end();
-                    h_cell_active = false;
+                    s_cell_active = false;
                 }
 
                 // update some heuristic values
@@ -237,18 +239,17 @@ namespace dejavu {
                 }
 
                 T->op_refine_cell_start(color);
-                if (!h_individualize) T->op_additional_info(color_sz);
+                if (!s_individualize) T->op_additional_info(color_sz);
 
-                h_cell_active = true;
+                s_cell_active = true;
                 return true;
             }
 
             std::function<type_worklist_color_hook> self_worklist_hook() {
-                return [this](auto && PH1, auto && PH2) { return worklist_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); };
-            }
-
-            std::function<type_additional_info_hook> self_add_hook() {
-                return [this](auto && PH1) { write_to_trace(std::forward<decltype(PH1)>(PH1)); };
+                return [this](auto && PH1, auto && PH2) {
+                    return worklist_hook(std::forward<decltype(PH1)>(PH1),
+                                       std::forward<decltype(PH2)>(PH2));
+                };
             }
 
         public:
@@ -262,8 +263,8 @@ namespace dejavu {
                 this->c = c;
                 this->R = R;
 
-                T  = &_T1;
-                cT = &_T2;
+                T  = &internal_T1;
+                cT = &internal_T2;
 
                 workspace.allocate(c->lab_sz);
                 touched_color.initialize(c->lab_sz);
@@ -274,7 +275,6 @@ namespace dejavu {
 
                 my_split_hook = self_split_hook();
                 my_worklist_hook = self_worklist_hook();
-                my_add_hook   = self_add_hook();
             }
 
             /**
@@ -376,7 +376,7 @@ namespace dejavu {
              */
             void reset_trace_equal() {
                 T->reset_trace_equal();
-                h_deviation_inc_current = 0;
+                s_deviation_inc_current = 0;
             }
 
             /**
@@ -385,7 +385,8 @@ namespace dejavu {
              * @param state A reference to the reduced_save in which the state will be stored.
              */
             void save_reduced_state(reduced_save &state) {
-                state.set_state(base_vertex, *c, T->get_hash(), T->get_position(), s_base_pos);
+                state.set_state(base_vertex, *c, T->get_hash(), T->get_position(),
+                                s_base_pos);
             }
 
             /**
@@ -394,7 +395,7 @@ namespace dejavu {
              * @param state A reference to the reduced_save from which the state will be loaded.
              */
             void __attribute__ ((noinline)) load_reduced_state(reduced_save &state) {
-                bool partial_base = false;
+                // bool partial_base = false;
                 /*if(state.get_base().size() <= base_vertex.size()) {
                     int i;
                     for (i = 0; i < state.get_base().size(); ++i) if (state.get_base()[i] != base_vertex[i]) break;
@@ -445,11 +446,11 @@ namespace dejavu {
                 mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
             }
 
-            coloring *get_coloring() const {
+            [[nodiscard]] coloring *get_coloring() const {
                 return c;
             }
 
-            int get_base_pos() {
+            [[nodiscard]] int get_base_pos() const {
                 return s_base_pos;
             }
 
@@ -494,38 +495,36 @@ namespace dejavu {
                 base_vertex.push_back(v); // always keep track of base (needed for BFS)
 
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
-                    base_singleton_pt.push_back(singletons.size());
+                    base_singleton_pt.push_back((int) singletons.size());
                     base_color.push_back(c->vertex_to_col[v]);
                     base_color_sz.push_back(c->ptn[c->vertex_to_col[v]] + 1);
                     base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
                 }
 
-                assert(!h_cell_active);
+                assert(!s_cell_active);
 
-                h_individualize = true;
+                s_individualize = true;
                 const int prev_col = c->vertex_to_col[v];
                 const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
-                if (T) T->op_individualize(prev_col, c->vertex_to_col[v]);
-                h_individualize = false;
+                T->op_individualize(prev_col, c->vertex_to_col[v]);
+                s_individualize = false;
                 s_last_refinement_singleton_only = true;
-
-                if (T) T->op_refine_start();
+                T->op_refine_start();
 
                 if (mode == IR_MODE_RECORD_TRACE) {
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
                                        my_worklist_hook);
-                    if (T && h_cell_active) T->op_refine_cell_end();
-                    if (T) T->op_refine_end();
+                    if (s_cell_active) T->op_refine_cell_end();
+                    T->op_refine_end();
                 } else {
-                    // TODO compare_base_cells currently implemented in split hook, could reconsider this...
-                    // T->trace_equal()?compare_base_cells[s_base_pos - 1]:-1
                     R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
                                        my_worklist_hook);
-                    //assert(T->trace_equal() ?c->cells==compare_base_cells[s_base_pos - 1] : true);
-                    if (T && T->trace_equal() && c->cells==compare_base_cells[s_base_pos - 1]) {T->skip_to_individualization();}
+                    if (T->trace_equal() && c->cells==compare_base_cells[s_base_pos - 1]) {
+                        T->skip_to_individualization();
+                    }
                 }
 
-                h_cell_active = false;
+                s_cell_active = false;
 
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) base_cells.push_back(c->cells);
             }
@@ -599,6 +598,14 @@ namespace dejavu {
                 T->reset_trace_equal();
             }
 
+            /**
+             * Perform the given walk from the given IR node.
+             *
+             * @param g The graph.
+             * @param start_from A reduced_save describing the IR node from which the walk should be performed.
+             * @param vertices A vector of vertices that describes the walk, i.e., these vertices will be individualized
+             *                 in the given order.
+             */
             void walk(sgraph *g, ir::reduced_save &start_from, std::vector<int>& vertices) {
                 load_reduced_state(start_from);
 
@@ -649,25 +656,39 @@ namespace dejavu {
          * Heuristics which enable the creation of different cell selectors, as well as moving an \ref controller to a
          * leaf of the IR tree.
          */
-        class selector_factory {
-            // heuristics to attempt to find a good selector, as well as creating a split-map for dfs_ir
-            // TODO: enable different selector strategies for restarts
-            // TODO: make a grab-able hook for dynamic selector which can also deviate from base color (blueprint selector)
-            int locked_lim = 512;
+        class base_selector {
+            const int locked_lim = 512;
 
             std::vector<int> saved_color_base;
             std::function<type_selector_hook> dynamic_seletor;
             mark_set test_set;
             std::vector<int> candidates;
 
-        public:
-
-            // TODO: save the base of state for blueprint selection
-            void save_base(controller *state) {
-
+            int color_score(sgraph *g, controller *state, int color) {
+                test_set.reset();
+                const int v = state->get_coloring()->lab[color];
+                const int d = g->d[v];
+                const int ept = g->v[v];
+                int non_triv_col_d = 1;
+                for (int i = 0; i < d; ++i) {
+                    const int test_col = state->get_coloring()->vertex_to_col[g->e[ept + i]];
+                    if (!test_set.get(test_col)) {
+                        non_triv_col_d += 1;
+                        test_set.set(test_col);
+                    }
+                }
+                return state->get_coloring()->ptn[color] * non_triv_col_d;
             }
 
-            // TODO configuration of dynamic selector when deviating from base
+            static int color_score_size(controller *state, int color) {
+                return state->get_coloring()->ptn[color];
+            }
+
+            static int color_score_anti_size(controller *state, int color) {
+                return INT32_MAX - state->get_coloring()->ptn[color];
+            }
+
+        public:
 
             /**
              * Dynamic cell selector, chooses first non-trivial color class, unless color class from stored base is
@@ -677,7 +698,7 @@ namespace dejavu {
              * @param base_pos Current position in base.
              */
             int dynamic_selector_first(const coloring *c, const int base_pos) {
-                if (base_pos >= 0 && base_pos < saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0 &&
+                if (base_pos >= 0 && base_pos < (int) saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0 &&
                     c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos]) {
                     return saved_color_base[base_pos];
                 }
@@ -694,11 +715,10 @@ namespace dejavu {
              * @return A selector hook based on the saved base and configured dynamic selector.
              */
             std::function<type_selector_hook> *get_selector_hook() {
-                dynamic_seletor = std::bind(&selector_factory::dynamic_selector_first, this, std::placeholders::_1,
+                dynamic_seletor = std::bind(&base_selector::dynamic_selector_first, this, std::placeholders::_1,
                                             std::placeholders::_2);
                 return &dynamic_seletor;
             }
-
 
             void find_base(sgraph *g, controller *state, const int h_choose) {
                 switch(h_choose % 3) {
@@ -798,62 +818,6 @@ namespace dejavu {
                 saved_color_base = state->base_color;
             }
 
-            void find_test_base(sgraph *g, controller *state) {
-                state->mode_write_base();
-
-                candidates.clear();
-                candidates.reserve(locked_lim);
-                int prev_color = -1;
-
-                mark_set neighbour_color;
-                neighbour_color.initialize(g->v_size);
-
-                while (state->get_coloring()->cells != g->v_size) {
-                    int best_color = -1;
-
-                    // pick previous color if possible
-                    if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
-                        //std::cout << "previous color" << std::endl;
-                        best_color = prev_color;
-                    }
-
-                    // heuristic, try to pick "good" color
-                    if (best_color == -1) {
-                        candidates.clear();
-                        int best_score = -1;
-
-                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
-                            if (state->get_coloring()->ptn[i] > 0) {
-                                candidates.push_back(i);
-                            }
-
-                            i += state->get_coloring()->ptn[i] + 1;
-                        }
-
-                        while (!candidates.empty()) {
-                            const int test_color = candidates.back();
-                            candidates.pop_back();
-
-                            int test_score = color_score_size(g, state, test_color);
-                            if (neighbour_color.get(test_color)) {
-                                test_score *= 10;
-                            }
-                            if (test_score > best_score) {
-                                best_color = test_color;
-                                best_score = test_score;
-                            }
-                        }
-                    }
-
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
-                    prev_color = best_color;
-                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
-                }
-
-                saved_color_base = state->base_color;
-            }
-
             /**
              * Find a base/selector for a given graph \p g from state \p state. Attempts to find a with small color
              * classes.
@@ -868,42 +832,36 @@ namespace dejavu {
                 test_set.initialize(g->v_size);
                 candidates.clear();
                 candidates.reserve(locked_lim);
-                int prev_color = -1;
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
 
                     // heuristic, try to pick "good" color
-                    if (best_color == -1) {
-                        candidates.clear();
-                        int best_score = INT32_MIN;
-
-                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
-                            if (state->get_coloring()->ptn[i] > 0) {
-                                candidates.push_back(i);
-                            }
-
-                            if (candidates.size() >= (size_t) locked_lim)
-                                break;
-
-                            i += state->get_coloring()->ptn[i] + 1;
+                    candidates.clear();
+                    int best_score = INT32_MIN;
+                    for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                        if (state->get_coloring()->ptn[i] > 0) {
+                            candidates.push_back(i);
                         }
 
-                        while (!candidates.empty()) {
-                            const int test_color = candidates.back();
-                            candidates.pop_back();
+                        if (candidates.size() >= (size_t) locked_lim)
+                            break;
 
-                            int test_score = color_score_anti_size(g, state, test_color);
-                            if (test_score > best_score || best_color == -1) {
-                                best_color = test_color;
-                                best_score = test_score;
-                            }
+                        i += state->get_coloring()->ptn[i] + 1;
+                    }
+                    while (!candidates.empty()) {
+                        const int test_color = candidates.back();
+                        candidates.pop_back();
+
+                        int test_score = color_score_anti_size(state, test_color);
+                        if (test_score > best_score || best_color == -1) {
+                            best_color = test_color;
+                            best_score = test_score;
                         }
                     }
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
-                    prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
 
@@ -932,33 +890,29 @@ namespace dejavu {
                     int best_color = -1;
 
                     // heuristic, try to pick "good" color
-                    if (best_color == -1) {
-                        candidates.clear();
-                        int best_score = -1;
-
-                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
-                            if (state->get_coloring()->ptn[i] > 0) {
-                                candidates.push_back(i);
-                            }
-
-                            //if (candidates.size() >= (size_t) locked_lim)
-                            //    break;
-
-                            i += state->get_coloring()->ptn[i] + 1;
+                    candidates.clear();
+                    int best_score = -1;
+                    for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                        if (state->get_coloring()->ptn[i] > 0) {
+                            candidates.push_back(i);
                         }
 
-                        while (!candidates.empty()) {
-                            const int test_color = candidates.back();
-                            candidates.pop_back();
+                        //if (candidates.size() >= (size_t) locked_lim)
+                        //    break;
 
-                            int test_score = color_score_size(g, state, test_color);
-                            if (neighbour_color.get(test_color)) {
-                                test_score *= 10;
-                            }
-                            if (test_score > best_score) {
-                                best_color = test_color;
-                                best_score = test_score;
-                            }
+                        i += state->get_coloring()->ptn[i] + 1;
+                    }
+                    while (!candidates.empty()) {
+                        const int test_color = candidates.back();
+                        candidates.pop_back();
+
+                        int test_score = color_score_size(state, test_color);
+                        if (neighbour_color.get(test_color)) {
+                            test_score *= 10;
+                        }
+                        if (test_score > best_score) {
+                            best_color = test_color;
+                            best_score = test_score;
                         }
                     }
 
@@ -968,35 +922,6 @@ namespace dejavu {
                 }
 
                 saved_color_base = state->base_color;
-            }
-
-            int color_score(sgraph *g, controller *state, int color) {
-                test_set.reset();
-                const int v = state->get_coloring()->lab[color];
-                const int d = g->d[v];
-                const int ept = g->v[v];
-                int non_triv_col_d = 1;
-                for (int i = 0; i < d; ++i) {
-                    const int test_col = state->get_coloring()->vertex_to_col[g->e[ept + i]];
-                    if (!test_set.get(test_col)) {
-                        non_triv_col_d += 1;
-                        test_set.set(test_col);
-                    }
-                }
-                return state->get_coloring()->ptn[color] * non_triv_col_d;
-            }
-
-            static int color_score_size(sgraph *g, controller *state, int color) {
-                return state->get_coloring()->ptn[color];
-            }
-
-            static int color_score_anti_size(sgraph *g, controller *state, int color) {
-                return INT32_MAX - state->get_coloring()->ptn[color];
-            }
-
-
-            int state_score(sgraph *g, controller *state) {
-                return state->get_coloring()->cells;
             }
         };
 
@@ -1057,9 +982,9 @@ namespace dejavu {
             }
 
             stored_leaf(std::vector<int>& arr, stored_leaf_type store_type) : store_type(store_type) {
-                lab_or_base.allocate(arr.size());
+                lab_or_base.allocate((int) arr.size());
                 std::copy(arr.begin(), arr.end(), lab_or_base.get_array());
-                lab_or_base.set_size(arr.size());
+                lab_or_base.set_size((int) arr.size());
             }
 
             const int* get_lab_or_base() {
@@ -1101,8 +1026,8 @@ namespace dejavu {
              * Free up all memory.
              */
             ~shared_leaves() {
-                for(int i = 0; i < garbage_collector.size(); ++i) {
-                    delete garbage_collector[i];
+                for(auto & i : garbage_collector) {
+                    delete i;
                 }
             }
 
@@ -1172,18 +1097,18 @@ namespace dejavu {
                 this->data = data;
                 this->next = next;
                 if(next == nullptr) {
-                    next = this;
+                    next = this; // TODO supposed to be this->next?
                 }
                 this->parent = parent;
             }
             tree_node* get_next() {
                 return next;
             }
-            tree_node* get_parent() {
+            [[maybe_unused]] tree_node* get_parent() {
                 return parent;
             }
-            void set_next(tree_node* next) {
-                this->next = next;
+            void set_next(tree_node* new_next) {
+                this->next = new_next;
             }
             reduced_save* get_save() {
                 return data;
@@ -1192,21 +1117,21 @@ namespace dejavu {
             void prune() {
                 is_pruned = true;
             }
-            bool get_prune() {
+            [[nodiscard]] bool get_prune() const {
                 return is_pruned;
             }
             void add_hash(long add) {
                 this->hash += add;
             }
 
-            long get_hash() {
+            [[nodiscard]] long get_hash() const {
                 return hash;
             }
 
             void base() {
                 is_base = true;
             }
-            bool get_base() {
+            [[nodiscard]] bool get_base() const {
                 return is_base;
             }
         };
@@ -1240,7 +1165,7 @@ namespace dejavu {
             shared_leaves stored_leaves; /**< stores leaves of the IR tree */
             deviation_map stored_deviation; /**< stores trace deviations of the current BFS level*/
 
-            shared_tree(int domain_size) {
+            explicit shared_tree(int domain_size) {
                 h_bfs_top_level_orbit.initialize(domain_size);
             };
 
@@ -1248,8 +1173,7 @@ namespace dejavu {
                 if(finished_up_to > 1) {
                     for(int j = finished_up_to; j >= 1; --j) {
                         finish_level(j);
-                        for(int i = 0; i < tree_data_jump_map[j].size(); ++i) {
-                            auto node = tree_data_jump_map[j][i];
+                        for(auto node : tree_data_jump_map[j]) {
                             //node->get_parent()->add_hash(node->get_hash() + 1);
                             const int v = node->get_save()->get_base()[0];
                             node_invariant[v] += 1;//+node->get_hash();
@@ -1284,7 +1208,7 @@ namespace dejavu {
             /**
              * @return How many leaves were stored during random search.
              */
-            int stat_leaves() {
+            int stat_leaves() const {
                 return stored_leaves.s_leaves;
             }
 
@@ -1294,8 +1218,8 @@ namespace dejavu {
                     return false;
                 }
 
-                const int old_size = current_base.size();
-                const int new_size = new_base.size();
+                const int old_size = (int) current_base.size();
+                const int new_size = (int) new_base.size();
 
                 // compare with stored base, keep whatever is possible
                 int keep_until = 0;
@@ -1392,7 +1316,7 @@ namespace dejavu {
             }
 
             void finish_level(int level) {
-                if(tree_data_jump_map[level].size() == 0) {
+                if(tree_data_jump_map[level].empty()) {
                     tree_node * first = tree_data[level];
                     tree_data_jump_map[level].reserve(tree_level_size[level]);
                     tree_node * next = first;
@@ -1406,17 +1330,16 @@ namespace dejavu {
 
             ir::tree_node* pick_node_from_level(const int level, int num) {
                 finish_level(level);
-                // TODO very sure this is too slow!
                 num = num % tree_level_size[level];
                 return tree_data_jump_map[level][num];
             }
 
-            int get_finished_up_to() {
+            [[nodiscard]] int get_finished_up_to() const {
                 return finished_up_to;
             }
 
-            void set_finished_up_to(const int finished_up_to) {
-                this->finished_up_to = finished_up_to;
+            void set_finished_up_to(const int new_finished_up_to) {
+                this->finished_up_to = new_finished_up_to;
             }
 
             tree_node* get_level(int level) {
@@ -1436,7 +1359,7 @@ namespace dejavu {
             }
 
             ~shared_tree() {
-                for(int i = 0; i < garbage_collector.size(); ++i) delete garbage_collector[i];
+                for(auto & i : garbage_collector) delete i;
             };
         };
     }

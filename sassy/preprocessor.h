@@ -516,47 +516,6 @@ namespace sassy {
             return current_vertex;
         }
 
-        // i never found twins 0
-        void red_twins(sgraph *g, int *colmap, sassy_hook* hook) {
-            std::cout << "looking for twins..." << std::endl;
-            coloring col;
-            g->initialize_coloring(&col, colmap);
-
-            mark_set test_twin(g->v_size);
-
-            // iterate over color classes
-            for(int i = 0; i < g->v_size;) {
-                const int color = i;
-                const int color_size = col.ptn[color] + 1;
-                i += color_size;
-
-                for(int j = 0; j < color_size; ++j) {
-                    const int vertex = col.lab[color + j];
-                    test_twin.reset();
-                    for(int k = 0; k < g->d[vertex]; ++k) {
-                        const int neighbour = g->e[g->v[vertex] + k];
-                        test_twin.set(neighbour);
-                    }
-
-                    for(int jj = j+1; jj < color_size; ++jj) {
-                        bool is_twin = true;
-                        const int other_vertex = col.lab[color + jj];
-                        for(int k = 0; k < g->d[other_vertex]; ++k) {
-                            const int neighbour = g->e[g->v[other_vertex] + k];
-                            if(!test_twin.get(neighbour)) {
-                                is_twin = false;
-                                break;
-                            }
-                        }
-                        if(is_twin)
-                            std::cout << "found twins " << vertex << "&" << other_vertex << std::endl;
-                    }
-
-                }
-
-            }
-        }
-
         // color-wise degree2 unique endpoint algorithm
         void red_deg2_unique_endpoint_new(sgraph *g, int *colmap, sassy_hook* hook) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
@@ -4310,7 +4269,7 @@ namespace sassy {
                                 assert(touched_color.get(c3.vertex_to_col[ind_v1]));
                                 const int init_c3 = R1->individualize_vertex(&c3, ind_v1);
                                 assert(touched_color.get(init_c3));
-                                const int touched_col_prev = touched_color_list.cur_pos;
+                                [[maybe_unused]] const int touched_col_prev = touched_color_list.cur_pos;
                                 R1->refine_coloring(g, &c3, &I1, init_c3, nullptr, -1, -1,
                                                    nullptr, &touched_color, &touched_color_list);
                                 assert(touched_col_prev == touched_color_list.cur_pos);

@@ -66,8 +66,6 @@ int commandline_mode(int argc, char **argv) {
     std::string filename = "";
     bool entered_file = false;
     int  timeout = -1;
-    bool comp_dejavu = true;
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     bool permute_graph = false;
 
     for (int i = 1; i < argc; ++i) {
@@ -137,15 +135,6 @@ int commandline_mode(int argc, char **argv) {
         } else if (arg == "__COMPRESS") {
             //config.CONFIG_PREPROCESS_COMPRESS      = true;
            // config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
-        } else if (arg == "__PERMUTE_SEED") {
-            if (i + 1 < argc) {
-                i++;
-                permute_graph = true;
-                seed = atoi(argv[i]);
-            } else {
-                std::cerr << "--permute_seed option requires one argument." << std::endl;
-                return 1;
-            }
         }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
                 //config.CONFIG_ONLY_COLOR_REF_INVARIANT = true;
         }  else if (arg == "__FORCE_SELECTOR") {

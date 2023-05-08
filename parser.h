@@ -18,8 +18,9 @@ static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int**
     std::string nv_str, ne_str;
     std::string nv1_string, nv2_string;
     int nv1, nv2;
-    int i;
-    int nv, ne;
+    size_t i;
+    int nv = 0;
+    int ne = 0;
     while (std::getline(infile, line)) {
         char m = line[0];
         int average_d;
@@ -38,8 +39,8 @@ static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int**
                 average_d = (ne / nv) + 3;
                 g->initialize(nv, ne * 2);
                 incidence_list.reserve(nv);
-                for(int i = 0; i < nv; ++i) {
-                    incidence_list.emplace_back(std::vector<int>());
+                for(int j = 0; j < nv; ++j) {
+                    incidence_list.emplace_back();
                     incidence_list[incidence_list.size() - 1].reserve(average_d);
                 }
                 break;
@@ -87,15 +88,15 @@ static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int**
 
     int maxd = 0;
 
-    for(size_t i = 0; i < incidence_list.size(); ++i) {
+    for(auto & i : incidence_list) {
         g->v[vpos] = epos;
-        g->d[vpos] = incidence_list[i].size();
+        g->d[vpos] = (int) i.size();
         //degrees.insert(g->d[vpos]);
         if(g->d[vpos] > maxd)
             maxd = g->d[vpos];
         vpos += 1;
-        for(size_t j = 0; j < incidence_list[i].size(); ++j) {
-            g->e[epos] = incidence_list[i][j];
+        for(int j : i) {
+            g->e[epos] = j;
             epos += 1;
         }
     }
@@ -114,7 +115,7 @@ static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int**
 
     assert(nv == g->v_size);
     assert(2 * ne == g->e_size);
-    const double parse_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+    const double parse_time = (double) (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
     std::cout << "Parse time: " << parse_time / 1000000.0 << "ms" << std::endl;
 }
 

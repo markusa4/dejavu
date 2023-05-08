@@ -129,7 +129,7 @@ namespace sassy {
             alloc(domain_size);
         }
 
-        bool check() {
+        [[maybe_unused]] void check() const {
             bool comp = true;
 
             for (int i = 0; i < lab_sz; ++i) {
@@ -137,7 +137,7 @@ namespace sassy {
                 comp = comp && (lab[vertex_to_lab[i]] == i);
             }
 
-            int last_col = -1;
+            [[maybe_unused]] int last_col = -1;
             int counter = 1;
             for (int i = 0; i < ptn_sz; ++i) {
                 --counter;
@@ -153,7 +153,7 @@ namespace sassy {
                 assert(vertex_to_col[lab[i]] == i);
                 i += ptn[i] + 1;
             }
-            return comp;
+            assert(comp);
         }
     };
 }

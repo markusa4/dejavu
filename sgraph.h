@@ -148,9 +148,9 @@ public:
             }
 
             int increment = 0;
-            for(int i = 0; i < colsize.size(); i++) {
-                const int col_sz = colsize[i];
-                colsize[i] += increment;
+            for(int & i : colsize) {
+                const int col_sz = i;
+                i += increment;
                 increment += col_sz;
             }
             assert(increment == v_size);

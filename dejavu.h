@@ -78,11 +78,9 @@ namespace dejavu {
 
     public:
         // settings
-        int h_error_bound        = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
+        int h_error_bound       = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
                                        * misses an automorphism with probabiltiy at most (1/2)^10 < 0.098% */
-        int h_limit_leaf        = 0;  /**< limit for the amount of IR leaves to be stored*/
-        int h_limit_fail        = 0;  /**< limit for the amount of backtracking allowed*/
-
+        int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed*/
         int h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
                                        *  previous base */
 
@@ -121,7 +119,6 @@ namespace dejavu {
 
             // if the preprocessor changed the vertex set of the graph, need to use reverse translation
             dejavu_hook dhook = sassy::preprocessor::dejavu_hook;
-            //if(g->v_size != gg.v_size)
             hook = &dhook; /*< change hook to sassy hook*/
 
             // print that we are solving now...
@@ -146,7 +143,7 @@ namespace dejavu {
             bool s_long_base        = false; /*< flag for bases that are considered very long     */
             bool s_short_base       = false; /*< flag for bases that are considered very short    */
             bool s_few_cells        = false;
-            bool s_many_cells       = false;
+            [[maybe_unused]] bool s_many_cells       = false;
             bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph since last restart */
             int  s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                              *  case where all searchable bases became much larger due to BFS or other
@@ -159,7 +156,7 @@ namespace dejavu {
 
             // local modules and workspace, to be used by other modules
             ir::refinement       m_refinement; /*< workspace for color refinement and other utilities */
-            ir::selector_factory m_selectors;  /*< cell selector creation                             */
+            ir::base_selector m_selectors;  /*< cell selector creation                             */
             groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
             groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims       */
 
@@ -203,10 +200,10 @@ namespace dejavu {
                     // now, we manage the restart....
                     local_state.load_reduced_state(root_save); /*< start over from root */
                     progress_print_split();
-                    const int increase_fac = (s_restarts >= 3) ? h_budget_inc_fact : 2; /*<factor to increase the budget */
-                    if(s_inprocessed) h_budget = 1;          /*< if we inprocessed, we hope that the graph is easy again */
-                    h_budget *= increase_fac;                                                   /*< increase the budget! */
-                    s_cost = 0;                                                                        /* reset the cost */
+                    const int increase_fac = (s_restarts >= 3)? h_budget_inc_fact :2;/*<factor to increase the budget */
+                    if(s_inprocessed) h_budget = 1;       /*< if we inprocessed, we hope that the graph is easy again */
+                    h_budget *= increase_fac;                                                /*< increase the budget! */
+                    s_cost = 0;                                                                     /* reset the cost */
                 }
 
                 // keep vertices which are save to individualize for in-processing
@@ -216,7 +213,7 @@ namespace dejavu {
                 // find a selector, moves local_state to a leaf of IR shared_tree
                 m_selectors.find_base(g, &local_state, s_restarts);
                 auto selector = m_selectors.get_selector_hook();
-                progress_print("selector", local_state.s_base_pos,local_state.T->get_position());
+                progress_print("sel_fact", local_state.s_base_pos,local_state.T->get_position());
                 int base_size = local_state.s_base_pos;
 
                 // TODO if base sizes are equal, we should always prefer the one with smallest number of IR leaves
@@ -283,9 +280,8 @@ namespace dejavu {
 
                 s_last_bfs_pruned = false;
                 int s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
-                int s_iterations = 0;
-                int h_rand_fail_lim_total = 0;
-                int h_rand_fail_lim_now   = 0;
+                int h_rand_fail_lim_total  = 0;
+                int h_rand_fail_lim_now    = 0;
 
                 // in the following, we will always decide between 3 different strategies: random paths, BFS, or
                 // inprocessing followed by a restart
@@ -315,7 +311,6 @@ namespace dejavu {
                         s_path_fail1_avg    = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
                         s_trace_cost1_avg   = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
                     }
-
                     double s_bfs_cost_estimate = s_trace_cost1_avg * s_bfs_next_level_nodes;
 
                     const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
@@ -342,9 +337,10 @@ namespace dejavu {
                         // the effect of trace deviation maps
                         if(sh_tree->get_finished_up_to() >= 1) score_bfs *= (1-s_path_fail1_avg);
 
-                        //std::cout << score_rand << " vs. " << score_bfs << std::endl;
+                        // we make a decision...
+                        h_next_routine    = (score_rand < score_bfs)? random_ir : bfs_ir;
 
-                        h_next_routine    = (score_rand < score_bfs)? random_ir : bfs_ir; /*< the decision! */
+                        // if we do random_ir next, increase its budget
                         h_rand_fail_lim_now = h_next_routine == random_ir? 2*h_rand_fail_lim_now : h_rand_fail_lim_now;
                     }
 
@@ -355,8 +351,8 @@ namespace dejavu {
                         h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
 
                     // ... unless we are "almost done"... then we stretch the budget!
-                    if(m_rand.h_almost_done(*sh_schreier)) h_next_routine = random_ir; /* full commit to this base!*/
-                    if(m_rand.s_rolling_success > 0.1 && s_cost <= h_budget * 2) h_next_routine = random_ir;
+                    if(search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
+                    if(m_rand.s_rolling_success > 0.1 && s_cost <= h_budget * 2)   h_next_routine = random_ir;
                     if(s_hard && m_rand.s_succeed >= 1 && s_cost <= h_budget * 10) h_next_routine = random_ir;
 
                     // immediately inprocess if BFS was successful in pruning on the first level
@@ -425,8 +421,6 @@ namespace dejavu {
                             do_a_restart = true;
                         break;
                     }
-
-                    ++s_iterations;
                 }
 
                 // Are we done or just restarting?
@@ -436,6 +430,7 @@ namespace dejavu {
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
                 s_inproc_success += s_inprocessed;
 
+                // edge case where inprocessing might finish the graph
                 if(root_save.get_coloring()->cells == g->v_size) {
                     finished_symmetries = true;
                     break;
