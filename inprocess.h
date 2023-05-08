@@ -35,13 +35,18 @@ namespace dejavu::search_strategy {
 
                 tree->make_node_invariant(); // "compresses" node invariant from all levels into first level
 
+                bool something_was_pruned = false;
+
                 for (int i = 0; i < g->v_size; ++i) {
-                    if (is_pruned.get(i)) hash[i] = 1;
+                    if (is_pruned.get(i)) {
+                        hash[i] = 1;
+                        something_was_pruned = true;
+                    }
                     else hash[i] = 0;
-                    hash[i] += (int) (*tree->get_node_invariant())[i] % 16;
+                    hash[i] += (int) (*tree->get_node_invariant())[i] % 256;
                 }
                 for (int i = 0; i < g->v_size; ++i) {
-                    hash[i] = 17 * local_state.c->vertex_to_col[i] + hash[i];
+                    hash[i] = 257 * local_state.c->vertex_to_col[i] + hash[i];
                 }
                 g->initialize_coloring(local_state.c, hash.get_array());
                 const int cell_after = local_state.c->cells;
@@ -51,8 +56,10 @@ namespace dejavu::search_strategy {
                     local_state.refine(g);
                     progress_print("inpr_ref", std::to_string(cell_after),
                                    std::to_string(local_state.c->cells));
-                }                }
-
+                } else {
+                    //assert(!something_was_pruned);
+                }
+            }
             group->determine_potential_individualization(&inproc_can_individualize,
                                                          local_state.get_coloring());
 

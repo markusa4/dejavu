@@ -3038,8 +3038,10 @@ namespace sassy {
                         quotient_component_touched_swap.push_back(i);
                 }
 
-                if (quotient_component_touched_swap.size() < 2)
+                if (quotient_component_touched_swap.size() < 2) {
+                    break; // added this
                     ++penalty;
+                }
                 if (quotient_component_touched_swap.size() < 3)
                     ++penalty;
 
@@ -3680,8 +3682,10 @@ namespace sassy {
                         quotient_component_touched_swap.push_back(i);
                 }
 
-                if (quotient_component_touched_swap.size() < 2)
+                if (quotient_component_touched_swap.size() < 2) {
+                    break; // added this
                     ++penalty;
+                }
                 if (quotient_component_touched_swap.size() < 3)
                     ++penalty;
 
@@ -4689,9 +4693,15 @@ namespace sassy {
 
             g->initialize_coloring(&c, colmap);
 
+            const int pre_v_size = g->v_size;
+            const int pre_e_size = g->e_size;
+            const int pre_cells  = c.cells;
+
             refinement R_stack = refinement(config);
             R1 = &R_stack;
             R1->refine_coloring_first(g, &c, -1);
+
+            const bool color_refinement_effective = pre_cells != c.cells;
 
             if (c.cells == g->v_size) {
                 PRINT("(prep-red) graph is discrete");
@@ -4741,8 +4751,35 @@ namespace sassy {
 
             // eliminate degree 1 + 0 and discrete vertices
             del_discrete_edges_inplace(g, &c);
+            bool has_deg_0 = false;
+            bool has_deg_1 = false;
+            bool has_deg_2 = false;
+            bool has_discrete = false;
+            bool graph_changed = false;
+
+            for (int i = 0; i < c.ptn_sz;) {
+                const int v = c.lab[i];
+                switch (g->v[v]) {
+                    case 0:
+                        has_deg_0 = true;
+                        break;
+                    case 1:
+                        has_deg_1 = true;
+                        break;
+                    case 2:
+                        has_deg_2 = true;
+                        break;
+                    default:
+                        break;
+                }
+                const int col_sz = c.ptn[i] + 1;
+                has_discrete = has_discrete || col_sz == 1;
+                i += col_sz;
+            }
             copy_coloring_to_colmap(&c, colmap);
             PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+
+            if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
 
             if (schedule != nullptr) {
                 del_e = mark_set();
@@ -4753,19 +4790,29 @@ namespace sassy {
                         return;
                     }
                     preop next_op = (*schedule)[pc];
+                    const int pre_v = g->v_size;
                     switch (next_op) {
                         case preop::deg01: {
+                            if(!has_deg_0 && !has_deg_1 && !graph_changed) break;
                             red_deg10_assume_cref(g, colmap, hook);
                             perform_del(g, colmap);
                             //PRINT("(prep-red) after 01 reduction (G, E) " << g->v_size << ", " << g->e_size);
                             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg01" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
-                            order_according_to_color(g, colmap);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_order" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                            if(!(g->v_size == pre_v_size && g->e_size == pre_e_size && !color_refinement_effective)) {
+                                order_according_to_color(g, colmap);
+                                PRINT(std::setw(16) << std::left <<
+                                                    (std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                            std::chrono::high_resolution_clock::now() -
+                                                            timer).count()) / 1000000.0 << std::setw(16)
+                                                    << "color_order" << std::setw(10) << g->v_size << std::setw(10)
+                                                    << g->e_size);
+                            }
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
                         case preop::deg2ma: {
+                            if(!has_deg_2 && !graph_changed) break;
                             red_deg2_path_size_1(g, colmap);
                             perform_del_add_edge(g, colmap);
                             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg2ma" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
@@ -4773,6 +4820,7 @@ namespace sassy {
                             break;
                         }
                         case preop::deg2ue: {
+                            if(!has_deg_2 && !graph_changed) break;
                             red_deg2_unique_endpoint_new(g, colmap, hook);
                             perform_del_add_edge(g, colmap);
 
@@ -4892,6 +4940,7 @@ namespace sassy {
                             break;
                         }
                     }
+                    graph_changed = graph_changed || pre_v != g->v_size;
                 }
             }
 

@@ -64,7 +64,7 @@ namespace dejavu {
                                        *  previous base */
 
         // statistics
-        big_number s_grp_sz;
+        big_number s_grp_sz; /**< size of the automorphism group computed */
         [[maybe_unused]] bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
 
         /**
@@ -82,6 +82,9 @@ namespace dejavu {
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
+            sassy::configstruct config;
+            //config.CONFIG_PREP_DEACT_PROBE = true;
+            m_prep.configure(&config);
 
             // preprocess the graph using sassy
             PRINT("preprocessing...");
@@ -403,7 +406,10 @@ namespace dejavu {
                 }
 
                 // Are we done or just restarting?
-                if (finished_symmetries) break; // we are done
+                if (finished_symmetries) {
+                    sh_schreier->compute_group_size(); // need to compute the group size now
+                    break; // we are done
+                }
 
                 // we are restarting -- so we try to inprocess using the gathered data
                 s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
@@ -412,6 +418,7 @@ namespace dejavu {
                 // edge case where inprocessing might finish the graph
                 if(root_save.get_coloring()->cells == g->v_size) {
                     finished_symmetries = true;
+                    std::cout << "this" << std::endl;
                     break;
                 }
             }
@@ -422,7 +429,7 @@ namespace dejavu {
             s_grp_sz.multiply(m_inprocess.s_grp_sz);
             s_grp_sz.multiply(m_prep.base, m_prep.exp);
             s_grp_sz.multiply(m_dfs.s_grp_sz);
-            s_grp_sz.multiply(sh_schreier->compute_group_size());
+            s_grp_sz.multiply(sh_schreier->s_grp_sz);
 
             delete sh_schreier; /*< clean up allocated schreier structure */
             delete sh_tree;     /*< ... and also the shared IR tree       */

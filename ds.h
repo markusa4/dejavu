@@ -296,7 +296,7 @@ namespace dejavu {
              * @param index Index of the internal array.
              * @return The element `arr[index]`.
              */
-            T &operator[](int index) {
+            T &operator[](int index) const {
                 assert(index >= 0);
                 assert(index < arr_sz);
                 return arr[index];

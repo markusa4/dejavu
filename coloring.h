@@ -52,6 +52,7 @@ public:
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;
             buffer_const *= 2;
+            buffer_const = std::min(buffer_const, 65536);
         }
 
         bulk_domain_cnt += domain_size;

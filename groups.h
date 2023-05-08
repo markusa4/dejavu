@@ -717,9 +717,9 @@ namespace dejavu {
 
             std::mutex lock_transversal;          /**< locks this transversal */
 
-            int fixed;                            /**< vertex fixed by this transversal */
+            int fixed = -1;                       /**< vertex fixed by this transversal */
             int sz_upb = INT32_MAX;               /**< upper bound for size of the transversal (e.g. color class size) */
-            int level;
+            int level = -1;
             bool finished = false;
 
             std::vector<int> fixed_orbit;         /**< contains vertices of orbit at this schreier level */
@@ -768,7 +768,7 @@ namespace dejavu {
              * @param gen_num The number of the generator in \p generators, which is applied to \p automorphism.
              * @param pwr A power that is applied to the generator first.
              */
-            void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
+            static void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
                        generating_set &generators, const int gen_num, const int pwr) {
                 // load perm into workspace
                 auto generator = generators[gen_num];
@@ -792,14 +792,14 @@ namespace dejavu {
             /**
              * @return Size of the transversal.
              */
-            int size() {
-                return fixed_orbit.size();
+            [[nodiscard]] int size() const {
+                return (int) fixed_orbit.size();
             }
 
             /**
              * @return Size of the transversal.
              */
-            int size_upper_bound() {
+            [[nodiscard]] int size_upper_bound() const {
                 return sz_upb;
             }
 
@@ -829,7 +829,7 @@ namespace dejavu {
              */
             void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection) {
                 load_orbit_to_scratch(w);
-                int back_swap = selection.size() - 1;
+                int back_swap = (int) selection.size() - 1;
                 int front_pt;
                 for (front_pt = 0; front_pt <= back_swap;) {
                     if (!w.scratch1.get(selection[front_pt])) {
@@ -846,14 +846,14 @@ namespace dejavu {
             /**
              * @return Whether size of this transversal matches the given upper bound.
              */
-            bool is_finished() {
+            [[nodiscard]] bool is_finished() const {
                 return finished;
             }
 
             /**
              * @return Point fixed by this transversal.
              */
-            int fixed_point() {
+            [[nodiscard]] int fixed_point() const {
                 return fixed;
             }
 
@@ -864,12 +864,12 @@ namespace dejavu {
              * @param level Position of the transversal in the base of Schreier structure.
              * @param sz_upb Upper bound for the size of transversal (e.g., color class size in combinatorial base).
              */
-            void initialize(const int fixed_vertex, const int level, const int sz_upb) {
+            void initialize(const int fixed_vertex, const int new_level, const int new_sz_upb) {
                 assert(fixed_vertex >= 0);
                 assert(level >= 0);
                 fixed = fixed_vertex;
-                this->level = level;
-                this->sz_upb = sz_upb;
+                this->level  = new_level;
+                this->sz_upb = new_sz_upb;
                 add_to_fixed_orbit(fixed_vertex, -1, 0);
             }
 
@@ -922,7 +922,7 @@ namespace dejavu {
                     finished = true;
                 }
 
-                assert(sz_upb >= fixed_orbit.size());
+                assert(sz_upb >= (int) fixed_orbit.size());
 
                 w.scratch1.reset();
                 return changed;
@@ -972,18 +972,19 @@ namespace dejavu {
         public:
             int s_consecutive_success = 0;  /**< track repeated sifts for probabilistic abort criterion */
             int h_error_bound         = 10; /**< determines error probability                           */
+            big_number s_grp_sz; /**< size of the automorphism group computed */
 
             /**
              * @return Number of stored generators using a sparse data structure.
              */
-            int s_sparsegen() {
+            [[nodiscard]] int s_sparsegen() const {
                 return generators.s_stored_sparse;
             }
 
             /**
              * @return Number of stored generators using a dense data structure.
              */
-            int s_densegen() {
+            [[nodiscard]] int s_densegen() const {
                 return generators.s_stored_dense;
             }
 
@@ -1017,11 +1018,11 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
-            bool reset(int domain_size, schreier_workspace& w, std::vector<int> &new_base,
+            bool reset(int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
                        std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
                 if(!init) {
-                    initialize(domain_size, new_base, new_base_sizes, stop);
+                    initialize(new_domain_size, new_base, new_base_sizes, stop);
                     return false;
                 }
                 const int old_size = transversals.size();
@@ -1081,14 +1082,14 @@ namespace dejavu {
              * @param pos Position in base.
              * @return Vertex fixed at position \p pos in base.
              */
-            int base_point(int pos) {
+            [[nodiscard]] int base_point(int pos) const {
                 return transversals[pos]->fixed_point();
             }
 
             /**
              * @return Size of base of this Schreier structure.
              */
-            int base_size() const {
+            [[nodiscard]] int base_size() const {
                 return transversals.size();
             }
 
@@ -1248,14 +1249,13 @@ namespace dejavu {
             /**
              * @return Size of group described by this Schreier structure.
              */
-            big_number compute_group_size() {
-                big_number grp_sz;
-
+            void compute_group_size() {
+                s_grp_sz.mantissa = 1.0;
+                s_grp_sz.exponent = 0;
                 // multiply the sizes of the individual levels in the Schreier table
                 for (int level = 0; level < transversals.size(); ++level) {
-                    grp_sz.multiply(transversals[level]->size());
+                    s_grp_sz.multiply(transversals[level]->size());
                 }
-                return grp_sz;
             }
         };
     }

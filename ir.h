@@ -1227,7 +1227,13 @@ namespace dejavu {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
                         if (current_base[keep_until] != new_base[keep_until]) break;
                     }
-                } else {
+                }
+
+                if(keep_until == 0) {
+                    if(garbage_collector.size() > 1024) {
+                        for(auto & i : garbage_collector) delete i;
+                        garbage_collector.clear();
+                    }
                 }
 
 
