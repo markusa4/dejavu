@@ -4,7 +4,6 @@
 #include "refinement.h"
 #include "../coloring.h"
 #include "../sgraph.h"
-#include "configuration.h"
 
 namespace sassy {
     enum selector_type {

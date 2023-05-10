@@ -37,7 +37,7 @@ void empty_hook(int n, const int * p, int support, const int *) {}
 void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
-    auto empty_hook_func = sassy::sassy_hook(empty_hook);
+    auto empty_hook_func = dejavu_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
     dejavu::dejavu2 d;
     bool del = false;

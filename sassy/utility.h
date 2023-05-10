@@ -26,14 +26,6 @@ namespace sassy {
 #define MASH3(i) (((unsigned long) i + 1) * (423233 - ((unsigned long) i + 1)))
 #define MASH4(i) (((unsigned long) i + 1) * (23524361 - (unsigned long) i * 3))
 #define MASH5(i) (((unsigned long) i + 1) * (23524361 - (unsigned long) i * 3))
-
-//#define PRINT(str) {if(config->CONFIG_PRINT) {std::cout << str << std::endl;}}
-//#define PRINT(str) {}
-
-// metrics used to compare strategies
-    struct strategy_metrics {
-        int color_refinement_cost = 0;
-    };
 }
 
 #endif //SASSY_UTILITY_H

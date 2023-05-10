@@ -6,7 +6,7 @@
 
 #include "utility.h"
 #include "refinement.h"
-#include "graph.h"
+#include "../graph.h"
 #include "selector.h"
 #include <vector>
 #include <iomanip>
@@ -28,11 +28,19 @@ namespace sassy {
         int exp     = 0;
         int domain_size;
 
-        configstruct* config = nullptr;
+        bool CONFIG_PRINT = false;
+        bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
+        bool CONFIG_IR_IDLE_SKIP = true;  // blueprints
+        bool CONFIG_IR_INDIVIDUALIZE_EARLY = false; // experimental feature, based on an idea by Adolfo Piperno
+        bool CONFIG_PREP_DEACT_PROBE = false; // preprocessor: no probing
+        bool CONFIG_PREP_DEACT_DEG01 = false; // preprocessor: no degree 0,1 processing
+        bool CONFIG_PREP_DEACT_DEG2 = false;  // preprocessor: no degree 2   processing
+        bool CONFIG_IR_REFINE_EARLYOUT_LATE = false;
+        bool CONFIG_TRANSLATE_ONLY = false;
+
     private:
         //inline static preprocessor* save_preprocessor;
-        sassy_hook*                 saved_hook;
-        configstruct                config_default;
+        dejavu_hook*                 saved_hook;
 
         coloring c;
         dejavu::work_list automorphism;
@@ -227,7 +235,7 @@ namespace sassy {
 
         // check for degree 2 matchings between color classes and mark for deletion
         void red_deg2_path_size_1(dejavu::sgraph *g, int *colmap) {
-            if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
                 return;
 
             del.reset();
@@ -516,7 +524,7 @@ namespace sassy {
 
         // color-wise degree2 unique endpoint algorithm
         void red_deg2_unique_endpoint_new(dejavu::sgraph *g, int *colmap) {
-            if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
                 return;
 
             dejavu::mark_set color_test(g->v_size);
@@ -788,7 +796,7 @@ namespace sassy {
 
         // color cycles according to their size
         // remove uniform colored cycles
-        void red_deg2_color_cycles(dejavu::sgraph *g, int *colmap, sassy_hook* hook) {
+        void red_deg2_color_cycles(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
             coloring col;
             g->initialize_coloring(&col, colmap);
             for(int i = 0; i < g->v_size; ++i) {
@@ -825,7 +833,7 @@ namespace sassy {
 
         // TODO: re-write algorithm color-wise
         void red_deg2_trivial_connect(dejavu::sgraph* g, int* colmap) {
-            if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
                 return;
 
             dejavu::mark_set color_test(g->v_size);
@@ -1096,9 +1104,9 @@ namespace sassy {
         }
 
         // reduce vertices of degree 1 and 0, outputs corresponding automorphisms
-        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, sassy_hook* consume) {
+        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, dejavu_hook* consume) {
             g->initialize_coloring(&c, colmap);
-            if (config->CONFIG_PREP_DEACT_DEG01)
+            if (CONFIG_PREP_DEACT_DEG01)
                 return;
 
             worklist_deg0.reset();
@@ -1634,7 +1642,7 @@ namespace sassy {
         }
 
         // perform edge flips according to quotient graph
-        void red_quotient_edge_flip(dejavu::sgraph *g, int *colmap, sassy_hook* consume) { // TODO could still optimize further ...
+        void red_quotient_edge_flip(dejavu::sgraph *g, int *colmap, dejavu_hook* consume) { // TODO could still optimize further ...
             if (g->v_size <= 1)
                 return;
 
@@ -2271,8 +2279,8 @@ namespace sassy {
 
         // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
         // performs sparse probing for all color classes, but only for 1 individualization
-        void sparse_ir_probe(dejavu::sgraph *g, int *colmap, sassy_hook* consume, selector_type sel_type) {
-            if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_PROBE)
+        void sparse_ir_probe(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, selector_type sel_type) {
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_PROBE)
                 return;
 
             std::vector<int> individualize_later;
@@ -2356,8 +2364,7 @@ namespace sassy {
                 touched_color_list.push_back(cell);
                 touched_color_list.push_back(init_c1);
 
-                R1->refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1,
-                                    nullptr, &touched_color, &touched_color_list);
+                R1->refine_coloring(g, &c1, &I1, init_c1, -1, -1, nullptr, &touched_color, &touched_color_list);
 
                 // color cache to reset c2 back "before" individualization
                 for (int j = 0; j < touched_color_list.cur_pos; ++j) {
@@ -2394,7 +2401,7 @@ namespace sassy {
                     I2.acc = acc_prev;
                     const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
                     assert(init_c1 == init_c2);
-                    R1->refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color,
+                    R1->refine_coloring(g, &c2, &I2, init_c2, -1, -1, nullptr, &touched_color,
                                        &touched_color_list);
 
                     if (I1.acc != I2.acc) {
@@ -2511,7 +2518,7 @@ namespace sassy {
                 for (size_t i = 0; i < individualize_later.size(); ++i) {
                     const int ind_vert = individualize_later[i];
                     const int init_c = R1->individualize_vertex(&original_c, ind_vert);
-                    R1->refine_coloring(g, &original_c, &I1, init_c, nullptr, -1, -1,
+                    R1->refine_coloring(g, &original_c, &I1, init_c, -1, -1,
                                         nullptr, nullptr, nullptr);
                 }
                 for (int i = 0; i < g->v_size; ++i) {
@@ -2522,7 +2529,7 @@ namespace sassy {
 
         // given automorphism of reduced graph, reconstructs automorphism of the original graph
         // does not optimize for consecutive calls
-        void pre_hook(int _n, const int *_automorphism, int _supp, const int *_automorphism_supp, sassy_hook* hook) {
+        void pre_hook(int _n, const int *_automorphism, int _supp, const int *_automorphism_supp, dejavu_hook* hook) {
             if(hook == nullptr)
                 return;
 
@@ -2599,7 +2606,7 @@ namespace sassy {
     public:
         // given automorphism of reduced graph, reconstructs automorphism of the original graph
         void
-        pre_hook_buffered(int _n, const int *_automorphism, int _supp, const int *_automorphism_supp, sassy_hook* hook) {
+        pre_hook_buffered(int _n, const int *_automorphism, int _supp, const int *_automorphism_supp, dejavu_hook* hook) {
             if(hook == nullptr) {
                 return;
             }
@@ -2736,7 +2743,7 @@ namespace sassy {
 
     private:
         // compute or update quotient components
-        void compute_quotient_graph_components_update(dejavu::sgraph *g, coloring *c1, sassy_hook* consume) {
+        void compute_quotient_graph_components_update(dejavu::sgraph *g, coloring *c1, dejavu_hook* consume) {
             if (!init_quotient_arrays) {
                 seen_vertex.initialize(g->v_size);
                 seen_color.initialize(g->v_size);
@@ -2961,8 +2968,8 @@ namespace sassy {
         }
 
         // perform sparse probing for color classes of size 2, num_paths number of times
-        int sparse_ir_probe_sz2_quotient_components(dejavu::sgraph *g, int *colmap, sassy_hook* consume, int num_paths) {
-            if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_PROBE)
+        int sparse_ir_probe_sz2_quotient_components(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, int num_paths) {
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_PROBE)
                 return 0;
 
             quotient_component_touched.clear();
@@ -3115,11 +3122,11 @@ namespace sassy {
                             touched_color.set(init_c1);
                             touched_color_list.push_back(cell);
                             touched_color_list.push_back(init_c1);
-                            R1->refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1, nullptr, &touched_color,
+                            R1->refine_coloring(g, &c1, &I1, init_c1, -1, -1, nullptr, &touched_color,
                                                &touched_color_list);
 
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1, nullptr, &touched_color,
+                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, -1, nullptr, &touched_color,
                                                &touched_color_list);
                             I1.acc = 0;
                             I2.acc = 0;
@@ -3263,9 +3270,9 @@ namespace sassy {
                                         touched_color_list.push_back(col);
                                     }
 
-                                    config->CONFIG_IR_IDLE_SKIP = true;
+                                    R1->CONFIG_IR_IDLE_SKIP = true;
 
-                                    R1->refine_coloring(g, &c1, &Ivec_wr, init_color_class1, nullptr, -1, -1,
+                                    R1->refine_coloring(g, &c1, &Ivec_wr, init_color_class1, -1, -1,
                                                        nullptr, &touched_color, &touched_color_list);
                                     ind_cols.push_back(rpos);
                                     cell_cnt.push_back(c1.cells);
@@ -3289,7 +3296,7 @@ namespace sassy {
                                     const int v2 = c2.lab[rpos];
                                     const int init_color_class2 = R1->individualize_vertex(&c2, v2);
                                     comp = comp &&
-                                           R1->refine_coloring(g, &c2, &Ivec_rd, init_color_class2, nullptr, cell_cnt[j],
+                                           R1->refine_coloring(g, &c2, &Ivec_rd, init_color_class2, cell_cnt[j],
                                                               -1,
                                                               nullptr, &touched_color, &touched_color_list);
                                     if (!comp)
@@ -3605,9 +3612,9 @@ namespace sassy {
         }
 
         // perform sparse probing for color classes of bounded size, num_paths number of times
-        int sparse_ir_probe_quotient_components(dejavu::sgraph *g, int *colmap, sassy_hook* consume, int max_col_size,
+        int sparse_ir_probe_quotient_components(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, int max_col_size,
                                                 int num_paths) {
-            if (g->v_size <= 1 || num_paths <= 0 || config->CONFIG_PREP_DEACT_PROBE)
+            if (g->v_size <= 1 || num_paths <= 0 || CONFIG_PREP_DEACT_PROBE)
                 return 0;
 
             avg_support_sparse_ir = 0;
@@ -3730,12 +3737,12 @@ namespace sassy {
                         touched_color_list.push_back(init_c1);
                         assert(cell != init_c1);
 
-                        R1->refine_coloring(g, &c1, &I1, init_c1, nullptr, -1, -1,
+                        R1->refine_coloring(g, &c1, &I1, init_c1, -1, -1,
                                            nullptr, &touched_color, &touched_color_list);
 
                         if (c2.ptn[cell] != 0) {
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1,
+                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, -1,
                                                nullptr, &touched_color, &touched_color_list);
                         } else {
                             I2.acc = I1.acc + 1;
@@ -3819,7 +3826,7 @@ namespace sassy {
                                 // individualize and test cell + k
                                 const int init_ck = R1->individualize_vertex(&c2, ind_vk);
                                 I2.acc = 0;
-                                R1->refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1,
+                                R1->refine_coloring(g, &c2, &I2, init_ck, -1, -1,
                                                    nullptr, &touched_color, &touched_color_list);
                                 reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                                    _automorphism_supp.get_array());
@@ -3912,7 +3919,7 @@ namespace sassy {
 
                             I2.acc = 0;
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, nullptr, -1, -1,
+                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, -1,
                                                nullptr, &touched_color, &touched_color_list);
 
                             int num_inds = 0;
@@ -3951,7 +3958,7 @@ namespace sassy {
                                     touched_color_list_cache.push_back(col);
                                 }
 
-                                R1->refine_coloring(g, &c1, &I1, init_color_class1, nullptr, -1, -1,
+                                R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, -1,
                                                    nullptr, &touched_color_cache, &touched_color_list_cache);
 
 
@@ -3966,7 +3973,7 @@ namespace sassy {
                                     break;
                                 }
                                 const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                R1->refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
+                                R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, -1,
                                                    nullptr, &touched_color_cache, &touched_color_list_cache);
 
                                 if (c1.cells == g->v_size) {
@@ -4097,7 +4104,7 @@ namespace sassy {
                                         touched_color_list.push_back(init_ck);
                                     }
                                     I2.acc = 0;
-                                    R1->refine_coloring(g, &c2, &I2, init_ck, nullptr, -1, -1, nullptr, &touched_color,
+                                    R1->refine_coloring(g, &c2, &I2, init_ck, -1, -1, nullptr, &touched_color,
                                                        &touched_color_list);
                                     reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                                        _automorphism_supp.get_array());
@@ -4144,7 +4151,7 @@ namespace sassy {
                                                 touched_color.set(col);
                                                 touched_color_list.push_back(col);
                                             }
-                                            R1->refine_coloring(g, &c2, &I2, init_color_class2, nullptr, -1, -1,
+                                            R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, -1,
                                                                nullptr, &touched_color,
                                                                &touched_color_list); // cell_cnt[repeat_num_inds]
                                             ++repeat_num_inds;
@@ -4190,7 +4197,7 @@ namespace sassy {
                                             const int rpos = col + (0 % (c1.ptn[col] + 1));
                                             const int v1 = c1.lab[rpos];
                                             const int init_color_class1 = R1->individualize_vertex(&c1, v1);
-                                            R1->refine_coloring(g, &c1, &I1, init_color_class1, nullptr, -1, -1,
+                                            R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, -1,
                                                                nullptr, &touched_color, &touched_color_list);
 
                                             ind_cols.push_back(col);
@@ -4250,7 +4257,7 @@ namespace sassy {
                                 const int init_c3 = R1->individualize_vertex(&c3, ind_v1);
                                 assert(touched_color.get(init_c3));
                                 [[maybe_unused]] const int touched_col_prev = touched_color_list.cur_pos;
-                                R1->refine_coloring(g, &c3, &I1, init_c3, nullptr, -1, -1,
+                                R1->refine_coloring(g, &c3, &I1, init_c3, -1, -1,
                                                    nullptr, &touched_color, &touched_color_list);
                                 assert(touched_col_prev == touched_color_list.cur_pos);
 
@@ -4569,23 +4576,17 @@ namespace sassy {
         }
 
     public:
-        void configure(configstruct* _config) {
-            this->config = _config;
-        }
 
-        void reduce(static_graph *g, sassy_hook* hook, std::vector<preop> *schedule = nullptr) {
+        void reduce(dejavu::static_graph *g, dejavu_hook* hook, std::vector<preop> *schedule = nullptr) {
             reduce(g->get_sgraph(), g->get_coloring(), hook, schedule);
         }
 
 
         // main routine of the preprocessor, reduces (g, colmap) -- returns automorphisms through hook
         // optional parameter schedule defines the order of applied techniques
-        void reduce(dejavu::sgraph *g, int *colmap, sassy_hook* hook, const std::vector<preop> *schedule = nullptr) {
-            const std::vector<preop> default_schedule = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop};
-            //std::vector<preop> alt_schedule = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, probeflat, deg2ma};
-            if(config == nullptr) {
-                config = &config_default;
-            }
+        void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
+            const std::vector<preop> default_schedule = 
+                    {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop};
 
             if(schedule == nullptr) {
                 schedule = &default_schedule;
@@ -4598,7 +4599,7 @@ namespace sassy {
             PRINT("____________________________________________________");
             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "start" << std::setw(10) << g->v_size << std::setw(10) << g->e_size );
 
-            if(config->CONFIG_TRANSLATE_ONLY) {
+            if(CONFIG_TRANSLATE_ONLY) {
                 translate_layer_fwd.reserve(g->v_size);
                 backward_translation_layers.emplace_back(std::vector<int>());
                 const size_t back_ind = backward_translation_layers.size() - 1;
@@ -4673,7 +4674,9 @@ namespace sassy {
             const int pre_e_size = g->e_size;
             const int pre_cells  = c.cells;
 
-            refinement R_stack = refinement(config);
+            refinement R_stack = refinement();
+            R_stack.CONFIG_IR_IDLE_SKIP = CONFIG_IR_IDLE_SKIP;
+            R_stack.CONFIG_IR_REFINE_EARLYOUT_LATE = CONFIG_IR_REFINE_EARLYOUT_LATE;
             R1 = &R_stack;
             R1->refine_coloring_first(g, &c, -1);
 
@@ -4842,7 +4845,7 @@ namespace sassy {
                                 int count_iteration = 0;
 
                                 // continue reducing as long as we discover new degree 0 or degree 1 vertices
-                                while ((deg0 > 0 || deg1 > 0) && !config->CONFIG_PREP_DEACT_DEG01) {
+                                while ((deg0 > 0 || deg1 > 0) && !CONFIG_PREP_DEACT_DEG01) {
                                     // heuristics to activate / deactivate techniques
                                     // this could be more sophisticated...
                                     if (avg_end_of_comp > 0.5 &&
@@ -4915,7 +4918,7 @@ namespace sassy {
             // could do multiple calls for now obviously independent components -- could use "buffer consumer" to translate domains
         }
 
-        void save_my_hook(sassy_hook *hook) {
+        void save_my_hook(dejavu_hook *hook) {
             saved_hook = hook;
         }
 
@@ -4966,7 +4969,7 @@ namespace sassy {
         }
 
         // dejavu usage specific: (TODO!)
-        static inline void dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
+        static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
             if(p->skipped_preprocessing) {
                 if(p->saved_hook != nullptr) {

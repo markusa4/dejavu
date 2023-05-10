@@ -96,6 +96,9 @@ namespace dejavu {
          * @param other_exponent Exponent of number to multiply.
          */
         void multiply(long double other_mantissa, int other_exponent) {
+            if(std::fpclassify(other_mantissa) == FP_INFINITE ||  std::fpclassify(other_mantissa) == FP_NAN) {
+                return;
+            }
             while (other_mantissa >= 10.0) {
                 exponent += 1;
                 other_mantissa = other_mantissa / 10;
@@ -107,6 +110,9 @@ namespace dejavu {
 
     private:
         void man_to_exp() {
+            if(std::fpclassify(mantissa) == FP_INFINITE ||  std::fpclassify(mantissa) == FP_NAN) {
+                return;
+            }
             while(mantissa >= 10.0) {
                 exponent += 1;
                 mantissa = mantissa / 10;

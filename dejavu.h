@@ -75,7 +75,7 @@ namespace dejavu {
             if(g->v_size <= 1) return;
 
             // if the preprocessor changed the vertex set of the graph, need to use reverse translation
-            dejavu_hook dhook = sassy::preprocessor::dejavu_hook;
+            dejavu_hook dhook = sassy::preprocessor::_dejavu_hook;
             hook = &dhook; /*< change hook to sassy hook*/
 
             // print that we are solving now...

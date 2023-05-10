@@ -1,9 +1,9 @@
 #ifndef SASSY_GRAPH_BUILDER_H
 #define SASSY_GRAPH_BUILDER_H
 
-#include "../sgraph.h"
+#include "sgraph.h"
 
-namespace sassy {
+namespace dejavu {
     /**
      * \brief Graph with static number of vertices and edges
      *
@@ -23,7 +23,7 @@ namespace sassy {
      */
     class static_graph {
     private:
-        dejavu::sgraph   g;
+        sgraph   g;
         int*     c = nullptr;
         int*     edge_cnt;
         unsigned int num_vertices_defined  = 0;

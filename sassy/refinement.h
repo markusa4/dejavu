@@ -3,7 +3,6 @@
 
 #include "utility.h"
 #include "invariant.h"
-#include "configuration.h"
 #include <list>
 #include <iostream>
 #include <cstring>
@@ -190,18 +189,14 @@ namespace sassy {
 
 // refinement manager, preserving the workspace between refinements
     class refinement {
-    private:
-        configstruct* config = nullptr;
     public:
-        refinement()=delete;
-        refinement(configstruct* config) {
-            this->config = config;
-        }
+        bool CONFIG_IR_IDLE_SKIP = true;
+        bool CONFIG_IR_REFINE_EARLYOUT_LATE = true;
 
         // color refinement
         // includes several options for using invariants, blueprints and k-deviation
         bool refine_coloring(dejavu::sgraph *g, coloring *c, invariant *I,
-                             int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
+                             int init_color_class, int cell_early, int individualize_early,
                              std::vector<int> *early_individualized, dejavu::mark_set *touched_color,
                              dejavu::work_list *touched_color_list) {
             bool comp = true;
@@ -237,14 +232,12 @@ namespace sassy {
                 color_class_splits.reset();
                 const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
                 const int next_color_class_sz = c->ptn[next_color_class] + 1;
-                if (m)
-                    m->color_refinement_cost += next_color_class_sz;
                 comp = I->write_top_and_compare(INV_MARK_STARTCELL, true) && comp;
 
                 // if cell did not split anything in the target invariant, skip refinement until the end of this cell
                 if (I->no_write && !I->never_fail && comp) {
                     const bool skip = !I->protocol_read(next_color_class);
-                    if (skip && config->CONFIG_IR_IDLE_SKIP) {
+                    if (skip && CONFIG_IR_IDLE_SKIP) {
                         I->fast_forward(INV_MARK_ENDCELL);
                         continue;
                     }
@@ -330,7 +323,7 @@ namespace sassy {
                     }
 
                     // partition is as large as the one of target invariant, can skip to the end of the entire refinement
-                    if (c->cells == cell_early && comp && !config->CONFIG_IR_REFINE_EARLYOUT_LATE) {
+                    if (c->cells == cell_early && comp && !CONFIG_IR_REFINE_EARLYOUT_LATE) {
                         if (!I->only_acc) {
                             I->fast_forward(INV_MARK_ENDREF);
                             if (I->no_write)
@@ -339,10 +332,6 @@ namespace sassy {
                         color_class_splits.reset();
                         cell_todo.reset(&queue_pointer);
                         return comp;
-                    }
-
-                    // random blueprint individualization during color refinement
-                    if (config->CONFIG_IR_INDIVIDUALIZE_EARLY) {
                     }
 
                     if (latest_old_class != old_class) {
@@ -1024,11 +1013,7 @@ namespace sassy {
                             old_color_classes.push_back(col);
                         }
                     } else {
-                        if (config->CONFIG_IR_FULL_INVARIANT)
-                            vertex_worklist.push_back(col);
-                        else {
-                            singleton_inv += MASH4(col);
-                        }
+                        singleton_inv += MASH4(col);
                     }
                 }
                 cc += 1;
@@ -1036,16 +1021,7 @@ namespace sassy {
 
             // write singletons
             comp = I->write_top_and_compare(g->v_size * 3 + old_color_classes.cur_pos) && comp;
-
-            if (config->CONFIG_IR_FULL_INVARIANT) {
-                vertex_worklist.sort();
-                while (!vertex_worklist.empty()) {
-                    const int col = vertex_worklist.pop_back();
-                    comp = I->write_top_and_compare(g->v_size * 9 + col) && comp;
-                }
-            } else {
-                comp = I->write_top_and_compare(singleton_inv) && comp;
-            }
+            comp = I->write_top_and_compare(singleton_inv) && comp;
 
             old_color_classes.sort();
 
@@ -1298,10 +1274,7 @@ namespace sassy {
 
                 if (c->ptn[col] == 0) {
                     // if full invariant, sort -- else use a hash value
-                    if (config->CONFIG_IR_FULL_INVARIANT)
-                        vertex_worklist.push_back(col); // treat singletons in separate list (more efficient sorting)
-                    else
-                        singleton_inv += MASH5(col);
+                    singleton_inv += MASH5(col);
                     continue;
                 }
 
@@ -1317,8 +1290,7 @@ namespace sassy {
             }
 
             singleton_inv += old_color_classes.cur_pos;
-            if (!config->CONFIG_IR_FULL_INVARIANT)
-                comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
+            comp = I->write_top_and_compare(g->v_size * 3 + singleton_inv) && comp;
 
             old_color_classes.sort();
 
@@ -1330,8 +1302,7 @@ namespace sassy {
             }
 
             // sort and write down singletons in invariant
-            if (config->CONFIG_IR_FULL_INVARIANT)
-                vertex_worklist.sort();
+            vertex_worklist.sort();
 
             for (i = 0; i < vertex_worklist.cur_pos; ++i) {
                 comp = I->write_top_and_compare(g->v_size * 11 + vertex_worklist[i]) && comp; // size
