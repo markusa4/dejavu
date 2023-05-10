@@ -4,16 +4,23 @@
 #include "sgraph.h"
 
 namespace sassy {
-    // Graph format based on the internal format of sassy, but adding sanity checks and easy access to the construction.
-    // The graph must first be initialized (either using the respective constructor or using initialize_graph).
-    // For the initialization, the final number of vertices or edges must be given. The number of vertices or edges
-    // can not be changed. Then, using add_vertex and add_edge, the precise number of defined vertices and edges must be
-    // added. The add_vertex(color, deg) function requests a color and a degree. Both can not be changed later.
-    // The add_edge(v1, v2) function adds an undirected edge from v1 to v2. It is always required that v1 < v2 holds, to
-    // prevent the accidental addition of hyper-edges.
-    //
-    // After the graph was built, the internal sassy graph (sgraph) can be accessed either by the user, or the provided
-    // functions. Once the graph construction is finished, the internal sgraph can be changed arbitrarily.
+    /**
+     * \brief Graph with static number of vertices and edges
+     *
+     * Graph format based on the internal format of dejavu (sgraph), but adding sanity checks and easy access to the
+     * construction. Essentially, this class provides a more convenient interface to construct `sgraph`s.
+     *
+     * The graph must first be initialized (either using the respective constructor or using initialize_graph). For the
+     * initialization, the final number of vertices or edges must be given. The number of vertices or edges can not be
+     * changed. Then, using add_vertex and add_edge, the precise number of defined vertices and edges must be added.
+     * The `add_vertex(color, deg)` function requires a color and a degree. Both can not be changed later.
+     *
+     * The `add_edge(v1, v2)` function adds an undirected edge from `v1` to `v2`. It is always required that `v1 < v2`
+     * holds, to prevent the accidental addition of hyper-edges.
+     *
+     * After the graph was built, the internal sassy graph (sgraph) can be accessed either by the user, or the provided
+     * functions. Once the graph construction is finished, the internal sgraph can be changed arbitrarily.
+     */
     class static_graph {
     private:
         sgraph   g;
@@ -70,28 +77,28 @@ namespace sassy {
             if(finalized)
                 throw std::logic_error("can not change finalized graph");
             initialized = true;
-            g.initialize(nv, 2*ne);
-            g.v_size = nv;
-            g.d_size = nv;
-            g.e_size = 2*ne;
+            g.initialize((int) nv, (int) (2*ne));
+            g.v_size = (int) nv;
+            g.d_size = (int) nv;
+            g.e_size = (int) (2*ne);
             c = new int[nv];
             edge_cnt = new int[nv];
             for(unsigned int i = 0; i < nv; ++i)
                 edge_cnt[i] = 0;
         };
 
-        int add_vertex(const int color, const int deg) {
+        unsigned int add_vertex(const int color, const int deg) {
             if(!initialized)
                 throw std::logic_error("uninitialized graph");
             if(finalized)
                 throw std::logic_error("can not change finalized graph");
-            const int vertex = num_vertices_defined;
+            const unsigned int vertex = num_vertices_defined;
             ++num_vertices_defined;
             if(num_vertices_defined > (unsigned int) g.v_size)
                 throw std::out_of_range("vertices out-of-range, define more vertices initially");
             c[vertex]   = color;
             g.d[vertex] = deg;
-            g.v[vertex] = num_deg_edges_defined;
+            g.v[vertex] = (int) num_deg_edges_defined;
             num_deg_edges_defined += deg;
             return vertex;
         };

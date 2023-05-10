@@ -8,7 +8,7 @@
 #include <vector>
 #include "coloring.h"
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 #include <iostream>
 #include <set>
 #include <cstring>

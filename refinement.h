@@ -24,11 +24,6 @@ namespace dejavu {
         // bool worklist_color_hook(int color, int color_sz);
         typedef bool type_worklist_color_hook(const int, const int);
 
-        // return whether to continue splitting the respective cell, or skip it
-        // bool worklist_color_hook(int color, int color_sz);
-        typedef void type_additional_info_hook(const long);
-
-
         // worklist implementation for color refinement
         class cell_worklist {
         public:

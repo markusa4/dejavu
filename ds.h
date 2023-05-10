@@ -150,7 +150,7 @@ namespace dejavu {
              * Allocate an array of size \p size.
              * @param size Space to allocate.
              */
-            void alloc(const int size) {
+            void alloc(const unsigned int size) {
                 arr = (T *) malloc(sizeof(T) * size);
                 arr_sz = size;
             }
@@ -167,7 +167,7 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            explicit work_list_t(int size) {
+            explicit work_list_t(unsigned int size) {
                 allocate(size);
             }
 
@@ -177,7 +177,7 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            void allocate(int size) {
+            void allocate(unsigned int size) {
                 assert(!arr);
                 //arr     = new T[size];
                 alloc(size);
@@ -252,10 +252,10 @@ namespace dejavu {
              *
              * @param size New size to allocate the array to.
              */
-            void resize(const int size) {
+            void resize(const unsigned int size) {
                 if (arr && size <= arr_sz) return;
                 T *old_arr = nullptr;
-                int old_arr_sz = arr_sz;
+                unsigned int old_arr_sz = arr_sz;
                 if (arr) old_arr = arr;
                 alloc(size);
                 if (old_arr != nullptr) {
@@ -316,7 +316,7 @@ namespace dejavu {
 
             int cur_pos = 0; /**< current position */
         private:
-            int arr_sz = -1;      /**< size to which \a arr is currently allocated*/
+            unsigned int arr_sz = 0;      /**< size to which \a arr is currently allocated*/
             T *arr     = nullptr; /**< internal array */
         };
 
@@ -435,14 +435,14 @@ namespace dejavu {
         class mark_set {
             int *s = nullptr;
             int mark = 0;
-            int sz = -1;
+            unsigned int sz = 0;
         public:
             mark_set() = default;
             explicit mark_set(int size) {
                 initialize(size);
             }
 
-            void initialize(int size) {
+            void initialize(unsigned int size) {
                 if(s && sz == size) return;
                 if(s) free(s);
                 s = (int*) calloc(size, sizeof(int));

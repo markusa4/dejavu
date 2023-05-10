@@ -28,10 +28,10 @@ namespace sassy {
 
         void alloc(int sz) {
             if (!init) {
-                lab = new int[sz];
-                ptn = new int[sz];
-                vertex_to_col = new int[sz];
-                vertex_to_lab = new int[sz];
+                lab = new int[4*sz];
+                ptn = lab + sz;
+                vertex_to_col = lab + 2*sz;
+                vertex_to_lab = lab + 3*sz;
                 init = true;
 
                 lab_sz = sz;
@@ -40,10 +40,10 @@ namespace sassy {
         }
 
         void dealloc() {
-            delete[] ptn;
+            //delete[] ptn;
             delete[] lab;
-            delete[] vertex_to_lab;
-            delete[] vertex_to_col;
+            //delete[] vertex_to_lab;
+            //delete[] vertex_to_col;
         };
 
         void copy_ptn(coloring *c) {

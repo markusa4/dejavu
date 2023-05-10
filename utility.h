@@ -24,12 +24,19 @@
     #define OS_WINDOWS
 #endif
 
+#if __APPLE__
+    #define OS_MAC
+#endif
+
+#if __linux__
+    #define OS_LINUX
+#endif
+
 #define INV_MARK_ENDREF    (INT32_MAX - 5)
 #define INV_MARK_STARTCELL (INT32_MAX - 6)
 #define INV_MARK_ENDCELL   (INT32_MAX - 7)
 
 #define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) (void)0;
 
 // TODO maybe can be done faster
 unsigned int hash(unsigned int x) {
@@ -64,6 +71,7 @@ namespace dejavu {
 
         /**
          * Multiply a \p number to this big_number.
+         *
          * @param number The number to multiply.
          */
         void multiply(int number) {
@@ -72,6 +80,7 @@ namespace dejavu {
 
         /**
          * Multiply a \p number to this big_number.
+         *
          * @param number The number to multiply.
          */
         void multiply(big_number number) {
@@ -80,8 +89,9 @@ namespace dejavu {
 
 
         /**
-         * Multiply a number consistent of a mantissa (\p other_mantissa) and exponent (\p other_exponent) to this
+         * Multiply a number consisting of a mantissa (\p other_mantissa) and exponent (\p other_exponent) to this
          * big_number.
+         *
          * @param other_mantissa Mantissa of number to multiply.
          * @param other_exponent Exponent of number to multiply.
          */
