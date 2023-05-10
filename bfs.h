@@ -148,7 +148,7 @@ namespace dejavu {
 
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
                     gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                    cert = local_state.certify_automorphism(g, *gws_automorphism);
+                    cert = local_state.certify(g, *gws_automorphism);
                     ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
                     // TODO call hook
                     ++s_total_leaves;

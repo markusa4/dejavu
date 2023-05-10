@@ -151,8 +151,14 @@ namespace dejavu {
              * @param size Space to allocate.
              */
             void alloc(const unsigned int size) {
+                dealloc();
                 arr = (T *) malloc(sizeof(T) * size);
                 arr_sz = size;
+            }
+
+            void dealloc() {
+                if(arr) free(arr);
+                arr = nullptr;
             }
 
         public:
@@ -178,10 +184,7 @@ namespace dejavu {
              * @param size Size to allocate.
              */
             void allocate(unsigned int size) {
-                assert(!arr);
-                //arr     = new T[size];
                 alloc(size);
-                //init = true;
                 cur_pos = 0;
             }
 
@@ -269,7 +272,7 @@ namespace dejavu {
              * Deallocates the internal array.
              */
             ~work_list_t() {
-                if (arr) free(arr);
+                dealloc();
             }
 
             /**

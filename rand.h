@@ -101,7 +101,7 @@ namespace dejavu::search_strategy {
                 }
 
 
-                const bool cert = local_state.certify_automorphism(g, *gws_automorphism);
+                const bool cert = local_state.certify(g, *gws_automorphism);
 
                 if (cert) {
                     // We found an automorphism!

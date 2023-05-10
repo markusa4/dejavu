@@ -38,7 +38,7 @@ namespace dejavu {
         ir::shared_tree*         sh_tree     = nullptr;  /**< IR tree                 */
 
         // TODO: should not be necessary in the end!
-        void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
+        static void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
             gg->v = g->v;
             gg->d = g->d;
             gg->e = g->e;
@@ -47,7 +47,7 @@ namespace dejavu {
             gg->e_size = g->e_size;
         }
         // TODO: should not be necessary in the end!
-        void transfer_sassy_sgraph_to_sgraph(sgraph* g, sassy::sgraph* gg) {
+        static void transfer_sassy_sgraph_to_sgraph(sgraph* g, sassy::sgraph* gg) {
             g->v = gg->v;
             g->d = gg->d;
             g->e = gg->e;
@@ -59,7 +59,7 @@ namespace dejavu {
         // settings
         int h_error_bound       = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
                                        * misses an automorphism with probabiltiy at most (1/2)^10 < 0.098% */
-        int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed*/
+        //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed*/
         int h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
                                        *  previous base */
 

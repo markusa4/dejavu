@@ -688,19 +688,19 @@ namespace dejavu {
              * @param num Identifier of a generator.
              * @return A pointer to the generator which corresponds to the identifier.
              */
-            stored_automorphism *get_generator(const size_t num) {
+            [[nodiscard]] stored_automorphism* get_generator(const size_t num) const {
                 return generators[num];
             }
 
-            stored_automorphism *operator[](const size_t num) {
+            stored_automorphism* operator[](const size_t num) const {
                 return get_generator(num);
             }
 
             /**
              * @return number of stored generators
              */
-            size_t size() {
-                return generators.size();
+            [[nodiscard]] int size() const {
+                return static_cast<int>(generators.size());
             }
 
             void clear() {

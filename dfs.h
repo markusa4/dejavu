@@ -32,7 +32,7 @@ namespace dejavu {
         class dfs_ir {
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
 
-            groups::automorphism_workspace* gws_automorphism;
+            groups::automorphism_workspace* ws_automorphism;
 
         public:
             enum termination_reason {r_none, r_fail, r_cost};
@@ -46,7 +46,7 @@ namespace dejavu {
 
 
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
-                gws_automorphism = automorphism;
+                ws_automorphism = automorphism;
             }
             /**
              * Recurses to an equal leaf (according to trace compared to within \p state), unless backtracking is
@@ -80,33 +80,31 @@ namespace dejavu {
                     const int pos_end   = (int) state->singletons.size();
                     automorphism.write_singleton(&state->compare_singletons, &state->singletons,
                                                  pos_start, pos_end);
-                    //bool found_auto = R->certify_automorphism_sparse(g, initial_colors->get_array(), automorphism->get_array(),
-                    //                                                 automorphism_supp->cur_pos, automorphism_supp->get_array());
 
                     bool prev_cert = true;
 
-                    //assert(state->s_hint_color_is_singleton_now ? state->s_last_refinement_singleton_only : true);
-
                     if (prev_fail && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
-                        prev_cert = state->check_single_failure(g, initial_colors->vertex_to_col, automorphism, prev_fail_pos);
+                        prev_cert = state->check_single_failure(g, initial_colors->vertex_to_col, automorphism,
+                                                                prev_fail_pos);
                     }
 
-                    //if(state->c->cells == g->v_size) {
                     if (prev_cert && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
-                        // TODO: add better heuristic to not always do this check, too expensive!
-                        auto cert_res = state->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
-                                                                                          automorphism,cert_pos);
-                        cert_pos = std::get<2>(cert_res);
-                        if (std::get<0>(cert_res)) {
-                            cert_res = state->certify_automorphism_sparse_report_fail_resume(g, initial_colors->vertex_to_col,
-                                                                                         automorphism, 0);
+                        auto [certified, fail_pos, new_cert_pos] =
+                                state->certify_sparse_report_fail_resume(g,
+                                                                         initial_colors->vertex_to_col,
+                                                                         automorphism, cert_pos);
+                        cert_pos = new_cert_pos;
+                        if (certified) {
+                            std::tie(certified, fail_pos, new_cert_pos) =
+                                    state->certify_sparse_report_fail_resume(g,initial_colors->vertex_to_col,
+                                                                             automorphism, 0);
                         }
 
-                        if (std::get<0>(cert_res)) {
+                        if (certified) {
                             return {true, true};
                         } else {
                             prev_fail = true;
-                            prev_fail_pos = std::get<1>(cert_res);
+                            prev_fail_pos = fail_pos;
                         }
                     }
                 }
@@ -135,8 +133,7 @@ namespace dejavu {
                 orbs.initialize(g->v_size);
 
                 // automorphism workspace
-                //groups::automorphism_workspace pautomorphism(g->v_size);
-                gws_automorphism->reset();
+                ws_automorphism->reset();
 
                 // we want to terminate if things become to costly, we save the current trace position to track cost
                 cost_snapshot = local_state.T->get_position();
@@ -179,19 +176,21 @@ namespace dejavu {
                         const int wr_pos_end= (int) local_state.singletons.size();
 
                         // ... and then check whether this implies a (sparse) automorphism
-                        gws_automorphism->write_singleton(&local_state.compare_singletons, &local_state.singletons,
-                                                      wr_pos_st,wr_pos_end);
-                        bool found_auto = local_state.certify_automorphism(g, *gws_automorphism);
-                        assert(gws_automorphism->perm()[vert] == ind_v);
+                        ws_automorphism->write_singleton(&local_state.compare_singletons,
+                                                         &local_state.singletons, wr_pos_st,
+                                                         wr_pos_end);
+                        bool found_auto = local_state.certify(g, *ws_automorphism);
+                        assert(ws_automorphism->perm()[vert] == ind_v);
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
-                            auto rec_succeeded = recurse_to_equal_leaf(g, initial_colors,&local_state,
-                                                                       *gws_automorphism);
-                            found_auto = (rec_succeeded.first && rec_succeeded.second);
-                            if (rec_succeeded.first && !rec_succeeded.second) {
-                                gws_automorphism->reset();
-                                gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                                found_auto = local_state.certify_automorphism(g, *gws_automorphism);
+                            auto [success, certified] = recurse_to_equal_leaf(g, initial_colors,
+                                                                              &local_state,*ws_automorphism);
+                            found_auto = (success && certified);
+                            if (success && !certified) {
+                                ws_automorphism->reset();
+                                ws_automorphism->write_color_diff(local_state.c->vertex_to_col,
+                                                                  local_state.leaf_color.lab);
+                                found_auto = local_state.certify(g, *ws_automorphism);
                             }
                         }
 
@@ -200,14 +199,15 @@ namespace dejavu {
                         double cost_partial  = (cost_end - cost_start) / (cost_snapshot*1.0);
                         recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
 
-                        // if we found automorphism, add to orbit, (and TODO: call hook)
+                        // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
-                            assert(gws_automorphism->nsupport() > 0);
-                            assert(gws_automorphism->perm()[vert] == ind_v);
-                            if(hook) (*hook)(0, gws_automorphism->perm(), gws_automorphism->nsupport(), gws_automorphism->support());
-                            orbs.add_automorphism_to_orbit(*gws_automorphism);
+                            assert(ws_automorphism->nsupport() > 0);
+                            assert(ws_automorphism->perm()[vert] == ind_v);
+                            if(hook) (*hook)(0, ws_automorphism->perm(), ws_automorphism->nsupport(),
+                                             ws_automorphism->support());
+                            orbs.add_automorphism_to_orbit(*ws_automorphism);
                         }
-                        gws_automorphism->reset();
+                        ws_automorphism->reset();
 
                         // move state back up where we started in this iteration
                         while (prev_base_pos < local_state.s_base_pos) {
@@ -216,7 +216,7 @@ namespace dejavu {
 
                         // if no automorphism could be determined we would have to backtrack -- so stop!
                         if (!found_auto) {
-                            fail = true; // TODO: need to track global failure
+                            fail = true;
                             break;
                         }
 
@@ -226,13 +226,10 @@ namespace dejavu {
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
-
-                        if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col && initial_colors->ptn[col] + 1 == col_sz) {
+                        if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col &&
+                           initial_colors->ptn[col] + 1 == col_sz) {
                             save_to_individualize->push_back({local_state.leaf_color.lab[col], col_sz});
-                        } else {
-                            //std::cout << (initial_colors->vertex_to_col[initial_colors->lab[col]]  == col) << ", " << (initial_colors->ptn[col] + 1 == col_sz) << std::endl;
                         }
-
                         s_grp_sz.multiply(col_sz);
                     }
                 }

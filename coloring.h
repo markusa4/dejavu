@@ -75,21 +75,24 @@ public:
 
 class coloring {
 public:
-    int* bulk_alloc;
-    int* bulk_pt;
 
-    int* lab;
-    int* ptn;
-
-    int lab_sz;
-    int ptn_sz;
-    bool init = false;
-    bool efficient_alloc = false;
-    int* vertex_to_col;
-    int* vertex_to_lab;
+    int* lab = nullptr;
+    int* ptn = nullptr;
+    int* vertex_to_col = nullptr;
+    int* vertex_to_lab = nullptr;
 
     int cells = 1;
+
+    int lab_sz = 0;
+    int ptn_sz = 0;
+
+    bool init = false;
+    bool efficient_alloc = false;
+
     int smallest_cell_lower_bound = INT32_MAX;
+
+    int* bulk_alloc = nullptr;
+    int* bulk_pt    = nullptr;
 
     ~coloring() {
         if(init) {
@@ -135,12 +138,17 @@ public:
             delete[] lab;
             delete[] vertex_to_lab;
             delete[] vertex_to_col;
+
+            ptn = nullptr;
+            lab = nullptr;
+            vertex_to_col = nullptr;
+            vertex_to_lab = nullptr;
         } else {
             coloring_allocator<int>::coloring_bulk_deallocator(bulk_alloc);
         }
     };
 
-    void copy_ptn(coloring *c) {
+    void copy_ptn(coloring *c) const {
         assert(init);
         assert(c->init);
         memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
@@ -234,7 +242,7 @@ public:
         alloc(domain_size);
     }
 
-    bool check() {
+    [[maybe_unused]] void check() const {
         bool comp = true;
 
         for(int i = 0; i < lab_sz;++i) {
@@ -242,7 +250,7 @@ public:
             comp = comp && (lab[vertex_to_lab[i]] == i);
         }
 
-        int last_col = -1;
+        [[maybe_unused]] int last_col = -1;
         int counter  = 1;
         for (int i = 0; i < ptn_sz; ++i) {
             --counter;
@@ -259,7 +267,7 @@ public:
             assert(vertex_to_col[lab[i]] == i);
             i += ptn[i] + 1;
         }
-        return comp;
+        assert(comp);
     }
 };
 

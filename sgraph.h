@@ -19,7 +19,7 @@ class sgraph {
         vertexComparator(const sgraph& g) : g(g) {}
         const sgraph& g;
 
-         bool operator()(const int & v1, const int & v2) {
+         bool operator()(const int & v1, const int & v2) const {
             return g.d[v1] < g.d[v2];
         }
     };
@@ -29,7 +29,7 @@ class sgraph {
         const sgraph& g;
         const int* vertex_to_col;
 
-        bool operator()(const int & v1, const int & v2) {
+        bool operator()(const int & v1, const int & v2) const {
             //return (g.d[v1] < g.d[v2]) || ((g.d[v1] == g.d[v2]) && (vertex_to_col[v1] < vertex_to_col[v2]));
             return (vertex_to_col[v1] < vertex_to_col[v2]);
         }
@@ -189,7 +189,7 @@ public:
         c->cells = cells;
     }
 
-    void sanity_check() {
+    [[maybe_unused]] void sanity_check() {
 #ifndef NDEBUG
         for(int i = 0; i < v_size; ++i) {
             assert(d[i]>0?v[i] < e_size:true);
@@ -249,7 +249,7 @@ public:
         e_size = g->e_size;
     }
 
-    void sort_edgelist() const {
+    [[maybe_unused]] void sort_edgelist() const {
         for(int i = 0; i < v_size; ++i) {
             const int estart = v[i];
             const int eend   = estart + d[i];
@@ -265,15 +265,5 @@ public:
         }
     }
 };
-
-void permute_colmap(int** colmap, int colmap_sz, const int* p) {
-    int* new_colmap = new int[colmap_sz];
-    for(int i = 0; i < colmap_sz; ++i) {
-        new_colmap[i] = (*colmap)[p[i]];
-    }
-    int* old_colmap = *colmap;
-    *colmap = new_colmap;
-    delete[] old_colmap;
-}
 
 #endif //DEJAVU_SGRAPH_H

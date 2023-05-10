@@ -31,16 +31,16 @@ namespace dejavu {
             std::vector<int> data; /**< keeps all the data of the trace */
 
             trace *compare_trace = nullptr; /**< link to a stored trace to compare to */
-            long hash = 0; /**< hash value to summarize all operations performed on this trace */
+            unsigned long hash = 0; /**< hash value to summarize all operations performed on this trace */
 
             // mode
             bool compare = false; /**< whether to compare operations to a stored trace*/
             bool record = false; /**< whether to record a trace */
 
             // housekeeping
-            int cell_act_spot = -1;
-            int cell_old_color = -1;
-            bool assert_cell_act = false;
+            int cell_act_spot      = -1;
+            int cell_old_color     = -1;
+            bool assert_cell_act   = false;
             bool assert_refine_act = false;
 
             // comparison variables
@@ -48,7 +48,7 @@ namespace dejavu {
             bool comp = true;
 
             void add_to_hash(int d) {
-                long ho = hash & 0xff00000000000000;    // extract high-order 8 bits from hash
+                unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
                 hash    = hash << 8;                    // shift hash left by 5 bits
                 hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
                 hash    = hash ^ d;                     // XOR into hash
