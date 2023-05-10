@@ -58,7 +58,7 @@ public:
         if (bulk_domain_cnt >= bulk_domain_sz)
             bulk_domain_sz = -1;
 
-        return std::pair<int *, int *>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
+        return {bulk_domain, bulk_domain + bulk_domain_cnt - domain_size};
     }
 
     static void coloring_bulk_deallocator(int *bulk_domain) {

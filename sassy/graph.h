@@ -1,7 +1,7 @@
 #ifndef SASSY_GRAPH_BUILDER_H
 #define SASSY_GRAPH_BUILDER_H
 
-#include "sgraph.h"
+#include "../sgraph.h"
 
 namespace sassy {
     /**
@@ -23,7 +23,7 @@ namespace sassy {
      */
     class static_graph {
     private:
-        sgraph   g;
+        dejavu::sgraph   g;
         int*     c = nullptr;
         int*     edge_cnt;
         unsigned int num_vertices_defined  = 0;
@@ -51,7 +51,6 @@ namespace sassy {
         static_graph(const unsigned int nv, const unsigned int ne) {
             g.initialize(nv, 2*ne);
             g.v_size = nv;
-            g.d_size = nv;
             g.e_size = 2*ne;
             c = new int[nv];
             edge_cnt = new int[nv];
@@ -79,7 +78,6 @@ namespace sassy {
             initialized = true;
             g.initialize((int) nv, (int) (2*ne));
             g.v_size = (int) nv;
-            g.d_size = (int) nv;
             g.e_size = (int) (2*ne);
             c = new int[nv];
             edge_cnt = new int[nv];
@@ -189,7 +187,7 @@ namespace sassy {
             }
         }
 
-        sgraph* get_sgraph() {
+        dejavu::sgraph* get_sgraph() {
             finalize();
             return &g;
         };

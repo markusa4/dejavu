@@ -14,8 +14,8 @@ typedef std::chrono::high_resolution_clock Clock;
 thread_local bool bulk_domain_reset = false;
 
 dejavu::ir::refinement test_r;
-sgraph _test_graph;
-int*   _test_col;
+dejavu::sgraph dej_test_graph;
+int*   dej_test_col;
 
 volatile int dejavu_kill_request = 0;
 
@@ -34,7 +34,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
 
 void empty_hook(int n, const int * p, int support, const int *) {}
 
-void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
+void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
     Clock::time_point timer = Clock::now();
     auto empty_hook_func = sassy::sassy_hook(empty_hook);
@@ -48,11 +48,11 @@ void bench_dejavu(sgraph* g, int* colmap, double* dejavu_solve_time) {
 
 #ifndef NDEBUG
     auto test_hook_func = sassy::sassy_hook(dejavu::test_hook);
-    _test_graph.copy_graph(g);
-    _test_col = (int*) calloc(g->v_size, sizeof(int));
-    memcpy(_test_col, colmap, sizeof(int) * g->v_size);
+    dej_test_graph.copy_graph(g);
+    dej_test_col = (int*) calloc(g->v_size, sizeof(int));
+    memcpy(dej_test_col, colmap, sizeof(int) * g->v_size);
     d.automorphisms(g, colmap, &test_hook_func);
-    free(_test_col);
+    free(dej_test_col);
 #else
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif
@@ -170,11 +170,11 @@ int commandline_mode(int argc, char **argv) {
         return 1;
     }
 
-    sgraph *g = new sgraph;
+    dejavu::sgraph *g = new dejavu::sgraph();
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
     parse_dimacs_file_fast(filename, g, &colmap);
-    sgraph *_g = new sgraph;
+    dejavu::sgraph *_g = new dejavu::sgraph();
     if(permute_graph) {
         std::cout << "Permuting graph (not implemented)" << std::endl;
         _g = g;

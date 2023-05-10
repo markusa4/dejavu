@@ -12,17 +12,17 @@
 #include "inprocess.h"
 
 // structures for testing
-extern        dejavu::ir::refinement test_r;
-extern sgraph _test_graph;
-extern int*   _test_col;
+extern dejavu::ir::refinement test_r;
+extern dejavu::sgraph dej_test_graph;
+extern int*           dej_test_col;
 
 
 namespace dejavu {
     void test_hook(int n, const int *p, int nsupp, const int *supp) {
         std::cout << "certifying..." << std::endl;
-        assert(test_r.certify_automorphism_sparse(&_test_graph, p, nsupp, supp));
-        assert(test_r.certify_automorphism(&_test_graph, _test_col, p));
-        assert(test_r.certify_automorphism_sparse(&_test_graph, _test_col, p, nsupp, supp));
+        assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
+        assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
+        assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
     }
 
     /**
@@ -36,24 +36,6 @@ namespace dejavu {
         // shared modules
         groups::shared_schreier* sh_schreier = nullptr;  /**< Schreier-Sims structure */
         ir::shared_tree*         sh_tree     = nullptr;  /**< IR tree                 */
-
-        // TODO: should not be necessary in the end!
-        static void transfer_sgraph_to_sassy_sgraph(sgraph* g, sassy::sgraph* gg) {
-            gg->v = g->v;
-            gg->d = g->d;
-            gg->e = g->e;
-            gg->v_size = g->v_size;
-            gg->d_size = g->v_size;
-            gg->e_size = g->e_size;
-        }
-        // TODO: should not be necessary in the end!
-        static void transfer_sassy_sgraph_to_sgraph(sgraph* g, sassy::sgraph* gg) {
-            g->v = gg->v;
-            g->d = gg->d;
-            g->e = gg->e;
-            g->v_size = gg->v_size;
-            g->e_size = gg->e_size;
-        }
 
     public:
         // settings
@@ -82,20 +64,15 @@ namespace dejavu {
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
-            sassy::configstruct config;
-            //config.CONFIG_PREP_DEACT_PROBE = true;
-            m_prep.configure(&config);
 
             // preprocess the graph using sassy
             PRINT("preprocessing...");
-            sassy::sgraph gg;
-            transfer_sgraph_to_sassy_sgraph(g, &gg);
-            m_prep.reduce(&gg, colmap, hook); /*< reduces the graph */
+            m_prep.reduce(g, colmap, hook); /*< reduces the graph */
             s_grp_sz.multiply(m_prep.base, m_prep.exp); /*< group size needed if the
                                                                                     *  early out below is used */
 
             // early-out if preprocessor finished solving the graph
-            if(gg.v_size <= 1) return;
+            if(g->v_size <= 1) return;
 
             // if the preprocessor changed the vertex set of the graph, need to use reverse translation
             dejavu_hook dhook = sassy::preprocessor::dejavu_hook;
@@ -104,10 +81,6 @@ namespace dejavu {
             // print that we are solving now...
             PRINT(std::endl << "solving..." << std::endl);
             progress_print_header();
-
-            // we first need to set up quite a few datastructures and modules
-            // we start by transferring the graph
-            transfer_sassy_sgraph_to_sgraph(g, &gg);
 
             // flag to denote which color refinement version is used
             g->dense = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
@@ -135,10 +108,10 @@ namespace dejavu {
             std::vector<int> base_sizes; /*< current size of colors on base */
 
             // local modules and workspace, to be used by other modules
-            ir::refinement       m_refinement; /*< workspace for color refinement and other utilities */
+            ir::refinement    m_refinement; /*< workspace for color refinement and other utilities */
             ir::base_selector m_selectors;  /*< cell selector creation                             */
             groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
-            groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims       */
+            groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims   */
 
             // shared, global modules
             sh_tree     = new ir::shared_tree(g->v_size); /*< BFS levels, shared leaves, ...           */

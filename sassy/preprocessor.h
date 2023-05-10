@@ -10,8 +10,6 @@
 #include "selector.h"
 #include <vector>
 #include <iomanip>
-#include <sys/resource.h>
-#include <stdlib.h>
 #include <ctime>
 
 namespace sassy {
@@ -32,25 +30,23 @@ namespace sassy {
 
         configstruct* config = nullptr;
     private:
-        std::clock_t start_time;
-
         //inline static preprocessor* save_preprocessor;
         sassy_hook*                 saved_hook;
         configstruct                config_default;
 
         coloring c;
-        work_list automorphism;
-        work_list automorphism_supp;
+        dejavu::work_list automorphism;
+        dejavu::work_list automorphism_supp;
 
-        work_list aux_automorphism;
-        work_list aux_automorphism_supp;
+        dejavu::work_list aux_automorphism;
+        dejavu::work_list aux_automorphism_supp;
 
         bool layers_melded = false;
 
         bool skipped_preprocessing = false;
 
-        mark_set del;
-        mark_set del_e;
+        dejavu::mark_set del;
+        dejavu::mark_set del_e;
 
         tiny_orbit orbit;
 
@@ -66,17 +62,17 @@ namespace sassy {
         int avg_reached_end_of_component = 0;
         double avg_end_of_comp           = 0.0;
 
-        work_list_t<std::vector<int>> add_edge_buff;
-        work_list worklist_deg0;
-        work_list worklist_deg1;
-        mark_set add_edge_buff_act;
+        dejavu::work_list_t<std::vector<int>> add_edge_buff;
+        dejavu::work_list worklist_deg0;
+        dejavu::work_list worklist_deg1;
+        dejavu::mark_set add_edge_buff_act;
         refinement* R1;
 
-        mark_set touched_color_cache;
-        work_list touched_color_list_cache;
+        dejavu::mark_set touched_color_cache;
+        dejavu::work_list touched_color_list_cache;
 
         std::vector<int> g_old_v;
-        work_list edge_scratch;
+        dejavu::work_list edge_scratch;
 
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
@@ -91,18 +87,18 @@ namespace sassy {
         std::vector<int> quotient_component_touched;
         std::vector<int> quotient_component_touched_swap;
 
-        mark_set seen_vertex;
-        mark_set seen_color;
+        dejavu::mark_set seen_vertex;
+        dejavu::mark_set seen_color;
         bool init_quotient_arrays = false;
         std::vector<int> worklist;
 
-        work_list _automorphism;
-        work_list _automorphism_supp;
+        dejavu::work_list _automorphism;
+        dejavu::work_list _automorphism_supp;
         std::vector<int> save_colmap;
-        mark_set  touched_color;
-        work_list touched_color_list;
+        dejavu::mark_set  touched_color;
+        dejavu::work_list touched_color_list;
 
-        work_list before_move;
+        dejavu::work_list before_move;
 
         bool ir_quotient_component_init = false;
 
@@ -213,7 +209,7 @@ namespace sassy {
         };
 
         // are vert1 and vert2 adjacent in g?
-        bool is_adjacent(sgraph*g, int vert1, int vert2) {
+        bool is_adjacent(dejavu::sgraph*g, int vert1, int vert2) {
             if(g->d[vert1] < g->d[vert2]) {
                 for(int i = 0; i < g->d[vert1]; ++i) {
                     if(g->e[g->v[vert1] + i] == vert2)
@@ -230,7 +226,7 @@ namespace sassy {
         }
 
         // check for degree 2 matchings between color classes and mark for deletion
-        void red_deg2_path_size_1(sgraph *g, int *colmap) {
+        void red_deg2_path_size_1(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
                 return;
 
@@ -412,7 +408,8 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        int walk_cycle(sgraph *g, const int start, const int block, mark_set* path_done, work_list* path) {
+        static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::mark_set* path_done,
+                              dejavu::work_list* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -455,7 +452,8 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        std::pair<int, int> walk_to_endpoint(sgraph *g, const int start, const int block, mark_set* path_done) {
+        static std::pair<int, int> walk_to_endpoint(dejavu::sgraph *g, const int start, const int block,
+                                                    dejavu::mark_set* path_done) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -476,7 +474,7 @@ namespace sassy {
             return {current_vertex, last_vertex};
         }
 
-        void order_edgelist(sgraph *g) {
+        void order_edgelist(dejavu::sgraph *g) {
             memcpy(edge_scratch.get_array(), g->e, g->e_size*sizeof(int));
 
             int epos = 0;
@@ -494,7 +492,7 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        int walk_to_endpoint_collect_path(sgraph *g, const int start, const int block, work_list* path) {
+        static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block, dejavu::work_list* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -517,13 +515,13 @@ namespace sassy {
         }
 
         // color-wise degree2 unique endpoint algorithm
-        void red_deg2_unique_endpoint_new(sgraph *g, int *colmap, sassy_hook* hook) {
+        void red_deg2_unique_endpoint_new(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
                 return;
 
-            mark_set color_test(g->v_size);
+            dejavu::mark_set color_test(g->v_size);
 
-            mark_set color_unique(g->v_size);
+            dejavu::mark_set color_unique(g->v_size);
 
             coloring col;
             g->initialize_coloring(&col, colmap);
@@ -537,28 +535,20 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            work_list endpoint_cnt(g->v_size);
+            dejavu::work_list endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
-            mark_set path_done(g->v_size);
-
-            work_list color_pos(g->v_size);
-
-            work_list filter(g->v_size);
-
-            work_list not_unique(g->v_size);
-
-            work_list not_unique_analysis(g->v_size);
-
-            work_list path_list(g->v_size);
-
-            work_list path(g->v_size);
-
-            work_list connected_paths(g->e_size);
-
-            work_list connected_endpoints(g->e_size);
+            dejavu::mark_set path_done(g->v_size);
+            dejavu::work_list color_pos(g->v_size);
+            dejavu::work_list filter(g->v_size);
+            dejavu::work_list not_unique(g->v_size);
+            dejavu::work_list not_unique_analysis(g->v_size);
+            dejavu::work_list path_list(g->v_size);
+            dejavu::work_list path(g->v_size);
+            dejavu::work_list connected_paths(g->e_size);
+            dejavu::work_list connected_endpoints(g->e_size);
 
             // collect and count endpoints
             int total_paths = 0;
@@ -798,20 +788,17 @@ namespace sassy {
 
         // color cycles according to their size
         // remove uniform colored cycles
-        void red_deg2_color_cycles(sgraph *g, int *colmap, sassy_hook* hook) {
+        void red_deg2_color_cycles(dejavu::sgraph *g, int *colmap, sassy_hook* hook) {
             coloring col;
             g->initialize_coloring(&col, colmap);
             for(int i = 0; i < g->v_size; ++i) {
                 colmap[i] = col.vertex_to_col[i];
             }
 
-            mark_set path_done(g->v_size);
-
-            work_list cycle_length(g->v_size);
-
-            work_list recolor_nodes(g->v_size);
-
-            work_list path(g->v_size);
+            dejavu::mark_set path_done(g->v_size);
+            dejavu::work_list cycle_length(g->v_size);
+            dejavu::work_list recolor_nodes(g->v_size);
+            dejavu::work_list path(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -837,13 +824,12 @@ namespace sassy {
         }
 
         // TODO: re-write algorithm color-wise
-        void red_deg2_trivial_connect(sgraph *g, int *colmap, sassy_hook* hook) {
+        void red_deg2_trivial_connect(dejavu::sgraph* g, int* colmap) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_DEG2)
                 return;
 
-            mark_set color_test(g->v_size);
-
-            mark_set color_unique(g->v_size);
+            dejavu::mark_set color_test(g->v_size);
+            dejavu::mark_set color_unique(g->v_size);
 
             coloring col;
             g->initialize_coloring(&col, colmap);
@@ -857,22 +843,21 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            work_list endpoint_cnt(g->v_size);
+            dejavu::work_list endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
-            mark_set path_done(g->v_size);
-            work_list color_pos(g->v_size);
-            work_list filter(g->v_size);
-            work_list not_unique(2*g->v_size);
-            work_list not_unique_analysis(g->v_size);
-            work_list path_list(g->v_size);
-            work_list path(g->v_size);
-            work_list connected_paths(g->e_size);
-            work_list connected_endpoints(g->e_size);
-            work_list neighbour_list(g->v_size);
-            work_list neighbour_to_endpoint(g->v_size);
+            dejavu::mark_set path_done(g->v_size);
+            dejavu::work_list color_pos(g->v_size);
+            dejavu::work_list filter(g->v_size);
+            dejavu::work_list not_unique(2*g->v_size);
+            dejavu::work_list not_unique_analysis(g->v_size);
+            dejavu::work_list path(g->v_size);
+            dejavu::work_list connected_paths(g->e_size);
+            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::work_list neighbour_list(g->v_size);
+            dejavu::work_list neighbour_to_endpoint(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1111,7 +1096,7 @@ namespace sassy {
         }
 
         // reduce vertices of degree 1 and 0, outputs corresponding automorphisms
-        void red_deg10_assume_cref(sgraph *g, int *colmap, sassy_hook* consume) {
+        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, sassy_hook* consume) {
             g->initialize_coloring(&c, colmap);
             if (config->CONFIG_PREP_DEACT_DEG01)
                 return;
@@ -1119,7 +1104,7 @@ namespace sassy {
             worklist_deg0.reset();
             worklist_deg1.reset();
 
-            mark_set is_parent(g->v_size);
+            dejavu::mark_set is_parent(g->v_size);
 
             g_old_v.clear();
             g_old_v.reserve(g->v_size);
@@ -1127,20 +1112,18 @@ namespace sassy {
                 g_old_v.push_back(g->d[i]);
             }
 
-            work_list pair_match(g->v_size);
-
-            work_list parentlist(g->v_size);
-
-            work_list childcount(g->v_size);
+            dejavu::work_list pair_match(g->v_size);
+            dejavu::work_list parentlist(g->v_size);
+            dejavu::work_list childcount(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount.push_back(0);
 
-            work_list childcount_prev(g->v_size);
+            dejavu::work_list childcount_prev(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount_prev.push_back(0);
 
-            work_list_t<std::pair<int, int>> stack1(g->v_size);
-            work_list map(g->v_size);
+            dejavu::work_list_t<std::pair<int, int>> stack1(g->v_size);
+            dejavu::work_list map(g->v_size);
 
             assert(_automorphism_supp.cur_pos == 0);
 
@@ -1651,7 +1634,7 @@ namespace sassy {
         }
 
         // perform edge flips according to quotient graph
-        void red_quotient_edge_flip(sgraph *g, int *colmap, sassy_hook* consume) { // TODO could still optimize further ...
+        void red_quotient_edge_flip(dejavu::sgraph *g, int *colmap, sassy_hook* consume) { // TODO could still optimize further ...
             if (g->v_size <= 1)
                 return;
 
@@ -1660,8 +1643,8 @@ namespace sassy {
             worklist_deg0.reset();
             worklist_deg1.reset();
 
-            mark_set connected_col(g->v_size);
-            mark_set is_not_matched(g->v_size);
+            dejavu::mark_set connected_col(g->v_size);
+            dejavu::mark_set is_not_matched(g->v_size);
 
             // int v_has_matching_color = 0;
 
@@ -1741,7 +1724,7 @@ namespace sassy {
 
         // deletes vertices marked in 'del'
         // assumes that g->v points to g->e in ascending order
-        void perform_del(sgraph *g, int *colmap) {
+        void perform_del(dejavu::sgraph *g, int *colmap) {
             // copy some stuff
             g_old_v.clear();
             translate_layer_fwd.clear();
@@ -1772,7 +1755,6 @@ namespace sassy {
             if (new_vsize == 0 || new_vsize == 1) {
                 g->v_size = 0;
                 g->e_size = 0;
-                g->d_size = 0;
                 return;
             }
 
@@ -1836,13 +1818,12 @@ namespace sassy {
 
             g->e_size = epos;
             g->v_size = new_vsize;
-            g->d_size = new_vsize;
             del.reset();
         }
 
         // deletes vertices marked in 'del'
         // assumes that g->v points to g->e in ascending order
-        void perform_del_edge(sgraph *g, int *colmap) {
+        void perform_del_edge(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1)
                 return;
 
@@ -1886,14 +1867,13 @@ namespace sassy {
 
             g->e_size = epos;
             g->v_size = new_vsize;
-            g->d_size = new_vsize;
         }
 
         // deletes vertices marked in 'del'
         // for vertices v where add_edge_buff_act[v] is set, in turn adds edges add_edge_buff_act[v]
         // assumes that g->v points to g->e in ascending order
         // assumes that degree of a vertex stays the same or gets smaller
-        void perform_del_add_edge(sgraph *g, int *colmap) {
+        void perform_del_add_edge(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1)
                 return;
 
@@ -1928,7 +1908,6 @@ namespace sassy {
             if (new_vsize == 0 || new_vsize == 1) {
                 g->v_size = 0;
                 g->e_size = 0;
-                g->d_size = 0;
                 return;
             }
 
@@ -2006,7 +1985,6 @@ namespace sassy {
             }
 
             g->v_size = new_vsize;
-            g->d_size = new_vsize;
 
             for (int i = 0; i < g->v_size; ++i) {
                 assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
@@ -2024,7 +2002,7 @@ namespace sassy {
         }
 
         // marks all discrete vertices in 'del'
-        void mark_discrete_for_deletion(sgraph *g, int *colmap) {
+        void mark_discrete_for_deletion(dejavu::sgraph *g, int *colmap) {
             //int discrete_cnt = 0;
             worklist_deg0.reset();
             for (int i = 0; i < domain_size; ++i) {
@@ -2042,7 +2020,7 @@ namespace sassy {
         }
 
         // deletes all discrete vertices
-        void perform_del_discrete(sgraph *g, int *colmap) {
+        void perform_del_discrete(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1)
                 return;
 
@@ -2060,7 +2038,6 @@ namespace sassy {
             }
             if (discrete_cnt == g->v_size) {
                 g->v_size = 0;
-                g->d_size = 0;
                 g->e_size = 0;
                 return;
             }
@@ -2152,14 +2129,13 @@ namespace sassy {
 
             g->e_size = epos;
             g->v_size = new_vsize;
-            g->d_size = new_vsize;
             del.reset();
         }
 
         // select a color class in a quotient component
         // assumes internal state of quotient component is up-to-date
         std::pair<int, int>
-        select_color_component(sgraph *g, coloring *c1, int component_start_pos, int component_end_pos, int hint) {
+        select_color_component(dejavu::sgraph *g, coloring *c1, int component_start_pos, int component_end_pos, int hint) {
             int cell = -1;
             bool only_discrete_prev = true;
             int _i = component_start_pos;
@@ -2194,7 +2170,7 @@ namespace sassy {
         // select a color class in a quotient component
         // assumes internal state of quotient component is up-to-date
         std::pair<int, int>
-        select_color_component_large(sgraph *g, coloring *c1, int component_start_pos, int component_end_pos,
+        select_color_component_large(dejavu::sgraph *g, coloring *c1, int component_start_pos, int component_end_pos,
                                      int hint) {
             int cell = -1;
             bool only_discrete_prev = true;
@@ -2234,9 +2210,9 @@ namespace sassy {
 
         // select a color class in a quotient component
         // assumes internal state of quotient component is up-to-date
-        std::pair<int, int> select_color_component_large_touched(sgraph *g, coloring *c1, int component_start_pos,
+        std::pair<int, int> select_color_component_large_touched(dejavu::sgraph *g, coloring *c1, int component_start_pos,
                                                                  int component_end_pos, int hint,
-                                                                 mark_set *touched_set) {
+                                                                 dejavu::mark_set *touched_set) {
             int cell = -1;
             bool only_discrete_prev = true;
             int _i = component_start_pos;
@@ -2295,7 +2271,7 @@ namespace sassy {
 
         // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
         // performs sparse probing for all color classes, but only for 1 individualization
-        void sparse_ir_probe(sgraph *g, int *colmap, sassy_hook* consume, selector_type sel_type) {
+        void sparse_ir_probe(dejavu::sgraph *g, int *colmap, sassy_hook* consume, selector_type sel_type) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_PROBE)
                 return;
 
@@ -2328,8 +2304,8 @@ namespace sassy {
             strategy m;
             m.cell_selector_type = sel_type;
 
-            mark_set  touched_color(g->v_size);
-            work_list touched_color_list(g->v_size);
+            dejavu::mark_set  touched_color(g->v_size);
+            dejavu::work_list touched_color_list(g->v_size);
 
             invariant I1, I2;
             I1.only_acc = true;
@@ -2760,7 +2736,7 @@ namespace sassy {
 
     private:
         // compute or update quotient components
-        void compute_quotient_graph_components_update(sgraph *g, coloring *c1, sassy_hook* consume) {
+        void compute_quotient_graph_components_update(dejavu::sgraph *g, coloring *c1, sassy_hook* consume) {
             if (!init_quotient_arrays) {
                 seen_vertex.initialize(g->v_size);
                 seen_color.initialize(g->v_size);
@@ -2973,19 +2949,19 @@ namespace sassy {
         }
 
         // initialize some data structures
-        void assure_ir_quotient_init(sgraph *g) {
+        void assure_ir_quotient_init(dejavu::sgraph *g) {
             if (!ir_quotient_component_init) {
                 touched_color.initialize(g->v_size);
-                touched_color_list.initialize(g->v_size);
+                touched_color_list.allocate(g->v_size);
                 touched_color_cache.initialize(g->v_size);
-                touched_color_list_cache.initialize(g->v_size);
+                touched_color_list_cache.allocate(g->v_size);
                 orbit.initialize(g->v_size);
                 ir_quotient_component_init = true;
             }
         }
 
         // perform sparse probing for color classes of size 2, num_paths number of times
-        int sparse_ir_probe_sz2_quotient_components(sgraph *g, int *colmap, sassy_hook* consume, int num_paths) {
+        int sparse_ir_probe_sz2_quotient_components(dejavu::sgraph *g, int *colmap, sassy_hook* consume, int num_paths) {
             if (g->v_size <= 1 || config->CONFIG_PREP_DEACT_PROBE)
                 return 0;
 
@@ -3540,7 +3516,7 @@ namespace sassy {
         }
 
         // select a non-trivial color class within a given component
-        int select_color_component_min_cost(sgraph *g, coloring *c1, int component_start_pos, int component_end_pos,
+        int select_color_component_min_cost(dejavu::sgraph *g, coloring *c1, int component_start_pos, int component_end_pos,
                                             int max_cell_size) {
             bool only_discrete_prev = true;
             int cell = -1;
@@ -3585,7 +3561,7 @@ namespace sassy {
             return cell;
         }
 
-        void reset_coloring_to_coloring_touched(sgraph *g, coloring *c_to, coloring *c_from,
+        void reset_coloring_to_coloring_touched(dejavu::sgraph *g, coloring *c_to, coloring *c_from,
                                                 int quotient_component_start_pos_v, int quotient_component_end_pos_v) {
             worklist_deg0.reset();
 
@@ -3629,7 +3605,7 @@ namespace sassy {
         }
 
         // perform sparse probing for color classes of bounded size, num_paths number of times
-        int sparse_ir_probe_quotient_components(sgraph *g, int *colmap, sassy_hook* consume, int max_col_size,
+        int sparse_ir_probe_quotient_components(dejavu::sgraph *g, int *colmap, sassy_hook* consume, int max_col_size,
                                                 int num_paths) {
             if (g->v_size <= 1 || num_paths <= 0 || config->CONFIG_PREP_DEACT_PROBE)
                 return 0;
@@ -4422,7 +4398,7 @@ namespace sassy {
         }
 
         // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later
-        void del_discrete_edges_inplace(sgraph *g, coloring *c) {
+        void del_discrete_edges_inplace(dejavu::sgraph *g, coloring *c) {
             int rem_edges = 0;
             int discrete_vert = 0;
             del.reset();
@@ -4461,7 +4437,7 @@ namespace sassy {
         }
 
         // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later, component-wise
-        void del_discrete_edges_inplace_component(sgraph *g, coloring *c, int component_start_pos) {
+        void del_discrete_edges_inplace_component(dejavu::sgraph *g, coloring *c, int component_start_pos) {
             int rem_edges = 0;
             int discrete_vert = 0;
             for (size_t _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
@@ -4517,7 +4493,7 @@ namespace sassy {
         }
 
         // counts vertices of degree 0, 1, 2 in g
-        void count_graph_deg(sgraph *g, int *deg0, int *deg1, int *deg2) {
+        void count_graph_deg(dejavu::sgraph *g, int *deg0, int *deg1, int *deg2) {
             *deg0 = 0;
             *deg1 = 0;
             *deg2 = 0;
@@ -4538,7 +4514,7 @@ namespace sassy {
             }
         }
 
-        void order_according_to_color(sgraph *g, int* colmap) {
+        void order_according_to_color(dejavu::sgraph *g, int* colmap) {
             bool in_order = true;
             for(int i = 0; i < g->v_size-1; ++i) {
                 in_order = in_order && (colmap[i] <= colmap[i+1]);
@@ -4551,7 +4527,7 @@ namespace sassy {
 
             g->initialize_coloring(&c, colmap);
 
-            work_list old_arr(g->v_size);
+            dejavu::work_list old_arr(g->v_size);
 
             std::memcpy(old_arr.get_array(), g->v, g->v_size*sizeof(int));
             for(int j = 0; j < g->v_size; ++j) {
@@ -4604,7 +4580,7 @@ namespace sassy {
 
         // main routine of the preprocessor, reduces (g, colmap) -- returns automorphisms through hook
         // optional parameter schedule defines the order of applied techniques
-        void reduce(sgraph *g, int *colmap, sassy_hook* hook, const std::vector<preop> *schedule = nullptr) {
+        void reduce(dejavu::sgraph *g, int *colmap, sassy_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop};
             //std::vector<preop> alt_schedule = {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, probeflat, deg2ma};
             if(config == nullptr) {
@@ -4632,20 +4608,20 @@ namespace sassy {
                 for (int i = 0; i < g->v_size; ++i)
                     backward_translation_layers[back_ind].push_back(i);
 
-                automorphism.initialize(g->v_size);
+                automorphism.allocate(g->v_size);
                 for (int i = 0; i < g->v_size; ++i) {
                     automorphism.push_back(i);
                 }
-                automorphism_supp.initialize(g->v_size);
-                _automorphism.initialize(g->v_size);
-                _automorphism_supp.initialize(g->v_size);
+                automorphism_supp.allocate(g->v_size);
+                _automorphism.allocate(g->v_size);
+                _automorphism_supp.allocate(g->v_size);
                 for (int i = 0; i < g->v_size; ++i)
                     _automorphism[i] = i;
-                aux_automorphism.initialize(g->v_size);
+                aux_automorphism.allocate(g->v_size);
                 for (int i = 0; i < g->v_size; ++i) {
                     aux_automorphism.push_back(i);
                 }
-                aux_automorphism_supp.initialize(g->v_size);
+                aux_automorphism_supp.allocate(g->v_size);
 
                 domain_size = g->v_size;
 
@@ -4668,10 +4644,10 @@ namespace sassy {
             //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_setup" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             const int test_d = g->d[0];
-            int i;
-            for (i = 0; i < g->v_size && g->d[i] == test_d; ++i);
+            int k;
+            for (k = 0; k < g->v_size && g->d[k] == test_d; ++k);
 
-            if(i == g->v_size) {
+            if(k == g->v_size) {
                 // graph is regular
                 skipped_preprocessing = true;
                 PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "regular" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
@@ -4686,7 +4662,7 @@ namespace sassy {
             for (int i = 0; i < g->v_size; ++i)
                 backward_translation_layers[back_ind].push_back(i);
 
-            edge_scratch.initialize(g->e_size);
+            edge_scratch.allocate(g->e_size);
 
             order_according_to_color(g, colmap);
             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_order" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
@@ -4707,47 +4683,45 @@ namespace sassy {
                 PRINT("(prep-red) graph is discrete");
                 g->v_size = 0;
                 g->e_size = 0;
-                g->d_size = 0;
                 return;
             }
 
             int deg0, deg1, deg2;
-            add_edge_buff.initialize(domain_size);
+            add_edge_buff.allocate(domain_size);
             for (int i = 0; i < domain_size; ++i)
                 add_edge_buff.push_back(std::vector<int>()); // do this smarter... i know how many edges end up here
             add_edge_buff_act.initialize(domain_size);
 
             translate_layer_fwd.reserve(g->v_size);
 
-            automorphism.initialize(g->v_size);
+            automorphism.allocate(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 automorphism.push_back(i);
             }
-            automorphism_supp.initialize(g->v_size);
-            aux_automorphism.initialize(g->v_size);
+            automorphism_supp.allocate(g->v_size);
+            aux_automorphism.allocate(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 aux_automorphism.push_back(i);
             }
-            aux_automorphism_supp.initialize(g->v_size);
-            _automorphism.initialize(g->v_size);
-            _automorphism_supp.initialize(g->v_size);
+            aux_automorphism_supp.allocate(g->v_size);
+            _automorphism.allocate(g->v_size);
+            _automorphism_supp.allocate(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 _automorphism[i] = i;
 
-            before_move.initialize(domain_size);
+            before_move.allocate(domain_size);
 
-            worklist_deg0.initialize(g->v_size);
-            worklist_deg1.initialize(g->v_size);
+            worklist_deg0.allocate(g->v_size);
+            worklist_deg1.allocate(g->v_size);
 
             domain_size = g->v_size;
 
             // assumes colmap is array of length g->v_size
-            del = mark_set();
+            del = dejavu::mark_set();
             del.initialize(g->v_size);
 
             recovery_strings.reserve(g->v_size);
-            for (int i = 0; i < domain_size; ++i)
-                recovery_strings.emplace_back(std::vector<int>());
+            for (int j = 0; j < domain_size; ++j) recovery_strings.emplace_back();
 
             // eliminate degree 1 + 0 and discrete vertices
             del_discrete_edges_inplace(g, &c);
@@ -4782,7 +4756,7 @@ namespace sassy {
             if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
 
             if (schedule != nullptr) {
-                del_e = mark_set();
+                del_e = dejavu::mark_set();
                 del_e.initialize(g->e_size);
 
                 for (size_t pc = 0; pc < schedule->size(); ++pc) {
@@ -4821,10 +4795,10 @@ namespace sassy {
                         }
                         case preop::deg2ue: {
                             if(!has_deg_2 && !graph_changed) break;
-                            red_deg2_unique_endpoint_new(g, colmap, hook);
+                            red_deg2_unique_endpoint_new(g, colmap);
                             perform_del_add_edge(g, colmap);
 
-                            red_deg2_trivial_connect(g, colmap, hook);
+                            red_deg2_trivial_connect(g, colmap);
                             perform_del_add_edge(g, colmap);
 
                             red_deg2_color_cycles(g, colmap, hook);
@@ -4883,20 +4857,15 @@ namespace sassy {
 
                                     prev_size = g->v_size;
 
-                                    //red_twins(g, colmap, hook);
-
                                     red_deg10_assume_cref(g, colmap, hook);
                                     mark_discrete_for_deletion(g, colmap);
                                     perform_del(g, colmap);
 
-                                    red_deg2_unique_endpoint_new(g, colmap, hook);
+                                    red_deg2_unique_endpoint_new(g, colmap);
                                     perform_del_add_edge(g, colmap);
-                                    //g->sanity_check();
 
                                     red_deg2_path_size_1(g, colmap);
                                     perform_del_add_edge(g, colmap);
-
-                                    //red_twins(g, colmap, hook);
 
                                     sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 8);
                                     perform_del_discrete(g, colmap);
@@ -4907,15 +4876,10 @@ namespace sassy {
                                     red_deg2_path_size_1(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
-                                    //sparse_ir_probe_quotient_components(g, colmap, hook, 16, 4 - back_off + add_on);
-                                    //perform_del_discrete(g, colmap);
-
-                                    //red_twins(g, colmap, hook);
-
-                                    red_deg2_unique_endpoint_new(g, colmap, hook);
+                                    red_deg2_unique_endpoint_new(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
-                                    red_deg2_trivial_connect(g, colmap, hook);
+                                    red_deg2_trivial_connect(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
                                     red_deg2_color_cycles(g, colmap, hook);

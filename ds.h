@@ -373,7 +373,7 @@ namespace dejavu {
 
         // work set with arbitrary type
         template<class T>
-        class alignas(16) work_set_t {
+        class work_set_t {
         public:
             void initialize(int size) {
                 s = new T[size];
@@ -434,9 +434,13 @@ namespace dejavu {
 
         typedef work_set_t<int> work_set_int;
 
-        // set specialized for quick resets
+        /**
+         * \brief Sets specialized for quick resets
+         *
+         * Set on a statically specified domain of elements 1, ..., size, with O(1) \a set and \a get.
+         */
         class mark_set {
-            int *s = nullptr;
+            int *s   = nullptr;
             int mark = 0;
             unsigned int sz = 0;
         public:
@@ -449,7 +453,8 @@ namespace dejavu {
                 if(s && sz == size) return;
                 if(s) free(s);
                 s = (int*) calloc(size, sizeof(int));
-                sz = size;
+                sz   = size;
+                mark = 0;
                 reset();
             }
 

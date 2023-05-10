@@ -2,8 +2,8 @@
 #define SASSY_SELECTOR_H
 
 #include "refinement.h"
-#include "coloring.h"
-#include "sgraph.h"
+#include "../coloring.h"
+#include "../sgraph.h"
 #include "configuration.h"
 
 namespace sassy {
@@ -32,7 +32,7 @@ namespace sassy {
         int hint_sz = -1;
 
         ring_pair largest_cache;
-        work_list non_trivial_list;
+        dejavu::work_list non_trivial_list;
         int init = false;
 
     public:
@@ -55,7 +55,7 @@ namespace sassy {
         int select_color_largest(coloring *c) {
             if (!init) {
                 largest_cache.initialize(c->lab_sz);
-                non_trivial_list.initialize(c->lab_sz);
+                non_trivial_list.allocate(c->lab_sz);
                 init = true;
             }
 
@@ -139,7 +139,7 @@ namespace sassy {
         }
 
         int
-        select_color_dynamic(sgraph *g, coloring *c, strategy *s) {
+        select_color_dynamic(dejavu::sgraph *g, coloring *c, strategy *s) {
             if (c->cells == g->v_size)
                 return -1;
             switch (s->cell_selector_type) {

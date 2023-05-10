@@ -3,7 +3,7 @@
 #include "sgraph.h"
 #include <string>
 
-static void parse_dimacs_file_fast(const std::string& filename, sgraph* g, int** colmap) {
+static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap) {
     //const size_t bufsize = 4*1024;
     //char buf[bufsize];
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();

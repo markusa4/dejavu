@@ -2,8 +2,6 @@
 #define SASSY_REFINEMENT_H
 
 #include "utility.h"
-#include "coloring.h"
-#include "sgraph.h"
 #include "invariant.h"
 #include "configuration.h"
 #include <list>
@@ -11,152 +9,11 @@
 #include <cstring>
 
 namespace sassy {
-// sorting utilizing minimal sorting networks for n <= 6
-    template<class T>
-    void sort_t(T *arr, int sz) {
-#define min(x, y) (x<y?x:y)
-#define max(x, y) (x<y?y:x)
-#define SWAP(x, y) { const T a = min(arr[x], arr[y]); \
-                    const T b = max(arr[x], arr[y]); \
-                    arr[x] = a; arr[y] = b; }
-        switch (sz) {
-            case 0:
-            case 1:
-                break;
-            case 2: SWAP(0, 1);
-                break;
-            case 3: SWAP(0, 1);
-                SWAP(0, 2);
-                SWAP(1, 2);
-                break;
-            case 4: SWAP(0, 1);
-                SWAP(2, 3);
-                SWAP(0, 2);
-                SWAP(1, 3);
-                SWAP(1, 2);
-                break;
-            case 5: SWAP(0, 1);
-                SWAP(2, 3);
-                SWAP(0, 2);
-                SWAP(1, 4);
-                SWAP(0, 1);
-                SWAP(2, 3);
-                SWAP(1, 2);
-                SWAP(3, 4);
-                SWAP(2, 3);
-                break;
-            case 6: SWAP(1, 2);
-                SWAP(4, 5);
-                SWAP(0, 2);
-                SWAP(3, 5);
-                SWAP(0, 1);
-                SWAP(3, 4);
-                SWAP(1, 4);
-                SWAP(0, 3);
-                SWAP(2, 5);
-                SWAP(1, 3);
-                SWAP(2, 4);
-                SWAP(2, 3);
-                break;
-            default:
-                std::sort(arr, arr + sz);
-        }
-#undef SWAP
-#undef min
-#undef max
-    }
-
-// work list / stack with fixed size limitation
-    template<class T>
-    class work_list_t {
-    public:
-        work_list_t() {};
-        work_list_t(int size) {
-            initialize(size);
-        };
-
-        void initialize(int size) {
-            if(init)
-                delete[] arr;
-            arr = new T[size];
-            arr_sz = size;
-            init = true;
-            cur_pos = 0;
-        }
-
-        void push_back(T value) {
-            assert(cur_pos >= 0 && cur_pos < arr_sz);
-            arr[cur_pos] = value;
-            cur_pos += 1;
-        }
-
-        T pop_back() {
-            return arr[--cur_pos];
-        }
-
-        T *last() {
-            return &arr[cur_pos - 1];
-        }
-
-        bool empty() {
-            return cur_pos == 0;
-        }
-
-        void reset() {
-            cur_pos = 0;
-        }
-
-        ~work_list_t() {
-            if (init) {
-                delete[] arr;
-            }
-        }
-
-        void sort() {
-            sort_t<T>(arr, cur_pos);
-        }
-
-        T *get_array() {
-            return arr;
-        }
-
-        T &operator[](int index) {
-            assert(index >= 0);
-            assert(index < arr_sz);
-            return arr[index];
-        }
-
-        void sort_after_map(T *map) {
-            struct comparator_map {
-                T *map;
-
-                comparator_map(T *map) {
-                    this->map = map;
-                }
-
-                bool operator()(const T &a, const T &b) {
-                    return map[a] < map[b];
-                }
-            };
-            comparator_map c = comparator_map(map);
-            std::sort(arr, arr + cur_pos, c);
-        }
-
-        int cur_pos = 0;
-        bool init = false;
-    private:
-        T *arr = nullptr;
-        int arr_sz = -1;
-    };
-
-    typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
-    typedef work_list_t<int> work_list;
-
     class tiny_orbit {
         int sz;
-        mark_set touched;
-        work_list_t<int> reset_arr;
-        work_list_t<int> map_arr;
+        dejavu::mark_set touched;
+        dejavu::work_list_t<int> reset_arr;
+        dejavu::work_list_t<int> map_arr;
     public:
         int find_and_cut_orbit(const int v1) {
             assert(v1 >= 0);
@@ -213,124 +70,13 @@ namespace sassy {
         void initialize(int domain_size) {
             sz = domain_size;
             touched.initialize(domain_size);
-            reset_arr.initialize(domain_size);
-            map_arr.initialize(domain_size);
+            reset_arr.allocate(domain_size);
+            map_arr.allocate(domain_size);
             for (int i = 0; i < domain_size; ++i) {
                 map_arr.push_back(i);
             }
         }
     };
-
-// queue with fixed size limitation
-    class work_queue {
-    public:
-        void initialize(int size) {
-            assert(!init);
-            sz = size;
-            pos = 0;
-            queue = new int[size];
-            init = true;
-        }
-
-        void push(int val) {
-            //assert(init);
-            assert(pos != sz);
-            queue[pos] = val;
-            pos++;
-        }
-
-        int pop() {
-            //assert(init);
-            assert(pos > 0);
-            pos--;
-            return queue[pos];
-        }
-
-        bool empty() {
-            //assert(init);
-            return (pos == 0);
-        }
-
-        ~work_queue() {
-            if (init) {
-                delete[] queue;
-            }
-        }
-
-        void reset() {
-            pos = 0;
-        }
-
-        int *queue;
-        int pos;
-    private:
-        bool init = false;
-        int sz;
-    };
-
-// work set with arbitrary type
-    template<class T>
-    class work_set_t {
-    public:
-        void initialize(int size) {
-            s = new T[size];
-            reset_queue.initialize(size);
-
-            memset(s, -1, size * sizeof(T));
-
-            init = true;
-            sz = size;
-        }
-
-        void set(int index, T value) {
-            assert(index >= 0);
-            assert(index < sz);
-            s[index] = value;
-        }
-
-        T get(int index) {
-            assert(index >= 0);
-            assert(index < sz);
-            return s[index];
-        }
-
-        void reset() {
-            while (!reset_queue.empty())
-                s[reset_queue.pop()] = -1;
-        }
-
-        void reset_hard() {
-            memset(s, -1, sz * sizeof(T));
-            reset_queue.pos = 0;
-        }
-
-        T inc(int index) {
-            assert(index >= 0);
-            assert(index < sz);
-            if (s[index]++ == -1)
-                reset_queue.push(index);
-            return s[index];
-        }
-
-        void inc_nr(int index) {
-            assert(index >= 0 && index < sz);
-            ++s[index];
-        }
-
-        ~work_set_t() {
-            if (init)
-                delete[] s;
-        }
-
-        work_queue reset_queue;
-    private:
-        bool init = false;
-        T *s;
-        int sz;
-    };
-
-    typedef work_set_t<int> work_set_int;
-
 
 // worklist implementation for color refinement
     class cell_worklist {
@@ -346,7 +92,7 @@ namespace sassy {
             delete[] arr;
         }
 
-        int add_cell(work_set_int *queue_pointer, int col) {
+        int add_cell(dejavu::work_set_int *queue_pointer, int col) {
             assert(init);
             assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
             queue_pointer->set(col, cur_pos);
@@ -355,7 +101,7 @@ namespace sassy {
             return 0;
         }
 
-        int next_cell(work_set_int *queue_pointer, coloring *c) {
+        int next_cell(dejavu::work_set_int *queue_pointer, coloring *c) {
             // look at first 12 positions and pick the (first) smallest cell within these entries
             int sm_j = cur_pos - 1;
             for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
@@ -376,7 +122,7 @@ namespace sassy {
             return sm_col;
         }
 
-        int next_cell(work_set_int *queue_pointer, coloring *c, work_list_t<int> *singleton_hint) {
+        int next_cell(dejavu::work_set_int *queue_pointer, coloring *c, dejavu::work_list_t<int> *singleton_hint) {
             // use singleton_hint
             int sm_j = -1;
             while (!singleton_hint->empty()) {
@@ -412,7 +158,7 @@ namespace sassy {
             return sm_col;
         }
 
-        void replace_cell(work_set_int *queue_pointer, int col_old, int col) {
+        void replace_cell(dejavu::work_set_int *queue_pointer, int col_old, int col) {
             const int pos = queue_pointer->get(col_old);
             arr[pos] = col;
             assert(queue_pointer->get(col_old) != -1);
@@ -420,7 +166,7 @@ namespace sassy {
             queue_pointer->set(col, pos);
         }
 
-        void reset(work_set_int *queue_pointer) {
+        void reset(dejavu::work_set_int *queue_pointer) {
             while (cur_pos > 0) {
                 cur_pos--;
                 queue_pointer->set(arr[cur_pos], -1);
@@ -454,10 +200,10 @@ namespace sassy {
 
         // color refinement
         // includes several options for using invariants, blueprints and k-deviation
-        bool refine_coloring(sgraph *g, coloring *c, invariant *I,
+        bool refine_coloring(dejavu::sgraph *g, coloring *c, invariant *I,
                              int init_color_class, strategy_metrics *m, int cell_early, int individualize_early,
-                             std::vector<int> *early_individualized, mark_set *touched_color,
-                             work_list *touched_color_list) {
+                             std::vector<int> *early_individualized, dejavu::mark_set *touched_color,
+                             dejavu::work_list *touched_color_list) {
             bool comp = true;
             singleton_hint.reset();
             assure_initialized(g);
@@ -670,7 +416,7 @@ namespace sassy {
 
         // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
         // techniques -- meant to be used as the first refinement in automorphism computation
-        bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class = -1) {
+        bool refine_coloring_first(dejavu::sgraph *g, coloring *c, int init_color_class = -1) {
             assure_initialized(g);
             singleton_hint.reset();
             cell_todo.reset(&queue_pointer);
@@ -782,7 +528,7 @@ namespace sassy {
         }
 
         // certify an automorphism on a graph
-        bool certify_automorphism(sgraph *g, const int *p) {
+        bool certify_automorphism(dejavu::sgraph *g, const int *p) {
             int i, found;
 
             assure_initialized(g);
@@ -819,7 +565,7 @@ namespace sassy {
             return true;
         }
 
-        bool is_adjacent(sgraph*g, int vert1, int vert2) {
+        bool is_adjacent(dejavu::sgraph*g, int vert1, int vert2) {
             if(g->d[vert1] < g->d[vert2]) {
                 for(int i = 0; i < g->d[vert1]; ++i) {
                     if(g->e[g->v[vert1] + i] == vert2)
@@ -836,7 +582,7 @@ namespace sassy {
         }
 
         // certify an automorphism on a graph
-        bool certify_automorphism(sgraph *g, const int *colmap, const int *p) {
+        bool certify_automorphism(dejavu::sgraph *g, const int *colmap, const int *p) {
             int i, found;
 
             assure_initialized(g);
@@ -878,7 +624,7 @@ namespace sassy {
         }
 
         // certify an automorphism on a graph, sparse
-        bool certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p,
+        bool certify_automorphism_sparse(const dejavu::sgraph *g, const int *colmap, const int *p,
                                          int supp, const int *supp_arr) {
             int i, found;
 
@@ -927,7 +673,7 @@ namespace sassy {
 
         // certify an automorphism on a graph, sparse, report on which vertex failed
         std::pair<bool, int>
-        certify_automorphism_sparse_report_fail(const sgraph *g, const int *colmap,
+        certify_automorphism_sparse_report_fail(const dejavu::sgraph *g, const int *colmap,
                                                 const int *p, int supp, const int *supp_arr) {
             int i, found;
 
@@ -973,7 +719,7 @@ namespace sassy {
         }
 
         // certify an automorphism, for a single vertex
-        bool check_single_failure(const sgraph *g, const int *colmap, const int *p,
+        bool check_single_failure(const dejavu::sgraph *g, const int *colmap, const int *p,
                                   int failure) {
             int i, found;
 
@@ -1022,32 +768,32 @@ namespace sassy {
 
     private:
         bool initialized = false;
-        work_set_int queue_pointer;
+        dejavu::work_set_int queue_pointer;
         cell_worklist cell_todo;
-        mark_set scratch_set;
-        work_list_t<int> vertex_worklist;
-        work_set_t<int> color_vertices_considered;
-        work_set_t<int> neighbours; // degree type instead?
-        work_set_t<int> neighbour_sizes;
+        dejavu::mark_set scratch_set;
+        dejavu::work_list vertex_worklist;
+        dejavu::work_set_t<int> color_vertices_considered;
+        dejavu::work_set_t<int> neighbours; // degree type instead?
+        dejavu::work_set_t<int> neighbour_sizes;
         //work_list_t<int>  singletons;
-        work_list_t<int> singleton_hint;
-        work_list_t<int> old_color_classes;
-        work_list_pair_bool color_class_splits;
+        dejavu::work_list singleton_hint;
+        dejavu::work_list old_color_classes;
+        dejavu::work_list_pair_bool color_class_splits;
 
         int *scratch;
         int *workspace_int;
 
-        void assure_initialized(const sgraph *g) {
+        void assure_initialized(const dejavu::sgraph *g) {
             if (!initialized) {
                 const int n = g->v_size;
 
                 // reducing contention on heap allocator through bulk allocation...
                 workspace_int = new int[n];
 
-                vertex_worklist.initialize(n * 2);
+                vertex_worklist.allocate(n * 2);
                 //singletons.initialize(n);
-                singleton_hint.initialize(n);
-                old_color_classes.initialize(n);
+                singleton_hint.allocate(n);
+                old_color_classes.allocate(n);
                 neighbours.initialize(n);
                 neighbour_sizes.initialize(n);
                 queue_pointer.initialize(n);
@@ -1056,7 +802,7 @@ namespace sassy {
                 scratch = (int *) workspace_int;
                 scratch_set.initialize(n);
 
-                color_class_splits.initialize(n);
+                color_class_splits.allocate(n);
                 cell_todo.initialize(n * 2);
 
                 memset(scratch, 0, n * sizeof(int));
@@ -1064,9 +810,9 @@ namespace sassy {
             }
         }
 
-        bool refine_color_class_sparse(sgraph *g, coloring *c,
+        bool refine_color_class_sparse(dejavu::sgraph *g, coloring *c,
                                        int color_class, int class_size,
-                                       work_list_pair_bool *color_class_split_worklist, invariant *I) {
+                                       dejavu::work_list_pair_bool *color_class_split_worklist, invariant *I) {
             // for all vertices of the color class...
             bool comp, mark_as_largest;
             int i, j, cc, end_cc, largest_color_class_size, acc_in, singleton_inv1, singleton_inv2, acc;
@@ -1247,9 +993,9 @@ namespace sassy {
             return comp;
         }
 
-        bool refine_color_class_dense(sgraph *g, coloring *c,
+        bool refine_color_class_dense(dejavu::sgraph *g, coloring *c,
                                       int color_class, int class_size,
-                                      work_list_pair_bool *color_class_split_worklist, invariant *I) {
+                                      dejavu::work_list_pair_bool *color_class_split_worklist, invariant *I) {
             bool comp;
             int i, cc, acc, largest_color_class_size, singleton_inv, pos;
             cc = color_class; // iterate over color class
@@ -1398,9 +1144,9 @@ namespace sassy {
             return comp;
         }
 
-        bool refine_color_class_dense_dense(sgraph *g, coloring *c,
+        bool refine_color_class_dense_dense(dejavu::sgraph *g, coloring *c,
                                             int color_class, int class_size,
-                                            work_list_pair_bool *color_class_split_worklist, invariant *I) {
+                                            dejavu::work_list_pair_bool *color_class_split_worklist, invariant *I) {
             bool comp;
             int i, j, acc, cc, largest_color_class_size;
             cc = color_class; // iterate over color class
@@ -1529,9 +1275,9 @@ namespace sassy {
             return comp;
         }
 
-        bool refine_color_class_singleton(sgraph *g, coloring *c,
+        bool refine_color_class_singleton(dejavu::sgraph *g, coloring *c,
                                           int color_class, int class_size,
-                                          work_list_pair_bool *color_class_split_worklist, invariant *I) {
+                                          dejavu::work_list_pair_bool *color_class_split_worklist, invariant *I) {
             bool comp;
             int i, cc, deg1_write_pos, deg1_read_pos, singleton_inv;
             cc = color_class; // iterate over color class
@@ -1655,8 +1401,8 @@ namespace sassy {
             return comp;
         }
 
-        bool refine_color_class_singleton_first(sgraph *g, coloring *c,
-                                                const int color_class, work_list_pair_bool *color_class_split_worklist) {
+        bool refine_color_class_singleton_first(dejavu::sgraph *g, coloring *c,
+                                                const int color_class, dejavu::work_list_pair_bool *color_class_split_worklist) {
 
             const int vc = c->lab[color_class];
             const int pe = g->v[vc];
@@ -1746,9 +1492,9 @@ namespace sassy {
             return true;
         }
 
-        bool refine_color_class_dense_first(sgraph *g, coloring *c,
+        bool refine_color_class_dense_first(dejavu::sgraph *g, coloring *c,
                                             int color_class, int class_size,
-                                            work_list_pair_bool *color_class_split_worklist) {
+                                            dejavu::work_list_pair_bool *color_class_split_worklist) {
             int i, cc, acc, largest_color_class_size, pos;
             cc = color_class; // iterate over color class
 
@@ -1863,9 +1609,9 @@ namespace sassy {
             return true;
         }
 
-        bool refine_color_class_dense_dense_first(sgraph *g, coloring *c,
+        bool refine_color_class_dense_dense_first(dejavu::sgraph *g, coloring *c,
                                                   int color_class, int class_size,
-                                                  work_list_pair_bool *color_class_split_worklist) {
+                                                  dejavu::work_list_pair_bool *color_class_split_worklist) {
             // for all vertices of the color class...
             int i, j, cc, acc, largest_color_class_size, pos;
             cc = color_class; // iterate over color class
@@ -1971,9 +1717,9 @@ namespace sassy {
             return true;
         }
 
-        bool refine_color_class_sparse_first(sgraph *g, coloring *c,
+        bool refine_color_class_sparse_first(dejavu::sgraph *g, coloring *c,
                                              int color_class, int class_size,
-                                             work_list_pair_bool *color_class_split_worklist) {
+                                             dejavu::work_list_pair_bool *color_class_split_worklist) {
             bool comp;
             int v_new_color, cc, largest_color_class_size, acc;
             int* it;
