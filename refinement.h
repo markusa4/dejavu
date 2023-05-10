@@ -511,7 +511,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph, sparse
-            bool __attribute__ ((noinline)) certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
+            bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
                 int i, found;
 
                 assure_initialized(g);
@@ -556,9 +556,8 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph, sparse
-            bool __attribute__ ((noinline))
-            certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p, int supp,
-                                        const int *supp_arr) {
+            bool certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p, int supp,
+                                             const int *supp_arr) {
                 int i, found;
 
                 assure_initialized(g);
@@ -608,7 +607,6 @@ assert(c->cells == actual_cells);
             std::tuple<bool, int, int>
             certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int*, const int *p, int supp,
                                                            const int *supp_arr, int pos_start) {
-
                 assure_initialized(g);
 
                 //for(i = 0; i < g->v_size; ++i) {
@@ -682,10 +680,9 @@ assert(c->cells == actual_cells);
             cell_worklist cell_todo;
             mark_set scratch_set;
             work_list_t<int> vertex_worklist;
-            work_set_t<int> color_vertices_considered;
-            work_set_t<int> neighbours; // degree type instead?
+            work_set_t<int> color_vertices_considered; // todo this should use a different datastructure, with n space and not 2n
+            work_set_t<int> neighbours;
             work_set_t<int> neighbour_sizes;
-            //work_list_t<vertex_t>  singletons;
             work_list_t<int> singleton_hint;
             work_list_t<int> old_color_classes;
             work_list_pair_bool color_class_splits;
@@ -702,7 +699,7 @@ assert(c->cells == actual_cells);
 
                     vertex_worklist.allocate(n * 2);
                     //singletons.initialize(n);
-                    singleton_hint.allocate(n);
+                    //singleton_hint.allocate(n);
                     old_color_classes.allocate(n);
                     neighbours.initialize(n);
                     neighbour_sizes.initialize(n);
@@ -721,11 +718,8 @@ assert(c->cells == actual_cells);
                 }
             }
 
-            bool refine_color_class_sparse(sgraph *g, coloring *c,
-                                           int color_class, int class_size,
-                                           work_list_pair_bool *color_class_split_worklist
-                    //const std::function<type_additional_info_hook>& write_to_trace = nullptr
-            ) {
+            bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
+                                           work_list_pair_bool *color_class_split_worklist) {
                 // for all vertices of the color class...
                 bool comp, mark_as_largest;
                 int i, j, cc, end_cc, largest_color_class_size, acc;
@@ -737,8 +731,6 @@ assert(c->cells == actual_cells);
                 cc = color_class; // iterate over color class
                 comp = true;
 
-                //singletons.reset();
-                scratch_set.reset();
                 old_color_classes.reset();
                 neighbours.reset();
                 color_vertices_considered.reset();
@@ -759,9 +751,9 @@ assert(c->cells == actual_cells);
                             color_vertices_considered.inc_nr(col);
                             assert(col + color_vertices_considered.get(col) < g->v_size);
                             scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
-                            if (!scratch_set.get(col)) {
+                                                                                  // TODO could consolidate or checkerboard color_vertices_considered and scratch?
+                            if (color_vertices_considered.get(col) == 0) { // TODO use color_vertices_considered[col] == 0?
                                 old_color_classes.push_back(col);
-                                scratch_set.set(col);
                             }
                         }
                     }
@@ -1125,11 +1117,8 @@ assert(c->cells == actual_cells);
                 cc = color_class; // iterate over color class
 
                 neighbours.reset();
-                scratch_set.reset();
                 vertex_worklist.reset();
                 old_color_classes.reset();
-
-                //int singleton_inv = 0;
 
                 const int vc = c->lab[cc];
                 const int pe = g->v[vc];
@@ -1144,8 +1133,7 @@ assert(c->cells == actual_cells);
                         continue;
                     }
 
-                    if (!scratch_set.get(col)) {
-                        scratch_set.set(col);
+                    if(neighbours.get(col) == -1) {
                         old_color_classes.push_back(col);
                         // neighbours acts as the write position for degree 1 vertices of col in the scratchpad
                         neighbours.set(col, col);

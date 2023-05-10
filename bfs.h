@@ -93,7 +93,7 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
-            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::reduced_save* last_load) {
+            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::limited_save* last_load) {
                 auto next_node_save = node->get_save();
 
                 // TODO consider base size 1 and top-level automorphisms
@@ -160,7 +160,7 @@ namespace dejavu {
                 // TODO work on control flow below
                 if(local_state.T->trace_equal() && cert) {
                     ++s_total_kept;
-                    auto new_save = new ir::reduced_save();
+                    auto new_save = new ir::limited_save();
                     local_state.save_reduced_state(*new_save);
                     ir_tree->add_node(local_state.s_base_pos, new_save, node, is_base);
                 } else {
@@ -191,7 +191,7 @@ namespace dejavu {
             }
 
             void work_on_todo(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
-                ir::reduced_save* last_load = nullptr;
+                ir::limited_save* last_load = nullptr;
                 while(!ir_tree->queue_missing_node_empty()) {
                     const auto todo = ir_tree->queue_missing_node_pop();
                     compute_node(g, ir_tree, local_state, todo.first, todo.second, last_load);

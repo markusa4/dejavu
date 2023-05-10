@@ -41,7 +41,7 @@ namespace dejavu {
          * IR computations can be resumed from this state either using BFS or random walks. The state in particular does not
          * keep enough information to resume using DFS.
          */
-        class reduced_save {
+        class limited_save {
             // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
             // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
 
@@ -51,8 +51,8 @@ namespace dejavu {
             int trace_position = 0; /**< position of trace of this IR node */
             int base_position = 0;  /**< length of base of this IR node */
         public:
-            void set_state(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
-                           int s_base_position) {
+            void save(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
+                      int s_base_position) {
                 this->base_vertex = s_base_vertex;
                 this->c.copy_force(&s_c);
                 this->invariant = s_invariant;
@@ -213,9 +213,8 @@ namespace dejavu {
                 s_deviation_inc_current += (!cont);
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
-                // TODO: should this be in split hook, or in color refinement?
-                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() && compare_base_cells[s_base_pos - 1] == c->cells);
-                //const bool ndone = true;
+                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() &&
+                                    compare_base_cells[s_base_pos - 1] == c->cells);
                 return ndone && (cont || deviation_override);
             }
 
@@ -232,7 +231,6 @@ namespace dejavu {
                 }
 
                 // update some heuristic values
-                // TODO: only activate blueprints on first few restarts!
                 if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
                     T->blueprint_skip_to_next_cell();
                     return false;
@@ -382,31 +380,20 @@ namespace dejavu {
             /**
              * Save a partial state of this controller.
              *
-             * @param state A reference to the reduced_save in which the state will be stored.
+             * @param state A reference to the limited_save in which the state will be stored.
              */
-            void save_reduced_state(reduced_save &state) {
-                state.set_state(base_vertex, *c, T->get_hash(), T->get_position(),
-                                s_base_pos);
+            void save_reduced_state(limited_save &state) {
+                state.save(base_vertex, *c, T->get_hash(), T->get_position(),
+                           s_base_pos);
             }
 
             /**
              * Load a partial state into this controller.
              *
-             * @param state A reference to the reduced_save from which the state will be loaded.
+             * @param state A reference to the limited_save from which the state will be loaded.
              */
-            void __attribute__ ((noinline)) load_reduced_state(reduced_save &state) {
-                // bool partial_base = false;
-                /*if(state.get_base().size() <= base_vertex.size()) {
-                    int i;
-                    for (i = 0; i < state.get_base().size(); ++i) if (state.get_base()[i] != base_vertex[i]) break;
-                    partial_base = (i == state.get_base().size());
-                }
-
-                if(partial_base) {
-                    c->copy(state.get_coloring());
-                } else {*/
-                    c->copy_force(state.get_coloring());
-                //}
+            void load_reduced_state(limited_save &state) {
+                c->copy_force(state.get_coloring());
 
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
@@ -415,7 +402,7 @@ namespace dejavu {
                 s_base_pos = state.get_base_position();
                 base_vertex = state.get_base();
 
-                // these become meaningless
+                // these become meaningless, so clear them out
                 base_singleton_pt.clear();
                 base_color.clear();
                 base_color_sz.clear();
@@ -427,7 +414,7 @@ namespace dejavu {
             }
 
             // TODO: hopefully can be deprecated
-            void load_reduced_state_without_coloring(reduced_save &state) {
+            void load_reduced_state_without_coloring(limited_save &state) {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
@@ -602,11 +589,11 @@ namespace dejavu {
              * Perform the given walk from the given IR node.
              *
              * @param g The graph.
-             * @param start_from A reduced_save describing the IR node from which the walk should be performed.
+             * @param start_from A limited_save describing the IR node from which the walk should be performed.
              * @param vertices A vector of vertices that describes the walk, i.e., these vertices will be individualized
              *                 in the given order.
              */
-            void walk(sgraph *g, ir::reduced_save &start_from, std::vector<int>& vertices) {
+            void walk(sgraph *g, ir::limited_save &start_from, std::vector<int>& vertices) {
                 load_reduced_state(start_from);
 
                 while (s_base_pos < (int) vertices.size()) {
@@ -1085,14 +1072,14 @@ namespace dejavu {
 
         class tree_node {
             std::mutex    lock;
-            reduced_save* data;
+            limited_save* data;
             tree_node*    next;
             tree_node*    parent;
             bool          is_base = false;
             bool          is_pruned = false;
             long          hash = 0;
         public:
-            tree_node(reduced_save* data, tree_node* next, tree_node* parent) {
+            tree_node(limited_save* data, tree_node* next, tree_node* parent) {
                 this->data = data;
                 this->next = next;
                 if(next == nullptr) {
@@ -1109,7 +1096,7 @@ namespace dejavu {
             void set_next(tree_node* new_next) {
                 this->next = new_next;
             }
-            reduced_save* get_save() {
+            limited_save* get_save() {
                 return data;
             }
 
@@ -1190,7 +1177,7 @@ namespace dejavu {
                 return &node_invariant;
             }
 
-            void initialize(std::vector<int> &base, ir::reduced_save* root) {
+            void initialize(std::vector<int> &base, ir::limited_save* root) {
                 tree_data.resize(base.size() + 1);
                 tree_level_size.resize(base.size() + 1);
                 tree_data_jump_map.resize(base.size() + 1);
@@ -1211,7 +1198,7 @@ namespace dejavu {
                 return stored_leaves.s_leaves;
             }
 
-            bool reset(std::vector<int> &new_base, ir::reduced_save* root, bool keep_old) {
+            bool reset(std::vector<int> &new_base, ir::limited_save* root, bool keep_old) {
                 if(!init) {
                     initialize(new_base, root);
                     return false;
@@ -1299,7 +1286,7 @@ namespace dejavu {
                 node_invariant[v] += inv;
             }
 
-            void add_node(int level, reduced_save* data, tree_node* parent, bool is_base = false) {
+            void add_node(int level, limited_save* data, tree_node* parent, bool is_base = false) {
                 // TODO use locks
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;

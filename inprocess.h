@@ -15,12 +15,13 @@ namespace dejavu::search_strategy {
         // statistics
         big_number s_grp_sz; /**< group size */
 
+        // TODO: option to compute add stronger invariants on the furthest BFS level
+
         std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized */
         std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing      */
 
-        bool
-        inprocess(sgraph *g, ir::shared_tree *tree, groups::shared_schreier *group, ir::controller &local_state,
-                  ir::reduced_save &root_save) {
+        bool inprocess(sgraph *g, ir::shared_tree *tree, groups::shared_schreier *group, ir::controller &local_state,
+                       ir::limited_save &root_save) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/

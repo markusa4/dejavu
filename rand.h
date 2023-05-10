@@ -39,7 +39,7 @@ namespace dejavu::search_strategy {
          * @param local_state Local state in which the leaf will be stored.
          * @param start_from State from which the walk to the leaf is performed.
          */
-        static void load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::reduced_save &start_from,
+        static void load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::limited_save &start_from,
                                   ir::stored_leaf *leaf) {
             assert(leaf->get_store_type() == ir::stored_leaf::STORE_BASE);
             std::vector<int> base;
@@ -62,7 +62,7 @@ namespace dejavu::search_strategy {
          */
         bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::shared_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
-                                           ir::reduced_save &root_save, bool uniform) {
+                                           ir::limited_save &root_save, bool uniform) {
             bool used_load = false;
 
             assert(g->v_size == local_state.c->cells);
@@ -199,10 +199,10 @@ namespace dejavu::search_strategy {
                           int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
-            ir::reduced_save my_own_save;
+            ir::limited_save my_own_save;
 
-            ir::reduced_save* root_save  = ir_tree.pick_node_from_level(0,0)->get_save();
-            ir::reduced_save* start_from = root_save;
+            ir::limited_save* root_save  = ir_tree.pick_node_from_level(0, 0)->get_save();
+            ir::limited_save* start_from = root_save;
 
             //while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
             //      && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success

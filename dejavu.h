@@ -139,7 +139,7 @@ namespace dejavu {
             ir::controller local_state(&m_refinement, &local_coloring); /*< controls movement in IR tree*/
 
             // save root state for random and BFS search, as well as restarts
-            ir::reduced_save root_save;
+            ir::limited_save root_save;
             local_state.save_reduced_state(root_save); /*< root of the IR tree */
             int s_last_base_size = g->v_size + 1;         /*< v_size + 1 is larger than any actual base*/
 
