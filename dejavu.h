@@ -18,7 +18,8 @@ extern int*           dej_test_col;
 
 
 namespace dejavu {
-    void test_hook(int n, const int *p, int nsupp, const int *supp) {
+    void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
+                   [[maybe_unused]] const int *supp) {
         std::cout << "certifying..." << std::endl;
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
         assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));

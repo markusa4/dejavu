@@ -606,7 +606,7 @@ assert(c->cells == actual_cells);
 
             // certify an automorphism on a graph, sparse, report on which vertex failed
             std::tuple<bool, int, int>
-            certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int *colmap, const int *p, int supp,
+            certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int*, const int *p, int supp,
                                                            const int *supp_arr, int pos_start) {
 
                 assure_initialized(g);
@@ -642,7 +642,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism, for a single vertex
-            bool check_single_failure(const sgraph *g, const int *colmap, const int *p, int failure) {
+            bool check_single_failure(const sgraph *g, const int *, const int *p, int failure) {
                 assure_initialized(g);
 
                 const int i = failure;

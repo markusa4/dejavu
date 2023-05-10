@@ -196,8 +196,7 @@ namespace sassy {
         // color refinement
         // includes several options for using invariants, blueprints and k-deviation
         bool refine_coloring(dejavu::sgraph *g, coloring *c, invariant *I,
-                             int init_color_class, int cell_early, int individualize_early,
-                             std::vector<int> *early_individualized, dejavu::mark_set *touched_color,
+                             int init_color_class, int cell_early, dejavu::mark_set *touched_color,
                              dejavu::work_list *touched_color_list) {
             bool comp = true;
             singleton_hint.reset();
@@ -236,7 +235,7 @@ namespace sassy {
 
                 // if cell did not split anything in the target invariant, skip refinement until the end of this cell
                 if (I->no_write && !I->never_fail && comp) {
-                    const bool skip = !I->protocol_read(next_color_class);
+                    const bool skip = !I->protocol_read();
                     if (skip && CONFIG_IR_IDLE_SKIP) {
                         I->fast_forward(INV_MARK_ENDCELL);
                         continue;
@@ -249,7 +248,7 @@ namespace sassy {
 
                 if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
                     // singleton
-                    comp = refine_color_class_singleton(g, c, next_color_class, next_color_class_sz,
+                    comp = refine_color_class_singleton(g, c, next_color_class,
                                                         &color_class_splits, I);
                 } else if (g->dense) {
                     if (dense_dense) { // dense-dense
@@ -313,7 +312,7 @@ namespace sassy {
                         color_class_splits.reset();
                         cell_todo.reset(&queue_pointer);
                         I->write_cells(c->cells);
-                        I->protocol_write(true, next_color_class);
+                        I->protocol_write(true);
                         I->protocol_mark();
                         if (I->no_write)
                             I->protocol_skip_to_mark();
@@ -363,7 +362,7 @@ namespace sassy {
                 const int new_cells = c->cells - pre_cells;
 
                 // mark end of cell and denote whether this cell was splitting or non-splitting
-                I->protocol_write(new_cells > 0, next_color_class);
+                I->protocol_write(new_cells > 0);
                 comp = I->write_top_and_compare(INV_MARK_ENDCELL, true) && comp;
                 if (!comp && deviation_expander <= 0) break;
             }
@@ -1252,7 +1251,7 @@ namespace sassy {
         }
 
         bool refine_color_class_singleton(dejavu::sgraph *g, coloring *c,
-                                          int color_class, int class_size,
+                                          int color_class,
                                           dejavu::work_list_pair_bool *color_class_split_worklist, invariant *I) {
             bool comp;
             int i, cc, deg1_write_pos, deg1_read_pos, singleton_inv;

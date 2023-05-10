@@ -32,7 +32,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
     }
 }
 
-void empty_hook(int n, const int * p, int support, const int *) {}
+void empty_hook(int, const int*, int, const int *) {}
 
 void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)

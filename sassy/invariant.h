@@ -14,7 +14,6 @@ namespace sassy {
 
     class invariant {
     public:
-        invariant *created = nullptr;
         std::vector<int> vec_cells;
         std::vector<std::pair<int, int>> vec_selections;
         std::vector<cell_state> vec_protocol;
@@ -74,17 +73,7 @@ namespace sassy {
             }
         }
 
-        inline void selection_write(int cell, int cell_size) {
-            if (!no_write) {
-                vec_selections.push_back(std::pair<int, int>(cell, cell_size));
-            }
-        }
-
-        inline int selection_read(int base_point) {
-            return (vec_selections)[base_point].first;
-        }
-
-        inline void protocol_write(bool active_cell, int c) {
+        inline void protocol_write(bool active_cell) {
             if (!no_write) {
                 ++protocol_pos;
                 vec_protocol.push_back(active_cell ? cell_state::CELL_ACTIVE : cell_state::CELL_IDLE);
@@ -98,7 +87,7 @@ namespace sassy {
             }
         }
 
-        inline bool protocol_read(int c) {
+        inline bool protocol_read() {
             ++protocol_pos;
             return (compareI->vec_protocol)[protocol_pos] == cell_state::CELL_ACTIVE;
         }
@@ -140,11 +129,6 @@ namespace sassy {
         }
 
         void create_vector(int prealloc) {
-            created = this;
-            //vec_cells     = new std::vector<int>();
-            //vec_protocol  = new std::vector<cell_state>();
-            //vec_invariant = new std::vector<int>();
-            //vec_selections= new std::vector<std::pair<int,int>>(); // should also include size, for future blueprint uses
             vec_cells.reserve(prealloc + 16);
             vec_protocol.reserve(prealloc + 16);
             vec_invariant.reserve(prealloc * 20);
@@ -157,31 +141,6 @@ namespace sassy {
             vec_invariant.clear();
             vec_selections.clear();
         }
-
-        void purge() {
-            if (created != nullptr) {
-                //delete vec_cells;
-                //delete vec_protocol;
-                //delete vec_invariant;
-                //delete vec_selections;
-                created = nullptr;
-            }
-        }
-
-        ~invariant() {
-            if (created == this) {
-                //delete vec_invariant;
-                //delete vec_protocol;
-                //delete vec_cells;
-                //delete vec_selections;
-            }
-        }
-
-        /*static void* operator new(size_t size) {
-            return NFAlloc(size);
-        }
-        static void operator delete(void *p) {
-        }*/
     };
 }
 
