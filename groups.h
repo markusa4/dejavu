@@ -137,7 +137,7 @@ namespace dejavu {
              * @param other Automorphism in sparse notation that is applied to this automorphism in.
              * @param pwr Power with which \p other is applied to this automorphism.
              */
-            void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
+            [[maybe_unused]] void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
                        automorphism_workspace *other, int pwr = 1) {
                 apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
             }
@@ -804,13 +804,6 @@ namespace dejavu {
              */
             [[nodiscard]] int size() const {
                 return (int) fixed_orbit.size();
-            }
-
-            /**
-             * @return Size of the transversal.
-             */
-            [[nodiscard]] int size_upper_bound() const {
-                return sz_upb;
             }
 
             void set_size_upper_bound(const int new_sz_upb) {

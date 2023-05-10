@@ -62,46 +62,48 @@ namespace dejavu {
              *
              * @todo should just always certify the leaf...
              */
-            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state,
-                                                        groups::automorphism_workspace &automorphism) {
+            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state) {
                 bool prev_fail = false;
                 int prev_fail_pos = -1;
                 int cert_pos = 0;
 
                 while ((size_t) state->s_base_pos < state->compare_base_color.size()) {
-                    const int col = state->compare_base_color[state->s_base_pos];
+                    const int col    = state->compare_base_color[state->s_base_pos]; // the base color
                     const int col_sz = state->c->ptn[col] + 1;
-                    if (col_sz < 2)
-                        return {false, false};
+                    if (col_sz < 2) return {false, false}; // color of original base is trivial here, abort
                     const int ind_v = state->c->lab[col];
 
+                    // individualize a vertex of base color
                     state->move_to_child(g, ind_v);
                     const int pos_start = state->base_singleton_pt[state->base_singleton_pt.size() - 1];
                     const int pos_end   = (int) state->singletons.size();
-                    automorphism.write_singleton(&state->compare_singletons, &state->singletons,
+
+                    // write sparse automorphism with singletons derived so far
+                    ws_automorphism->write_singleton(&state->compare_singletons, &state->singletons,
                                                  pos_start, pos_end);
 
+                    // try to certify the automorphism, but if it failed previously, first check whether that specific
+                    // failure was even rectified
                     bool prev_cert = true;
-
                     if (prev_fail && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
-                        prev_cert = state->check_single_failure(g, initial_colors->vertex_to_col, automorphism,
-                                                                prev_fail_pos);
+                        prev_cert = state->check_single_failure(g, initial_colors->vertex_to_col,
+                                                                *ws_automorphism,prev_fail_pos);
                     }
 
                     if (prev_cert && state->s_last_refinement_singleton_only && state->s_hint_color_is_singleton_now) {
                         auto [certified, fail_pos, new_cert_pos] =
                                 state->certify_sparse_report_fail_resume(g,
                                                                          initial_colors->vertex_to_col,
-                                                                         automorphism, cert_pos);
+                                                                         *ws_automorphism, cert_pos);
                         cert_pos = new_cert_pos;
                         if (certified) {
                             std::tie(certified, fail_pos, new_cert_pos) =
                                     state->certify_sparse_report_fail_resume(g,initial_colors->vertex_to_col,
-                                                                             automorphism, 0);
+                                                                             *ws_automorphism, 0);
                         }
 
                         if (certified) {
-                            return {true, true};
+                            return {true, true}; // we found an automorphism
                         } else {
                             prev_fail = true;
                             prev_fail_pos = fail_pos;
@@ -109,9 +111,10 @@ namespace dejavu {
                     }
                 }
                 if (state->c->cells == g->v_size) {
-                    return {true, false};
+                    return {true, false}; // we reached a leaf that looks equivalent, but could not certify
+                                                // automorphism
                 } else {
-                    return {false, false};
+                    return {false, false}; // failed to reach equivalent leaf
                 }
             }
 
@@ -184,7 +187,7 @@ namespace dejavu {
                         // if no luck with sparse automorphism, try more proper walk to leaf node
                         if (!found_auto) {
                             auto [success, certified] = recurse_to_equal_leaf(g, initial_colors,
-                                                                              &local_state,*ws_automorphism);
+                                                                              &local_state);
                             found_auto = (success && certified);
                             if (success && !certified) {
                                 ws_automorphism->reset();

@@ -2113,21 +2113,18 @@ namespace sassy {
 
 // ring queue for pairs of integers
     class ring_pair {
-        std::pair<int, int> *arr;
-        bool init = false;
+        std::pair<int, int> *arr = nullptr;
         int arr_sz = -1;
         int front_pos = -1;
         int back_pos = -1;
 
     public:
         void initialize(int size) {
-            if(init)
-                delete[] arr;
-            arr = new std::pair<int, int>[size];
+            if(arr) free(arr);
+            arr = (std::pair<int, int>*) malloc(size * sizeof(std::pair<int, int>));
             arr_sz = size;
             back_pos = 0;
             front_pos = 0;
-            init = true;
         }
 
         void push_back(std::pair<int, int> value) {
@@ -2143,13 +2140,12 @@ namespace sassy {
             front_pos = (front_pos + 1) % arr_sz;
         }
 
-        bool empty() {
+        [[nodiscard]] bool empty() const {
             return (front_pos == back_pos);
         }
 
         ~ring_pair() {
-            if (init)
-                delete[] arr;
+            if(arr) free(arr);
         }
 
         void reset() {

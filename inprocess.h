@@ -35,14 +35,9 @@ namespace dejavu::search_strategy {
 
                 tree->make_node_invariant(); // "compresses" node invariant from all levels into first level
 
-                bool something_was_pruned = false;
 
                 for (int i = 0; i < g->v_size; ++i) {
-                    if (is_pruned.get(i)) {
-                        hash[i] = 1;
-                        something_was_pruned = true;
-                    }
-                    else hash[i] = 0;
+                    hash[i]  = is_pruned.get(i);
                     hash[i] += (int) (*tree->get_node_invariant())[i] % 256;
                 }
                 for (int i = 0; i < g->v_size; ++i) {

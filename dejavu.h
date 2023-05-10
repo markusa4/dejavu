@@ -65,7 +65,7 @@ namespace dejavu {
 
         // statistics
         big_number s_grp_sz; /**< size of the automorphism group computed */
-        [[maybe_unused]] bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
+        bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
 
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
@@ -305,6 +305,7 @@ namespace dejavu {
                         // BFS is, to then make an informed decision of what to do next
 
                         // we do so by negatively scoring each method: higher score, worse technique
+                        // TODO should this use s_random_path_trace_cost?
                         double score_rand = s_trace_full_cost * h_rand_fail_lim_now * (1-m_rand.s_rolling_success);
                         double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
 

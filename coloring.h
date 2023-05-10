@@ -11,9 +11,8 @@
 
 extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
 
-template<class vertex_t>
 class garbage_collector {
-    static std::vector<vertex_t*> junk;
+    static std::vector<int*> junk;
     static std::unique_ptr<std::mutex> lock;
 public:
     static void free_trash() {
@@ -24,21 +23,20 @@ public:
         }
         lock->unlock();
     }
-    static void add_trash(vertex_t* arr) {
+    static void add_trash(int* arr) {
         lock->lock();
         junk.push_back(arr);
         lock->unlock();
     }
 };
 
-template<class vertex_t> std::unique_ptr<std::mutex> garbage_collector<vertex_t>::lock = std::make_unique<std::mutex>();
-template<class vertex_t> std::vector<vertex_t*> garbage_collector<vertex_t>::junk = std::vector<vertex_t*>();
+std::unique_ptr<std::mutex> garbage_collector::lock = std::make_unique<std::mutex>();
+std::vector<int*> garbage_collector::junk = std::vector<int*>();
 
-template<class vertex_t>
 class coloring_allocator {
 public:
-    static std::pair<vertex_t *, vertex_t *> coloring_bulk_allocator(int domain_size) {
-        thread_local vertex_t *bulk_domain = nullptr;
+    static std::pair<int *, int *> coloring_bulk_allocator(int domain_size) {
+        thread_local int *bulk_domain = nullptr;
         thread_local int buffer_const = 5; // was 20, for very large graphs this fails hard
         thread_local int bulk_domain_sz = -1, bulk_domain_cnt = -1;
 
@@ -46,8 +44,8 @@ public:
             if (bulk_domain_reset)
                 buffer_const = 20;
             bulk_domain_reset = false;
-            bulk_domain = new vertex_t[buffer_const * domain_size + 1];
-            garbage_collector<vertex_t>::add_trash(bulk_domain);
+            bulk_domain = new int[buffer_const * domain_size + 1];
+            garbage_collector::add_trash(bulk_domain);
             bulk_domain[0] = 0;
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;
@@ -60,10 +58,10 @@ public:
         if (bulk_domain_cnt >= bulk_domain_sz)
             bulk_domain_sz = -1;
 
-        return std::pair<vertex_t *, vertex_t *>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
+        return std::pair<int *, int *>(bulk_domain, bulk_domain + bulk_domain_cnt - domain_size);
     }
 
-    static void coloring_bulk_deallocator(vertex_t *bulk_domain) {
+    static void coloring_bulk_deallocator(int *bulk_domain) {
         bulk_domain_reset = true;
         /*if (--bulk_domain[0] == 0) {
             std::cout << "removeB " << bulk_domain << std::endl;
@@ -103,7 +101,7 @@ public:
     void alloc(int sz) {
         if(true) { // TODO need to work on colorings...
             if (!init) {
-                std::pair<int *, int *> alloc = coloring_allocator<int>::coloring_bulk_allocator(sz * 4);
+                std::pair<int *, int *> alloc = coloring_allocator::coloring_bulk_allocator(sz * 4);
                 bulk_alloc = alloc.first;
                 bulk_pt = alloc.second;
 
@@ -144,7 +142,7 @@ public:
             vertex_to_col = nullptr;
             vertex_to_lab = nullptr;
         } else {
-            coloring_allocator<int>::coloring_bulk_deallocator(bulk_alloc);
+            coloring_allocator::coloring_bulk_deallocator(bulk_alloc);
         }
     };
 
