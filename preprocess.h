@@ -2317,8 +2317,6 @@ namespace sassy {
             color_cache.copy_ptn(&c1);
 
             selector S;
-            strategy m;
-            m.cell_selector_type = sel_type;
 
             dejavu::mark_set  touched_color(g->v_size);
             dejavu::work_list touched_color_list(g->v_size);
@@ -2333,7 +2331,7 @@ namespace sassy {
 
             while (true) {
                 // select a color class
-                const int cell = S.select_color_dynamic(g, &c1, &m);
+                const int cell = S.select_color_dynamic(g, &c1, sel_type);
                 if (cell == -1)
                     break;
 

@@ -55,21 +55,13 @@ namespace sassy {
         SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM
     };
 
-    struct strategy {
-        selector_type cell_selector_type = SELECTOR_FIRST;
-        int cell_selector_seed = 0;
-        bool init = false;
-
-        strategy() = default;
-    };
-
     class selector {
         int skipstart = 0;
         int hint = -1;
         int hint_sz = -1;
 
         ring_pair largest_cache;
-        dejavu::work_list non_trivial_list;
+        dejavu::ds::work_list non_trivial_list;
         int init = false;
 
     public:
@@ -176,12 +168,12 @@ namespace sassy {
         }
 
         int
-        select_color_dynamic(dejavu::sgraph *g, coloring *c, strategy *s) {
+        select_color_dynamic(dejavu::sgraph *g, coloring *c, selector_type cell_selector_type) {
             if (c->cells == g->v_size)
                 return -1;
-            switch (s->cell_selector_type) {
+            switch (cell_selector_type) {
                 case SELECTOR_RANDOM:
-                    return seeded_select_color(c, s->cell_selector_seed);
+                    return seeded_select_color(c, 0);
                 case SELECTOR_LARGEST:
                     return select_color_largest(c);
                 case SELECTOR_SMALLEST:
