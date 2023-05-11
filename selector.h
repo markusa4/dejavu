@@ -1,28 +1,66 @@
 #ifndef SASSY_SELECTOR_H
 #define SASSY_SELECTOR_H
 
-#include "refinement.h"
-#include "../coloring.h"
-#include "../sgraph.h"
+#include "coloring.h"
+#include "sgraph.h"
 
 namespace sassy {
+    // ring queue for pairs of integers
+    class ring_pair {
+        std::pair<int, int> *arr = 0;
+        bool init = false;
+        int arr_sz = -1;
+        int front_pos = -1;
+        int back_pos = -1;
+
+    public:
+        void initialize(int size) {
+            if(init)
+                delete[] arr;
+            arr = new std::pair<int, int>[size];
+            arr_sz = size;
+            back_pos = 0;
+            front_pos = 0;
+            init = true;
+        }
+
+        void push_back(std::pair<int, int> value) {
+            arr[back_pos] = value;
+            back_pos = (back_pos + 1) % arr_sz;
+        }
+
+        std::pair<int, int> *front() {
+            return &arr[front_pos];
+        }
+
+        void pop() {
+            front_pos = (front_pos + 1) % arr_sz;
+        }
+
+        bool empty() {
+            return (front_pos == back_pos);
+        }
+
+        ~ring_pair() {
+            if (init)
+                delete[] arr;
+        }
+
+        void reset() {
+            front_pos = back_pos;
+        }
+    };
+
     enum selector_type {
         SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM
     };
 
     struct strategy {
-        invariant *I = nullptr;
         selector_type cell_selector_type = SELECTOR_FIRST;
         int cell_selector_seed = 0;
         bool init = false;
 
         strategy() = default;
-
-        ~strategy() {
-            if (init) {
-                delete I;
-            }
-        }
     };
 
     class selector {

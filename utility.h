@@ -46,6 +46,15 @@ unsigned int hash(unsigned int x) {
     return x;
 }
 
+unsigned long add_to_hash(unsigned long hash, const int d) {
+    const unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
+    hash    = hash << 8;                    // shift hash left by 5 bits
+    hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
+    hash    = hash ^ d;                     // XOR into hash
+
+    return hash;
+}
+
 inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
     return f.good();

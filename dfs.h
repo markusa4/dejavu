@@ -161,6 +161,7 @@ namespace dejavu {
                     // iterate over current color class
                     for (int i = col_sz - 1; i >= 0; --i) {
                         const int ind_v = local_state.leaf_color.lab[col + i];
+                        assert(local_state.c->vertex_to_col[vert] == local_state.c->vertex_to_col[ind_v]);
 
                         // only consider every orbit once
                         if (ind_v == vert || !orbs.represents_orbit(ind_v))  continue;
@@ -173,6 +174,7 @@ namespace dejavu {
                         const int prev_base_pos = local_state.s_base_pos;
                         local_state.T->reset_trace_equal();
                         local_state.move_to_child(g, ind_v);
+                        assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[vert]);
 
                         // write singleton diff into automorphism...
                         const int wr_pos_st = local_state.base_singleton_pt[local_state.base_singleton_pt.size() - 1];
@@ -191,8 +193,12 @@ namespace dejavu {
                             found_auto = (success && certified);
                             if (success && !certified) {
                                 ws_automorphism->reset();
+                                assert(ws_automorphism->perm()[vert] == vert);
+                                assert(ws_automorphism->perm()[ind_v] == ind_v);
+                                assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[vert]);
                                 ws_automorphism->write_color_diff(local_state.c->vertex_to_col,
                                                                   local_state.leaf_color.lab);
+                                assert(ws_automorphism->perm()[ind_v] == vert || ws_automorphism->perm()[vert] == ind_v);
                                 found_auto = local_state.certify(g, *ws_automorphism);
                             }
                         }
@@ -205,7 +211,7 @@ namespace dejavu {
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
                             assert(ws_automorphism->nsupport() > 0);
-                            assert(ws_automorphism->perm()[vert] == ind_v);
+                            assert(ws_automorphism->perm()[ind_v] == vert || ws_automorphism->perm()[vert] == ind_v);
                             if(hook) (*hook)(0, ws_automorphism->perm(), ws_automorphism->nsupport(),
                                              ws_automorphism->support());
                             orbs.add_automorphism_to_orbit(*ws_automorphism);

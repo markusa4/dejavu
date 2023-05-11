@@ -152,12 +152,14 @@ namespace dejavu {
              */
             void alloc(const unsigned int size) {
                 dealloc();
-                arr = (T *) malloc(sizeof(T) * size);
+                //arr = (T *) malloc(sizeof(T) * size);
+                arr = new T[size];
                 arr_sz = size;
             }
 
             void dealloc() {
-                if(arr) free(arr);
+                //if(arr) free(arr);
+                if(arr) delete[] arr;
                 arr = nullptr;
             }
 

@@ -47,7 +47,7 @@ void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     }
 
 #ifndef NDEBUG
-    auto test_hook_func = sassy::sassy_hook(dejavu::test_hook);
+    auto test_hook_func = dejavu_hook(dejavu::test_hook);
     dej_test_graph.copy_graph(g);
     dej_test_col = (int*) calloc(g->v_size, sizeof(int));
     memcpy(dej_test_col, colmap, sizeof(int) * g->v_size);

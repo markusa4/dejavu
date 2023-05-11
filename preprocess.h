@@ -4,9 +4,7 @@
 #define SASSY_VERSION_MAJOR 1
 #define SASSY_VERSION_MINOR 1
 
-#include "utility.h"
-#include "refinement.h"
-#include "../graph.h"
+#include "graph.h"
 #include "selector.h"
 #include <vector>
 #include <iomanip>
@@ -56,7 +54,7 @@ namespace sassy {
         dejavu::mark_set del;
         dejavu::mark_set del_e;
 
-        tiny_orbit orbit;
+        dejavu::groups::orbit orbit;
 
         std::vector<std::vector<int>> translation_layers;
         std::vector<std::vector<int>> backward_translation_layers;
@@ -70,11 +68,11 @@ namespace sassy {
         int avg_reached_end_of_component = 0;
         double avg_end_of_comp           = 0.0;
 
-        dejavu::work_list_t<std::vector<int>> add_edge_buff;
+        std::vector<std::vector<int>> add_edge_buff;
         dejavu::work_list worklist_deg0;
         dejavu::work_list worklist_deg1;
         dejavu::mark_set add_edge_buff_act;
-        refinement* R1;
+        dejavu::ir::refinement* R1;
 
         dejavu::mark_set touched_color_cache;
         dejavu::work_list touched_color_list_cache;
@@ -206,6 +204,7 @@ namespace sassy {
                 return;
 
             del.reset();
+            int found_match = 0;
 
             coloring test_col;
             g->initialize_coloring(&test_col, colmap);
@@ -223,10 +222,9 @@ namespace sassy {
             }
 
             add_edge_buff_act.reset();
-            add_edge_buff.reset();
-            for (int i = 0; i < g->v_size; ++i)
-                add_edge_buff.push_back(
-                        std::vector<int>()); // could do this smarter... i know how many edges end up here
+            //add_edge_buff.reserve(g->v_size);
+            //for (int i = 0; i < g->v_size; ++i)
+             //   add_edge_buff.emplace_back(); // could do this smarter... i know how many edges end up here
 
             for (int i = 0; i < g->v_size;) {
                 const int test_v = test_col.lab[i];
@@ -278,6 +276,7 @@ namespace sassy {
                             }
 
                             if (check_if_match) {
+                                found_match += test_col.ptn[i] + 1;
                                 for (int f = 0; f < test_col.ptn[i] + 1; ++f) {
                                     const int _test_v = test_col.lab[i + f];
                                     del.set(_test_v);
@@ -334,6 +333,8 @@ namespace sassy {
 
                         touched_color_cache.set(col_n1);
                         touched_color_cache.set(col_n2);
+
+                        found_match += test_col.ptn[i] + 1;
 
                         //const size_t debug_str_sz = recovery_strings[translate_back(test_v)].size();
 
@@ -2240,6 +2241,49 @@ namespace sassy {
             return {cell, hint};
         }
 
+
+        unsigned long* invariant_acc = nullptr;
+        dejavu::mark_set*  internal_touched_color;
+        dejavu::work_list* internal_touched_color_list;
+        std::function<dejavu::ir::type_split_color_hook> my_split_hook;
+
+        bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
+            // record colors that were changed
+            if (!internal_touched_color->get(new_color)) {
+                internal_touched_color->set(new_color);
+                internal_touched_color_list->push_back(new_color);
+            }
+            if (!internal_touched_color->get(old_color)) {
+                internal_touched_color->set(old_color);
+                internal_touched_color_list->push_back(old_color);
+            }
+
+            /*// write singletons to singleton list
+            if (new_color_sz == 1) {
+                singletons.push_back(c->lab[new_color]);
+            }*/
+
+            *invariant_acc = add_to_hash(*invariant_acc, new_color);
+
+            return true;
+        }
+
+        std::function<dejavu::ir::type_split_color_hook> self_split_hook() {
+            return [this](auto && PH1, auto && PH2, auto && PH3) { return
+                    split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                               std::forward<decltype(PH3)>(PH3)); };
+        }
+
+        void refine_coloring(dejavu::sgraph *g, coloring *c, unsigned long* invariant,
+                             int init_color_class, int cell_early, dejavu::mark_set *set_touched_color,
+                             dejavu::work_list *set_touched_color_list) {
+            invariant_acc = invariant;
+            internal_touched_color      = set_touched_color;
+            internal_touched_color_list = set_touched_color_list;
+
+            R1->refine_coloring(g, c, init_color_class, cell_early, my_split_hook);
+        }
+
         // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
         // performs sparse probing for all color classes, but only for 1 individualization
         void sparse_ir_probe(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, selector_type sel_type) {
@@ -2270,6 +2314,7 @@ namespace sassy {
 
             coloring color_cache;
             color_cache.copy(&c1);
+            color_cache.copy_ptn(&c1);
 
             selector S;
             strategy m;
@@ -2277,12 +2322,11 @@ namespace sassy {
 
             dejavu::mark_set  touched_color(g->v_size);
             dejavu::work_list touched_color_list(g->v_size);
+            //touched_color.reset();
+            //touched_color_list.reset();
 
-            invariant I1, I2;
-            I1.only_acc = true;
-            I2.only_acc = true;
-            I1.acc = 0;
-            I2.acc = 0;
+            unsigned long I1 = 0;
+            unsigned long I2 = 0;
 
             bool certify = true;
             S.empty_cache();
@@ -2294,9 +2338,6 @@ namespace sassy {
                     break;
 
                 const int cell_sz = c1.ptn[cell];
-
-                // TODO: but this could work more often? original_c could change after this succeeds once?
-                // TODO: difficulty: original_c and c1 dont match up then
                 bool is_orig_color    = original_c.vertex_to_col[original_c.lab[cell]] == cell;
                 bool is_orig_color_sz = original_c.ptn[cell] == cell_sz;
 
@@ -2315,10 +2356,10 @@ namespace sassy {
                 const int ind_v1 = c1.lab[cell];
                 assert(c1.vertex_to_col[ind_v1] == cell);
                 assert(c1.ptn[cell] > 0);
-                const long acc_prev = I1.acc;
-                I2.acc = acc_prev;
-                I1.acc = acc_prev;
-                const int init_c1 = R1->individualize_vertex(&c1, ind_v1);
+                const unsigned long acc_prev = I1;
+                I2 = acc_prev;
+                I1 = acc_prev;
+                const int init_c1 = dejavu::ir::refinement::individualize_vertex(&c1, ind_v1);
 
                 bool all_certified = true;
 
@@ -2327,7 +2368,9 @@ namespace sassy {
                 touched_color_list.push_back(cell);
                 touched_color_list.push_back(init_c1);
 
-                R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color,
+                                &touched_color_list);
 
                 // color cache to reset c2 back "before" individualization
                 for (int j = 0; j < touched_color_list.cur_pos; ++j) {
@@ -2361,14 +2404,15 @@ namespace sassy {
                     assert(c2.vertex_to_col[ind_v2] == cell);
                     assert(c2.ptn[cell] > 0);
                     assert(c2.ptn[cell] == cell_sz);
-                    I2.acc = acc_prev;
-                    const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
+                    I2 = acc_prev;
+                    const int init_c2 = dejavu::ir::refinement::individualize_vertex(&c2, ind_v2);
                     assert(init_c1 == init_c2);
-                    R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                    //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                    refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,
+                                    &touched_color_list);
 
-                    if (I1.acc != I2.acc) {
-                        if (cell_sz == 1)
-                            individualize_later.push_back(ind_v1);
+                    if (I1 != I2) {
+                        if (cell_sz == 1) individualize_later.push_back(ind_v1);
                         all_certified = false;
                         hard_reset = true;
                         break;
@@ -2427,6 +2471,8 @@ namespace sassy {
                         } else {
                             // can't happen?
                         }
+                    } else {
+                        hard_reset = true;
                     }
 
                     reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
@@ -2435,8 +2481,9 @@ namespace sassy {
                 }
 
                 // reset c2 to c1
+                const int pre_c2_cells = c2.cells;
                 c2.cells = c1.cells;
-                if (c1.cells != g->v_size && !hard_reset) {
+                if (c1.cells != g->v_size && pre_c2_cells != g->v_size && !hard_reset) {
                     for (int j = 0; j < touched_color_list.cur_pos; ++j) {
                         const int _c = touched_color_list[j];
                         int f = 0;
@@ -2480,7 +2527,8 @@ namespace sassy {
                 for (size_t i = 0; i < individualize_later.size(); ++i) {
                     const int ind_vert = individualize_later[i];
                     const int init_c = R1->individualize_vertex(&original_c, ind_vert);
-                    R1->refine_coloring(g, &original_c, &I1, init_c, -1, nullptr, nullptr);
+                    //R1->refine_coloring(g, &original_c, &I1, init_c, -1, nullptr, nullptr);
+                    R1->refine_coloring(g, &original_c, init_c);
                 }
                 for (int i = 0; i < g->v_size; ++i) {
                     colmap[i] = original_c.vertex_to_col[i];
@@ -2992,10 +3040,7 @@ namespace sassy {
                 touched_color.reset();
                 touched_color_list.reset();
 
-                invariant I1, I2, Ivec_wr, Ivec_rd;
-                I1.only_acc = true;
-                I2.only_acc = true;
-                Ivec_wr.create_vector(500);
+                unsigned long I1 = 0, I2 = 0;//, Ivec_wr, Ivec_rd;
 
                 bool certify = true;
                 size_t quotient_component_start_pos = 0;
@@ -3069,8 +3114,8 @@ namespace sassy {
                         touched_color.reset();
                         touched_color_list.reset();
 
-                        I1.acc = 0;
-                        I2.acc = 0;
+                        I1 = 0;
+                        I2 = 0;
 
                         int ind_v1, ind_v2;
 
@@ -3083,21 +3128,23 @@ namespace sassy {
                             touched_color.set(init_c1);
                             touched_color_list.push_back(cell);
                             touched_color_list.push_back(init_c1);
-                            R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                            //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                            refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
 
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
-                            I1.acc = 0;
-                            I2.acc = 0;
+                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
+                            refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
+                            I1 = 0;
+                            I2 = 0;
                         } else {
-                            I1.acc = 1;
+                            I1 = 1;
                         }
-                        if (I1.acc != I2.acc) {
+                        if (I1 != I2) {
                             // could only use component
                             for (int i = 0; i < g->v_size; ++i) {
                                 colmap[i] = c1.vertex_to_col[i];
                             }
-                            I2.acc = I1.acc;
+                            I2 = I1;
                             c2.copy(&c1);
                             continue;
                         }
@@ -3208,8 +3255,9 @@ namespace sassy {
                                 ind_cols.clear();
                                 cell_cnt.clear();
 
-                                Ivec_wr.reset_compare_invariant();
-                                Ivec_wr.reset();
+                                //Ivec_wr.reset_compare_invariant();
+                                //Ivec_wr.reset();
+                                I1 = 0;
 
                                 while (true) {
                                     ++len;
@@ -3233,10 +3281,10 @@ namespace sassy {
                                         touched_color_list.push_back(col);
                                     }
 
-                                    R1->CONFIG_IR_IDLE_SKIP = true;
-
-                                    R1->refine_coloring(g, &c1, &Ivec_wr, init_color_class1, -1, &touched_color,
-                                                        &touched_color_list);
+                                    //R1->refine_coloring(g, &c1, &Ivec_wr, init_color_class1, -1, &touched_color,
+                                    //                    &touched_color_list);
+                                    refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
+                                                    &touched_color_list);
                                     ind_cols.push_back(rpos);
                                     cell_cnt.push_back(c1.cells);
                                     int check;
@@ -3250,20 +3298,19 @@ namespace sassy {
                                         break;
                                 }
 
-                                Ivec_rd.reset_compare_invariant();
-                                Ivec_rd.set_compare_invariant(&Ivec_wr);
+                                //Ivec_rd.reset_compare_invariant();
+                                //Ivec_rd.set_compare_invariant(&Ivec_wr);
+                                I2 = 0;
                                 bool comp = true;
 
                                 for (size_t j = 0; j < ind_cols.size(); ++j) {
                                     const int rpos = ind_cols[j];
                                     const int v2 = c2.lab[rpos];
                                     const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                    comp = comp &&
-                                           R1->refine_coloring(g, &c2, &Ivec_rd, init_color_class2, cell_cnt[j],
+                                    refine_coloring(g, &c2, &I2, init_color_class2, cell_cnt[j],
                                                               &touched_color, &touched_color_list);
-                                    if (!comp)
-                                        break;
                                 }
+                                comp = I1 == I2;
 
                                 if (!comp) {
                                     break;
@@ -3466,7 +3513,7 @@ namespace sassy {
         }
 
         // adds a given automorphism to the orbit structure
-        void add_automorphism_to_orbit(tiny_orbit *orbit, int *automorphism, int nsupp, int *supp) {
+        void add_automorphism_to_orbit(dejavu::groups::orbit *orbit, int *automorphism, int nsupp, int *supp) {
             for (int i = 0; i < nsupp; ++i) {
                 orbit->combine_orbits(automorphism[supp[i]], supp[i]);
             }
@@ -3626,9 +3673,7 @@ namespace sassy {
                 touched_color.reset();
                 touched_color_list.reset();
 
-                invariant I1, I2;
-                I1.only_acc = true;
-                I2.only_acc = true;
+                unsigned long I1 = 0, I2 = 0;
 
                 bool certify = true;
                 int quotient_component_start_pos = 0;
@@ -3674,8 +3719,8 @@ namespace sassy {
                         touched_color.reset();
                         touched_color_list.reset();
 
-                        I1.acc = 0;
-                        I2.acc = 0;
+                        I1 = 0;
+                        I2 = 0;
 
                         const int ind_v1 = c1.lab[cell];
                         const int ind_v2 = c1.lab[cell + 1];
@@ -3687,17 +3732,21 @@ namespace sassy {
                         touched_color_list.push_back(init_c1);
                         assert(cell != init_c1);
 
-                        R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                        //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
+                        refine_coloring(g, &c1, &I1, init_c1, -1,
+                                        &touched_color, &touched_color_list);
 
                         if (c2.ptn[cell] != 0) {
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                            refine_coloring(g, &c2, &I2, init_c2, -1,
+                                            &touched_color, &touched_color_list);
                         } else {
-                            I2.acc = I1.acc + 1;
+                            I2 = I1 + 1;
                         }
 
-                        if (I1.acc != I2.acc) {
-                            I2.acc = I1.acc;
+                        if (I1 != I2) {
+                            I2 = I1;
                             // could use component!
                             c1.copy(&c3);
                             c2.copy(&c3);
@@ -3773,13 +3822,14 @@ namespace sassy {
 
                                 // individualize and test cell + k
                                 const int init_ck = R1->individualize_vertex(&c2, ind_vk);
-                                I2.acc = 0;
-                                R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
+                                I2 = 0;
+                                //R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
+                                refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
                                 reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                                    _automorphism_supp.get_array());
                                 _automorphism_supp.reset();
 
-                                if (I1.acc == I2.acc && c1.cells == c2.cells) {
+                                if (I1 == I2 && c1.cells == c2.cells) {
                                     if (c1.cells !=
                                         g->v_size) { // touched_colors doesn't work properly when early-out is used
                                         // read automorphism
@@ -3864,9 +3914,10 @@ namespace sassy {
                             reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
                                                                quotient_component_end_pos_v);
 
-                            I2.acc = 0;
+                            I2 = 0;
                             const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
+                            refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
 
                             int num_inds = 0;
                             // int touched_start_pos = 0;
@@ -3904,8 +3955,10 @@ namespace sassy {
                                     touched_color_list_cache.push_back(col);
                                 }
 
-                                R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color_cache,
-                                                    &touched_color_list_cache);
+                                //R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color_cache,
+                                //                    &touched_color_list_cache);
+                                refine_coloring(g, &c1, &I1, init_color_class1, -1,
+                                                &touched_color_cache,&touched_color_list_cache);
 
 
                                 ind_cols.push_back(col);
@@ -3914,13 +3967,15 @@ namespace sassy {
                                 //const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
                                 const int v2 = c2.lab[rpos];
                                 if (c2.ptn[col] == 0) {
-                                    I2.acc = I1.acc + 1;
+                                    I2 = I1 + 1;
                                     certify = false;
                                     break;
                                 }
                                 const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
-                                                    &touched_color_list_cache);
+                                //R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
+                                //                    &touched_color_list_cache);
+                                refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
+                                                &touched_color_list_cache);
 
                                 if (c1.cells == g->v_size) {
                                     for (int _i = quotient_component_start_pos_v;
@@ -4049,8 +4104,9 @@ namespace sassy {
                                         touched_color.set(init_ck);
                                         touched_color_list.push_back(init_ck);
                                     }
-                                    I2.acc = 0;
-                                    R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
+                                    I2 = 0;
+                                    //R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
+                                    refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
                                     reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                                        _automorphism_supp.get_array());
                                     _automorphism_supp.reset();
@@ -4083,7 +4139,7 @@ namespace sassy {
                                             const int rpos =
                                                     col + (0 % (c2.ptn[col] + 1));
                                             if (c2.ptn[col] == 0) {
-                                                I2.acc = I1.acc + 1;
+                                                I2 = I1 + 1;
                                                 break;
                                             }
                                             const int v2 = c2.lab[rpos];
@@ -4096,14 +4152,16 @@ namespace sassy {
                                                 touched_color.set(col);
                                                 touched_color_list.push_back(col);
                                             }
-                                            R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color,
-                                                               &touched_color_list); // cell_cnt[repeat_num_inds]
+                                            //R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color,
+                                            //                   &touched_color_list); // cell_cnt[repeat_num_inds]
+                                            refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color,
+                                                            &touched_color_list);
                                             ++repeat_num_inds;
                                         }
 
                                         should_add_ind = false;
 
-                                        if (I1.acc == I2.acc && c1.cells == c2.cells) {
+                                        if (I1 == I2 && c1.cells == c2.cells) {
                                             for (int j = 0; j <
                                                             touched_color_list.cur_pos; ++j) { // check the singleton automorphism
                                                 const int _c = touched_color_list[j];
@@ -4141,8 +4199,10 @@ namespace sassy {
                                             const int rpos = col + (0 % (c1.ptn[col] + 1));
                                             const int v1 = c1.lab[rpos];
                                             const int init_color_class1 = R1->individualize_vertex(&c1, v1);
-                                            R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
-                                                                &touched_color_list);
+                                            //R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
+                                            //                    &touched_color_list);
+                                            refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
+                                                            &touched_color_list);
 
                                             ind_cols.push_back(col);
                                             cell_cnt.push_back(c1.cells);
@@ -4196,12 +4256,13 @@ namespace sassy {
 
                             if (certify) {
                                 // int f = 0;
-                                I1.acc = 0;
+                                I1 = 0;
                                 assert(touched_color.get(c3.vertex_to_col[ind_v1]));
                                 const int init_c3 = R1->individualize_vertex(&c3, ind_v1);
                                 assert(touched_color.get(init_c3));
                                 [[maybe_unused]] const int touched_col_prev = touched_color_list.cur_pos;
-                                R1->refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
+                                //R1->refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
+                                refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
                                 assert(touched_col_prev == touched_color_list.cur_pos);
 
                                 assert(touched_color_list.cur_pos <=
@@ -4600,9 +4661,7 @@ namespace sassy {
             const int pre_e_size = g->e_size;
             const int pre_cells  = c.cells;
 
-            refinement R_stack = refinement();
-            R_stack.CONFIG_IR_IDLE_SKIP = CONFIG_IR_IDLE_SKIP;
-            R_stack.CONFIG_IR_REFINE_EARLYOUT_LATE = CONFIG_IR_REFINE_EARLYOUT_LATE;
+            dejavu::ir::refinement R_stack = dejavu::ir::refinement();
             R1 = &R_stack;
             R1->refine_coloring_first(g, &c, -1);
 
@@ -4616,9 +4675,11 @@ namespace sassy {
             }
 
             int deg0, deg1, deg2;
-            add_edge_buff.allocate(domain_size);
+            //add_edge_buff.allocate(domain_size);
+            add_edge_buff.clear();
+            add_edge_buff.reserve(domain_size);
             for (int i = 0; i < domain_size; ++i)
-                add_edge_buff.push_back(std::vector<int>()); // do this smarter... i know how many edges end up here
+                add_edge_buff.emplace_back(); // do this smarter... i know how many edges end up here
             add_edge_buff_act.initialize(domain_size);
 
             translate_layer_fwd.reserve(g->v_size);
@@ -4683,6 +4744,8 @@ namespace sassy {
             PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
+
+            my_split_hook = self_split_hook();
 
             if (schedule != nullptr) {
                 del_e = dejavu::mark_set();

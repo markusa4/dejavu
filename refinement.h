@@ -158,9 +158,7 @@ namespace dejavu {
          */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                                  const std::function<type_split_color_hook> &split_hook = nullptr,
-                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr
-                    //,const std::function<type_additional_info_hook>& write_to_trace = nullptr
-            ) {
+                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
                 singleton_hint.reset();
                 assure_initialized(g);
 
@@ -195,14 +193,16 @@ namespace dejavu {
                         continue;
                     }
 
-                    bool dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+                    const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
-                    if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
+                    // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
+                    // we choose a separate algorithm depending on the size and density of the graph and/or color class
+                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
                         // singleton
                         refine_color_class_singleton(g, c, next_color_class,&color_class_splits);
                     } else if (g->dense) {
-                        if (dense_dense) { // dense-dense
-                            refine_color_class_dense_dense(g, c, next_color_class, next_color_class_sz,
+                        if (very_dense) { // dense-dense
+                            refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz,
                                                            &color_class_splits);
                         } else { // dense-sparse
                             refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
@@ -435,7 +435,7 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph
-            bool __attribute__ ((noinline)) certify_automorphism(sgraph *g, const int *p) {
+            bool certify_automorphism(sgraph *g, const int *p) {
                 int i, found;
 
                 assure_initialized(g);
@@ -604,6 +604,53 @@ assert(c->cells == actual_cells);
             }
 
             // certify an automorphism on a graph, sparse, report on which vertex failed
+            std::pair<bool, int>
+            certify_automorphism_sparse_report_fail(const dejavu::sgraph *g, const int *colmap,
+                                                    const int *p, int supp, const int *supp_arr) {
+                int i, found;
+
+                assure_initialized(g);
+
+                //for(i = 0; i < g->v_size; ++i) {
+                for (int f = 0; f < supp; ++f) {
+                    i = supp_arr[f];
+                    const int image_i = p[i];
+                    if (image_i == i)
+                        continue;
+                    if (g->d[i] != g->d[image_i]) // degrees must be equal
+                        return std::pair<bool, int>(false, -1);
+                    if (colmap[i] != colmap[image_i]) // colors must be equal
+                        return std::pair<bool, int>(false, -1);
+
+                    scratch_set.reset();
+                    // automorphism must preserve neighbours
+                    found = 0;
+                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                        const int vertex_j = g->e[j];
+                        const int image_j = p[vertex_j];
+                        if (colmap[vertex_j] != colmap[image_j])
+                            return std::pair<bool, int>(false, i);
+                        scratch_set.set(image_j);
+                        //scratch[image_j] = vertex_j;
+                        found += 1;
+                    }
+                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                        const int vertex_j = g->e[j];
+                        if (!scratch_set.get(vertex_j)) {
+                            return std::pair<bool, int>(false, i);
+                        }
+                        scratch_set.unset(vertex_j);
+                        found -= 1;
+                    }
+                    if (found != 0) {
+                        return std::pair<bool, int>(false, i);
+                    }
+                }
+
+                return std::pair<bool, int>(true, -1);
+            }
+
+            // certify an automorphism on a graph, sparse, report on which vertex failed
             std::tuple<bool, int, int>
             certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int*, const int *p, int supp,
                                                            const int *supp_arr, int pos_start) {
@@ -699,7 +746,7 @@ assert(c->cells == actual_cells);
 
                     vertex_worklist.allocate(n * 2);
                     //singletons.initialize(n);
-                    //singleton_hint.allocate(n);
+                    singleton_hint.allocate(n);
                     old_color_classes.allocate(n);
                     neighbours.initialize(n);
                     neighbour_sizes.initialize(n);
@@ -719,7 +766,7 @@ assert(c->cells == actual_cells);
             }
 
             bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
-                                           work_list_pair_bool *color_class_split_worklist) {
+                                           work_list_pair_bool *report_splits) {
                 // for all vertices of the color class...
                 bool comp, mark_as_largest;
                 int i, j, cc, end_cc, largest_color_class_size, acc;
@@ -831,7 +878,7 @@ assert(c->cells == actual_cells);
                         mark_as_largest = largest_color_class_size < (ptn[i] + 1);
                         largest_color_class_size = mark_as_largest ? (ptn[i] + 1) : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(_col, i), mark_as_largest));
 
                         i += ptn[i] + 1;
@@ -844,9 +891,8 @@ assert(c->cells == actual_cells);
                 return comp;
             }
 
-            bool refine_color_class_dense(sgraph *g, coloring *c,
-                                          int color_class, int class_size,
-                                          work_list_pair_bool *color_class_split_worklist) {
+            bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size,
+                                          work_list_pair_bool *report_splits) {
                 bool comp;
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
@@ -979,7 +1025,7 @@ assert(c->cells == actual_cells);
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
                         largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(col, i), mark_as_largest));
                         if (v_color != 0)
                             c->ptn[v_color - 1] = 0;
@@ -992,7 +1038,7 @@ assert(c->cells == actual_cells);
 
             bool refine_color_class_dense_dense(sgraph *g, coloring *c,
                                                 int color_class, int class_size,
-                                                work_list_pair_bool *color_class_split_worklist) {
+                                                work_list_pair_bool *report_splits) {
                 bool comp;
                 int i, j, acc, cc, largest_color_class_size;
                 cc = color_class; // iterate over color class
@@ -1097,7 +1143,7 @@ assert(c->cells == actual_cells);
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
                         largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(col, i), mark_as_largest));
                         if (v_color != 0)
                             c->ptn[v_color - 1] = 0;
@@ -1109,10 +1155,8 @@ assert(c->cells == actual_cells);
                 return comp;
             }
 
-            void refine_color_class_singleton(sgraph *g, coloring *c,
-                                              int color_class, work_list_pair_bool *color_class_split_worklist
-                    //,const std::function<type_additional_info_hook>& write_to_trace = nullptr
-            ) {
+            void refine_color_class_singleton(sgraph *g, coloring *c, int color_class,
+                                              work_list_pair_bool *report_splits) {
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
 
@@ -1204,11 +1248,11 @@ assert(c->cells == actual_cells);
                     assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
                     assert(c->vertex_to_col[c->lab[deg1_col]] == deg1_col);
 
-                    // add new classes to color_class_split_worklist
+                    // add new classes to report_splits
                     const bool leq = deg1_col_sz > deg0_col_sz;
-                    color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg0_col), !leq));
-                    color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg1_col), leq));
 
                     // reset neighbours count to -1
@@ -1216,8 +1260,8 @@ assert(c->cells == actual_cells);
                 }
             }
 
-            bool refine_color_class_singleton_first(sgraph *g, coloring *c,
-                                                    int color_class, work_list_pair_bool *color_class_split_worklist) {
+            bool refine_color_class_singleton_first(sgraph *g, coloring *c, int color_class,
+                                                    work_list_pair_bool *report_splits) {
                 bool comp;
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
@@ -1287,11 +1331,11 @@ assert(c->cells == actual_cells);
                         deg1_read_pos--;
                     }
 
-                    // add new classes to color_class_split_worklist
+                    // add new classes to report_splits
                     const bool leq = deg1_col_sz > deg0_col_sz;
-                    color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg0_col), !leq));
-                    color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg1_col), leq));
 
                     // reset neighbours count to -1
@@ -1303,7 +1347,7 @@ assert(c->cells == actual_cells);
 
             bool refine_color_class_dense_first(sgraph *g, coloring *c,
                                                 int color_class, int class_size,
-                                                work_list_pair_bool *color_class_split_worklist) {
+                                                work_list_pair_bool *report_splits) {
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
 
@@ -1407,7 +1451,7 @@ assert(c->cells == actual_cells);
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
                         largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(col, i), mark_as_largest));
                         if (v_color != 0)
                             c->ptn[v_color - 1] = 0;
@@ -1420,7 +1464,7 @@ assert(c->cells == actual_cells);
 
             bool refine_color_class_dense_dense_first(sgraph *g, coloring *c,
                                                       int color_class, int class_size,
-                                                      work_list_pair_bool *color_class_split_worklist) {
+                                                      work_list_pair_bool *report_splits) {
                 // for all vertices of the color class...
                 int i, j, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
@@ -1514,7 +1558,7 @@ assert(c->cells == actual_cells);
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
                         largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(col, i), mark_as_largest));
                         if (v_color != 0)
                             c->ptn[v_color - 1] = 0;
@@ -1528,7 +1572,7 @@ assert(c->cells == actual_cells);
 
             bool refine_color_class_sparse_first(sgraph *g, coloring *c,
                                                  int color_class, int class_size,
-                                                 work_list_pair_bool *color_class_split_worklist) {
+                                                 work_list_pair_bool *report_splits) {
                 bool comp;
                 int v_new_color, cc, largest_color_class_size, acc;
 
@@ -1645,7 +1689,7 @@ assert(c->cells == actual_cells);
                         const bool mark_as_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = mark_as_largest ? (c->ptn[i] + 1) : largest_color_class_size;
 
-                        color_class_split_worklist->push_back(std::pair<std::pair<int, int>, bool>(
+                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                                 std::pair<int, int>(_col, i), mark_as_largest));
                         if (i != 0)
                             c->ptn[i - 1] = 0;

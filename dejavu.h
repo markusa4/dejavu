@@ -8,7 +8,7 @@
 #include "dfs.h"
 #include "bfs.h"
 #include "rand.h"
-#include "sassy/preprocessor.h"
+#include "preprocess.h"
 #include "inprocess.h"
 
 // structures for testing

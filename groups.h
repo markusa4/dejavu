@@ -869,7 +869,7 @@ namespace dejavu {
              */
             void initialize(const int fixed_vertex, const int new_level, const int new_sz_upb) {
                 assert(fixed_vertex >= 0);
-                assert(level >= 0);
+                assert(new_level >= 0);
                 fixed = fixed_vertex;
                 this->level  = new_level;
                 this->sz_upb = new_sz_upb;
@@ -972,7 +972,7 @@ namespace dejavu {
             int finished_up_to = -1;
 
             generating_set generators;
-            work_list_t<shared_transversal *> transversals;
+            std::vector<shared_transversal *> transversals;
 
             bool init = false;
 
@@ -1009,10 +1009,11 @@ namespace dejavu {
                 domain_size = new_domain_size;
                 assert(this->domain_size > 0);
                 generators.initialize(domain_size);
-                transversals.allocate(stop);
-                transversals.set_size(stop);
+                transversals.reserve(stop);
+                //transversals.set_size(stop);
                 for (int i = 0; i < stop; ++i) {
-                    transversals[i] = new shared_transversal();
+                    transversals.push_back(new shared_transversal());
+                    //transversals[i] = new shared_transversal();
                     transversals[i]->initialize(base[i], i, base_sizes[i]);
                 }
                 init = true;
@@ -1029,11 +1030,11 @@ namespace dejavu {
             bool reset(int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
                        std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
+                const int old_size = transversals.size();
                 if(!init) {
                     initialize(new_domain_size, new_base, new_base_sizes, stop);
                     return false;
                 }
-                const int old_size = transversals.size();
                 const int new_size = stop;
 
                 // compare with stored base, keep whatever is possible
@@ -1052,7 +1053,7 @@ namespace dejavu {
                 finished_up_to = -1;
 
                 transversals.resize(new_size);
-                transversals.set_size(new_size);
+                //transversals.set_size(new_size);
 
 
                 for(int i = 0; i < keep_until; ++i) {
