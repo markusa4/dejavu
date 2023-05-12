@@ -42,7 +42,7 @@ namespace sassy {
             front_pos = (front_pos + 1) % arr_sz;
         }
 
-        bool empty() {
+        [[nodiscard]] bool empty() const {
             return (front_pos == back_pos);
         }
 

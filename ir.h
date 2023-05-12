@@ -650,6 +650,8 @@ namespace dejavu {
             mark_set test_set;
             std::vector<int> candidates;
 
+            big_number ir_tree_size_estimate;;
+
             int color_score(sgraph *g, controller *state, int color) {
                 test_set.reset();
                 const int v = state->get_coloring()->lab[color];
@@ -706,6 +708,10 @@ namespace dejavu {
                 return &dynamic_seletor;
             }
 
+            big_number get_ir_size_estimate() {
+                return ir_tree_size_estimate;
+            }
+
             void find_base(sgraph *g, controller *state, const int h_choose) {
                 switch(h_choose % 3) {
                     case 0:
@@ -717,6 +723,12 @@ namespace dejavu {
                     case 2:
                         find_small_optimized_base(g, state);
                         break;
+                }
+
+                ir_tree_size_estimate.mantissa = 1.0;
+                ir_tree_size_estimate.exponent = 0;
+                for(auto col_sz : state->base_color_sz) {
+                    ir_tree_size_estimate.multiply(col_sz);
                 }
             }
             /**

@@ -103,6 +103,7 @@ namespace dejavu {
                                              *  case where all searchable bases became much larger due to BFS or other
                                              *  changes */
             bool s_last_bfs_pruned = false; /*< keep track of whether last BFS calculation pruned some nodes */
+            big_number s_last_tree_sz;
 
             // some data we want to keep track of
             std::vector<int> base;       /*< current base of vertices       */
@@ -148,6 +149,7 @@ namespace dejavu {
             while (true) {
                 // "Dry land is not a myth, I've seen it!"
                 const bool s_hard = h_budget > 10000; /* graph is "hard" */
+                const bool s_easy = s_restarts == -1; /* graph is "easy" */
 
                 ++s_restarts; /*< increase the restart counter */
                 if(s_restarts > 0) {
@@ -178,19 +180,24 @@ namespace dejavu {
                 s_few_cells  = root_save.get_coloring()->cells <= 2;                  /*< "few"  cells in initial  */
                 s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial  */
 
+                const bool s_same_length     = base_size == s_last_base_size;
+
                 const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                 const bool s_too_long_long   = s_long_base && (base_size >  1.25 * s_last_base_size);
                 const bool s_too_long_hard   = s_hard && !s_inprocessed && (base_size > s_last_base_size);
                 const bool s_too_long        = s_too_long_anyway || s_too_long_long || s_too_long_hard;
 
+                const bool s_too_big         = s_same_length && (s_last_tree_sz < m_selectors.get_ir_size_estimate());
+
                 // immediately discard this base if deemed too large, unless we are discarding too often
-                if (s_too_long && s_inproc_success < 2 && s_consecutive_discard < 3) {
+                if ((s_too_big || s_too_long) && s_inproc_success < 2 && s_consecutive_discard < 3) {
                     progress_print("skip", local_state.s_base_pos,s_last_base_size);
                     ++s_consecutive_discard;
                     continue;
                 }
                 s_consecutive_discard = 0;    /*< reset counter since we are not discarding this one   */
                 s_last_base_size = base_size; /*< also reset `s_last_base_size` to current `base_size` */
+                s_last_tree_sz = m_selectors.get_ir_size_estimate();
 
                 // make snapshot of trace and leaf, used by following search strategies
                 local_state.compare_to_this();
@@ -265,7 +272,10 @@ namespace dejavu {
                         s_path_fail1_avg    = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
                         s_trace_cost1_avg   = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
                     }
-                    double s_bfs_cost_estimate = s_trace_cost1_avg * s_bfs_next_level_nodes;
+                    const double reset_cost_rand = g->v_size;
+                    const double reset_cost_bfs  = std::min(s_trace_cost1_avg, (double) g->v_size);
+                    double s_bfs_cost_estimate  = (s_trace_cost1_avg        + reset_cost_bfs) * (s_bfs_next_level_nodes);
+                    double s_rand_cost_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now ;
 
                     const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
 
@@ -279,8 +289,8 @@ namespace dejavu {
                         // BFS is, to then make an informed decision of what to do next
 
                         // we do so by negatively scoring each method: higher score, worse technique
-                        // TODO should this use s_random_path_trace_cost?
-                        double score_rand = s_trace_full_cost * h_rand_fail_lim_now * (1-m_rand.s_rolling_success);
+                        //double score_rand = s_trace_full_cost * h_rand_fail_lim_now * (1-m_rand.s_rolling_success);
+                        double score_rand = s_rand_cost_estimate * (1-m_rand.s_rolling_success);
                         double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
 
                         // we make some adjustments to try to model effect of techniques better
@@ -300,14 +310,17 @@ namespace dejavu {
                     }
 
                     // we override the above decisions in specific cases...
+                    if(h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1-s_path_fail1_avg) > 2*h_budget)
+                            h_next_routine = restart; /* best decision would be BFS, but it would exceed the budget a
+                                                       * lot! */
                     if(s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
                     if(s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                        s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
                         h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
 
-                    // ... unless we are "almost done"... then we stretch the budget!
+                    // ... but if we are "almost done" with random search... we stretch the budget and continue!
                     if(search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
-                    if(m_rand.s_rolling_success > 0.1 && s_cost <= h_budget * 2)   h_next_routine = random_ir;
+                    if(m_rand.s_rolling_success > 0.1 && s_cost <= h_budget * 4)   h_next_routine = random_ir;
                     if(s_hard && m_rand.s_succeed >= 1 && s_cost <= h_budget * 10) h_next_routine = random_ir;
 
                     // immediately inprocess if BFS was successful in pruning on the first level
@@ -317,6 +330,7 @@ namespace dejavu {
                         case random_ir: {
                             h_rand_fail_lim_total += h_rand_fail_lim_now;
                             m_rand.setup(h_look_close); // TODO: look_close does not seem worth it
+                            m_rand.h_sift_random = !s_easy;
 
                             if (sh_tree->get_finished_up_to() == 0) {
                                 // random automorphisms, single origin
