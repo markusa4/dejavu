@@ -1174,7 +1174,8 @@ namespace dejavu {
                         for(auto node : tree_data_jump_map[j]) {
                             //node->get_parent()->add_hash(node->get_hash() + 1);
                             const int v = node->get_save()->get_base()[0];
-                            node_invariant[v] += 1;//+node->get_hash();
+                            //node_invariant[v] += 1;//+node->get_hash();
+                            node_invariant[v] += hash(j);
                         }
                     }
                     /*for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {

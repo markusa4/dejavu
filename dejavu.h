@@ -188,10 +188,11 @@ namespace dejavu {
                 const bool s_too_long_hard   = s_hard && !s_inprocessed && (base_size > s_last_base_size);
                 const bool s_too_long        = s_too_long_anyway || s_too_long_long || s_too_long_hard;
 
-                const bool s_too_big         = s_same_length && (s_last_tree_sz < m_selectors.get_ir_size_estimate());
+                const bool s_too_big         = s_short_base && s_same_length &&
+                                               (s_last_tree_sz < m_selectors.get_ir_size_estimate());
 
                 // immediately discard this base if deemed too large, unless we are discarding too often
-                if ((s_too_big || s_too_long) && s_inproc_success < 2 && s_consecutive_discard < 3) {
+                if ((s_too_big || s_too_long) && s_inproc_success < 1 && s_consecutive_discard < 3) {
                     progress_print("skip", local_state.s_base_pos,s_last_base_size);
                     ++s_consecutive_discard;
                     continue;
@@ -326,6 +327,8 @@ namespace dejavu {
 
                     // immediately inprocess if BFS was successful in pruning on the first level
                     if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;
+                    if(sh_tree->get_finished_up_to() > 1 && sh_tree->get_current_level_size() < base_sizes[0])
+                        h_next_routine = restart;
 
                     switch(h_next_routine) {
                         case random_ir: {
@@ -402,7 +405,8 @@ namespace dejavu {
                 }
 
                 // we are restarting -- so we try to inprocess using the gathered data
-                s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save);
+                s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save,
+                                                      h_budget);
                 s_inproc_success += s_inprocessed;
 
                 // edge case where inprocessing might finish the graph

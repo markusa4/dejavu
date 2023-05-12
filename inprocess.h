@@ -39,7 +39,7 @@ namespace dejavu::search_strategy {
         std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing      */
 
         bool inprocess(sgraph *g, ir::shared_tree *tree, groups::shared_schreier *group, ir::controller &local_state,
-                       ir::limited_save &root_save) {
+                       ir::limited_save &root_save, int budget) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/
@@ -75,10 +75,9 @@ namespace dejavu::search_strategy {
                 }
             }
 
-
-            /*if (tree->get_finished_up_to() > 2 || cell_prev != local_state.c->cells) { // did we do BFS?
+            // A stronger invariant from the BFS tree
+            /*if (tree->get_finished_up_to() >= 2 || cell_prev != local_state.c->cells) {
                 const int cell_prev_inv = local_state.get_coloring()->cells;
-                // TODO: hashing actually makes this worse!
                 work_list hash(g->v_size);
                 std::vector<unsigned long> new_invariant;
                 new_invariant.reserve(g->v_size);
@@ -100,6 +99,8 @@ namespace dejavu::search_strategy {
                 //}
 
                 const int level = tree->get_finished_up_to();
+                const int level_sz = tree->get_level_size(level);
+                const int degree = g->d[0];
                 //auto test_node = tree->pick_node_from_level(level, 0);
                 //auto test_node_save = test_node->get_save();
                 auto test_node_save = &root_save;
@@ -114,13 +115,15 @@ namespace dejavu::search_strategy {
                     i += col_sz + 1;
                 }
 
-                if(smallest_non_trivial_color >= 0 && smallest_non_trivial_color_sz < g->v_size) {
+                if(smallest_non_trivial_color >= 0 && level_sz * degree < budget && smallest_non_trivial_color_sz < g->v_size) {
                     std::cout << smallest_non_trivial_color_sz << std::endl;
-                    for (int i = 0; i < tree->get_level_size(level); ++i) {
+                    for (int i = 0; i < level_sz; ++i) {
                         auto node = tree->pick_node_from_level(level, i);
                         auto node_save = node->get_save();
-                        for (int j = 0; j < smallest_non_trivial_color_sz + 1; ++j) {
-                            const int v = root_save.get_coloring()->lab[smallest_non_trivial_color + j];
+                        //for (int j = 0; j < smallest_non_trivial_color_sz + 1; ++j) {
+                            //const int v = root_save.get_coloring()->lab[smallest_non_trivial_color + j];
+                        for (int j = 0; j < g->v_size; ++j) {
+                            const int v = j;
                             auto inv = invariant_path2(g, node_save->get_coloring(), v);
                             new_invariant[v] += inv;
                         }
