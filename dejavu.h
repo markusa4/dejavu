@@ -80,7 +80,7 @@ namespace dejavu {
             hook = &dhook; /*< change hook to sassy hook*/
 
             // print that we are solving now...
-            PRINT(std::endl << "solving..." << std::endl);
+            PRINT("\nsolving...");
             progress_print_header();
 
             // flag to denote which color refinement version is used

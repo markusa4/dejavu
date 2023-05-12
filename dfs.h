@@ -31,8 +31,7 @@ namespace dejavu {
          */
         class dfs_ir {
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
-
-            groups::automorphism_workspace* ws_automorphism;
+            groups::automorphism_workspace* ws_automorphism = nullptr;
 
         public:
             enum termination_reason {r_none, r_fail, r_cost};

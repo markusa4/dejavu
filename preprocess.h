@@ -5,12 +5,193 @@
 #define SASSY_VERSION_MINOR 1
 
 #include "graph.h"
-#include "selector.h"
 #include <vector>
 #include <iomanip>
 #include <ctime>
 
 namespace sassy {
+    // ring queue for pairs of integers
+    class ring_pair {
+        std::pair<int, int> *arr = 0;
+        bool init = false;
+        int arr_sz = -1;
+        int front_pos = -1;
+        int back_pos = -1;
+
+    public:
+        void initialize(int size) {
+            if(init)
+                delete[] arr;
+            arr = new std::pair<int, int>[size];
+            arr_sz = size;
+            back_pos = 0;
+            front_pos = 0;
+            init = true;
+        }
+
+        void push_back(std::pair<int, int> value) {
+            arr[back_pos] = value;
+            back_pos = (back_pos + 1) % arr_sz;
+        }
+
+        std::pair<int, int> *front() {
+            return &arr[front_pos];
+        }
+
+        void pop() {
+            front_pos = (front_pos + 1) % arr_sz;
+        }
+
+        bool empty() {
+            return (front_pos == back_pos);
+        }
+
+        ~ring_pair() {
+            if (init)
+                delete[] arr;
+        }
+
+        void reset() {
+            front_pos = back_pos;
+        }
+    };
+
+    enum selector_type {
+        SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM
+    };
+
+    class selector {
+        int skipstart = 0;
+        int hint = -1;
+        int hint_sz = -1;
+
+        ring_pair largest_cache;
+        dejavu::ds::work_list non_trivial_list;
+        int init = false;
+
+    public:
+        int seeded_select_color(coloring *c, int seed) {
+            std::vector<int> cells;
+            for (int i = 0; i < c->ptn_sz;) {
+                if (c->ptn[i] > 0) {
+                    cells.push_back(i);
+                }
+                i += c->ptn[i] + 1;
+            }
+            if (cells.size() == 0) {
+                return -1;
+            } else {
+                int target_cell = seed % cells.size();
+                return cells[target_cell];
+            }
+        }
+
+        int select_color_largest(coloring *c) {
+            if (!init) {
+                largest_cache.initialize(c->lab_sz);
+                non_trivial_list.allocate(c->lab_sz);
+                init = true;
+            }
+
+            while (!largest_cache.empty()) {
+                std::pair<int, int> *elem = largest_cache.front();
+                if (c->ptn[elem->first] == elem->second) {
+                    assert(c->ptn[elem->first] > 0);
+                    return elem->first;
+                }
+                largest_cache.pop();
+            }
+
+            int largest_cell = -1;
+            int largest_cell_sz = -1;
+            bool only_trivial = true;
+
+            assert(skipstart < c->ptn_sz);
+            for (int i = skipstart; i < c->ptn_sz;) {
+                assert(c->vertex_to_col[c->lab[i]] == i);
+                assert(i < c->ptn_sz);
+                if (c->ptn[i] != 0 && only_trivial) {
+                    skipstart = i;
+                    only_trivial = false;
+                }
+                if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
+                    largest_cell = i;
+                    largest_cell_sz = c->ptn[i];
+                    largest_cache.reset();
+                    largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
+                } else if (c->ptn[i] == largest_cell_sz) {
+                    largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
+                }
+
+                i += c->ptn[i] + 1;
+            }
+            assert(c->ptn[largest_cell] > 0);
+            return largest_cell;
+        }
+
+        int select_color_smallest(coloring *c) {
+            int smallest_cell = -1;
+            int smallest_cell_sz = c->lab_sz + 1;
+            bool only_trivial = true;
+            for (int i = skipstart; i < c->ptn_sz; i += c->ptn[i] + 1) {
+                if (c->ptn[i] != 0) {
+                    if (only_trivial) {
+                        skipstart = i;
+                        only_trivial = false;
+                    }
+                    if ((c->ptn[i] + 1) < smallest_cell_sz) {
+                        smallest_cell = i;
+                        smallest_cell_sz = (c->ptn[i] + 1);
+                        if (smallest_cell_sz == 2) {
+                            break;
+                        }
+                    }
+                }
+            }
+            return smallest_cell;
+        }
+
+        int select_color_first(coloring *c) {
+            int first_cell = -1;
+
+            for (int i = skipstart; i < c->ptn_sz;) {
+                if (c->ptn[i] > 0) {
+                    skipstart = i;
+                    first_cell = i;
+                    break;
+                }
+                i += c->ptn[i] + 1;
+            }
+            return first_cell;
+        }
+
+        void empty_cache() {
+            skipstart = 0;
+            hint = -1;
+            hint_sz = -1;
+            largest_cache.reset();
+        }
+
+        int
+        select_color_dynamic(dejavu::sgraph *g, coloring *c, selector_type cell_selector_type) {
+            if (c->cells == g->v_size)
+                return -1;
+            switch (cell_selector_type) {
+                case SELECTOR_RANDOM:
+                    return seeded_select_color(c, 0);
+                case SELECTOR_LARGEST:
+                    return select_color_largest(c);
+                case SELECTOR_SMALLEST:
+                    return select_color_smallest(c);
+                case SELECTOR_TRACES:
+                    return select_color_largest(c);
+                case SELECTOR_FIRST:
+                default:
+                    return select_color_first(c);
+            }
+        }
+    };
+
     class preprocessor;
     thread_local preprocessor* save_preprocessor;
 
@@ -2247,21 +2428,17 @@ namespace sassy {
         dejavu::work_list* internal_touched_color_list;
         std::function<dejavu::ir::type_split_color_hook> my_split_hook;
 
-        bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
+        bool split_hook(const int old_color, const int new_color, const int) {
             // record colors that were changed
             if (!internal_touched_color->get(new_color)) {
                 internal_touched_color->set(new_color);
                 internal_touched_color_list->push_back(new_color);
             }
+
             if (!internal_touched_color->get(old_color)) {
                 internal_touched_color->set(old_color);
                 internal_touched_color_list->push_back(old_color);
             }
-
-            /*// write singletons to singleton list
-            if (new_color_sz == 1) {
-                singletons.push_back(c->lab[new_color]);
-            }*/
 
             *invariant_acc = add_to_hash(*invariant_acc, new_color);
 
@@ -2318,10 +2495,10 @@ namespace sassy {
 
             selector S;
 
-            dejavu::mark_set  touched_color(g->v_size);
-            dejavu::work_list touched_color_list(g->v_size);
-            //touched_color.reset();
-            //touched_color_list.reset();
+            //dejavu::mark_set  touched_color(g->v_size);
+            //dejavu::work_list touched_color_list(g->v_size);
+            touched_color.reset();
+            touched_color_list.reset();
 
             unsigned long I1 = 0;
             unsigned long I2 = 0;
@@ -3029,7 +3206,7 @@ namespace sassy {
                 }
 
                 if (quotient_component_touched_swap.size() < 2) {
-                    break; // added this
+                    //break; // added this
                     ++penalty;
                 }
                 if (quotient_component_touched_swap.size() < 3)
@@ -4755,9 +4932,10 @@ namespace sassy {
                     }
                     preop next_op = (*schedule)[pc];
                     const int pre_v = g->v_size;
+                    const int pre_e = g->e_size;
                     switch (next_op) {
                         case preop::deg01: {
-                            if(!has_deg_0 && !has_deg_1 && !graph_changed) break;
+                            if(!has_deg_0 && !has_deg_1 && !has_discrete && !graph_changed) break;
                             red_deg10_assume_cref(g, colmap, hook);
                             perform_del(g, colmap);
                             //PRINT("(prep-red) after 01 reduction (G, E) " << g->v_size << ", " << g->e_size);
@@ -4894,7 +5072,7 @@ namespace sassy {
                             break;
                         }
                     }
-                    graph_changed = graph_changed || pre_v != g->v_size;
+                    graph_changed = graph_changed || pre_v != g->v_size || pre_e != g->e_size;
                 }
             }
 

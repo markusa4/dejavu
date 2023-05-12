@@ -1030,7 +1030,7 @@ namespace dejavu {
             bool reset(int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
                        std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
-                const int old_size = transversals.size();
+                const int old_size = static_cast<int>(transversals.size());
                 if(!init) {
                     initialize(new_domain_size, new_base, new_base_sizes, stop);
                     return false;
@@ -1110,7 +1110,7 @@ namespace dejavu {
              * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
-                if (base_pos >= transversals.size()) return false;
+                if (base_pos >= static_cast<int>(transversals.size())) return false;
                 assert(base_pos >= 0);
                 assert(base_pos < transversals.size());
                 const int search = transversals[base_pos]->find_point(v);
@@ -1150,7 +1150,7 @@ namespace dejavu {
                 bool changed = false; /*< keeps track of whether we changed the Schreier structure while sifting */
 
                 automorphism.set_support01(true); // we don't need to track full support
-                for (int level = 0; level < transversals.size(); ++level) { // sift level-by-level
+                for (int level = 0; level < static_cast<int>(transversals.size()); ++level) { // sift level-by-level
                     // first, we try to extend the traversal using the new automorphism
                     changed = transversals[level]->extend_with_automorphism(w, generators, automorphism)
                               || changed;
@@ -1269,7 +1269,7 @@ namespace dejavu {
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
                 // multiply the sizes of the individual levels in the Schreier table
-                for (int level = 0; level < transversals.size(); ++level) {
+                for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
                     s_grp_sz.multiply(transversals[level]->size());
                 }
             }
