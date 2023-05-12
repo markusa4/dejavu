@@ -138,6 +138,7 @@ namespace dejavu {
 
             // set up a local state for IR computations
             ir::controller local_state(&m_refinement, &local_coloring); /*< controls movement in IR tree*/
+            local_state.h_deviation_inc = std::min(static_cast<int>(floor(2*sqrt(g->v_size))), 128);
 
             // save root state for random and BFS search, as well as restarts
             ir::limited_save root_save;
