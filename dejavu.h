@@ -69,7 +69,7 @@ namespace dejavu {
             // preprocess the graph using sassy
             PRINT("preprocessing...");
             m_prep.reduce(g, colmap, hook); /*< reduces the graph */
-            s_grp_sz.multiply(m_prep.base, m_prep.exp); /*< group size needed if the
+            s_grp_sz.multiply(m_prep.grp_sz); /*< group size needed if the
                                                                                     *  early out below is used */
 
             // early-out if preprocessor finished solving the graph
@@ -173,8 +173,6 @@ namespace dejavu {
                 progress_print("sel", local_state.s_base_pos,local_state.T->get_position());
                 int base_size = local_state.s_base_pos;
 
-                // TODO if base sizes are equal, we should always prefer the one with smallest number of IR leaves
-
                 // determine whether base is "large", or "short"
                 s_long_base  = base_size >  sqrt(g->v_size);  /*< a "long"  base  */
                 s_short_base = base_size <= 2;                   /*< a "short" base  */
@@ -182,12 +180,10 @@ namespace dejavu {
                 s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial  */
 
                 const bool s_same_length     = base_size == s_last_base_size;
-
                 const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                 const bool s_too_long_long   = s_long_base && (base_size >  1.25 * s_last_base_size);
                 const bool s_too_long_hard   = s_hard && !s_inprocessed && (base_size > s_last_base_size);
                 const bool s_too_long        = s_too_long_anyway || s_too_long_long || s_too_long_hard;
-
                 const bool s_too_big         = s_short_base && s_same_length &&
                                                (s_last_tree_sz < m_selectors.get_ir_size_estimate());
 
@@ -374,14 +370,14 @@ namespace dejavu {
                             if (sh_tree->get_finished_up_to() == base_size) {
                                 finished_symmetries = true;
                                 if (base_size == 2) { /*< case for the special code */
-                                    m_prep.multiply_to_group_size(
+                                    m_prep.grp_sz.multiply(
                                             (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base[0]) *
                                             sh_tree->h_bfs_automorphism_pw, 0);
                                 } else if (base_size == 1) {
-                                    m_prep.multiply_to_group_size(
+                                    m_prep.grp_sz.multiply(
                                             (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base[0]), 0);
                                 } else { /*< base case which just multiplies the remaining elements of the level */
-                                    m_prep.multiply_to_group_size(
+                                    m_prep.grp_sz.multiply(
                                             (double) sh_tree->get_level_size(sh_tree->get_finished_up_to()), 0);
                                 }
                             }
@@ -421,7 +417,7 @@ namespace dejavu {
             s_grp_sz.mantissa = 1.0;
             s_grp_sz.exponent = 0;
             s_grp_sz.multiply(m_inprocess.s_grp_sz);
-            s_grp_sz.multiply(m_prep.base, m_prep.exp);
+            s_grp_sz.multiply(m_prep.grp_sz);
             s_grp_sz.multiply(m_dfs.s_grp_sz);
             s_grp_sz.multiply(sh_schreier->s_grp_sz);
 

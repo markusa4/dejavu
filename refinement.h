@@ -149,15 +149,15 @@ namespace dejavu {
          * @param c The coloring to be refined.
          * @param init_color Initialize the worklist with a single color class (e.g., after individualization). The
          * default value -1 denotes that the worklist is initialized with all color classes of the coloring.
-         * @param color_limit Integer which is used to stop refinement whenever the refined coloring reaches this number of
-         * color classes. The default value -1 denotes that refinement is performed exhaustively.
-         * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used to stop
-         * refinement early.
+         * @param color_limit Integer which is used to stop refinement whenever the refined coloring reaches this number
+         * of color classes. The default value -1 denotes that refinement is performed exhaustively.
+         * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used
+             * to stop refinement early.
          * @param worklist_hook Function pointer that is called whenever a color class is considered for refinement. Return value
          * can be used to skip refinement of that color class.
          */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
-                                 const std::function<type_split_color_hook> &split_hook = nullptr,
+                                 const std::function<type_split_color_hook>    &split_hook = nullptr,
                                  const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
                 singleton_hint.reset();
                 assure_initialized(g);
