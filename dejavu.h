@@ -213,6 +213,8 @@ namespace dejavu {
                 if (dfs_level == 0) break; // DFS finished the graph -- we are done!
                 const bool s_dfs_backtrack = m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
 
+                std::cout << "could individualize: " << m_inprocess.inproc_can_individualize.size() << std::endl;
+
                 // next, we go into the random path + BFS algorithm, so we set up a Schreier structure and IR tree for
                 // the given base
 
@@ -238,7 +240,7 @@ namespace dejavu {
                 // TODO find a better way to add canonical leaf to leaf store
 
                 s_last_bfs_pruned = false;
-                int s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
+                int s_bfs_next_level_nodes = dejavu::search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
                 int h_rand_fail_lim_total  = 0;
                 int h_rand_fail_lim_now    = 0;
 
@@ -258,7 +260,7 @@ namespace dejavu {
                     // here are our decision heuristics (AKA dark magic)
 
                     // first, we update our estimations / statistics
-                    s_bfs_next_level_nodes = m_bfs.next_level_estimate(*sh_tree, selector);
+                    s_bfs_next_level_nodes = dejavu::search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
 
                     const bool s_have_rand_estimate   = (m_rand.s_paths >= 4);  /*< for some estimations, we need a few
                                                                                  *  random paths */
@@ -270,10 +272,6 @@ namespace dejavu {
                         s_path_fail1_avg    = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
                         s_trace_cost1_avg   = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
                     }
-                    const double reset_cost_rand = g->v_size;
-                    const double reset_cost_bfs  = std::min(s_trace_cost1_avg, (double) g->v_size);
-                    double s_bfs_cost_estimate  = (s_trace_cost1_avg        + reset_cost_bfs) * (s_bfs_next_level_nodes);
-                    double s_rand_cost_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now ;
 
                     const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
 
@@ -285,11 +283,15 @@ namespace dejavu {
                     } else {
                         // now that we have some data, we attempt to model how effective and costly random search and
                         // BFS is, to then make an informed decision of what to do next
+                        const double reset_cost_rand = g->v_size;
+                        const double reset_cost_bfs  = std::min(s_trace_cost1_avg, (double) g->v_size);
+                        double s_bfs_cost_estimate  = (s_trace_cost1_avg + reset_cost_bfs) * (s_bfs_next_level_nodes);
+                        double s_rand_cost_estimate = (s_random_path_trace_cost+reset_cost_rand) * h_rand_fail_lim_now;
 
                         // we do so by negatively scoring each method: higher score, worse technique
                         //double score_rand = s_trace_full_cost * h_rand_fail_lim_now * (1-m_rand.s_rolling_success);
                         double score_rand = s_rand_cost_estimate * (1-m_rand.s_rolling_success);
-                        double score_bfs  = s_bfs_cost_estimate * (0.1 + 1-s_path_fail1_avg);
+                        double score_bfs  = s_bfs_cost_estimate  * (0.1 + 1-s_path_fail1_avg);
 
                         // we make some adjustments to try to model effect of techniques better
                         // increase BFS score if BFS does not prune nodes on the next level -- we want to be somewhat

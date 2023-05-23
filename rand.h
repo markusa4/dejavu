@@ -150,11 +150,11 @@ namespace dejavu::search_strategy {
         int       s_leaves     = 0;                       /**< how many leaves were added */
 
         // settings for heuristics
-        int       h_leaf_limit = 0;                       /**< limit to how many leaves can be stored         */
-        bool      h_look_close = false;                   /**< whether to use trace early out on first level  */
-        const int h_hash_col_limit = 32;                  /**< limit for how many hash collisions are allowed */
-        bool      h_sift_random     = true;
-        int       h_sift_random_lim = 8;  // was 128
+        int       h_leaf_limit = 0;                       /**< limit to how many leaves can be stored          */
+        bool      h_look_close = false;                   /**< whether to use trace early out on first level   */
+        const int h_hash_col_limit  = 32;                 /**< limit for how many hash collisions are allowed  */
+        bool      h_sift_random     = true;               /**< sift random elements into Schreier structure    */
+        int       h_sift_random_lim = 8;                  /**< after how many paths random elements are sifted */
 
         void setup(bool look_close = false) {
             //h_leaf_limit = leaf_store_limit;
@@ -191,9 +191,8 @@ namespace dejavu::search_strategy {
             }
         }
 
-        // TODO I should have one random_walk method that is used by the methods below, i think
-        // TODO random_walks_from_tree should be the only outward facing method? base_aligned should just happen automatically, or flag
-
+        // TODO setting to escape base aligned search for more preprocessing? could even return skiplevel-coloring
+        // TODO preprocess using that, reset schreier structure, continue... ("in-in-processing" lol)
         void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                           ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state,
                           int fail_limit) {
@@ -204,8 +203,6 @@ namespace dejavu::search_strategy {
             ir::limited_save* root_save  = ir_tree.pick_node_from_level(0, 0)->get_save();
             ir::limited_save* start_from = root_save;
 
-            //while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
-            //      && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))) { // * s_rolling_first_level_success
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
                 local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
@@ -218,14 +215,15 @@ namespace dejavu::search_strategy {
                         local_state.move_to_child(g, group.base_point(local_state.s_base_pos));
                     }
                     assert(local_state.T->trace_equal());
-                    local_state.save_reduced_state(my_own_save);
+                    local_state.save_reduced_state(my_own_save); // from now on, we start from this save!
                     start_from = &my_own_save;
+                    std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << std::endl;
                 }
 
                 const int start_from_base_pos = local_state.s_base_pos;
                 int base_pos                  = local_state.s_base_pos;
 
-                // track whether current walk is base-aligned and/or uniform
+                // track whether current walk is base-aware and/or uniform
                 bool base_aligned = true;
                 bool uniform      = true;
 
@@ -236,7 +234,10 @@ namespace dejavu::search_strategy {
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
 
-                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)  && ir_tree.stored_leaves.s_leaves <= 1) {
+                    // base-aware search: if we are still walking along the base, and the vertex we picked is in the
+                    // same orbit as the base -- we might as well keep walking on the base, or choose a different vertex
+                    if(group.finished_up_to_level() + 1 == base_pos && group.is_in_base_orbit(base_pos, v)
+                         && ir_tree.stored_leaves.s_leaves <= 1) {
                         heuristic_reroll.clear();
                         for(int i = 0; i < col_sz; ++i) {
                             heuristic_reroll.push_back(local_state.c->lab[col + i]);
@@ -251,15 +252,17 @@ namespace dejavu::search_strategy {
                     if(group.is_in_base_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
                         v = group.base_point(local_state.s_base_pos);
                         assert(local_state.c->vertex_to_col[v] == col);
-                        uniform = false;
+                        uniform = false; // not uniform anymore!
                     } else {
-                        base_aligned = false;
+                        base_aligned = false; // we stopped walking along the base
                     }
                     assert(local_state.c->vertex_to_col[v] == col);
                     const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                     local_state.move_to_child(g, v);
 
+                    // keep track of some statistics for the first individualization (these statistics are used for
+                    // decisions concerning breadth-first search)
                     if(base_pos == start_from_base_pos) {
                         s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
                         s_paths_fail1 += !local_state.T->trace_equal();
@@ -272,12 +275,15 @@ namespace dejavu::search_strategy {
                 }
 
                 ++s_paths;
-                if(base_pos == start_from_base_pos) {
+                if(base_pos == start_from_base_pos) { // did not arrive in a leaf
                     ++s_paths_failany;
                     continue;
                 }
 
-                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state, *root_save, uniform);
+                // we arrived at a leaf... let's check whether we already have an equivalent leaf to form an
+                // automorphism -- or add this leaf to the storage
+                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state,
+                                              *root_save, uniform);
             }
         }
 
@@ -292,10 +298,6 @@ namespace dejavu::search_strategy {
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
 
-           /* while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion()
-                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit || (h_almost_done(group) && ir_tree.stored_leaves.s_leaves <= 2*h_leaf_limit))
-                  && (ir_tree.stored_leaves.s_leaves <= h_leaf_limit/4 || s_rolling_success > 0.001 || s_rolling_first_level_success > 0.1) // re-consider...
-                  && s_rolling_first_level_success > 0.001) { //  * s_rolling_first_level_success*/
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
