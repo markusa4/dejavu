@@ -25,7 +25,7 @@ namespace dejavu {
             int s_total_kept      = 0;
             int s_total_automorphism_prune = 0;
             int s_total_leaves = 0;
-            groups::automorphism_workspace* gws_automorphism;
+            groups::automorphism_workspace* gws_automorphism = nullptr;
 
         public:
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
@@ -48,7 +48,7 @@ namespace dejavu {
                 ir_tree.set_finished_up_to(current_level + 1);
             }
 
-            int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
+            static int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
                 const int base_pos = ir_tree.get_finished_up_to();
                 const auto start_node = ir_tree.get_level(base_pos);
                 assert(start_node != nullptr);
@@ -60,7 +60,8 @@ namespace dejavu {
                 return level_size * (c->ptn[col] + 1);
             }
 
-            void queue_up_level(std::function<ir::type_selector_hook> *selector, ir::shared_tree& ir_tree, int base_pos) {
+            static void queue_up_level(std::function<ir::type_selector_hook> *selector, ir::shared_tree& ir_tree,
+                                       int base_pos) {
                 auto start_node = ir_tree.get_level(base_pos);
                 assert(start_node != nullptr);
                 while(!start_node->get_base()) {
@@ -93,7 +94,8 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
-            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node, const int v, ir::limited_save* last_load) {
+            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node,
+                              const int v, ir::limited_save* last_load) {
                 auto next_node_save = node->get_save();
 
                 // TODO consider base size 1 and top-level automorphisms

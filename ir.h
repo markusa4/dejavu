@@ -46,10 +46,10 @@ namespace dejavu {
             // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
 
             std::vector<int> base_vertex; /**< base of vertices of this IR node (optional) */
-            coloring c;             /**< vertex coloring of this IR node */
-            long invariant = 0;     /**< hash of invariant of this IR node */
-            int trace_position = 0; /**< position of trace of this IR node */
-            int base_position = 0;  /**< length of base of this IR node */
+            coloring c;                   /**< vertex coloring of this IR node   */
+            long invariant     = 0;       /**< hash of invariant of this IR node */
+            int trace_position = 0;       /**< position of trace of this IR node */
+            int base_position  = 0;       /**< length of base of this IR node    */
         public:
             void save(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
                       int s_base_position) {
@@ -110,6 +110,8 @@ namespace dejavu {
             coloring      *c  = nullptr;
             trace         *T  = nullptr;
 
+            // TODO: should these be public? or rather accesible through const references or something?
+
             std::vector<int> singletons;
             std::vector<int> base_vertex;
             std::vector<int> base_color;
@@ -125,8 +127,6 @@ namespace dejavu {
 
             coloring leaf_color;
 
-            work_list workspace;
-
             // statistics
             int   s_base_pos = 0;                          /**< how large the base of the current IR node is*/
             bool  s_last_refinement_singleton_only = true; /**< whether in the last refinement, only singleton cells
@@ -134,7 +134,7 @@ namespace dejavu {
             int   s_hint_color                     = -1;   /**< a color that was not singleton in last refinement*/
             bool  s_hint_color_is_singleton_now    = true; /**< whether the \a s_hint_color is singleton now */
 
-            // settings for heuristics
+            // settings
             int   h_deviation_inc = 48; /**< how many additional splits to wait before terminating whenever
                                          * use_increase_deviation is used  */
         private:
@@ -264,7 +264,6 @@ namespace dejavu {
                 T  = &internal_T1;
                 cT = &internal_T2;
 
-                workspace.allocate(c->lab_sz);
                 touched_color.initialize(c->lab_sz);
                 touched_color_list.allocate(c->lab_sz);
                 prev_color_list.allocate(c->lab_sz);
@@ -923,7 +922,9 @@ namespace dejavu {
             }
         };
 
-
+        /**
+         *  \brief Store deviations for a BFS level
+         */
         class deviation_map {
         private:
             std::unordered_set<long> deviation_map;
@@ -970,7 +971,7 @@ namespace dejavu {
         class stored_leaf {
         public:
             enum stored_leaf_type { STORE_LAB, ///< stores coloring of the leaf
-                STORE_BASE ///< stores only base of the leaf
+                                    STORE_BASE ///< stores only base of the leaf
             };
 
             stored_leaf(int* arr, int arr_sz, stored_leaf_type store_type) : store_type(store_type) {
@@ -1014,7 +1015,8 @@ namespace dejavu {
             std::vector<stored_leaf*> garbage_collector;
 
         public:
-            int s_leaves = 0; /**< number of leaves stored */
+            int s_leaves          = 0;   /**< number of leaves stored */
+            int h_full_save_limit = 100; /**< number of leaves which will be stored fully */
 
             shared_leaves() {
                 leaf_store.reserve(20);
@@ -1024,8 +1026,8 @@ namespace dejavu {
              * Free up all memory.
              */
             ~shared_leaves() {
-                for(auto & i : garbage_collector) {
-                    delete i;
+                for(auto & l : garbage_collector) {
+                    delete l;
                 }
             }
 
@@ -1064,9 +1066,11 @@ namespace dejavu {
                 }
 
                 // if not, add the leaf
-                const bool full_save = s_leaves < 100;
-                auto type = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
-                auto new_leaf = full_save?new stored_leaf(c.lab,c.lab_sz, type):new stored_leaf(base, type);
+                const bool full_save = s_leaves < h_full_save_limit;
+                auto type
+                       = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
+                auto new_leaf
+                       = full_save?new stored_leaf(c.lab,c.lab_sz, type):new stored_leaf(base, type);
                 leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
                 garbage_collector.push_back(new_leaf);
                 ++s_leaves;
@@ -1079,6 +1083,7 @@ namespace dejavu {
             void clear() {
                 s_leaves = 0;
                 leaf_store.clear();
+                // TODO clear garbage collector?
             }
         };
 
@@ -1154,19 +1159,20 @@ namespace dejavu {
 
             std::vector<int> current_base;
 
-            std::vector<unsigned long> node_invariant;
+            std::vector<unsigned long> node_invariant; // TODO: move this to inprocessor
 
             bool init = false;
         public:
             groups::orbit h_bfs_top_level_orbit;
             int h_bfs_automorphism_pw = 0;
-            shared_leaves stored_leaves; /**< stores leaves of the IR tree */
-            deviation_map stored_deviation; /**< stores trace deviations of the current BFS level*/
+            shared_leaves stored_leaves;    /**< stores leaves of the IR tree */
+            deviation_map stored_deviation; /**< stores trace deviations of a BFS level*/
 
             explicit shared_tree(int domain_size) {
                 h_bfs_top_level_orbit.initialize(domain_size);
             };
 
+            // TODO: move this to inprocessor
             void make_node_invariant() {
                 if(finished_up_to > 1) {
                     for(int j = finished_up_to; j >= 1; --j) {
