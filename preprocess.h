@@ -10,6 +10,9 @@
 #include <ctime>
 
 namespace sassy {
+
+    using dejavu::ds::coloring;
+
     // ring queue for pairs of integers
     class ring_pair {
         std::pair<int, int> *arr = 0;

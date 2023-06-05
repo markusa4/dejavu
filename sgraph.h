@@ -57,8 +57,8 @@ namespace dejavu {
         }
 
         // initialize a coloring of this sgraph, partitioning degrees of vertices
-        void initialize_coloring(coloring *c, int *vertex_to_col) {
-            c->alloc(this->v_size);
+        void initialize_coloring(ds::coloring *c, int *vertex_to_col) {
+            c->initialize(this->v_size);
             std::memset(c->ptn, 1, sizeof(int) * v_size);
 
             if (this->v_size < c->domain_size) {

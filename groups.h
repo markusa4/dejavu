@@ -297,7 +297,7 @@ namespace dejavu {
              * @param v Vertex of the specified domain.
              * @return The orbit of \p v.
              */
-            int find_and_cut_orbit(const int v) {
+            int find_orbit(const int v) {
                 assert(v >= 0);
                 assert(v < sz);
                 int orbit1 = map_arr[v];
@@ -316,7 +316,7 @@ namespace dejavu {
             int orbit_size(const int v) {
                 assert(v >= 0);
                 assert(v < sz);
-                return orb_sz[find_and_cut_orbit(v)];
+                return orb_sz[find_orbit(v)];
             }
 
             /**
@@ -347,8 +347,8 @@ namespace dejavu {
                         reset_arr.push_back(v2);
                     touched.set(v1);
                     touched.set(v2);
-                    int orbit1 = find_and_cut_orbit(v1);
-                    int orbit2 = find_and_cut_orbit(v2);
+                    int orbit1 = find_orbit(v1);
+                    int orbit2 = find_orbit(v2);
                     if(orbit1 == orbit2)
                         return;
                     if(orbit1 < orbit2) {
@@ -376,8 +376,8 @@ namespace dejavu {
                 assert(v2 < sz);
                 if(v1 == v2)
                     return true;
-                const int orbit1 = find_and_cut_orbit(v1);
-                const int orbit2 = find_and_cut_orbit(v2);
+                const int orbit1 = find_orbit(v1);
+                const int orbit2 = find_orbit(v2);
                 return (orbit1 == orbit2);
             }
 
