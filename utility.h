@@ -39,14 +39,14 @@
 #define PRINT(str) std::cout << str << std::endl;
 
 // TODO maybe can be done faster
-unsigned int hash(unsigned int x) {
+static unsigned int hash(unsigned int x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = (x >> 16) ^ x;
     return x;
 }
 
-unsigned long add_to_hash(unsigned long hash, const int d) {
+static unsigned long add_to_hash(unsigned long hash, const int d) {
     const unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
     hash    = hash << 8;                    // shift hash left by 5 bits
     hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
@@ -55,7 +55,7 @@ unsigned long add_to_hash(unsigned long hash, const int d) {
     return hash;
 }
 
-inline bool file_exists(const std::string& name) {
+static inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
     return f.good();
 }
@@ -138,9 +138,9 @@ namespace dejavu {
         return out << number.mantissa << "*10^" << number.exponent;
     }
 
-    thread_local  std::chrono::high_resolution_clock::time_point first;
-    thread_local  std::chrono::high_resolution_clock::time_point previous;
-    thread_local bool set_first = false;
+    static std::chrono::high_resolution_clock::time_point first;
+    static std::chrono::high_resolution_clock::time_point previous;
+    static bool set_first = false;
 
     static void progress_print_split() {
         PRINT("______________________________________________________________");

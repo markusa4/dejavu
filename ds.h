@@ -445,6 +445,11 @@ namespace dejavu {
             int *s   = nullptr;
             int mark = 0;
             unsigned int sz = 0;
+
+            void full_reset() {
+                memset(s, mark, sz * sizeof(int));
+            }
+
         public:
             mark_set() = default;
             explicit mark_set(int size) {
@@ -452,7 +457,10 @@ namespace dejavu {
             }
 
             void initialize(unsigned int size) {
-                if(s && sz == size) return;
+                if(s && sz == size) {
+                    reset();
+                    return;
+                }
                 if(s) free(s);
                 s = (int*) calloc(size, sizeof(int));
                 sz   = size;
@@ -470,11 +478,10 @@ namespace dejavu {
                 s[pos] = mark - 1;
             }
             void reset() {
-                if(mark == -1) {
-                    memset(s, mark, sz * sizeof(int));
-                }
+                if(mark == -1) full_reset();
                 ++mark;
             }
+
             ~mark_set() {
                 if(s) free(s);
             }

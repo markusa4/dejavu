@@ -30,8 +30,8 @@ public:
     }
 };
 
-std::unique_ptr<std::mutex> garbage_collector::lock = std::make_unique<std::mutex>();
-std::vector<int*> garbage_collector::junk = std::vector<int*>();
+//std::unique_ptr<std::mutex> garbage_collector::lock = std::make_unique<std::mutex>();
+//std::vector<int*> garbage_collector::junk = std::vector<int*>();
 
 class coloring_allocator {
 public:
@@ -45,7 +45,7 @@ public:
                 buffer_const = 20;
             bulk_domain_reset = false;
             bulk_domain = new int[buffer_const * domain_size + 1];
-            garbage_collector::add_trash(bulk_domain);
+            //garbage_collector::add_trash(bulk_domain);
             bulk_domain[0] = 0;
             bulk_domain_sz = buffer_const * domain_size + 1;
             bulk_domain_cnt = 1;

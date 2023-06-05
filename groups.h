@@ -887,6 +887,8 @@ namespace dejavu {
                                           automorphism_workspace &automorphism) {
                 if (finished) return false; // Already finished transversal? Nothing to do, then!
 
+                // TODO maybe attempt to not load the orbit sometimes?
+
                 // load orbit of this transversal to our workspace, such that we have random access to points in O(1)
                 load_orbit_to_scratch(w);
                 bool changed = false; /*< we changed this transversal? */
@@ -896,7 +898,7 @@ namespace dejavu {
                 for (int i = 0; i < static_cast<int>(fixed_orbit.size()); ++i) {
                     const int p = fixed_orbit[i];
                     int j = automorphism.perm()[p];
-                    if (w.scratch1.get(j)) continue;
+                    if (j == p || w.scratch1.get(j)) continue;
 
                     int pwr = 0; // power we save in Schreier vector
                     for (int jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) ++pwr;

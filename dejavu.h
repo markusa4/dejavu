@@ -18,7 +18,7 @@ extern int*           dej_test_col;
 
 
 namespace dejavu {
-    void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
+    static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
                    [[maybe_unused]] const int *supp) {
         std::cout << "certifying..." << std::endl;
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
@@ -50,6 +50,10 @@ namespace dejavu {
         big_number s_grp_sz; /**< size of the automorphism group computed */
         bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
 
+        void automorphisms(static_graph* g, dejavu_hook* hook = nullptr) {
+            automorphisms(g->get_sgraph(), g->get_coloring(), hook);
+        }
+
         /**
          * Compute the automorphisms of the graph \p g colored with vertex colors \p colmap. Automorphisms are returned
          * using the function pointer \p hook.
@@ -66,11 +70,13 @@ namespace dejavu {
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
 
+            if(colmap == nullptr) colmap = (int*) calloc(g->v_size, sizeof(int)); // TODO free
+
             // preprocess the graph using sassy
             PRINT("preprocessing...");
             m_prep.reduce(g, colmap, hook); /*< reduces the graph */
             s_grp_sz.multiply(m_prep.grp_sz); /*< group size needed if the
-                                                                                    *  early out below is used */
+                                                       *  early out below is used */
 
             // early-out if preprocessor finished solving the graph
             if(g->v_size <= 1) return;
@@ -98,11 +104,11 @@ namespace dejavu {
             bool s_short_base       = false; /*< flag for bases that are considered very short    */
             bool s_few_cells        = false;
             [[maybe_unused]] bool s_many_cells       = false;
-            bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph since last restart */
+            bool s_inprocessed = false;     /*< flag which says that we've inprocessed the graph since last restart   */
             int  s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                              *  case where all searchable bases became much larger due to BFS or other
-                                             *  changes */
-            bool s_last_bfs_pruned = false; /*< keep track of whether last BFS calculation pruned some nodes */
+                                             *  changes                                                               */
+            bool s_last_bfs_pruned = false; /*< keep track of whether last BFS calculation pruned some nodes          */
             big_number s_last_tree_sz;
 
             // some data we want to keep track of
@@ -112,13 +118,13 @@ namespace dejavu {
             // local modules and workspace, to be used by other modules
             ir::refinement    m_refinement; /*< workspace for color refinement and other utilities */
             ir::base_selector m_selectors;  /*< cell selector creation                             */
-            groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
-            groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims   */
+            groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism  */
+            groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims    */
 
             // shared, global modules
-            sh_tree     = new ir::shared_tree(g->v_size); /*< BFS levels, shared leaves, ...           */
-            sh_schreier = new groups::shared_schreier();             /*< Schreier structure to sift automorphisms */
-            sh_schreier->h_error_bound = h_error_bound;              /*< pass the error bound parameter           */
+            sh_tree     = new ir::shared_tree(g->v_size); /*< BFS levels, shared leaves, ...               */
+            sh_schreier = new groups::shared_schreier();             /*< Schreier structure to sift automorphisms     */
+            sh_schreier->h_error_bound = h_error_bound;              /*< pass the error bound parameter               */
 
             // initialize modules for high-level search strategies
             search_strategy::dfs_ir      m_dfs;       /*< depth-first search   */
@@ -176,8 +182,8 @@ namespace dejavu {
                 // determine whether base is "large", or "short"
                 s_long_base  = base_size >  sqrt(g->v_size);  /*< a "long"  base  */
                 s_short_base = base_size <= 2;                   /*< a "short" base  */
-                s_few_cells  = root_save.get_coloring()->cells <= 2;                  /*< "few"  cells in initial  */
-                s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial  */
+                s_few_cells  = root_save.get_coloring()->cells <= 2;                  /*< "few"  cells in initial     */
+                s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial     */
 
                 const bool s_same_length     = base_size == s_last_base_size;
                 const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
@@ -213,8 +219,6 @@ namespace dejavu {
                 if (dfs_level == 0) break; // DFS finished the graph -- we are done!
                 const bool s_dfs_backtrack = m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
 
-                std::cout << "could individualize: " << m_inprocess.inproc_can_individualize.size() << std::endl;
-
                 // next, we go into the random path + BFS algorithm, so we set up a Schreier structure and IR tree for
                 // the given base
 
@@ -236,7 +240,7 @@ namespace dejavu {
                                         *   Schreier last time */
 
                 // first, we try to add the leaf of the base to the IR tree
-                m_rand.specific_walk(g, *sh_tree, local_state, base);
+                dejavu::search_strategy::random_ir::specific_walk(g, *sh_tree, local_state, base);
                 // TODO find a better way to add canonical leaf to leaf store
 
                 s_last_bfs_pruned = false;
@@ -263,7 +267,7 @@ namespace dejavu {
                     s_bfs_next_level_nodes = dejavu::search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
 
                     const bool s_have_rand_estimate   = (m_rand.s_paths >= 4);  /*< for some estimations, we need a few
-                                                                                 *  random paths */
+                                                                                 *  random paths                      */
                     double s_path_fail1_avg  = 0;
                     double s_trace_cost1_avg = s_trace_full_cost;
 
@@ -410,7 +414,6 @@ namespace dejavu {
                 // edge case where inprocessing might finish the graph
                 if(root_save.get_coloring()->cells == g->v_size) {
                     finished_symmetries = true;
-                    std::cout << "this" << std::endl;
                     break;
                 }
             }

@@ -142,23 +142,20 @@ namespace dejavu::search_strategy {
         double    s_rolling_first_level_success  = 1.0;   /**< rolling probability how many random paths succeed on the
                                                             *  first level*/
 
-        long      s_trace_cost1   = 0;
-        int       s_paths         = 0;                       /**< how many total paths have been computed */
-        int       s_paths_fail1   = 0;                       /**< how many total paths failed on first level */
-        int       s_paths_failany = 0;
-        int       s_succeed       = 0;
-        int       s_leaves     = 0;                       /**< how many leaves were added */
+        long      s_trace_cost1   = 0;                    /**< total cost incurred on first level         */
+        int       s_paths         = 0;                    /**< how many total paths have been computed    */
+        int       s_paths_fail1   = 0;                    /**< how many total paths failed on first level */
+        int       s_paths_failany = 0;                    /**< how many total paths have failed           */
+        int       s_succeed       = 0;                    /**< how many total paths have succeeded        */
+        int       s_leaves        = 0;                    /**< how many leaves were added                 */
 
         // settings for heuristics
-        int       h_leaf_limit = 0;                       /**< limit to how many leaves can be stored          */
-        bool      h_look_close = false;                   /**< whether to use trace early out on first level   */
+        bool      h_look_close      = false;              /**< whether to use trace early out on first level   */
         const int h_hash_col_limit  = 32;                 /**< limit for how many hash collisions are allowed  */
         bool      h_sift_random     = true;               /**< sift random elements into Schreier structure    */
         int       h_sift_random_lim = 8;                  /**< after how many paths random elements are sifted */
 
         void setup(bool look_close = false) {
-            //h_leaf_limit = leaf_store_limit;
-            //h_fail_limit = fail_limit;
             h_look_close = look_close;
         }
 
@@ -182,7 +179,7 @@ namespace dejavu::search_strategy {
             return group.s_consecutive_success >= 1;
         }
 
-        void
+        static void
         specific_walk(sgraph *g, ir::shared_tree &ir_tree, ir::controller &local_state, std::vector<int> &base_vertex) {
             local_state.walk(g, *ir_tree.pick_node_from_level(0,0)->get_save(), base_vertex);
             auto other_leaf = ir_tree.stored_leaves.lookup_leaf(local_state.T->get_hash());

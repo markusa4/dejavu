@@ -193,7 +193,7 @@ namespace sassy {
     };
 
     class preprocessor;
-    thread_local preprocessor* save_preprocessor;
+    static preprocessor* save_preprocessor;
 
     enum preop {
         deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop
