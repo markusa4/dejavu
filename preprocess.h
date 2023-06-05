@@ -2458,7 +2458,7 @@ namespace sassy {
                 colmap[i] = c1.vertex_to_col[i];
 
             coloring c2;
-            c2.copy(&c1);
+            c2.copy_from_ir_ancestor(&c1);
             c2.copy_ptn(&c1);
 
             for (int i = 0; i < g->v_size; ++i) {
@@ -2469,11 +2469,11 @@ namespace sassy {
             }
 
             coloring original_c;
-            original_c.copy(&c1);
+            original_c.copy_from_ir_ancestor(&c1);
             original_c.copy_ptn(&c1);
 
             coloring color_cache;
-            color_cache.copy(&c1);
+            color_cache.copy_from_ir_ancestor(&c1);
             color_cache.copy_ptn(&c1);
 
             selector S;
@@ -2662,7 +2662,7 @@ namespace sassy {
                         assert(c2.ptn[i] == c1.ptn[i]);
                     }
                 } else {
-                    c2.copy_force(&c1);
+                    c2.copy_any(&c1);
                     c2.copy_ptn(&c1);
 
                     for (int i = 0; i < g->v_size; ++i) {
@@ -3162,10 +3162,10 @@ namespace sassy {
             assure_ir_quotient_init(g);
 
             coloring c2;
-            c2.copy(&c1);
+            c2.copy_from_ir_ancestor(&c1);
 
             coloring c3;
-            c3.copy(&c1);
+            c3.copy_from_ir_ancestor(&c1);
 
             int penalty = 0;
 
@@ -3303,7 +3303,7 @@ namespace sassy {
                                 colmap[i] = c1.vertex_to_col[i];
                             }
                             I2 = I1;
-                            c2.copy(&c1);
+                            c2.copy_from_ir_ancestor(&c1);
                             continue;
                         }
 
@@ -3794,11 +3794,11 @@ namespace sassy {
             _automorphism_supp.reset();
 
             coloring c2;
-            c2.copy(&c1);
+            c2.copy_from_ir_ancestor(&c1);
             c2.copy_ptn(&c1);
 
             coloring c3;
-            c3.copy(&c1);
+            c3.copy_from_ir_ancestor(&c1);
             c3.copy_ptn(&c1);
 
             int penalty = 0;
@@ -3906,8 +3906,8 @@ namespace sassy {
                         if (I1 != I2) {
                             I2 = I1;
                             // could use component!
-                            c1.copy(&c3);
-                            c2.copy(&c3);
+                            c1.copy_from_ir_ancestor(&c3);
+                            c2.copy_from_ir_ancestor(&c3);
                             touched_current_component = false;
                             break;
                         }

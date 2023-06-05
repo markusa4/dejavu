@@ -82,7 +82,8 @@ namespace dejavu::search_strategy {
                     ++s_paths_failany;
                     s_rolling_success = (9.0 * s_rolling_success + 0.0) / 10.0;
                     leaf_storage.add_leaf(hash_c, *local_state.c, local_state.base_vertex);
-                    return false;
+                    //return false;
+                    break;
                 }
 
                 // If there is a leaf with the same hash, load the leaf and test automorphism
@@ -214,7 +215,7 @@ namespace dejavu::search_strategy {
                     assert(local_state.T->trace_equal());
                     local_state.save_reduced_state(my_own_save); // from now on, we start from this save!
                     start_from = &my_own_save;
-                    std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << std::endl;
+                    //std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << std::endl;
                 }
 
                 const int start_from_base_pos = local_state.s_base_pos;

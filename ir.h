@@ -54,7 +54,7 @@ namespace dejavu {
             void save(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
                       int s_base_position) {
                 this->base_vertex = s_base_vertex;
-                this->c.copy_force(&s_c);
+                this->c.copy_any(&s_c);
                 this->invariant = s_invariant;
                 this->trace_position = s_trace_position;
                 this->base_position = s_base_position;
@@ -324,7 +324,7 @@ namespace dejavu {
                 compare_base.resize(base_vertex.size());
                 std::copy(base_vertex.begin(), base_vertex.end(), compare_base.begin());
 
-                leaf_color.copy_force(c);
+                leaf_color.copy_any(c);
 
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
@@ -392,7 +392,7 @@ namespace dejavu {
              * @param state A reference to the limited_save from which the state will be loaded.
              */
             void load_reduced_state(limited_save &state) {
-                c->copy_force(state.get_coloring());
+                c->copy_any(state.get_coloring());
 
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());

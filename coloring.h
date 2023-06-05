@@ -26,15 +26,10 @@ public:
     int cells = 1;
     int domain_size = 0;
 
-    int smallest_cell_lower_bound = INT32_MAX;
-
+private:
     int* alloc_pt = nullptr;
 
-    ~coloring() {
-        if(alloc_pt) {
-            dealloc();
-        }
-    }
+public:
 
     void alloc(int sz) {
         assert(sz >= 0);
@@ -58,6 +53,11 @@ public:
         vertex_to_col = nullptr;
         vertex_to_lab = nullptr;
     };
+    ~coloring() {
+        if(alloc_pt) {
+            dealloc();
+        }
+    }
 
     void copy_ptn(coloring *c) const {
         assert(alloc_pt);
@@ -65,7 +65,7 @@ public:
         memcpy(ptn, c->ptn, c->domain_size*sizeof(int));
     }
 
-    void copy(coloring *c) {
+    void copy_from_ir_ancestor(coloring *c) {
         if(alloc_pt) {
             if(domain_size != c->domain_size) {
                 dealloc();
@@ -77,7 +77,6 @@ public:
         }
 
         if(!alloc_pt) alloc(c->domain_size);
-
 
         if(c->cells > c->domain_size / 4) {
             memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
@@ -93,16 +92,17 @@ public:
         memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size*sizeof(int));
 
         domain_size = c->domain_size;
-
         cells = c->cells;
-        smallest_cell_lower_bound = c->smallest_cell_lower_bound;
     }
 
-    void copy_force(coloring *c) {
+    /**
+     * Copies the given coloring into this coloring.
+     * 
+     * @param c The coloring to copy from.
+     */
+    void copy_any(coloring *c) {
         if(alloc_pt) {
-            if(domain_size != c->domain_size) {
-                dealloc();
-            }
+            if(domain_size != c->domain_size) dealloc();
         }
 
         if(!alloc_pt) {
@@ -123,9 +123,7 @@ public:
         memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size*sizeof(int));
 
         domain_size = c->domain_size;
-
         cells = c->cells;
-        smallest_cell_lower_bound = c->smallest_cell_lower_bound;
     }
 
     void initialize(int new_domain_size) {

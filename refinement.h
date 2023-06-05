@@ -232,9 +232,6 @@ namespace dejavu {
                             early_out = true;
                         }
 
-                        c->smallest_cell_lower_bound = ((class_size < c->smallest_cell_lower_bound) && class_size > 0) ?
-                                                       class_size : c->smallest_cell_lower_bound;
-
                         if (latest_old_class != old_class) {
                             latest_old_class = old_class;
                             skipped_largest = false;
@@ -382,8 +379,6 @@ namespace dejavu {
 
                         c->cells += (old_class != new_class);
                         const int class_size = c->ptn[new_class] + 1;
-                        c->smallest_cell_lower_bound = (class_size < c->smallest_cell_lower_bound) ?
-                                                       class_size : c->smallest_cell_lower_bound;
 
 #ifndef NDEBUG // debug code
                         if(color_class_splits.empty()) {
