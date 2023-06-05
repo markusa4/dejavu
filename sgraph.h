@@ -61,9 +61,8 @@ namespace dejavu {
             c->alloc(this->v_size);
             std::memset(c->ptn, 1, sizeof(int) * v_size);
 
-            if (this->v_size < c->lab_sz) {
-                c->lab_sz = this->v_size;
-                c->ptn_sz = this->v_size;
+            if (this->v_size < c->domain_size) {
+                c->domain_size = this->v_size;
             }
 
             if (v_size == 0)
@@ -76,11 +75,11 @@ namespace dejavu {
                 for (int i = 0; i < v_size; i++) {
                     c->lab[i] = i;
                 }
-                std::sort(c->lab, c->lab + c->lab_sz, vertexComparator(*this));
-                for (int i = 0; i < c->lab_sz; i++) {
+                std::sort(c->lab, c->lab + c->domain_size, vertexComparator(*this));
+                for (int i = 0; i < c->domain_size; i++) {
                     c->vertex_to_col[c->lab[i]] = last_new_cell;
                     c->vertex_to_lab[c->lab[i]] = i;
-                    if (i + 1 == c->lab_sz) {
+                    if (i + 1 == c->domain_size) {
                         cells += 1;
                         c->ptn[last_new_cell] = i - last_new_cell;
                         c->ptn[i] = 0;
@@ -168,10 +167,10 @@ namespace dejavu {
                     c->lab[i] = i;
                 }
                 std::sort(c->lab, c->lab + c->lab_sz, vertexComparatorColor(*this, vertex_to_col));*/
-                for (int i = 0; i < c->lab_sz; i++) {
+                for (int i = 0; i < c->domain_size; i++) {
                     c->vertex_to_col[c->lab[i]] = last_new_cell;
                     c->vertex_to_lab[c->lab[i]] = i;
-                    if (i + 1 == c->lab_sz) {
+                    if (i + 1 == c->domain_size) {
                         cells += 1;
                         c->ptn[last_new_cell] = i - last_new_cell;
                         c->ptn[i] = 0;

@@ -166,7 +166,7 @@ namespace dejavu {
 
                 if (init_color < 0) {
                     // initialize queue with all classes (except for largest one)
-                    for (int i = 0; i < c->ptn_sz;) {
+                    for (int i = 0; i < c->domain_size;) {
                         cell_todo.add_cell(&queue_pointer, i);
                         const int col_sz = c->ptn[i];
                         if (col_sz == 0) {
@@ -329,7 +329,7 @@ namespace dejavu {
                 cell_todo.reset(&queue_pointer);
 
                 if (init_color_class < 0) {
-                    for (int i = 0; i < c->ptn_sz;) {
+                    for (int i = 0; i < c->domain_size;) {
                         cell_todo.add_cell(&queue_pointer, i);
                         const int col_sz = c->ptn[i];
                         if (col_sz == 0) {
@@ -388,7 +388,7 @@ namespace dejavu {
 #ifndef NDEBUG // debug code
                         if(color_class_splits.empty()) {
 int actual_cells = 0;
-for (int i = 0; i < c->ptn_sz;) {
+for (int i = 0; i < c->domain_size;) {
 actual_cells += 1;
 i += c->ptn[i] + 1;
 }
@@ -1019,7 +1019,7 @@ assert(c->cells == actual_cells);
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->ptn_sz);
+                        assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
                         const int v_color = i;
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
@@ -1137,7 +1137,7 @@ assert(c->cells == actual_cells);
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->ptn_sz);
+                        assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
                         const int v_color = i;
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
@@ -1445,7 +1445,7 @@ assert(c->cells == actual_cells);
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->ptn_sz);
+                        assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
                         const int v_color = i;
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
@@ -1552,7 +1552,7 @@ assert(c->cells == actual_cells);
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->ptn_sz);
+                        assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
                         const int v_color = i;
                         const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
@@ -1684,7 +1684,7 @@ assert(c->cells == actual_cells);
                     largest_color_class_size = -1;
                     int i;
                     for (i = _col; i < _col + _col_sz;) {
-                        assert(i >= 0 && i < c->ptn_sz);
+                        assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
                         const bool mark_as_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = mark_as_largest ? (c->ptn[i] + 1) : largest_color_class_size;

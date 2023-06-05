@@ -9,259 +9,151 @@
 #include <cassert>
 #include "utility.h"
 
-extern thread_local bool bulk_domain_reset; // ToDo: parallelization messes this up, can create dangling pointer
-
-class garbage_collector {
-    static std::vector<int*> junk;
-    static std::unique_ptr<std::mutex> lock;
-public:
-    static void free_trash() {
-        lock->lock();
-        while(!junk.empty()) {
-            delete[] junk.back();
-            junk.pop_back();
-        }
-        lock->unlock();
-    }
-    static void add_trash(int* arr) {
-        lock->lock();
-        junk.push_back(arr);
-        lock->unlock();
-    }
-};
-
-//std::unique_ptr<std::mutex> garbage_collector::lock = std::make_unique<std::mutex>();
-//std::vector<int*> garbage_collector::junk = std::vector<int*>();
-
-class coloring_allocator {
-public:
-    static std::pair<int *, int *> coloring_bulk_allocator(int domain_size) {
-        thread_local int *bulk_domain = nullptr;
-        thread_local int buffer_const = 5; // was 20, for very large graphs this fails hard
-        thread_local int bulk_domain_sz = -1, bulk_domain_cnt = -1;
-
-        if (bulk_domain_sz < 0 || bulk_domain_reset) {
-            if (bulk_domain_reset)
-                buffer_const = 20;
-            bulk_domain_reset = false;
-            bulk_domain = new int[buffer_const * domain_size + 1];
-            //garbage_collector::add_trash(bulk_domain);
-            bulk_domain[0] = 0;
-            bulk_domain_sz = buffer_const * domain_size + 1;
-            bulk_domain_cnt = 1;
-            buffer_const *= 2;
-            buffer_const = std::min(buffer_const, 65536);
-        }
-
-        bulk_domain_cnt += domain_size;
-        bulk_domain[0] += 1;
-        if (bulk_domain_cnt >= bulk_domain_sz)
-            bulk_domain_sz = -1;
-
-        return {bulk_domain, bulk_domain + bulk_domain_cnt - domain_size};
-    }
-
-    static void coloring_bulk_deallocator(int *bulk_domain) {
-        bulk_domain_reset = true;
-        /*if (--bulk_domain[0] == 0) {
-            std::cout << "removeB " << bulk_domain << std::endl;
-            bulk_domain_reset = true;
-            delete[] bulk_domain;
-        }*/
-    }
-};
-
+/**
+ * \brief Vertex coloring for a graph
+ *
+ * Stores a vertex coloring for a graph with \a domain_size many vertices. Has mappings to and from colorings. The
+ * datastructure mostly follows the design used by Traces, with some slight adjustments. The class mainly exposes
+ * raw arrays, to be used by the solver internally.
+ */
 class coloring {
 public:
-
     int* lab = nullptr;
     int* ptn = nullptr;
     int* vertex_to_col = nullptr;
     int* vertex_to_lab = nullptr;
 
     int cells = 1;
-
-    int lab_sz = 0;
-    int ptn_sz = 0;
-
-    bool init = false;
-    bool efficient_alloc = false;
+    int domain_size = 0;
 
     int smallest_cell_lower_bound = INT32_MAX;
 
-    int* bulk_alloc = nullptr;
-    int* bulk_pt    = nullptr;
+    int* alloc_pt = nullptr;
 
     ~coloring() {
-        if(init) {
+        if(alloc_pt) {
             dealloc();
         }
     }
 
     void alloc(int sz) {
-        if(true) { // TODO need to work on colorings...
-            if (!init) {
-                std::pair<int *, int *> alloc = coloring_allocator::coloring_bulk_allocator(sz * 4);
-                bulk_alloc = alloc.first;
-                bulk_pt = alloc.second;
+        assert(sz >= 0);
 
-                lab = bulk_pt;
-                ptn = lab + sz;
-                vertex_to_col = lab + sz * 2;
-                vertex_to_lab = lab + sz * 3;
-                efficient_alloc = true;
-                init = true;
+        if (alloc_pt) dealloc();
+        alloc_pt = (int*) malloc(sz * 4 * sizeof(int));
+        assert(alloc_pt != nullptr);
 
-                lab_sz = sz;
-                ptn_sz = sz;
-            }
-        } else {
-            if (!init) {
-                lab = new int[sz];
-                ptn = new int[sz];
-                vertex_to_col = new int[sz];
-                vertex_to_lab = new int[sz];
-                efficient_alloc = false;
-                init = true;
+        lab = alloc_pt;
+        ptn = lab + sz;
+        vertex_to_col = lab + sz * 2;
+        vertex_to_lab = lab + sz * 3;
 
-                lab_sz = sz;
-                ptn_sz = sz;
-            }
-        }
+        domain_size = sz;
     }
 
     void dealloc() {
-        if(!efficient_alloc) {
-            delete[] ptn;
-            delete[] lab;
-            delete[] vertex_to_lab;
-            delete[] vertex_to_col;
-
-            ptn = nullptr;
-            lab = nullptr;
-            vertex_to_col = nullptr;
-            vertex_to_lab = nullptr;
-        } else {
-            coloring_allocator::coloring_bulk_deallocator(bulk_alloc);
-        }
+        if (alloc_pt) free(alloc_pt);
+        lab           = nullptr;
+        ptn           = nullptr;
+        vertex_to_col = nullptr;
+        vertex_to_lab = nullptr;
     };
 
     void copy_ptn(coloring *c) const {
-        assert(init);
-        assert(c->init);
-        memcpy(ptn, c->ptn, c->ptn_sz*sizeof(int));
+        assert(alloc_pt);
+        assert(c->alloc_pt);
+        memcpy(ptn, c->ptn, c->domain_size*sizeof(int));
     }
 
     void copy(coloring *c) {
-        if(init) {
-            if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
+        if(alloc_pt) {
+            if(domain_size != c->domain_size) {
                 dealloc();
-                init = false;
             } else {
                 cells = c->cells;
-                if(!efficient_alloc || !c->efficient_alloc) {
-                    for(int i = 0; i < c->ptn_sz;) {
-                        const int rd = c->ptn[i];
-                        ptn[i] = rd;
-                        i += rd +1;
-                    }
-                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(int));
-                } else {
-                    for(int i = 0; i < c->ptn_sz;) {
-                        const int rd = c->ptn[i];
-                        ptn[i] = rd;
-                        i += rd +1;
-                    }
-                    memcpy(vertex_to_col, c->vertex_to_col, c->ptn_sz * sizeof(int));
-                }
+                memcpy(vertex_to_col, c->vertex_to_col, c->domain_size * sizeof(int));
                 return;
             }
         }
 
-        if(!init) {
-            alloc(c->lab_sz);
-        }
+        if(!alloc_pt) alloc(c->domain_size);
 
-        if(c->cells > c->ptn_sz / 4) {
-            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(int));
+
+        if(c->cells > c->domain_size / 4) {
+            memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
         } else {
-            for (int i = 0; i < c->ptn_sz;) {
+            for (int i = 0; i < c->domain_size;) {
                 const int rd = c->ptn[i];
                 ptn[i] = rd;
                 i += rd + 1;
             }
         }
-        memcpy(lab, c->lab, c->lab_sz*sizeof(int));
-        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
-        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
+        memcpy(lab, c->lab, c->domain_size*sizeof(int));
+        memcpy(vertex_to_col, c->vertex_to_col, c->domain_size*sizeof(int));
+        memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size*sizeof(int));
 
-        lab_sz = c->lab_sz;
-        ptn_sz = c->ptn_sz;
+        domain_size = c->domain_size;
 
         cells = c->cells;
         smallest_cell_lower_bound = c->smallest_cell_lower_bound;
-        init = true;
     }
 
     void copy_force(coloring *c) {
-        if(init) {
-            if(lab_sz != c->lab_sz || ptn_sz != c->ptn_sz) {
+        if(alloc_pt) {
+            if(domain_size != c->domain_size) {
                 dealloc();
-                init = false;
             }
         }
 
-        if(!init) {
-            alloc(c->lab_sz);
+        if(!alloc_pt) {
+            alloc(c->domain_size);
         }
 
-        if(c->cells > c->ptn_sz / 4) {
-            memcpy(ptn, c->ptn, c->ptn_sz * sizeof(int));
+        if(c->cells > c->domain_size / 4) {
+            memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
         } else {
-            for (int i = 0; i < c->ptn_sz;) {
+            for (int i = 0; i < c->domain_size;) {
                 const int rd = c->ptn[i];
                 ptn[i] = rd;
                 i += rd + 1;
             }
         }
-        memcpy(lab, c->lab, c->lab_sz*sizeof(int));
-        memcpy(vertex_to_col, c->vertex_to_col, c->lab_sz*sizeof(int));
-        memcpy(vertex_to_lab, c->vertex_to_lab, c->lab_sz*sizeof(int));
+        memcpy(lab, c->lab, c->domain_size*sizeof(int));
+        memcpy(vertex_to_col, c->vertex_to_col, c->domain_size*sizeof(int));
+        memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size*sizeof(int));
 
-        lab_sz = c->lab_sz;
-        ptn_sz = c->ptn_sz;
+        domain_size = c->domain_size;
 
         cells = c->cells;
         smallest_cell_lower_bound = c->smallest_cell_lower_bound;
-        init = true;
     }
 
-    void initialize(int domain_size) {
-        alloc(domain_size);
+    void initialize(int new_domain_size) {
+        alloc(new_domain_size);
     }
 
     [[maybe_unused]] void check() const {
         bool comp = true;
 
-        for(int i = 0; i < lab_sz;++i) {
-            comp = comp && (lab[i] >= 0 && lab[i] < lab_sz);
+        for(int i = 0; i < domain_size;++i) {
+            comp = comp && (lab[i] >= 0 && lab[i] < domain_size);
             comp = comp && (lab[vertex_to_lab[i]] == i);
         }
 
         [[maybe_unused]] int last_col = -1;
         int counter  = 1;
-        for (int i = 0; i < ptn_sz; ++i) {
+        for (int i = 0; i < domain_size; ++i) {
             --counter;
             if(counter == 0) {
                 counter = ptn[i] + 1;
                 last_col = i;
-                assert(ptn[i] >= 0 && ptn[i] < lab_sz);
+                assert(ptn[i] >= 0 && ptn[i] < domain_size);
             } else {
                 assert(vertex_to_col[lab[i]] == last_col);
             }
         }
 
-        for(int i = 0; i < ptn_sz;) {
+        for(int i = 0; i < domain_size;) {
             assert(vertex_to_col[lab[i]] == i);
             i += ptn[i] + 1;
         }

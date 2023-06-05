@@ -163,7 +163,7 @@ namespace dejavu {
 
             void touch_initial_colors() {
                 int i = 0;
-                while (i < c->lab_sz) {
+                while (i < c->domain_size) {
                     touched_color.set(i);
                     i += c->ptn[i] + 1;
                 }
@@ -264,9 +264,9 @@ namespace dejavu {
                 T  = &internal_T1;
                 cT = &internal_T2;
 
-                touched_color.initialize(c->lab_sz);
-                touched_color_list.allocate(c->lab_sz);
-                prev_color_list.allocate(c->lab_sz);
+                touched_color.initialize(c->domain_size);
+                touched_color_list.allocate(c->domain_size);
+                prev_color_list.allocate(c->domain_size);
 
                 touch_initial_colors();
 
@@ -689,7 +689,7 @@ namespace dejavu {
                     c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos]) {
                     return saved_color_base[base_pos];
                 }
-                for (int i = 0; i < c->ptn_sz;) {
+                for (int i = 0; i < c->domain_size;) {
                     if (c->ptn[i] > 0) {
                         return i;
                     }
@@ -780,7 +780,7 @@ namespace dejavu {
                         candidates.clear();
                         int best_score = -1;
 
-                        for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                        for (int i = 0; i < state->get_coloring()->domain_size;) {
                             if (state->get_coloring()->ptn[i] > 0) {
                                 candidates.push_back(i);
                             }
@@ -836,7 +836,7 @@ namespace dejavu {
                     // heuristic, try to pick "good" color
                     candidates.clear();
                     int best_score = INT32_MIN;
-                    for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                    for (int i = 0; i < state->get_coloring()->domain_size;) {
                         if (state->get_coloring()->ptn[i] > 0) {
                             candidates.push_back(i);
                         }
@@ -889,7 +889,7 @@ namespace dejavu {
                     // heuristic, try to pick "good" color
                     candidates.clear();
                     int best_score = -1;
-                    for (int i = 0; i < state->get_coloring()->ptn_sz;) {
+                    for (int i = 0; i < state->get_coloring()->domain_size;) {
                         if (state->get_coloring()->ptn[i] > 0) {
                             candidates.push_back(i);
                         }
@@ -1070,7 +1070,7 @@ namespace dejavu {
                 auto type
                        = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
                 auto new_leaf
-                       = full_save?new stored_leaf(c.lab,c.lab_sz, type):new stored_leaf(base, type);
+                       = full_save?new stored_leaf(c.lab,c.domain_size, type):new stored_leaf(base, type);
                 leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
                 garbage_collector.push_back(new_leaf);
                 ++s_leaves;
@@ -1201,7 +1201,7 @@ namespace dejavu {
                 tree_level_size.resize(base.size() + 1);
                 tree_data_jump_map.resize(base.size() + 1);
                 add_node(0, root, nullptr, true);
-                node_invariant.resize(root->get_coloring()->lab_sz);
+                node_invariant.resize(root->get_coloring()->domain_size);
                 current_base = base;
                 init = true;
             }

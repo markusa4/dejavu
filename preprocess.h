@@ -72,7 +72,7 @@ namespace sassy {
     public:
         int seeded_select_color(coloring *c, int seed) {
             std::vector<int> cells;
-            for (int i = 0; i < c->ptn_sz;) {
+            for (int i = 0; i < c->domain_size;) {
                 if (c->ptn[i] > 0) {
                     cells.push_back(i);
                 }
@@ -88,8 +88,8 @@ namespace sassy {
 
         int select_color_largest(coloring *c) {
             if (!init) {
-                largest_cache.initialize(c->lab_sz);
-                non_trivial_list.allocate(c->lab_sz);
+                largest_cache.initialize(c->domain_size);
+                non_trivial_list.allocate(c->domain_size);
                 init = true;
             }
 
@@ -106,10 +106,10 @@ namespace sassy {
             int largest_cell_sz = -1;
             bool only_trivial = true;
 
-            assert(skipstart < c->ptn_sz);
-            for (int i = skipstart; i < c->ptn_sz;) {
+            assert(skipstart < c->domain_size);
+            for (int i = skipstart; i < c->domain_size;) {
                 assert(c->vertex_to_col[c->lab[i]] == i);
-                assert(i < c->ptn_sz);
+                assert(i < c->domain_size);
                 if (c->ptn[i] != 0 && only_trivial) {
                     skipstart = i;
                     only_trivial = false;
@@ -131,9 +131,9 @@ namespace sassy {
 
         int select_color_smallest(coloring *c) {
             int smallest_cell = -1;
-            int smallest_cell_sz = c->lab_sz + 1;
+            int smallest_cell_sz = c->domain_size + 1;
             bool only_trivial = true;
-            for (int i = skipstart; i < c->ptn_sz; i += c->ptn[i] + 1) {
+            for (int i = skipstart; i < c->domain_size; i += c->ptn[i] + 1) {
                 if (c->ptn[i] != 0) {
                     if (only_trivial) {
                         skipstart = i;
@@ -154,7 +154,7 @@ namespace sassy {
         int select_color_first(coloring *c) {
             int first_cell = -1;
 
-            for (int i = skipstart; i < c->ptn_sz;) {
+            for (int i = skipstart; i < c->domain_size;) {
                 if (c->ptn[i] > 0) {
                     skipstart = i;
                     first_cell = i;
@@ -1265,7 +1265,7 @@ namespace sassy {
             assert(_automorphism_supp.cur_pos == 0);
 
 
-            for (int i = 0; i < c.ptn_sz;) {
+            for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
                 switch (g_old_v[v]) {
                     case 0:
@@ -1854,7 +1854,7 @@ namespace sassy {
         }
 
         void copy_coloring_to_colmap(const coloring *c, int *colmap) {
-            for (int i = 0; i < c->lab_sz; ++i) {
+            for (int i = 0; i < c->domain_size; ++i) {
                 colmap[i] = c->vertex_to_col[i];
             }
         }
@@ -4554,7 +4554,7 @@ namespace sassy {
             int rem_edges = 0;
             int discrete_vert = 0;
             del.reset();
-            for (int i = 0; i < c->lab_sz;) {
+            for (int i = 0; i < c->domain_size;) {
                 const int col_sz = c->ptn[i];
                 if (col_sz == 0) {
                     ++discrete_vert;
@@ -4879,7 +4879,7 @@ namespace sassy {
             bool has_discrete = false;
             bool graph_changed = false;
 
-            for (int i = 0; i < c.ptn_sz;) {
+            for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
                 switch (g->v[v]) {
                     case 0:

@@ -22,6 +22,7 @@ TEST(graphs_test, graph_suite) {
     test_graph(directory + "ransq_1000_a.bliss");
     test_graph(directory + "Ranreg1024.bliss");
     test_graph(directory + "pp-16-10.dimacs");
+    test_graph(directory + "pp-25-100");
     test_graph(directory + "NCKL900K.bliss");
     test_graph(directory + "kef14.dimacs");
     test_graph(directory + "f-lex-reg-20-1.dimacs");
@@ -32,4 +33,6 @@ TEST(graphs_test, graph_suite) {
     test_graph(directory + "highschool1-aigio.dimacs");
     test_graph(directory + "AS.bliss");
     test_graph(directory + "usr4_116-1.dimacs");
+    test_graph(directory + "CHH_cc7-7_1078-1.dimacs");
+    test_graph(directory + "sts-79.dimacs");
 }
