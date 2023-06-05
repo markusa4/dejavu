@@ -51,14 +51,6 @@ namespace dejavu::search_strategy {
         /**
          * Co-routine which adds a leaf to leaf_storage, and sifts resulting automorphism into a given group.
          *
-         * @param g
-         * @param hook
-         * @param group
-         * @param leaf_storage
-         * @param local_state
-         * @param root_save
-         * @param uniform
-         * @return
          */
         bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::shared_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
@@ -160,11 +152,20 @@ namespace dejavu::search_strategy {
             h_look_close = look_close;
         }
 
+        /**
+         * Links this object to local workspaces.
+         *
+         * @param schreier Schreier workspace
+         * @param automorphism workspace to store automorphisms
+         */
         void link_to_workspace(groups::schreier_workspace* schreier, groups::automorphism_workspace* automorphism) {
             gws_automorphism = automorphism;
             gws_schreierw    = schreier;
         }
 
+        /**
+         * Resets all recorded statistics.
+         */
         void reset_statistics() {
             s_paths            = 0;
             s_paths_fail1      = 0;
@@ -191,6 +192,23 @@ namespace dejavu::search_strategy {
 
         // TODO setting to escape base aligned search for more preprocessing? could even return skiplevel-coloring
         // TODO preprocess using that, reset schreier structure, continue... ("in-in-processing" lol)
+        /**
+         * Performs Monte Carlo IR search.
+         *
+         * Returns either when probabilistic or deterministic abort criterion is satisfied, or whenever the
+         * \p fail_limit is reached.
+         *
+         * May use non-uniform base-alignment to fill Schreier tables faster.
+         *
+         * @param g graph
+         * @param hook hook to return automorphisms
+         * @param selector cell selector
+         * @param ir_tree ir tree computed so far
+         * @param group Schreier structure to sift found automorphisms into, used to calculate probabilistic abort
+         *              criterion
+         * @param local_state Local workspace used to perform random walks of IR tree
+         * @param fail_limit Limits the number of random IR walks not leading to a new automorphisms
+         */
         void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                           ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state,
                           int fail_limit) {
@@ -285,9 +303,22 @@ namespace dejavu::search_strategy {
             }
         }
 
-        // TODO implement dejavu strategy, more simple
-        // TODO depends on ir_tree, selector, and given base (no need to sift beyond base!)
-        // TODO: swap out ir_reduced to weighted IR shared_tree later? or just don't use automorphism pruning on BFS...?
+        /**
+         * Performs Monte Carlo IR search. Uses a given IR tree to initiate the search further down the tree (i.e., if
+         * BFS has been performed, we can start from the furthest BFS level).
+         *
+         * Returns either when probabilistic or deterministic abort criterion is satisfied, or whenever the
+         * \p fail_limit is reached.
+         *
+         * @param g graph
+         * @param hook hook to return automorphisms
+         * @param selector cell selector
+         * @param ir_tree ir tree computed so far
+         * @param group Schreier structure to sift found automorphisms into, used to calculate probabilistic abort
+         *              criterion
+         * @param local_state Local workspace used to perform random walks of IR tree
+         * @param fail_limit Limits the number of random IR walks not leading to a new automorphisms
+         */
         void random_walks_from_tree(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                                     ir::shared_tree &ir_tree, groups::shared_schreier &group,
                                     ir::controller &local_state, int fail_limit) {
