@@ -23,7 +23,6 @@ extern int*           dej_test_col;
 namespace dejavu {
     static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
                    [[maybe_unused]] const int *supp) {
-        std::cout << "certifying..." << std::endl;
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
         assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
@@ -145,6 +144,7 @@ namespace dejavu {
 
             // set up a local state for IR computations
             ir::controller local_state(&m_refinement, &local_coloring); /*< controls movement in IR tree*/
+            // set deviation counter relative to graph size
             local_state.h_deviation_inc = std::min(static_cast<int>(floor(2*sqrt(g->v_size))), 128);
 
             // save root state for random and BFS search, as well as restarts

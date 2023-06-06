@@ -131,8 +131,7 @@ namespace dejavu {
                 s_grp_sz.exponent = 0;
 
                 // orbit algorithm structure
-                groups::orbit orbs;
-                orbs.initialize(g->v_size);
+                groups::orbit orbs(g->v_size);
 
                 // automorphism workspace
                 ws_automorphism->reset();

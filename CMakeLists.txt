@@ -40,6 +40,7 @@ add_executable(
         tests/simple_graphs_test.cpp
         tests/main_test.cpp
         tests/refinement_test.cpp
+        tests/orbit_test.cpp
         tests/graphs_test.cpp
 )
 target_link_libraries(

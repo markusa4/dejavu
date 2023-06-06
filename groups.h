@@ -284,7 +284,7 @@ namespace dejavu {
          * Keeps track of an orbit partition, and provides tools to manipulate the orbits within.
          */
         class orbit {
-            int               sz;
+            int               sz = 0;
             mark_set          touched;
             work_list_t<int>  reset_arr;
             work_list_t<int>  map_arr;
@@ -407,7 +407,7 @@ namespace dejavu {
             /**
              * Initializes the orbit structure with the given size.
              *
-             * @param domain_size The size of the underlying domain.
+             * @param domain_size size of the underlying domain
              */
             void initialize(int domain_size) {
                 sz = domain_size;
@@ -420,6 +420,17 @@ namespace dejavu {
                     orb_sz.push_back(1);
                 }
             }
+
+            /**
+             * Initializes orbit with the given domain size.
+             *
+             * @param domain_size size of the underlying domain
+             */
+            explicit orbit(int domain_size) {
+                initialize(domain_size);
+            }
+
+            orbit() = default;
         };
 
         /**
@@ -1084,7 +1095,7 @@ namespace dejavu {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
                     if(transversals[i]->size() == corresponding_root_color_sz && corresponding_root_color_sz > 1) {
-                        save_to_individualize->push_back({transversals[i]->fixed_point(), corresponding_root_color_sz});
+                        save_to_individualize->emplace_back(transversals[i]->fixed_point(), corresponding_root_color_sz);
                     }
                 }
             }
