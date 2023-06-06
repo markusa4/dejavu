@@ -266,4 +266,83 @@ TEST(refinement_test, certify_test1) {
     EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), g1.get_coloring(), p));
     EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), g1.get_coloring(), p, 2, supp));
     EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), p, 2, supp));
+
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), p));
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), c.vertex_to_col, p));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), c.vertex_to_col, p, 2, supp));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), p, 2, supp));
+}
+
+
+TEST(refinement_test, certify_test2) {
+    dejavu::static_graph g1;
+    g1.initialize_graph(4, 3);
+    g1.add_vertex(0,1);
+    g1.add_vertex(1,2);
+    g1.add_vertex(2,2);
+    g1.add_vertex(0,1);
+    g1.add_edge(0, 1);
+    g1.add_edge(1, 2);
+    g1.add_edge(2, 3);
+    refinement R;
+    coloring c;
+    g1.get_sgraph()->initialize_coloring(&c, g1.get_coloring());
+    R.refine_coloring(g1.get_sgraph(), &c);
+    int* p = new int[4];
+    int* supp = new int[4];
+    p[0] = 0;
+    p[1] = 1;
+    p[2] = 2;
+    p[3] = 3;
+
+    EXPECT_TRUE(R.certify_automorphism(g1.get_sgraph(), p));
+    EXPECT_TRUE(R.certify_automorphism(g1.get_sgraph(), g1.get_coloring(), p));
+    EXPECT_TRUE(R.certify_automorphism_sparse(g1.get_sgraph(), g1.get_coloring(), p, 0, nullptr));
+    EXPECT_TRUE(R.certify_automorphism_sparse(g1.get_sgraph(), p, 0, nullptr));
+
+    p[0] = 3;
+    p[1] = 1;
+    p[2] = 2;
+    p[3] = 0;
+
+    supp[0] = 0;
+    supp[1] = 3;
+
+    ASSERT_EQ(g1.get_coloring()[0], g1.get_coloring()[3]);
+    ASSERT_NE(g1.get_coloring()[1], g1.get_coloring()[2]);
+
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), p));
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), g1.get_coloring(), p));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), g1.get_coloring(), p, 2, supp));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), p, 2, supp));
+
+    ASSERT_NE(c.vertex_to_col[0], c.vertex_to_col[3]);
+    ASSERT_NE(c.vertex_to_col[1], c.vertex_to_col[2]);
+
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), c.vertex_to_col, p));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), c.vertex_to_col, p, 2, supp));
+
+    p[0] = 3;
+    p[1] = 2;
+    p[2] = 1;
+    p[3] = 0;
+
+    supp[0] = 0;
+    supp[1] = 3;
+    supp[2] = 2;
+    supp[3] = 1;
+
+    ASSERT_EQ(g1.get_coloring()[0], g1.get_coloring()[3]);
+    ASSERT_NE(g1.get_coloring()[1], g1.get_coloring()[2]);
+
+    EXPECT_TRUE(R.certify_automorphism(g1.get_sgraph(), p));
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), g1.get_coloring(), p));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), g1.get_coloring(), p, 4, supp));
+    EXPECT_TRUE(R.certify_automorphism_sparse(g1.get_sgraph(), p, 4, supp));
+
+    ASSERT_NE(c.vertex_to_col[0], c.vertex_to_col[3]);
+    ASSERT_NE(c.vertex_to_col[1], c.vertex_to_col[2]);
+
+    EXPECT_FALSE(R.certify_automorphism(g1.get_sgraph(), c.vertex_to_col, p));
+    EXPECT_FALSE(R.certify_automorphism_sparse(g1.get_sgraph(), c.vertex_to_col, p, 4, supp));
 }

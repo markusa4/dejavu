@@ -475,8 +475,6 @@ assert(c->cells == actual_cells);
                     const int image_i = p[i];
                     if (image_i == i)
                         continue;
-                    if (g->d[i] != g->d[image_i]) // degrees must be equal
-                        return false;
                     if (colmap[i] != colmap[image_i]) // colors must be equal
                         return false;
 
@@ -511,15 +509,9 @@ assert(c->cells == actual_cells);
 
                 assure_initialized(g);
 
-                //for(i = 0; i < g->v_size; ++i) {
                 for (int f = 0; f < supp; ++f) {
                     i = supp_arr[f];
                     const int image_i = p[i];
-                    //if(image_i == i)
-                    //    continue;
-                    //if(g->d[i] != g->d[image_i]) // degrees must be equal
-                    //    return false;
-
                     scratch_set.reset();
                     // automorphism must preserve neighbours
                     found = 0;
@@ -527,7 +519,6 @@ assert(c->cells == actual_cells);
                         const int vertex_j = g->e[j];
                         const int image_j = p[vertex_j];
                         scratch_set.set(image_j);
-                        //scratch[image_j] = vertex_j;
                         found += 1;
                     }
                     for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
@@ -536,9 +527,6 @@ assert(c->cells == actual_cells);
                             scratch_set.reset();
                             return false;
                         }
-                        //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
-                        //    return false;
-                        //scratch_set.unset(vertex_j);
                         found -= 1;
                     }
                     if (found != 0) {
@@ -557,14 +545,9 @@ assert(c->cells == actual_cells);
 
                 assure_initialized(g);
 
-                //for(i = 0; i < g->v_size; ++i) {
                 for (int f = 0; f < supp; ++f) {
                     i = supp_arr[f];
                     const int image_i = p[i];
-                    //if (image_i == i)
-                    //    continue;
-                    //if (g->d[i] != g->d[image_i]) // degrees must be equal
-                    //    return false;
                     if (colmap[i] != colmap[image_i]) // colors must be equal
                         return false;
 
@@ -577,7 +560,6 @@ assert(c->cells == actual_cells);
                         if (colmap[vertex_j] != colmap[image_j])
                             return false;
                         scratch_set.set(image_j);
-                        //scratch[image_j] = vertex_j;
                         found += 1;
                     }
                     for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
@@ -585,8 +567,6 @@ assert(c->cells == actual_cells);
                         if (!scratch_set.get(vertex_j)) {
                             return false;
                         }
-                        //if(colmap[scratch[vertex_j]] != colmap[vertex_j])
-                        //    return false;
                         scratch_set.unset(vertex_j);
                         found -= 1;
                     }
@@ -610,10 +590,6 @@ assert(c->cells == actual_cells);
                 for (int f = 0; f < supp; ++f) {
                     i = supp_arr[f];
                     const int image_i = p[i];
-                    if (image_i == i)
-                        continue;
-                    if (g->d[i] != g->d[image_i]) // degrees must be equal
-                        return {false, -1};
                     if (colmap[i] != colmap[image_i]) // colors must be equal
                         return {false, -1};
 
@@ -626,7 +602,6 @@ assert(c->cells == actual_cells);
                         if (colmap[vertex_j] != colmap[image_j])
                             return {false, i};
                         scratch_set.set(image_j);
-                        //scratch[image_j] = vertex_j;
                         found += 1;
                     }
                     for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
