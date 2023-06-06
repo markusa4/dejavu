@@ -444,19 +444,33 @@ namespace dejavu {
         class mark_set {
             int *s   = nullptr;
             int mark = 0;
-            unsigned int sz = 0;
+            int sz = 0;
 
             void full_reset() {
                 memset(s, mark, sz * sizeof(int));
             }
 
         public:
+            /**
+             * Initializes a set of size 0
+             */
             mark_set() = default;
+
+            /**
+             * Initialize this set with the given \p size.
+             * @param size size to initialize this set to
+             */
             explicit mark_set(int size) {
                 initialize(size);
             }
 
-            void initialize(unsigned int size) {
+            /**
+             * Resizes this set to size \p size, resets the set
+             *
+             * @param size new size of this set
+             */
+            void initialize(int size) {
+                assert(size >= 0);
                 if(s && sz == size) {
                     reset();
                     return;
@@ -468,15 +482,39 @@ namespace dejavu {
                 reset();
             }
 
-            bool get(int pos) {
+            /**
+             * @param pos element to check
+             * @return Is element \p pos in set?
+             */
+            inline bool get(int pos) {
+                assert(pos >= 0);
+                assert(pos < sz);
                 return s[pos] == mark;
             }
-            void set(int pos) {
+
+            /**
+             * Adds element \p pos to set
+             *
+             * @param pos element to set
+             */
+            inline void set(int pos) {
+                assert(pos >= 0);
+                assert(pos < sz);
                 s[pos] = mark;
             }
-            void unset(int pos) {
+
+            /**
+             * Removes element \p pos from set
+             * @param pos element to remove
+             */
+            inline void unset(int pos) {
+                assert(pos >= 0);
+                assert(pos < sz);
                 s[pos] = mark - 1;
             }
+            /**
+             * Resets this set to the empty set
+             */
             void reset() {
                 if(mark == -1) full_reset();
                 ++mark;

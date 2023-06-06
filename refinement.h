@@ -342,19 +342,20 @@ namespace dejavu {
                     color_class_splits.reset();
                     const int next_color_class = cell_todo.next_cell(&queue_pointer, c, &singleton_hint);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
-                    bool dense_dense = false;
+                    //bool dense_dense = false;
                     //if(g->d[c->lab[next_color_class]] == 0) {
                     //   continue;
                     //}
-                    if (g->d[c->lab[next_color_class]] > 5) {
-                        dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
-                    }
+                    //if (g->d[c->lab[next_color_class]] > 5) {
+                    //    dense_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz)));
+                    //}
+                    const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
-                    if (next_color_class_sz == 1 && !(g->dense && dense_dense)) {
+                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
                         // singleton
                         refine_color_class_singleton_first(g, c, next_color_class,&color_class_splits);
                     } else if (g->dense) {
-                        if (dense_dense) { // dense-dense
+                        if (very_dense) { // dense-dense
                             refine_color_class_dense_dense_first(g, c, next_color_class, next_color_class_sz,
                                                                  &color_class_splits);
                         } else { // dense-sparse

@@ -71,10 +71,8 @@ namespace dejavu {
         }
 
         void initialize_graph(const unsigned int nv, const unsigned int ne) {
-            if(initialized)
+            if(initialized || finalized)
                 throw std::logic_error("can not initialize a graph that is already initialized");
-            if(finalized)
-                throw std::logic_error("can not change finalized graph");
             initialized = true;
             g.initialize((int) nv, (int) (2*ne));
             g.v_size = (int) nv;
@@ -112,6 +110,8 @@ namespace dejavu {
                 throw std::out_of_range("v1 is not a defined vertex, use add_vertex to add vertices");
             if(v2 >= num_vertices_defined)
                 throw std::out_of_range("v2 is not a defined vertex, use add_vertex to add vertices");
+            if(num_edges_defined + 2 > g.e_size)
+                throw std::out_of_range("too many edges");
             ++edge_cnt[v1];
             const int edg_cnt1 = edge_cnt[v1];
             if(edg_cnt1 > g.d[v1])

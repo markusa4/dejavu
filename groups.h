@@ -29,7 +29,7 @@ namespace dejavu {
                 automorphism[(*support)[i]] = (*support)[i];
             }
             support->reset();
-        };
+        }
 
         /**
          * Create an automorphism from two discrete vertex colorings.
@@ -39,8 +39,8 @@ namespace dejavu {
          * `vertex_to_col[i]`.
          * @param col_to_vertex Color-to-vertex mapping of the second coloring, i.e., the color i contains the vertex
          * `col_to_vertex[i]` (since the colorings are assumed to be discrete, every `i` must be a distinct color).
-         * @param automorphism Dense notation for the automorphism to be written. Assumed to be the identity upon calling
-         * the method.
+         * @param automorphism Dense notation for the automorphism to be written. Assumed to be the identity upon
+         * calling the method.
          * @param support Support for the automorphism \p automorphism.
          */
         static void color_diff_automorphism(int domain_size, const int *vertex_to_col, const int *col_to_vertex,
@@ -156,8 +156,7 @@ namespace dejavu {
              */
             void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
                   const int *p, int pwr = 1) {
-                if (pwr == 0)
-                    return;
+                if (pwr == 0) return;
                 if (pwr <= 5) {
                     if (pwr == 1)
                         for (int i = 0; i < domain_size; ++i) automorphism[i] = p[automorphism[i]];

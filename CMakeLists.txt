@@ -41,6 +41,7 @@ add_executable(
         tests/main_test.cpp
         tests/refinement_test.cpp
         tests/orbit_test.cpp
+        tests/static_graph_test.cpp
         tests/graphs_test.cpp
 )
 target_link_libraries(
