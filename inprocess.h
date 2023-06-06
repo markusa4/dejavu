@@ -11,13 +11,6 @@
 
 namespace dejavu::search_strategy {
     class inprocessor {
-    public:
-        // statistics
-        big_number s_grp_sz; /**< group size */
-
-        // TODO: option to compute add stronger invariants on the furthest BFS level
-
-
         static unsigned long invariant_path2(sgraph *g, coloring* c, int v) {
             unsigned long hash_inv = 0;
             const int ptn_st = g->v[v];
@@ -35,9 +28,24 @@ namespace dejavu::search_strategy {
             return hash_inv;
         }
 
-        std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized */
-        std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing      */
+    public:
+        // statistics
+        big_number s_grp_sz; /**< group size */
 
+        std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized           */
+        std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
+
+        /**
+         * Inprocess the (colored) graph using all the available solver data.
+         *
+         * @param g graph
+         * @param tree currently available  ir tree
+         * @param group currently available group of symmetries
+         * @param local_state workspace to perform individualization&refinement in
+         * @param root_save the current coloring of the IR tree root
+         * @param budget
+         * @return whether any preprocessing was performed
+         */
         bool inprocess(sgraph *g, ir::shared_tree *tree, groups::shared_schreier *group, ir::controller &local_state,
                        ir::limited_save &root_save, int budget) {
             local_state.load_reduced_state(root_save);

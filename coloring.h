@@ -25,8 +25,8 @@ namespace dejavu::ds {
         int *vertex_to_lab = nullptr;  /**< vertex `v` is stored in lab at position `vertex_to_lab[v]`, i.e.,
                                         `lab[vertex_to_lab[v]] = v`                                                   */
 
-        int cells = 1;
-        int domain_size = 0;
+        int cells       = 1;           /**< number of colors (i.e., cells) in the coloring                            */
+        int domain_size = 0;           /**< domain size of the coloring (i.e., number of vertices of the graph)       */
 
     private:
         int *alloc_pt = nullptr;
@@ -65,7 +65,6 @@ namespace dejavu::ds {
         };
 
     public:
-
         ~coloring() {
             if (alloc_pt) {
                 dealloc();
@@ -106,15 +105,7 @@ namespace dejavu::ds {
 
             if (!alloc_pt) alloc(c->domain_size);
 
-            if (c->cells > c->domain_size / 4) {
-                memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
-            } else {
-                for (int i = 0; i < c->domain_size;) {
-                    const int rd = c->ptn[i];
-                    ptn[i] = rd;
-                    i += rd + 1;
-                }
-            }
+            memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
             memcpy(lab, c->lab, c->domain_size * sizeof(int));
             memcpy(vertex_to_col, c->vertex_to_col, c->domain_size * sizeof(int));
             memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size * sizeof(int));
@@ -137,15 +128,7 @@ namespace dejavu::ds {
                 alloc(c->domain_size);
             }
 
-            if (c->cells > c->domain_size / 4) {
-                memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
-            } else {
-                for (int i = 0; i < c->domain_size;) {
-                    const int rd = c->ptn[i];
-                    ptn[i] = rd;
-                    i += rd + 1;
-                }
-            }
+            memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
             memcpy(lab, c->lab, c->domain_size * sizeof(int));
             memcpy(vertex_to_col, c->vertex_to_col, c->domain_size * sizeof(int));
             memcpy(vertex_to_lab, c->vertex_to_lab, c->domain_size * sizeof(int));
@@ -154,6 +137,12 @@ namespace dejavu::ds {
             cells = c->cells;
         }
 
+        /**
+         * Initialize this coloring with a given domain size. Allocates memory for the coloring. Does not initialize any
+         * content and runs in O(1).
+         *
+         * @param new_domain_size domain size of the coloring
+         */
         void initialize(int new_domain_size) {
             alloc(new_domain_size);
         }

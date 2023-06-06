@@ -333,7 +333,7 @@ namespace dejavu {
         class work_queue {
         public:
             void initialize(int size) {
-                assert(!init);
+                if(init) delete[] queue;
                 sz = size;
                 pos = 0;
                 queue = new int[size];

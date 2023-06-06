@@ -15,7 +15,7 @@ namespace sassy {
 
     // ring queue for pairs of integers
     class ring_pair {
-        std::pair<int, int> *arr = 0;
+        std::pair<int, int> *arr = nullptr;
         bool init = false;
         int arr_sz = -1;
         int front_pos = -1;
@@ -2472,12 +2472,10 @@ namespace sassy {
             }
 
             coloring original_c;
-            original_c.copy_from_ir_ancestor(&c1);
-            original_c.copy_ptn(&c1);
+            original_c.copy_any(&c1);
 
             coloring color_cache;
-            color_cache.copy_from_ir_ancestor(&c1);
-            color_cache.copy_ptn(&c1);
+            color_cache.copy_any(&c1);
 
             selector S;
 
@@ -3165,10 +3163,10 @@ namespace sassy {
             assure_ir_quotient_init(g);
 
             coloring c2;
-            c2.copy_from_ir_ancestor(&c1);
+            c2.copy_any(&c1);
 
             coloring c3;
-            c3.copy_from_ir_ancestor(&c1);
+            c3.copy_any(&c1);
 
             int penalty = 0;
 
@@ -3797,12 +3795,10 @@ namespace sassy {
             _automorphism_supp.reset();
 
             coloring c2;
-            c2.copy_from_ir_ancestor(&c1);
-            c2.copy_ptn(&c1);
+            c2.copy_any(&c1);
 
             coloring c3;
-            c3.copy_from_ir_ancestor(&c1);
-            c3.copy_ptn(&c1);
+            c3.copy_any(&c1);
 
             int penalty = 0;
 

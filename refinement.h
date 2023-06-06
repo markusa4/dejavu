@@ -561,10 +561,10 @@ assert(c->cells == actual_cells);
                 for (int f = 0; f < supp; ++f) {
                     i = supp_arr[f];
                     const int image_i = p[i];
-                    if (image_i == i)
-                        continue;
-                    if (g->d[i] != g->d[image_i]) // degrees must be equal
-                        return false;
+                    //if (image_i == i)
+                    //    continue;
+                    //if (g->d[i] != g->d[image_i]) // degrees must be equal
+                    //    return false;
                     if (colmap[i] != colmap[image_i]) // colors must be equal
                         return false;
 
@@ -712,12 +712,12 @@ assert(c->cells == actual_cells);
             }
 
             ~refinement() {
-                if (initialized)
+                if (domain_size >= 0)
                     delete[] workspace_int;
             }
 
         private:
-            bool initialized = false;
+            int domain_size = -1;
             work_set_int queue_pointer;
             cell_worklist cell_todo;
             mark_set scratch_set;
@@ -729,14 +729,15 @@ assert(c->cells == actual_cells);
             work_list_t<int> old_color_classes;
             work_list_pair_bool color_class_splits;
 
-            int *scratch;
-            int *workspace_int;
+            int *scratch = nullptr;
+            int *workspace_int = nullptr;
 
             void assure_initialized(const sgraph *g) {
-                if (!initialized) {
+                if (g->v_size > domain_size) {
                     const int n = g->v_size;
 
                     // reducing contention on heap allocator through bulk allocation...
+                    if(workspace_int) delete[] workspace_int;
                     workspace_int = new int[n];
 
                     vertex_worklist.allocate(n * 2);
@@ -756,7 +757,7 @@ assert(c->cells == actual_cells);
                     cell_todo.initialize(n * 2);
 
                     memset(scratch, 0, n * sizeof(int));
-                    initialized = true;
+                    domain_size = n;
                 }
             }
 

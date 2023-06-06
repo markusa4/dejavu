@@ -5,6 +5,9 @@
 #ifndef DEJAVU_DEJAVU_H
 #define DEJAVU_DEJAVU_H
 
+#define DEJAVU_VERSION_MAJOR 2
+#define DEJAVU_VERSION_MINOR 0
+
 #include "dfs.h"
 #include "bfs.h"
 #include "rand.h"
@@ -63,14 +66,12 @@ namespace dejavu {
          * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
          *
          * \sa A description of the graph format can be found in sgraph.
-         *
-         * @todo no-pruning DFS to fill up available leafs more efficiently
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
+            if(colmap == nullptr) colmap = (int*) calloc(g->v_size, sizeof(int)); // TODO free (use RAII)
+
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
-
-            if(colmap == nullptr) colmap = (int*) calloc(g->v_size, sizeof(int)); // TODO free
 
             // preprocess the graph using sassy
             PRINT("preprocessing...");
