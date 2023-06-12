@@ -679,7 +679,7 @@ namespace sassy {
                 endpoint_cnt.push_back(0);
             }
 
-            dejavu::mark_set path_done(g->v_size);
+            dejavu::mark_set  path_done(g->v_size);
             dejavu::work_list color_pos(g->v_size);
             dejavu::work_list filter(g->v_size);
             dejavu::work_list not_unique(g->v_size);
@@ -963,13 +963,13 @@ namespace sassy {
             }
         }
 
-        // TODO: re-write algorithm color-wise
-        void red_deg2_trivial_connect(dejavu::sgraph* g, int* colmap) {
+        void red_deg2_trivial_connect(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
                 return;
 
-            dejavu::mark_set color_test(g->v_size);
-            dejavu::mark_set color_unique(g->v_size);
+            dejavu::ds::mark_set color_test(g->v_size);
+
+            dejavu::ds::mark_set color_unique(g->v_size);
 
             coloring col;
             g->initialize_coloring(&col, colmap);
@@ -983,21 +983,21 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            dejavu::work_list endpoint_cnt(g->v_size);
+            dejavu::ds::work_list endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
-            dejavu::mark_set path_done(g->v_size);
-            dejavu::work_list color_pos(g->v_size);
-            dejavu::work_list filter(g->v_size);
-            dejavu::work_list not_unique(2*g->v_size);
-            dejavu::work_list not_unique_analysis(g->v_size);
-            dejavu::work_list path(g->v_size);
-            dejavu::work_list connected_paths(g->e_size);
-            dejavu::work_list connected_endpoints(g->e_size);
-            dejavu::work_list neighbour_list(g->v_size);
-            dejavu::work_list neighbour_to_endpoint(g->v_size);
+            dejavu::ds::mark_set path_done(g->v_size);
+            dejavu::ds::work_list color_pos(g->v_size);
+            dejavu::ds::work_list not_unique(2*g->v_size);
+            dejavu::ds::work_list not_unique_analysis(g->v_size);
+            dejavu::ds::work_list path_list(g->v_size);
+            dejavu::ds::work_list path(g->v_size);
+            dejavu::ds::work_list connected_paths(g->e_size);
+            dejavu::ds::work_list connected_endpoints(g->e_size);
+            dejavu::ds::work_list neighbour_list(g->v_size);
+            dejavu::ds::work_list neighbour_to_endpoint(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1049,10 +1049,10 @@ namespace sassy {
                 //if(endpoints != 1)
                 //    continue;
 
-                /*for (int j = 0; j < color_size; ++j) {
+                for (int j = 0; j < color_size; ++j) {
                     const int other_from_color = col.lab[color + j];
                     assert(endpoint_cnt[other_from_color] == endpoints);
-                }*/
+                }
 
                 if (endpoints == 0) {
                     continue;
@@ -1071,15 +1071,12 @@ namespace sassy {
                     color_test.set(neighbour_col);
                 }
 
-                filter.reset();
                 not_unique.reset();
                 // filter to indices with unique colors
                 for (int j = 0; j < endpoints; ++j) {
                     const int neighbour = connected_paths[g->v[test_vertex] + j];
                     const int neighbour_col = col.vertex_to_col[neighbour];
-                    if (!color_unique.get(neighbour_col)) { // if unique
-                        filter.push_back(j); // add index to filter
-                    } else {
+                    if (color_unique.get(neighbour_col)) { // if not unique
                         not_unique.push_back(neighbour);
                         assert(connected_endpoints[g->v[test_vertex] + j] >= 0);
                         assert(connected_endpoints[g->v[test_vertex] + j] < g->v_size);
@@ -1094,23 +1091,29 @@ namespace sassy {
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int endpoint = not_unique[kk + 1];
                     const int endpoint_col = col.vertex_to_col[endpoint];
-                    not_unique_analysis[endpoint_col] = 0;
+                    const int neighbour = not_unique[kk];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    not_unique_analysis[endpoint_col]  = 0;
+                    not_unique_analysis[neighbour_col] = 0;
                 }
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int endpoint = not_unique[kk + 1];
                     const int endpoint_col = col.vertex_to_col[endpoint];
+                    const int neighbour = not_unique[kk];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
                     ++not_unique_analysis[endpoint_col];
+                    ++not_unique_analysis[neighbour_col];
                 }
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int neighbour = not_unique[kk];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
                     const int endpoint  = not_unique[kk + 1];
                     const int endpoint_col    = col.vertex_to_col[endpoint];
-                    [[maybe_unused]] const int endpoint_col_sz = col.ptn[endpoint_col] + 1;
+                    const int endpoint_col_sz = col.ptn[endpoint_col] + 1;
                     path.reset();
                     if (!color_test.get(endpoint_col)) {
                         color_test.set(endpoint_col);
-
-                        if (not_unique_analysis[endpoint_col] == col.ptn[endpoint_col] + 1) {
+                        if (not_unique_analysis[endpoint_col] == not_unique_analysis[neighbour_col] && not_unique_analysis[endpoint_col] == col.ptn[endpoint_col] + 1) {
                             // check that path endpoints dont contain duplicates
                             bool all_unique = true;
                             color_unique.reset();
@@ -1126,12 +1129,12 @@ namespace sassy {
                                 }
                             }
 
-                            if (all_unique && col.ptn[endpoint_col] + 1 == not_unique_analysis[endpoint_col] && color < endpoint_col) { // col.ptn[endpoint_col] + 1 == 2 && color_size == 2 && only_once
-                                // TODO: make sure it's not doubly-connected to one of the vertices (need to check this for every vertex, actually)?
+                            // test_vertex connects to all vertices of endpoint_col!
+                            if (all_unique && color < endpoint_col) { // col.ptn[endpoint_col] + 1 == 2 && color_size == 2 && only_once
                                 const int path_col = col.vertex_to_col[neighbour];
-                                [[maybe_unused]] const int path_col_sz = col.ptn[path_col] + 1;
-
-                                assert(path_col_sz == (not_unique_analysis[endpoint_col] * color_size));
+                                const int path_col_sz = col.ptn[path_col] + 1;
+                                const int connects_to = not_unique_analysis[endpoint_col];
+                                assert(path_col_sz == (connects_to * color_size));
                                 assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
 
 
