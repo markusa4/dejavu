@@ -40,6 +40,9 @@ namespace dejavu {
         groups::shared_schreier* sh_schreier = nullptr;  /**< Schreier-Sims structure */
         ir::shared_tree*         sh_tree     = nullptr;  /**< IR tree                 */
 
+        // auxiliary
+        work_list  colmap_substitute;
+
     public:
         // settings
         int h_error_bound       = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
@@ -67,7 +70,12 @@ namespace dejavu {
          * \sa A description of the graph format can be found in sgraph.
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
-            if(colmap == nullptr) colmap = (int*) calloc(g->v_size, sizeof(int)); // TODO free (use RAII)
+            // no colmap provided? let's substitute the trivial coloring
+            if(colmap == nullptr) {
+                colmap_substitute.resize(g->v_size);
+                colmap = colmap_substitute.get_array();
+                for(int i = 0; i < g->v_size; ++i) colmap[i] = 0;
+            }
 
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
@@ -329,8 +337,8 @@ namespace dejavu {
                     if(s_hard && m_rand.s_succeed >= 1 && s_cost <= h_budget * 10) h_next_routine = random_ir;
 
                     // immediately inprocess if BFS was successful in pruning on the first level
-                    if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;
-                    if(sh_tree->get_finished_up_to() > 1 && sh_tree->get_current_level_size() < base_sizes[0])
+                    if(sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;
+                    if(sh_tree->get_finished_up_to()  > 1 && sh_tree->get_current_level_size() < base_sizes[0])
                         h_next_routine = restart;
 
                     switch(h_next_routine) {
@@ -365,7 +373,7 @@ namespace dejavu {
                         case bfs_ir: {
                             // perform one level of BFS
                             m_bfs.h_use_deviation_pruning = !((s_inproc_success >= 2) && s_path_fail1_avg > 0.1);
-                            m_bfs.do_a_level(g, *sh_tree, local_state, selector);
+                            m_bfs.do_a_level(g, hook, *sh_tree, local_state, selector);
                             progress_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
                                                   std::to_string(s_bfs_next_level_nodes) + ")",
                                            std::to_string(sh_tree->get_level_size(sh_tree->get_finished_up_to())));

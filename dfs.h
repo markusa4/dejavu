@@ -210,7 +210,7 @@ namespace dejavu {
                         if (found_auto) {
                             assert(ws_automorphism->nsupport() > 0);
                             assert(ws_automorphism->perm()[ind_v] == vert || ws_automorphism->perm()[vert] == ind_v);
-                            if(hook) (*hook)(0, ws_automorphism->perm(), ws_automorphism->nsupport(),
+                            if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
                                              ws_automorphism->support());
                             orbs.add_automorphism_to_orbit(*ws_automorphism);
                         }

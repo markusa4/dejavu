@@ -15,7 +15,6 @@ namespace dejavu {
          */
         class bfs_ir {
         public:
-
             bool h_use_deviation_pruning = true;
 
             // TODO some of this has to go into shared_tree
@@ -32,7 +31,7 @@ namespace dejavu {
                 gws_automorphism = automorphism;
             }
 
-            void do_a_level(sgraph* g, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
+            void do_a_level(sgraph* g, dejavu_hook* hook, ir::shared_tree& ir_tree, ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
 
                 s_deviation_prune = 0;
@@ -44,7 +43,7 @@ namespace dejavu {
                 assert(ir_tree.get_current_level_size() > 0);
 
                 queue_up_level(selector, ir_tree, current_level);
-                work_on_todo(g, &ir_tree, local_state);
+                work_on_todo(g, hook, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
             }
 
@@ -94,8 +93,8 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
-            void compute_node(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state, ir::tree_node* node,
-                              const int v, ir::limited_save* last_load) {
+            void compute_node(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree, ir::controller& local_state,
+                              ir::tree_node* node, const int v, ir::limited_save* last_load) {
                 auto next_node_save = node->get_save();
 
                 // TODO consider base size 1 and top-level automorphisms
@@ -152,7 +151,11 @@ namespace dejavu {
                     gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
                     cert = local_state.certify(g, *gws_automorphism);
                     ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
-                    // TODO call hook
+
+                    // Output automorphism
+                    if(hook) (*hook)(g->v_size, gws_automorphism->perm(), gws_automorphism->nsupport(),
+                                     gws_automorphism->support());
+
                     ++s_total_leaves;
                     gws_automorphism->reset();
 
@@ -192,11 +195,11 @@ namespace dejavu {
                 }
             }
 
-            void work_on_todo(sgraph* g, ir::shared_tree* ir_tree, ir::controller& local_state) {
+            void work_on_todo(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree, ir::controller& local_state) {
                 ir::limited_save* last_load = nullptr;
                 while(!ir_tree->queue_missing_node_empty()) {
                     const auto todo = ir_tree->queue_missing_node_pop();
-                    compute_node(g, ir_tree, local_state, todo.first, todo.second, last_load);
+                    compute_node(g, hook, ir_tree, local_state, todo.first, todo.second, last_load);
                     last_load = todo.first->get_save();
                 }
             }
