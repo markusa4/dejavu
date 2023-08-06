@@ -1,3 +1,7 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef SASSY_H
 #define SASSY_H
 
@@ -654,12 +658,11 @@ namespace sassy {
         }
 
         // color-wise degree2 unique endpoint algorithm
-        void red_deg2_unique_endpoint_new(dejavu::sgraph *g, int *colmap) {
+        void red_deg2_unique_endpoint(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
                 return;
 
             dejavu::mark_set color_test(g->v_size);
-
             dejavu::mark_set color_unique(g->v_size);
 
             coloring col;
@@ -682,8 +685,6 @@ namespace sassy {
             dejavu::mark_set  path_done(g->v_size);
             dejavu::work_list color_pos(g->v_size);
             dejavu::work_list filter(g->v_size);
-            dejavu::work_list not_unique(g->v_size);
-            dejavu::work_list not_unique_analysis(g->v_size);
             dejavu::work_list path_list(g->v_size);
             dejavu::work_list path(g->v_size);
             dejavu::work_list connected_paths(g->e_size);
@@ -692,6 +693,7 @@ namespace sassy {
             // collect and count endpoints
             int total_paths = 0;
             int total_deleted_vertices = 0;
+            int total_paths_excluded_not_unique = 0;
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -762,21 +764,18 @@ namespace sassy {
                     const int neighbour_col = col.vertex_to_col[neighbour];
                     if(color_test.get(neighbour_col)) {
                         color_unique.set(neighbour_col); // means "not unique"
+                        total_paths_excluded_not_unique += color_size;
                     }
                     color_test.set(neighbour_col);
                 }
 
                 filter.reset();
-                not_unique.reset();
                 // filter to indices with unique colors
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
                     const int neighbour_col = col.vertex_to_col[neighbour];
                     if(!color_unique.get(neighbour_col)) { // if unique
                         filter.push_back(j); // add index to filter
-                    } else {
-                        not_unique.push_back(neighbour);
-                        not_unique.push_back(connected_endpoints[g->v[test_vertex] + j]);
                     }
                 }
 
@@ -799,6 +798,7 @@ namespace sassy {
                     const int neighbour_endpoint = connected_endpoints[g->v[test_vertex] + j];
                     const int neighbour_col      = col.vertex_to_col[neighbour_endpoint];
                     if(color_test.get(neighbour_col)) {
+                        total_paths_excluded_not_unique += color_size;
                         color_unique.set(neighbour_col);
                     }
                     color_test.set(neighbour_col);
@@ -923,7 +923,282 @@ namespace sassy {
                 }
             }
 
+            std::cout << total_deleted_vertices          << std::endl;
+            std::cout << total_paths_excluded_not_unique << std::endl;
+
             //PRINT("(prep-red) deg2_unique_endpoint, vertices deleted: " << total_deleted_vertices << "/" << g->v_size);
+        }
+
+
+        // color-wise degree2 unique endpoint algorithm
+        void red_deg2_unique_edge(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
+                return;
+
+            dejavu::mark_set color_test(g->v_size);
+            dejavu::mark_set color_unique(g->v_size);
+
+            coloring col;
+            g->initialize_coloring(&col, colmap);
+
+            add_edge_buff_act.reset();
+            for (int i = 0; i < g->v_size; ++i) {
+                add_edge_buff[i].clear();
+            }
+
+            del.reset();
+
+            worklist_deg1.reset();
+
+            dejavu::work_list endpoint_cnt(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) {
+                endpoint_cnt.push_back(0);
+            }
+
+            dejavu::mark_set  path_done(g->v_size);
+            dejavu::work_list color_pos(g->v_size);
+            dejavu::work_list filter(g->v_size);
+            dejavu::work_list path_list(g->v_size);
+            dejavu::work_list path(g->v_size);
+            dejavu::work_list connected_paths(g->e_size);
+            dejavu::work_list connected_endpoints(g->e_size);
+
+            // collect and count endpoints
+            int total_paths = 0;
+            int total_deleted_vertices = 0;
+            int total_paths_excluded_not_unique = 0;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                if(g->d[i] == 2) {
+                    if(path_done.get(i))
+                        continue;
+                    const int n1 = g->e[g->v[i] + 0];
+                    const int n2 = g->e[g->v[i] + 1];
+                    // n1 or n2 is endpoint? then walk to other endpoint and collect information...
+                    if(g->d[n1] != 2) {
+                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done);
+                        if(other_endpoint.first == n1) // big self-loop
+                            continue;
+                        connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
+                        connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
+                        ++endpoint_cnt[n1];
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n1);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n1 != other_endpoint.first);
+                        ++total_paths;
+                    } else if(g->d[n2] != 2) {
+                        const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
+                        if(other_endpoint.first == n2) // big self-loop
+                            continue;
+                        connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
+                        connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
+                        ++endpoint_cnt[n2];
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n2);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n2 != other_endpoint.first);
+                        ++total_paths;
+                    }
+                }
+            }
+
+            path_done.reset();
+
+            // iterate over color classes
+            for(int i = 0; i < g->v_size;) {
+                const int color      = i;
+                const int color_size = col.ptn[color] + 1;
+                i += color_size;
+                const int test_vertex = col.lab[color];
+                const int endpoints   = endpoint_cnt[test_vertex];
+
+                for(int j = 0; j < color_size; ++j) {
+                    assert(endpoint_cnt[col.lab[color + j]] == endpoints);
+                }
+
+                // only want to look at endpoints of paths
+                if(endpoints == 0) continue;
+
+                color_test.reset();
+                color_unique.reset();
+
+                // only interested in paths with non-unique color, otherwise we could use unique endpoint algorithm
+                // check which neighbouring paths have non-unique color
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    if(color_test.get(neighbour_col)) {
+                        color_unique.set(neighbour_col); // means "not unique"
+                    }
+                    color_test.set(neighbour_col);
+                }
+
+                // TODO maybe filter here already whether we've already looked at a path
+
+                filter.reset();
+                // filter to indices with non-unique colors
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    if(color_unique.get(neighbour_col)) { // if unique
+                        filter.push_back(j); // add index to filter
+                    }
+                }
+
+                path.reset();
+                color_test.reset();
+                color_unique.reset();
+
+                // check which neighbouring endpoints have non-unique color and are NOT connected to `color`
+                for(int j = 0; j < g->d[test_vertex]; ++j) {
+                    const int neighbour     = g->e[g->v[test_vertex] + j];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    color_test.set(neighbour_col);
+                }
+
+                // also self-connections of color are forbidden
+                color_test.set(color);
+
+                for(int k = 0; k < filter.cur_pos; ++k) {
+                    const int j = filter[k];
+                    const int neighbour_endpoint = connected_endpoints[g->v[test_vertex] + j];
+                    const int neighbour_col      = col.vertex_to_col[neighbour_endpoint];
+                    if(color_test.get(neighbour_col)) {
+                        color_unique.set(neighbour_col);
+                    }
+                    color_test.set(neighbour_col);
+                }
+
+                // filter to indices with unique colors
+                int write_pos = 0;
+                for(int k = 0; k < filter.cur_pos; ++k) {
+                    const int j = filter[k];
+                    const int neighbour     = connected_endpoints[g->v[test_vertex] + j];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    if(!color_unique.get(neighbour_col)) {
+                        filter[write_pos] = j;
+                        ++write_pos;
+                    }
+                }
+                filter.cur_pos = write_pos;
+
+
+                // encode filter into color_unique, such that we can detect corresponding neighbours for all vertices
+                // of color class
+                color_unique.reset();
+                for(int k = 0; k < filter.cur_pos; ++k) {
+                    const int j = filter[k];
+                    const int filter_to_col = col.vertex_to_col[connected_paths[g->v[test_vertex] + j]];
+                    color_unique.set(filter_to_col);
+                    filter[k] = filter_to_col;
+                    //color_unique.set(col.vertex_to_col[connected_endpoints[filter[k]]]);
+                }
+
+                // TODO test for each neighbour color, and each possible test_vertex, whether there are duplicate
+                // TODO edges (i.e. whether there is two paths going from e1 <---> e2)
+                // TODO also make sure endpoint color only appears for one neighbour color
+
+                // order colors here already to access color_pos in O(1) later
+                filter.sort();
+                for(int k = 0; k < filter.cur_pos; ++k) {
+                    color_pos[filter[k]] = k;
+                }
+
+                const int num_paths = filter.cur_pos;
+
+                // do next steps for all vertices in color classes...
+                int reduced_verts = 0;
+                [[maybe_unused]] int reduced_verts_last = 0;
+
+                for(int j = 0; j < color_size; ++j) {
+                    const int vertex = col.lab[color + j];
+
+                    [[maybe_unused]] int sanity_check = 0;
+                    // paths left in filter (color_unique) are now collected for reduction
+                    color_test.reset();
+                    for(int k = 0; k < g->d[vertex]; ++k) {
+                        const int neighbour     = g->e[g->v[vertex] + k];
+                        const int neighbour_col = col.vertex_to_col[neighbour];
+                        if(color_unique.get(neighbour_col)) {
+                            const int pos = color_pos[neighbour_col];
+                            path_list[pos] = neighbour;
+                            ++sanity_check;
+                            assert(!color_test.get(neighbour_col));
+                            color_test.set(neighbour_col);
+                        }
+                    }
+
+                    assert(sanity_check == num_paths);
+
+                    for(int k = 0; k < num_paths; ++k) {
+                        reduced_verts = 0;
+                        const int path_start_vertex = path_list[k];
+                        assert(g->d[path_start_vertex] == 2);
+                        if(path_done.get(path_start_vertex)) {
+                            continue;
+                        }
+
+                        // get path and endpoint
+                        path.reset();
+                        const int other_endpoint =
+                                walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
+                        assert(path.cur_pos > 0);
+                        assert(vertex != other_endpoint);
+                        assert(other_endpoint != path_start_vertex);
+
+                        // mark path for deletion
+                        for(int l = 0; l < path.cur_pos; ++l) {
+                            const int del_v = path[l];
+                            assert(g->d[del_v] == 2);
+                            assert(!del.get(del_v));
+                            del.set(del_v);
+                            assert(!path_done.get(del_v));
+                            path_done.set(del_v);
+                            ++total_deleted_vertices;
+                        }
+
+                        // connect endpoints of path with new edge
+                        assert(!is_adjacent(g, vertex, other_endpoint));
+                        add_edge_buff[other_endpoint].push_back(vertex);
+                        add_edge_buff_act.set(other_endpoint);
+                        add_edge_buff[vertex].push_back(other_endpoint);
+                        add_edge_buff_act.set(vertex);
+
+                        // write path into recovery_strings
+                        const int unique_endpoint_orig = translate_back(vertex);
+                        // attach all represented vertices of path to unique_endpoint_orig in canonical fashion
+                        //path.sort_after_map(colmap); // should not be necessary
+                        recovery_strings[unique_endpoint_orig].reserve(2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
+                        for (int l = 0; l < path.cur_pos; ++l) {
+                            assert(path[l] >= 0);
+                            assert(path[l] < g->v_size);
+                            const int path_v_orig = translate_back(path[l]);
+                            assert(path_v_orig >= 0);
+                            assert(path_v_orig < domain_size);
+                            recovery_strings[unique_endpoint_orig].push_back(path_v_orig);
+                            recovery_strings[unique_endpoint_orig].insert(
+                                    recovery_strings[unique_endpoint_orig].end(),
+                                    recovery_strings[path_v_orig].begin(),
+                                    recovery_strings[path_v_orig].end());
+                        }
+                    }
+
+                    reduced_verts = static_cast<int>(recovery_strings[translate_back(vertex)].size());
+
+                    if(j > 0) {
+                        assert(reduced_verts == reduced_verts_last);
+                    }
+                    reduced_verts_last = reduced_verts;
+                }
+            }
+
+            std::cout << total_deleted_vertices          << std::endl;
+            std::cout << total_paths_excluded_not_unique << std::endl;
         }
 
         // color cycles according to their size
@@ -935,9 +1210,7 @@ namespace sassy {
                 colmap[i] = col.vertex_to_col[i];
             }
 
-            dejavu::mark_set path_done(g->v_size);
-            dejavu::work_list cycle_length(g->v_size);
-            dejavu::work_list recolor_nodes(g->v_size);
+            dejavu::mark_set  path_done(g->v_size);
             dejavu::work_list path(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
@@ -951,7 +1224,7 @@ namespace sassy {
                         continue;
 
                     path.reset();
-                    int cycle_length = walk_cycle(g, i, n1, &path_done, &path);
+                    const int cycle_length = walk_cycle(g, i, n1, &path_done, &path);
                     if(cycle_length == -1) {
                         continue;
                     } else {
@@ -1183,6 +1456,8 @@ namespace sassy {
 
                                         const int vert_orig = translate_back(col1_vertj);
 
+                                        // TODO removed vertices must not contain negative values, need additional check
+                                        // TODO or think about how to lift these properly
                                         recovery_strings[vert_orig].reserve(
                                                 recovery_strings[vert_orig].size() +
                                                 path.cur_pos);
@@ -1788,15 +2063,8 @@ namespace sassy {
 
             dejavu::mark_set connected_col(g->v_size);
             dejavu::mark_set is_not_matched(g->v_size);
-
-            // int v_has_matching_color = 0;
-
             coloring test_col;
             g->initialize_coloring(&test_col, colmap);
-
-            // int cnt = 0;
-            int edge_flip_pot = 0;
-            int edge_cnt = 0;
 
             std::vector<int> test_vec;
             for (int y = 0; y < g->v_size; ++y)
@@ -1806,8 +2074,6 @@ namespace sassy {
                 connected_col.reset();
                 is_not_matched.reset();
 
-                int connected_cols = 0;
-                int connected_col_eq_sz = 0;
                 int v = test_col.lab[i];
                 for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
                     const int v_neigh = g->e[f];
@@ -1816,9 +2082,6 @@ namespace sassy {
                         assert(test_col.vertex_to_col[v_neigh] < g->v_size);
                         assert(test_vec[test_col.vertex_to_col[v_neigh]] == 0);
                         connected_col.set(test_col.vertex_to_col[v_neigh]);
-                        connected_cols += 1;
-                        if (test_col.ptn[test_col.vertex_to_col[v_neigh]] == test_col.ptn[i])
-                            connected_col_eq_sz += 1;
                     } else {
                         assert(test_vec[test_col.vertex_to_col[v_neigh]] > 0);
                         is_not_matched.set(test_col.vertex_to_col[v_neigh]);
@@ -1835,7 +2098,6 @@ namespace sassy {
                         assert(test_vec[test_col.vertex_to_col[v_neigh]] < g->v_size);
                         if (test_vec[test_col.vertex_to_col[v_neigh]] ==
                             test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
-                            edge_cnt += 1;
                             del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
                         }
 
@@ -1843,8 +2105,6 @@ namespace sassy {
                             if (test_col.ptn[test_col.vertex_to_col[v_neigh]] == test_col.ptn[i] &&
                                 test_vec[test_col.vertex_to_col[v_neigh]] ==
                                 test_col.ptn[test_col.vertex_to_col[v_neigh]]) {
-                                edge_flip_pot += (test_vec[test_col.vertex_to_col[v_neigh]] * (test_col.ptn[i] + 1)) -
-                                                 (test_col.ptn[i] + 1);
                             }
                         }
                     }
@@ -1859,7 +2119,7 @@ namespace sassy {
             }
         }
 
-        void copy_coloring_to_colmap(const coloring *c, int *colmap) {
+        static void copy_coloring_to_colmap(const coloring *c, int *colmap) {
             for (int i = 0; i < c->domain_size; ++i) {
                 colmap[i] = c->vertex_to_col[i];
             }
@@ -2440,14 +2700,14 @@ namespace sassy {
                                std::forward<decltype(PH3)>(PH3)); };
         }
 
-        void refine_coloring(dejavu::sgraph *g, coloring *c, unsigned long* invariant,
+        void refine_coloring(dejavu::sgraph *g, coloring *col, unsigned long* invariant,
                              int init_color_class, int cell_early, dejavu::mark_set *set_touched_color,
                              dejavu::work_list *set_touched_color_list) {
             invariant_acc = invariant;
             internal_touched_color      = set_touched_color;
             internal_touched_color_list = set_touched_color_list;
 
-            R1->refine_coloring(g, c, init_color_class, cell_early, my_split_hook);
+            R1->refine_coloring(g, col, init_color_class, cell_early, my_split_hook);
         }
 
         // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
@@ -2688,7 +2948,7 @@ namespace sassy {
                 //PRINT("(prep-red) sparse-ir-flat completed: " << individualize_later.size());
                 for (size_t i = 0; i < individualize_later.size(); ++i) {
                     const int ind_vert = individualize_later[i];
-                    const int init_c = R1->individualize_vertex(&original_c, ind_vert);
+                    const int init_c = dejavu::ir::refinement::individualize_vertex(&original_c, ind_vert);
                     //R1->refine_coloring(g, &original_c, &I1, init_c, -1, nullptr, nullptr);
                     R1->refine_coloring(g, &original_c, init_c);
                 }
@@ -3054,8 +3314,7 @@ namespace sassy {
 
                         if (discrete_vertices > 0) {
                             quotient_component_worklist_boundary.emplace_back( // discrete vertex component
-                                    std::pair<int, int>(quotient_component_worklist_col.size(),
-                                                        v_write_pos));
+                                    quotient_component_worklist_col.size(),v_write_pos);
                             ++new_component;
                         }
 
@@ -3284,7 +3543,7 @@ namespace sassy {
                         if (c1.ptn[cell] == c2.ptn[cell]) {
                             ind_v1 = c1.lab[cell];
                             ind_v2 = c1.lab[cell + 1];
-                            const int init_c1 = R1->individualize_vertex(&c1, ind_v1);
+                            const int init_c1 = dejavu::ir::refinement::individualize_vertex(&c1, ind_v1);
 
                             touched_color.set(cell);
                             touched_color.set(init_c1);
@@ -3293,7 +3552,7 @@ namespace sassy {
                             //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
                             refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
 
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
+                            const int init_c2 = dejavu::ir::refinement::individualize_vertex(&c2, ind_v2);
                             //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
                             refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
                             I1 = 0;
@@ -3432,7 +3691,7 @@ namespace sassy {
                                     if (col == -1) break;
                                     const int rpos = col;
                                     const int v1 = c1.lab[rpos];
-                                    const int init_color_class1 = R1->individualize_vertex(&c1, v1);
+                                    const int init_color_class1 = dejavu::ir::refinement::individualize_vertex(&c1, v1);
 
                                     if (!touched_color.get(init_color_class1)) {
                                         touched_color.set(init_color_class1);
@@ -3468,7 +3727,7 @@ namespace sassy {
                                 for (size_t j = 0; j < ind_cols.size(); ++j) {
                                     const int rpos = ind_cols[j];
                                     const int v2 = c2.lab[rpos];
-                                    const int init_color_class2 = R1->individualize_vertex(&c2, v2);
+                                    const int init_color_class2 = dejavu::ir::refinement::individualize_vertex(&c2, v2);
                                     refine_coloring(g, &c2, &I2, init_color_class2, cell_cnt[j],
                                                               &touched_color, &touched_color_list);
                                 }
@@ -3884,7 +4143,7 @@ namespace sassy {
 
                         const int ind_v1 = c1.lab[cell];
                         const int ind_v2 = c1.lab[cell + 1];
-                        const int init_c1 = R1->individualize_vertex(&c1, ind_v1);
+                        const int init_c1 = dejavu::ir::refinement::individualize_vertex(&c1, ind_v1);
 
                         touched_color.set(cell);
                         touched_color.set(init_c1);
@@ -3897,7 +4156,7 @@ namespace sassy {
                                         &touched_color, &touched_color_list);
 
                         if (c2.ptn[cell] != 0) {
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
+                            const int init_c2 = dejavu::ir::refinement::individualize_vertex(&c2, ind_v2);
                             //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
                             refine_coloring(g, &c2, &I2, init_c2, -1,
                                             &touched_color, &touched_color_list);
@@ -3981,7 +4240,7 @@ namespace sassy {
                                                                    quotient_component_end_pos_v);
 
                                 // individualize and test cell + k
-                                const int init_ck = R1->individualize_vertex(&c2, ind_vk);
+                                const int init_ck = dejavu::ir::refinement::individualize_vertex(&c2, ind_vk);
                                 I2 = 0;
                                 //R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
                                 refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
@@ -4075,7 +4334,7 @@ namespace sassy {
                                                                quotient_component_end_pos_v);
 
                             I2 = 0;
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
+                            const int init_c2 = dejavu::ir::refinement::individualize_vertex(&c2, ind_v2);
                             //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
                             refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
 
@@ -4104,7 +4363,7 @@ namespace sassy {
                                 if (col == -1) break;
                                 const int rpos = col + (0 % (c1.ptn[col] + 1));
                                 const int v1 = c1.lab[rpos];
-                                const int init_color_class1 = R1->individualize_vertex(&c1, v1);
+                                const int init_color_class1 = dejavu::ir::refinement::individualize_vertex(&c1, v1);
 
                                 if (!touched_color_cache.get(init_color_class1)) {
                                     touched_color_cache.set(init_color_class1);
@@ -4131,7 +4390,7 @@ namespace sassy {
                                     certify = false;
                                     break;
                                 }
-                                const int init_color_class2 = R1->individualize_vertex(&c2, v2);
+                                const int init_color_class2 = dejavu::ir::refinement::individualize_vertex(&c2, v2);
                                 //R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
                                 //                    &touched_color_list_cache);
                                 refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
@@ -4255,7 +4514,7 @@ namespace sassy {
                                                                        quotient_component_end_pos_v);
 
                                     // individualize and test cell + k
-                                    const int init_ck = R1->individualize_vertex(&c2, ind_vk);
+                                    const int init_ck = dejavu::ir::refinement::individualize_vertex(&c2, ind_vk);
                                     if (!touched_color.get(cell)) {
                                         touched_color.set(cell);
                                         touched_color_list.push_back(cell);
@@ -4303,7 +4562,7 @@ namespace sassy {
                                                 break;
                                             }
                                             const int v2 = c2.lab[rpos];
-                                            const int init_color_class2 = R1->individualize_vertex(&c2, v2);
+                                            const int init_color_class2 = dejavu::ir::refinement::individualize_vertex(&c2, v2);
                                             if (!touched_color.get(init_color_class2)) {
                                                 touched_color.set(init_color_class2);
                                                 touched_color_list.push_back(init_color_class2);
@@ -4358,7 +4617,7 @@ namespace sassy {
                                             }
                                             const int rpos = col + (0 % (c1.ptn[col] + 1));
                                             const int v1 = c1.lab[rpos];
-                                            const int init_color_class1 = R1->individualize_vertex(&c1, v1);
+                                            const int init_color_class1 = dejavu::ir::refinement::individualize_vertex(&c1, v1);
                                             //R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
                                             //                    &touched_color_list);
                                             refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
@@ -4418,7 +4677,7 @@ namespace sassy {
                                 // int f = 0;
                                 I1 = 0;
                                 assert(touched_color.get(c3.vertex_to_col[ind_v1]));
-                                const int init_c3 = R1->individualize_vertex(&c3, ind_v1);
+                                const int init_c3 = dejavu::ir::refinement::individualize_vertex(&c3, ind_v1);
                                 assert(touched_color.get(init_c3));
                                 [[maybe_unused]] const int touched_col_prev = touched_color_list.cur_pos;
                                 //R1->refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
@@ -4666,6 +4925,7 @@ namespace sassy {
                         break;
                 }
             }
+            std::cout << *deg0 << ", " << *deg1 << ", " << *deg2 << std::endl;
         }
 
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
@@ -4883,7 +5143,7 @@ namespace sassy {
 
             for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
-                switch (g->v[v]) {
+                switch (g->d[v]) {
                     case 0:
                         has_deg_0 = true;
                         break;
@@ -4948,7 +5208,7 @@ namespace sassy {
                         }
                         case preop::deg2ue: {
                             if(!has_deg_2 && !graph_changed) break;
-                            red_deg2_unique_endpoint_new(g, colmap);
+                            red_deg2_unique_endpoint(g, colmap);
                             perform_del_add_edge(g, colmap);
 
                             red_deg2_trivial_connect(g, colmap);
@@ -5014,7 +5274,7 @@ namespace sassy {
                                     mark_discrete_for_deletion(g, colmap);
                                     perform_del(g, colmap);
 
-                                    red_deg2_unique_endpoint_new(g, colmap);
+                                    red_deg2_unique_endpoint(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
                                     red_deg2_path_size_1(g, colmap);
@@ -5029,7 +5289,7 @@ namespace sassy {
                                     red_deg2_path_size_1(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
-                                    red_deg2_unique_endpoint_new(g, colmap);
+                                    red_deg2_unique_endpoint(g, colmap);
                                     perform_del_add_edge(g, colmap);
 
                                     red_deg2_trivial_connect(g, colmap);
