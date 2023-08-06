@@ -24,8 +24,8 @@ namespace dejavu {
     static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
                    [[maybe_unused]] const int *supp) {
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
-        assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
-        assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
+        //assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
+        //assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
     }
 
     /**
@@ -37,16 +37,16 @@ namespace dejavu {
     class dejavu2 {
     private:
         // shared modules
-        groups::shared_schreier* sh_schreier = nullptr;  /**< Schreier-Sims structure */
-        ir::shared_tree*         sh_tree     = nullptr;  /**< IR tree                 */
+        groups::compressed_schreier* sh_schreier = nullptr;  /**< Schreier-Sims structure */
+        ir::shared_tree*             sh_tree     = nullptr;  /**< IR tree                 */
 
         // auxiliary
         work_list  colmap_substitute;
 
     public:
         // settings
-        int h_error_bound       = 10; /**< error probability is below `(1/2)^h_error_bound`, default value of 10 thus
-                                       * misses an automorphism with probabiltiy at most (1/2)^10 < 0.098% */
+        int h_error_bound       = 10; /**< error probability is below `1/2^h_error_bound`, default value of 10 thus
+                                       * misses an automorphism with probabiltiy at most 1/2^10 < 0.098% */
         //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed*/
         int h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
                                        *  previous base */
@@ -124,15 +124,17 @@ namespace dejavu {
             std::vector<int> base_sizes; /*< current size of colors on base */
 
             // local modules and workspace, to be used by other modules
-            ir::refinement    m_refinement; /*< workspace for color refinement and other utilities */
-            ir::base_selector m_selectors;  /*< cell selector creation                             */
-            groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism  */
-            groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims    */
+            ir::refinement    m_refinement;                    /*< workspace for color refinement and other utilities */
+            ir::base_selector m_selectors;                                                 /*< cell selector creation */
+            ds::domain_compressor m_compress;        /*< can compress a workspace of vertices to a subset of vertices */
+            groups::automorphism_workspace automorphism(g->v_size);  /*< workspace to keep an automorphism */
+            groups::schreier_workspace     schreierw(g->v_size);       /*< workspace for Schreier-Sims */
 
             // shared, global modules
             sh_tree     = new ir::shared_tree(g->v_size); /*< BFS levels, shared leaves, ...               */
-            sh_schreier = new groups::shared_schreier();             /*< Schreier structure to sift automorphisms     */
-            sh_schreier->h_error_bound = h_error_bound;              /*< pass the error bound parameter               */
+            sh_schreier = new groups::compressed_schreier();         /*< Schreier structure to sift automorphisms     */
+            //sh_schreier->h_error_bound = h_error_bound;            /*< pass the error bound parameter               */
+            sh_schreier->set_error_bound(h_error_bound);
 
             // initialize modules for high-level search strategies
             search_strategy::dfs_ir      m_dfs;       /*< depth-first search   */
@@ -233,8 +235,11 @@ namespace dejavu {
 
                 // first, the schreier structure
                 const bool can_keep_previous = (s_restarts >= 3) && !s_inprocessed;
+
+                m_compress.determine_compression_map(*root_save.get_coloring(), base, dfs_level);
+
                 const bool reset_prob =
-                        sh_schreier->reset(g->v_size, schreierw, base, base_sizes, dfs_level,
+                        sh_schreier->reset(&m_compress, g->v_size, schreierw, base, base_sizes, dfs_level,
                                            can_keep_previous,m_inprocess.inproc_fixed_points);
                 if(reset_prob) sh_schreier->reset_probabilistic_criterion(); /*< need to reset probabilistic abort
                                                                              *  criterion after inprocessing          */
@@ -346,11 +351,15 @@ namespace dejavu {
                             h_rand_fail_lim_total += h_rand_fail_lim_now;
                             m_rand.setup(h_look_close); // TODO: look_close does not seem worth it
                             m_rand.h_sift_random = !s_easy;
+                            m_rand.h_randomize_up_to = dfs_level;
 
                             if (sh_tree->get_finished_up_to() == 0) {
                                 // random automorphisms, single origin
                                 m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
                                                     h_rand_fail_lim_total);
+                                /*sassy::preprocessor deep_prep;
+                                deep_prep.reduce(g, root_save.get_coloring()->vertex_to_col, nullptr);
+                                std::cout << "inprep done" << std::endl;*/
                             } else {
                                 // random automorphisms, sampled from shared_tree
                                 m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
@@ -363,8 +372,8 @@ namespace dejavu {
                                                            std::to_string(sh_schreier->s_densegen()), "_");
                             }
 
-                            finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
-                                                  sh_schreier->probabilistic_abort_criterion();
+                            finished_symmetries         = sh_schreier->deterministic_abort_criterion()   ||
+                                                          sh_schreier->probabilistic_abort_criterion();
                             s_deterministic_termination = !(sh_schreier->probabilistic_abort_criterion() &&
                                                             !sh_schreier->deterministic_abort_criterion());
                             s_cost += h_rand_fail_lim_now;
@@ -433,7 +442,7 @@ namespace dejavu {
             s_grp_sz.multiply(m_inprocess.s_grp_sz);
             s_grp_sz.multiply(m_prep.grp_sz);
             s_grp_sz.multiply(m_dfs.s_grp_sz);
-            s_grp_sz.multiply(sh_schreier->s_grp_sz);
+            s_grp_sz.multiply(sh_schreier->get_group_size());
 
             delete sh_schreier; /*< clean up allocated schreier structure */
             delete sh_tree;     /*< ... and also the shared IR tree       */

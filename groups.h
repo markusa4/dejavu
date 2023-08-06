@@ -275,6 +275,12 @@ namespace dejavu {
             [[nodiscard]] int nsupport() const {
                 return automorphism_supp.cur_pos;
             }
+
+            /** Set support (unsafe).
+             */
+            void set_nsupport(int nsupp) {
+                automorphism_supp.set_size(nsupp);
+            }
         };
 
         /**
@@ -819,6 +825,10 @@ namespace dejavu {
             void set_size_upper_bound(const int new_sz_upb) {
                 sz_upb = new_sz_upb;
             }
+
+            [[nodiscard]] int get_size_upper_bound() {
+                return sz_upb;
+            }
             /**
              * Check whether a point \p p is contained in transversal.
              *
@@ -1021,7 +1031,12 @@ namespace dejavu {
                 domain_size = new_domain_size;
                 assert(this->domain_size > 0);
                 generators.initialize(domain_size);
+                generators.clear();
                 transversals.reserve(stop);
+                transversals.clear();
+
+                finished_up_to = -1;
+
                 //transversals.set_size(stop);
                 for (int i = 0; i < stop; ++i) {
                     transversals.push_back(new shared_transversal());
@@ -1043,7 +1058,7 @@ namespace dejavu {
                        std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
                 const int old_size = static_cast<int>(transversals.size());
-                if(!init) {
+                if(!init || new_domain_size != domain_size) {
                     initialize(new_domain_size, new_base, new_base_sizes, stop);
                     return false;
                 }
@@ -1074,6 +1089,7 @@ namespace dejavu {
                 for (int i = keep_until; i < stop; ++i) {
                     if(i < old_size) delete transversals[i];
                     transversals[i] = new shared_transversal();
+                    assert(new_base[i] >= 0);
                     transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
                 }
 
@@ -1123,10 +1139,16 @@ namespace dejavu {
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
                 if (base_pos >= static_cast<int>(transversals.size())) return false;
+                if(v < 0) return false;
                 assert(base_pos >= 0);
                 assert(base_pos < transversals.size());
                 const int search = transversals[base_pos]->find_point(v);
                 return search != -1;
+            }
+
+            [[nodiscard]]int get_base_orbit_size(const int base_pos) {
+                if (base_pos >= static_cast<int>(transversals.size())) return 0;
+                return transversals[base_pos]->size();
             }
 
             /**
@@ -1167,17 +1189,24 @@ namespace dejavu {
                     changed = transversals[level]->extend_with_automorphism(w, generators, automorphism)
                               || changed;
 
-                    // keep track of how far this Schreier structure is finished (matches given upper bounds)
-                    if (finished_up_to == level - 1 && transversals[level]->is_finished()) {
-                        ++finished_up_to;
-                    }
-
                     // secondly, we fix the point of this transversal in automorphism
                     const bool identity = transversals[level]->fix_automorphism(w, generators, automorphism);
-                    if (identity) break; // if automorphism is the identity now, no need to sift further
+                    if (identity) {
+                        //std::cout << "sift until " << level << ", c: " << changed << std::endl;
+                        break; // if automorphism is the identity now, no need to sift further
+                    }
                 }
 
-                // reset the automorphism_workspace
+                // keep track of how far this Schreier structure is finished (matches given upper bounds)
+                for (int level = finished_up_to + 1; level < static_cast<int>(transversals.size()); ++level) {
+                    if (finished_up_to == level - 1 && transversals[level]->is_finished()) {
+                        ++finished_up_to;
+                    } else {
+                        break;
+                    }
+                }
+
+                    // reset the automorphism_workspace
                 automorphism.set_support01(false);
                 automorphism.update_support();
                 automorphism.reset();
@@ -1197,7 +1226,7 @@ namespace dejavu {
             void generate_random(schreier_workspace& w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
                 automorphism.reset();
 
-                const int random_mult = static_cast<int>(rn_generator() % 7);
+                const int random_mult = static_cast<int>(rn_generator() % 7); // 7
                 const int num_mult = 1 + (random_mult);
                 for(int i = 0; i < num_mult; ++i) {
                     // load generator
@@ -1223,7 +1252,11 @@ namespace dejavu {
              */
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
                              std::default_random_engine& rn_generator) {
-                if(generators.size() <= 0) return false;
+                if(generators.size() <= 0) {
+                    std::cout << "no generators" << std::endl;
+                    return false;
+                }
+                automorphism.reset();
                 automorphism.set_support01(true);
                 generate_random(w, automorphism, rn_generator);
                 return sift(w, automorphism, false);
@@ -1263,6 +1296,14 @@ namespace dejavu {
              * @return Whether the deterministic abort criterion allows termination or not.
              */
             [[nodiscard]] bool deterministic_abort_criterion() const {
+                /*int num_finished = 0;
+                int num_not_finished = 0;
+                for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
+                    num_finished += transversals[level]->is_finished();
+                    num_not_finished += !transversals[level]->is_finished();
+                    if(!transversals[level]->is_finished()) std::cout << level << " bp: " << transversals[level]->fixed_point()  << "sz: " << transversals[level]->size() << "/" << transversals[level]->get_size_upper_bound()  << std::endl;
+                }
+                    std::cout << finished_up_to_level() + 1 << "/" << num_finished << "-" << num_not_finished << "/" << base_size() << std::endl;*/
                 return (finished_up_to_level() + 1 == base_size());
             }
 
@@ -1284,6 +1325,306 @@ namespace dejavu {
                 for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
                     s_grp_sz.multiply(transversals[level]->size());
                 }
+            }
+        };
+
+
+
+        /**
+         * \brief Schreier structure with fixed base. Implements precisely the interface as used by the dejavu
+         * automorphism solver.
+         *
+         * Internally, stores a shared_schreier structure in a compressed form using a domain_compressor.
+         *
+         */
+        class compressed_schreier {
+        private:
+            shared_schreier         internal_schreier;
+            domain_compressor*      compressor;
+            automorphism_workspace* compressed_automorphism;
+            std::vector<int> original_base;
+            std::vector<int> original_base_sizes;
+            int              original_stop = 0;
+
+            int              s_compressed_until = 0;
+
+        public:
+            double h_min_compression_ratio = 0.4; /*< only use compression if at least this ratio can be achieved */
+            double s_compression_ratio = 1.0;
+
+            /**
+             * @return Number of stored generators using a sparse data structure.
+             */
+            [[nodiscard]] int s_sparsegen() const {
+                return internal_schreier.s_sparsegen();
+            }
+
+            /**
+             * @return Number of stored generators using a dense data structure.
+             */
+            [[nodiscard]] int s_densegen() const {
+                return internal_schreier.s_densegen();
+            }
+
+            /**
+             * Reset up this Schreier structure with a new base.
+             *
+             * @param new_base the new base
+             * @param new_base_sizes upper bounds for the size of transversals
+             * @param stop integer which indicates to stop reading the base at this position
+             * @param keep_old If true, attempt to keep parts of the base that is already stored.
+             */
+            bool reset(ds::domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
+                       std::vector<int> &new_base_sizes, const int stop, bool keep_old,
+                       std::vector<int> &global_fixed_points) {
+                s_compressed_until = 0;
+                compressor = new_compressor;
+                // do not use compression at all if ration too bad (to save on translation cost, and such that keep_old
+                // works for difficult graphs)
+                if(compressor != nullptr &&
+                   compressor->s_compression_ratio > h_min_compression_ratio) compressor = nullptr;
+
+                if(compressor != nullptr) {
+                    std::cout << "                  " << ">schreier-compression-ratio " << compressor->s_compression_ratio << std::endl;
+                    // need more management if we are using compression
+                    original_base       = new_base;
+                    original_base_sizes = new_base_sizes;
+                    original_stop = stop;
+                    delete compressed_automorphism;
+                    compressed_automorphism = new automorphism_workspace(compressor->compressed_domain_size());
+                    keep_old = false;
+                    std::vector<int> new_basec;
+                    new_basec.reserve(new_base.size());
+                    for (int i = 0; i < new_base.size(); ++i) {
+                        new_basec.push_back(compressor->compress(new_base[i]));
+                    }
+                    s_compression_ratio = compressor->s_compression_ratio;
+                    return internal_schreier.reset(new_compressor->compressed_domain_size(), w, new_basec,
+                                                    new_base_sizes, stop, keep_old,
+                                                    global_fixed_points);
+                } else {
+                    // we are not using compression, so simply use the Schreier structure normally
+                    s_compression_ratio = 1.0;
+                    return internal_schreier.reset(new_domain_size, w, new_base,
+                                                    new_base_sizes, stop, keep_old,
+                                                    global_fixed_points);
+                }
+            }
+
+            void consider_compress_more_from_start(schreier_workspace& w, int compress_until, coloring& c) {
+                // TODO breaks some large-cfi
+                if(compressor == nullptr || s_compression_ratio < 0.1) return;
+                assert(compressor != nullptr);
+                std::vector<int> new_base;
+                std::vector<int> new_base_sizes;
+                new_base.resize(original_base.size() - compress_until);
+                new_base_sizes.resize(original_base.size() - compress_until);
+                int j = 0;
+                for(int i = compress_until; i < original_base.size(); ++i) {
+                    new_base[j]       = original_base[i];
+                    new_base_sizes[j] = original_base_sizes[i];
+                    ++j;
+                }
+                const int new_stop = original_stop - compress_until;
+
+                if(compressor->determine_compression_ratio(c, new_base, new_stop) >= 0.1) return;
+                s_compressed_until = compress_until;
+                compressor->determine_compression_map(c, new_base, new_stop);
+                s_compression_ratio = compressor->s_compression_ratio;
+                std::vector<int> new_basec;
+                for (int &b: new_base) {
+                    new_basec.push_back(compressor->compress(b));
+                }
+                delete compressed_automorphism;
+                compressed_automorphism = new automorphism_workspace(compressor->compressed_domain_size());
+                std::vector<int> empty_vec;
+                internal_schreier.reset(compressor->compressed_domain_size(), w, new_basec,
+                                               new_base_sizes, new_stop, false,empty_vec);
+            }
+
+            /**
+             * Returns a vertex to individualize for each color of \p root_coloring that matches in size a corresponding
+             * transversal.
+             *
+             * @param save_to_individualize Vector in which vertices deemed save to individualize are pushed.
+             * @param root_coloring The coloring with which the stored transversals are compared.
+             */
+            void determine_potential_individualization(std::vector<std::pair<int, int>>* save_to_individualize,
+                                                       coloring* root_coloring) {
+                if(s_compressed_until > 0) return; // let's not bother with this case...
+
+                if(compressor == nullptr) {
+                    internal_schreier.determine_potential_individualization(save_to_individualize, root_coloring);
+                    return;
+                }
+
+                for (int i = base_size()-1; i >= 0; --i) {
+                    const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[original_base[i]]] + 1;
+                    if(internal_schreier.get_base_orbit_size(i) == corresponding_root_color_sz && corresponding_root_color_sz > 1) {
+                        save_to_individualize->emplace_back(original_base[i], corresponding_root_color_sz);
+                    }
+                }
+            }
+
+            /**
+             * @param pos Position in base.
+             * @return Vertex fixed at position \p pos in base.
+             */
+            [[nodiscard]] int base_point(int pos) const {
+                if(compressor != nullptr) {
+                    return original_base[pos];
+                } else {
+                    return internal_schreier.base_point(pos);
+                }
+            }
+
+            /**
+             * @return Size of base of this Schreier structure.
+             */
+            [[nodiscard]] int base_size() const {
+                return internal_schreier.base_size();
+            }
+
+            /**
+             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
+             *
+             * @param base_pos Position in base.
+             * @param v Vertex to check.
+             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
+             */
+            bool is_in_base_orbit(const int base_pos, const int v) {
+                int v_translate = compressor != nullptr? compressor->compress(v) : v;
+                return internal_schreier.is_in_base_orbit(base_pos-s_compressed_until, v_translate);
+            }
+
+            /**
+             * Reduces a vector of vertices \p selection to contain only points not contained in transversal at position
+             * \p s_base_pos in Schreier structure.
+             *
+             * @param w A Schreier workspace.
+             * @param selection Vector to be reduced.
+             * @param base_pos Position in base.
+             */
+            void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection, int base_pos) {
+                if(compressor != nullptr) {
+                    for(int i = 0; i < selection.size(); ++i) {
+                        assert(compressor->compress(selection[i]) >= 0);
+                        selection[i] = compressor->compress(selection[i]);
+                    }
+                }
+                internal_schreier.reduce_to_unfinished(w, selection, base_pos-s_compressed_until);
+                if(compressor != nullptr) {
+                    for(int i = 0; i < selection.size(); ++i) {
+                        selection[i] = compressor->decompress(selection[i]);
+                        assert(selection[i] >= 0);
+                    }
+                }
+            }
+
+            void compress_automorphism(automorphism_workspace &automorphism, automorphism_workspace &automorphism_compress) {
+                automorphism_compress.reset();
+
+                const int support = automorphism.nsupport();
+                for(int i = 0; i < support; ++i) {
+                    const int vsupport = automorphism.support()[i];
+                    const int vsupportc = compressor->compress(vsupport);
+                    const int vmapsto = automorphism.perm()[vsupport];
+                    const int vmapstoc = compressor->compress(vmapsto);
+                    if(vsupportc >= 0) {
+                        assert(vmapstoc >= 0);
+                        automorphism_compress.write_single_map(vsupportc, vmapstoc);
+                    }
+                }
+            }
+
+            /**
+             * Sift automorphism into the Schreier structure.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
+             * @return Whether automorphism was added to the Schreier structure or not.
+             */
+            bool sift(schreier_workspace &w, automorphism_workspace &automorphism, bool uniform = false) {
+                if(compressor != nullptr) {
+                    compress_automorphism(automorphism, *compressed_automorphism);
+                    return internal_schreier.sift(w, *compressed_automorphism, uniform);
+                } else {
+                    return internal_schreier.sift(w, automorphism, uniform);
+                }
+            }
+
+            /**
+             * Sift a (semi-)randomly generated element into the Schreier structure.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism An automorphism_workspace used to store the randomly generated element.
+             * @return Whether the generated automorphism was added to the Schreier structure or not.
+             */
+            bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
+                             std::default_random_engine& rn_generator) {
+                if(compressor != nullptr) {
+                    return internal_schreier.sift_random(w, *compressed_automorphism, rn_generator);
+                } else {
+                    return internal_schreier.sift_random(w, automorphism, rn_generator);
+                }
+            }
+
+            /**
+             * Records a sift result for the probabilistic abort criterion.
+             *
+             * @param changed Whether the sift was successful or not.
+             */
+            void record_sift_result(const bool changed) {
+                internal_schreier.record_sift_result(changed);
+            }
+
+            /**
+             * Reset the probabilistic abort criterion.
+             */
+            void reset_probabilistic_criterion() {
+                internal_schreier.reset_probabilistic_criterion();
+            }
+
+            /**
+             * @return Whether the probabilistic abort criterion allows termination or not.
+             */
+            [[nodiscard]] bool probabilistic_abort_criterion() const {
+                return internal_schreier.probabilistic_abort_criterion();
+            }
+
+            /**
+             * @return Whether the deterministic abort criterion allows termination or not.
+             */
+            [[nodiscard]] bool deterministic_abort_criterion() const {
+                //std::cout << internal_schreier.base_point(14) << "->" << compressor->decompress(internal_schreier.base_point(14)) << std::endl;
+                return internal_schreier.deterministic_abort_criterion();
+            }
+
+            void set_error_bound(int error_bound) {
+                internal_schreier.h_error_bound = error_bound;
+            }
+
+            int get_consecutive_success() {
+                return internal_schreier.s_consecutive_success;
+            }
+
+            big_number get_group_size() {
+                return internal_schreier.s_grp_sz;
+            }
+
+            /**
+             * @return Level up to which Schreier structure is guaranteed to be complete according to given upper bounds.
+             *         -1 indicates no level has been finished.
+             */
+            [[nodiscard]] int finished_up_to_level() const {
+                return s_compressed_until + internal_schreier.finished_up_to_level();
+            }
+
+            /**
+             * @return Size of group described by this Schreier structure.
+             */
+            void compute_group_size() {
+                internal_schreier.compute_group_size();
             }
         };
     }

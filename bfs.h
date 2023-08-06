@@ -150,12 +150,14 @@ namespace dejavu {
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
                     gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
                     cert = local_state.certify(g, *gws_automorphism);
-                    ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
+                    if(cert) {
+                        ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
 
-                    // Output automorphism
-                    if(hook) (*hook)(g->v_size, gws_automorphism->perm(), gws_automorphism->nsupport(),
-                                     gws_automorphism->support());
-
+                        // Output automorphism
+                        if (hook)
+                            (*hook)(g->v_size, gws_automorphism->perm(), gws_automorphism->nsupport(),
+                                    gws_automorphism->support());
+                    }
                     ++s_total_leaves;
                     gws_automorphism->reset();
 

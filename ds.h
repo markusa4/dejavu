@@ -30,56 +30,7 @@ namespace dejavu {
          */
         template<class T>
         void inline sort_t(T *arr, int sz) {
-#define min(x, y) (x<y?x:y)
-#define max(x, y) (x<y?y:x)
-#define SWAP(x, y) { const T a = min(arr[x], arr[y]); \
-                    const T b = max(arr[x], arr[y]); \
-                    arr[x] = a; arr[y] = b; }
-            switch (sz) {
-                case 0:
-                case 1:
-                    break;
-                case 2: SWAP(0, 1);
-                    break;
-                case 3: SWAP(0, 1);
-                    SWAP(0, 2);
-                    SWAP(1, 2);
-                    break;
-                case 4: SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(0, 2);
-                    SWAP(1, 3);
-                    SWAP(1, 2);
-                    break;
-                case 5: SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(0, 2);
-                    SWAP(1, 4);
-                    SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(1, 2);
-                    SWAP(3, 4);
-                    SWAP(2, 3);
-                    break;
-                case 6: SWAP(1, 2);
-                    SWAP(4, 5);
-                    SWAP(0, 2);
-                    SWAP(3, 5);
-                    SWAP(0, 1);
-                    SWAP(3, 4);
-                    SWAP(1, 4);
-                    SWAP(0, 3);
-                    SWAP(2, 5);
-                    SWAP(1, 3);
-                    SWAP(2, 4);
-                    SWAP(2, 3);
-                    break;
-                default:
-                    std::sort(arr, arr + sz);
-            }
-#undef SWAP
-#undef min
-#undef max
+            std::sort(arr, arr + sz);
         }
 
         /**
@@ -522,6 +473,108 @@ namespace dejavu {
 
             ~mark_set() {
                 if(s) free(s);
+            }
+        };
+
+        class domain_compressor {
+            std::vector<int> map_to_small;
+            std::vector<int> map_to_big;
+            bool do_compress = false;
+            int s_vertices_active = 0;
+            int domain_size = 0;
+
+            void reset() {
+                s_compression_ratio = 1.0;
+                do_compress = false;
+            }
+        public:
+            double s_compression_ratio = 1.0;
+
+            void determine_compression_map(coloring& c, std::vector<int>& base, int stop) {
+                do_compress = true;
+                domain_size = c.domain_size;
+
+                mark_set color_was_added(c.domain_size);
+                mark_set test_vertices_active(c.domain_size);
+
+                color_was_added.reset();
+                test_vertices_active.reset();
+
+                s_vertices_active = 0;
+
+                for(int i = 0; i < stop; ++i) {
+                    const int base_vertex = base[i];
+                    const int col = c.vertex_to_col[base_vertex];
+                    if(!color_was_added.get(col)) {
+                        color_was_added.set(col);
+                        const int col_sz = c.ptn[col] + 1;
+                        s_vertices_active += col_sz;
+                        for(int j = 0; j < col_sz; ++j) {
+                            const int add_v = c.lab[col + j];
+                            test_vertices_active.set(add_v);
+                        }
+                    }
+                }
+
+               /*for(int i = 0; i < c.domain_size; ++i) {
+                    ++s_vertices_active;
+                    test_vertices_active.set(i);
+                }*/
+
+                //std::cout << "compress Schreier: " << s_vertices_active << "/" << c.domain_size << std::endl;
+                map_to_small.resize(c.domain_size);
+                map_to_big.resize(s_vertices_active);
+                int next_active_v_maps_to = 0;
+                for(int v = 0; v < c.domain_size; ++v) {
+                    if(test_vertices_active.get(v)) {
+                        map_to_small[v] = next_active_v_maps_to;
+                        map_to_big[next_active_v_maps_to] = v;
+                        ++next_active_v_maps_to;
+                    } else {
+                        map_to_small[v] = -1;
+                    }
+                }
+                s_compression_ratio = 1.0;
+                if(domain_size > 0) s_compression_ratio = 1.0 * s_vertices_active / domain_size;
+            }
+
+            double determine_compression_ratio(coloring& c, std::vector<int>& base, int stop) {
+                mark_set color_was_added(c.domain_size);
+
+                color_was_added.reset();
+
+                int vertices_active = 0;
+                for(int i = 0; i < stop; ++i) {
+                    const int base_vertex = base[i];
+                    const int col = c.vertex_to_col[base_vertex];
+                    if(!color_was_added.get(col)) {
+                        color_was_added.set(col);
+                        const int col_sz = c.ptn[col] + 1;
+                        vertices_active += col_sz;
+                    }
+                }
+                double compression_ratio = 1.0;
+                if(domain_size > 0) compression_ratio = 1.0 * vertices_active / c.domain_size;
+                std::cout << compression_ratio << std::endl;
+                return compression_ratio;
+            }
+
+            int compressed_domain_size() {
+                return s_vertices_active;
+            }
+
+            int decompressed_domain_size() {
+                return domain_size;
+            }
+
+            int compress(int v) {
+                if(!do_compress) return v;
+                return map_to_small[v];
+            }
+
+            int decompress(int v) {
+                if(!do_compress) return v;
+                return map_to_big[v];
             }
         };
     }

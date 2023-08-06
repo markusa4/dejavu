@@ -52,7 +52,7 @@ namespace dejavu::search_strategy {
          * Co-routine which adds a leaf to leaf_storage, and sifts resulting automorphism into a given group.
          *
          */
-        bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::shared_schreier &group,
+        bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::compressed_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
                                            ir::limited_save &root_save, bool uniform) {
             bool used_load = false;
@@ -109,9 +109,24 @@ namespace dejavu::search_strategy {
                     bool sift = group.sift(*gws_schreierw, *gws_automorphism, uniform);
                     gws_automorphism->reset();
 
-                    if(sift && h_sift_random && s_paths > h_sift_random_lim) {
-                        int fail = 3;
-                        while(fail >= 0) fail -= !group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                    if(sift) {
+                        /*const bool test1 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                        std::cout << "test: " << test1 << std::endl;
+                        const bool test2 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                        std::cout << "test: " << test2 << std::endl;
+                        const bool test3 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                        std::cout << "test: " << test3 << std::endl;
+                        const bool test4 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                        std::cout << "test: " << test4 << std::endl;*/
+                    }
+
+                    if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.025) {
+                        int fail = 3; // 3
+                        while(fail >= 0) {
+                            const bool sift_changed = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
+                            //std::cout << "r_sift_changed: " << sift_changed << std::endl;
+                            fail -= !sift_changed;
+                        }
                     }
 
                     gws_automorphism->reset();
@@ -148,6 +163,7 @@ namespace dejavu::search_strategy {
         const int h_hash_col_limit  = 32;                 /**< limit for how many hash collisions are allowed  */
         bool      h_sift_random     = true;               /**< sift random elements into Schreier structure    */
         int       h_sift_random_lim = 8;                  /**< after how many paths random elements are sifted */
+        int       h_randomize_up_to = INT32_MAX;          /**< randomize vertex selection up to this level */
 
         void setup(bool look_close = false) {
             h_look_close = look_close;
@@ -178,8 +194,8 @@ namespace dejavu::search_strategy {
             s_rolling_first_level_success  = 1.0;
         }
 
-        static bool h_almost_done(groups::shared_schreier &group) {
-            return group.s_consecutive_success >= 1;
+        static bool h_almost_done(groups::compressed_schreier &group) {
+            return group.get_consecutive_success() >= 1;
         }
 
         static void
@@ -211,7 +227,7 @@ namespace dejavu::search_strategy {
          * @param fail_limit Limits the number of random IR walks not leading to a new automorphisms
          */
         void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
-                          ir::shared_tree &ir_tree, groups::shared_schreier &group, ir::controller &local_state,
+                          ir::shared_tree &ir_tree, groups::compressed_schreier &group, ir::controller &local_state,
                           int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
@@ -220,6 +236,8 @@ namespace dejavu::search_strategy {
             ir::limited_save* root_save  = ir_tree.pick_node_from_level(0, 0)->get_save();
             ir::limited_save* start_from = root_save;
 
+            int s_cell_initial = start_from->get_coloring()->cells;
+
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
                 local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
@@ -227,14 +245,34 @@ namespace dejavu::search_strategy {
                 int could_start_from = group.finished_up_to_level();
 
                 // can start from below the root if we finished Schreier table at the current root
-                if(local_state.s_base_pos < could_start_from) {
+                if(local_state.s_base_pos <= could_start_from) {
                     while (local_state.s_base_pos <= could_start_from) {
                         local_state.move_to_child(g, group.base_point(local_state.s_base_pos));
                     }
                     assert(local_state.T->trace_equal());
                     local_state.save_reduced_state(my_own_save); // from now on, we start from this save!
                     start_from = &my_own_save;
-                    //std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << std::endl;
+
+                    const int s_cells_now = start_from->get_coloring()->cells;
+
+                    if(s_cells_now - s_cell_initial > 10000) {
+                        std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
+                        //std::cout << "reducing..." << std::endl;
+                        //group.consider_compress_more_from_start(*gws_schreierw, local_state.s_base_pos, *local_state.c);
+
+                        // TODO we should at least recompress the Schreier structure here
+                        // TODO probably also inprocess the graph...
+                        // TODO ... maybe for the sake of the code not supposed to become shit just stop, go to inprocess,
+                        // TODO and restart? should be way easier to implement, although not as efficient because we throw
+                        // TODO away DFS unnecessarily
+
+                        //root_save->get_coloring()->copy_any(start_from->get_coloring());
+                        //return;
+                        s_cell_initial = s_cells_now;
+                    }
+                    //std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << ", " << h_randomize_up_to << "-" << group.base_size() << std::endl;
+                    //ir::domain_compressor m_compress;
+                    //m_compress.determine_compression_map(*start_from->get_coloring(), local_state.base_vertex, group.base_size());
                 }
 
                 const int start_from_base_pos = local_state.s_base_pos;
@@ -249,7 +287,21 @@ namespace dejavu::search_strategy {
                     const int col = (*selector)(local_state.c, base_pos);
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int rand = ((int) generator()) % col_sz;
-                    int v = local_state.c->lab[col + rand];
+                    int choose_pos = col + rand;
+
+                    // if we are beyond where we need to sift, and we don't want to sample uniformly at random, we
+                    // stop picking random elements whatsoever
+                    if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
+                       base_pos < local_state.compare_base.size()) {
+                        uniform    = false; // sampled leaf not uniform anymore now
+                        choose_pos = col;   // just pick first vertex of color
+
+                        // or even better: let's choose the base vertex, if it's in the correct color
+                        const int v_base = local_state.compare_base[base_pos];
+                        const int v_base_col = local_state.c->vertex_to_col[v_base];
+                        if(col == v_base_col) choose_pos = local_state.c->vertex_to_lab[v_base];
+                    }
+                    int v = local_state.c->lab[choose_pos];
 
                     // base-aware search: if we are still walking along the base, and the vertex we picked is in the
                     // same orbit as the base -- we might as well keep walking on the base, or choose a different vertex
@@ -272,7 +324,12 @@ namespace dejavu::search_strategy {
                         uniform = false; // not uniform anymore!
                     } else {
                         base_aligned = false; // we stopped walking along the base
-                    }
+                    }  //base_aligned = false;
+
+                    //std::cout << "-----" << base_pos << ", " << col_sz  << ", " << v << std::endl;
+
+                    //if(local_state.s_base_pos == 14) std::cout << "picked " << v << std::endl;
+
                     assert(local_state.c->vertex_to_col[v] == col);
                     const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
@@ -289,6 +346,7 @@ namespace dejavu::search_strategy {
                     }
 
                     ++base_pos;
+                    assert(base_pos == local_state.s_base_pos);
                 }
 
                 ++s_paths;
@@ -321,7 +379,7 @@ namespace dejavu::search_strategy {
          * @param fail_limit Limits the number of random IR walks not leading to a new automorphisms
          */
         void random_walks_from_tree(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
-                                    ir::shared_tree &ir_tree, groups::shared_schreier &group,
+                                    ir::shared_tree &ir_tree, groups::compressed_schreier &group,
                                     ir::controller &local_state, int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);

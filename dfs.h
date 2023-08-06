@@ -235,7 +235,7 @@ namespace dejavu {
                     if (!fail) {
                         if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col &&
                            initial_colors->ptn[col] + 1 == col_sz) {
-                            save_to_individualize->push_back({local_state.leaf_color.lab[col], col_sz});
+                            save_to_individualize->emplace_back(local_state.base_vertex[local_state.s_base_pos], col_sz);
                         }
                         s_grp_sz.multiply(col_sz);
                     }

@@ -11,8 +11,6 @@
 
 typedef std::chrono::high_resolution_clock Clock;
 
-thread_local bool bulk_domain_reset = false;
-
 dejavu::ir::refinement test_r;
 dejavu::sgraph dej_test_graph;
 int*   dej_test_col;
@@ -21,7 +19,7 @@ volatile int dejavu_kill_request = 0;
 
 bool finished = false;
 
-void kill_thread(volatile int* kill_switch, int timeout) {
+/*void kill_thread(volatile int* kill_switch, int timeout) {
     Clock::time_point start = Clock::now();
     while(!finished) {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
@@ -30,7 +28,7 @@ void kill_thread(volatile int* kill_switch, int timeout) {
             *kill_switch = 1;
         }
     }
-}
+}*/
 
 void empty_hook(int, const int*, int, const int *) {}
 
@@ -57,6 +55,7 @@ void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    std::cout << "deterministic: " << d.s_deterministic_termination << ", error: 1/2^"<< d.h_error_bound << std::endl;
     std::cout << std::setprecision(4) << "#symmetries: " << d.s_grp_sz << std::endl;
      finished = true;
     if(del) free(colmap);
@@ -189,8 +188,8 @@ int commandline_mode(int argc, char **argv) {
 
     finished = false;
     std::thread killer;
-    if(timeout > 0)
-        killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
+    //if(timeout > 0)
+    //    killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
     bench_dejavu(_g, colmap, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();

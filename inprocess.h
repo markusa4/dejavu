@@ -46,7 +46,7 @@ namespace dejavu::search_strategy {
          * @param budget
          * @return whether any preprocessing was performed
          */
-        bool inprocess(sgraph *g, ir::shared_tree *tree, groups::shared_schreier *group, ir::controller &local_state,
+        bool inprocess(sgraph *g, ir::shared_tree *tree, groups::compressed_schreier *group, ir::controller &local_state,
                        ir::limited_save &root_save, int budget) {
             local_state.load_reduced_state(root_save);
 
@@ -157,7 +157,6 @@ namespace dejavu::search_strategy {
 
             group->determine_potential_individualization(&inproc_can_individualize,
                                                          local_state.get_coloring());
-
             if (!inproc_can_individualize.empty()) {
                 for (auto &i: inproc_can_individualize) {
                     const int ind_v = i.first;
