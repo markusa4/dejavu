@@ -223,6 +223,8 @@ namespace dejavu {
                 multiedge_test.reset();
                 for(int j = 0; j < d[i]; ++j) {
                     const int neigh = e[v[i] + j];
+                    assert(neigh >= 0);
+                    assert(neigh < v_size);
                     bool found = false;
                     for(int k = 0; k < d[neigh]; ++k) {
                         const int neigh_neigh = e[v[neigh] + k];

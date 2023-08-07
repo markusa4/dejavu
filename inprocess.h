@@ -11,7 +11,7 @@
 
 namespace dejavu::search_strategy {
     class inprocessor {
-        static unsigned long invariant_path2(sgraph *g, coloring* c, int v) {
+        /*static unsigned long invariant_path2(sgraph *g, coloring* c, int v) {
             unsigned long hash_inv = 0;
             const int ptn_st = g->v[v];
             const int ptn_en = ptn_st + g->d[v];
@@ -26,7 +26,7 @@ namespace dejavu::search_strategy {
                 }
             }
             return hash_inv;
-        }
+        }*/
 
     public:
         // statistics
@@ -47,7 +47,7 @@ namespace dejavu::search_strategy {
          * @return whether any preprocessing was performed
          */
         bool inprocess(sgraph *g, ir::shared_tree *tree, groups::compressed_schreier *group, ir::controller &local_state,
-                       ir::limited_save &root_save, int budget) {
+                       ir::limited_save &root_save, [[maybe_unused]] int budget) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/

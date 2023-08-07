@@ -14,19 +14,19 @@ namespace dejavu {
          * \brief Breadth-first search.
          */
         class bfs_ir {
-        public:
-            bool h_use_deviation_pruning = true;
-
-            // TODO some of this has to go into shared_tree
-            // statistics
-            int s_deviation_prune = 0;
-            int s_total_prune     = 0;
-            int s_total_kept      = 0;
-            int s_total_automorphism_prune = 0;
-            int s_total_leaves = 0;
             groups::automorphism_workspace* gws_automorphism = nullptr;
 
         public:
+            bool h_use_deviation_pruning = true; /**< use pruning using deviation maps */
+
+            // TODO some of this should go into shared_tree
+            // statistics
+            int s_total_prune              = 0; /**< how many nodes were pruned on last level */
+            int s_total_kept               = 0; /**< how many nodes were kept, i.e., not pruned */
+            int s_total_automorphism_prune = 0; /**< how many nodes were pruned using automorphism pruning */
+            int s_total_leaves             = 0; /**< how many of the computed nodes were leaves */
+            int s_deviation_prune          = 0; /**< how many nodes were pruned using deviation maps */
+
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
                 gws_automorphism = automorphism;
             }
