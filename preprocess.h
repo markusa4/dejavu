@@ -1065,7 +1065,9 @@ namespace sassy {
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
                     hub_vertex_position[i] = -1;
-                    if(recovery_strings[translate_back(i)].size() > 0) path_done.set(i); // not ideal...
+                    if(recovery_strings[translate_back(i)].size() > 0) {
+                        path_done.set(i); // not ideal...
+                    }
                     if(path_done.get(i))
                         continue;
                     const int n1 = g->e[g->v[i] + 0];
@@ -1201,7 +1203,6 @@ namespace sassy {
 
                 // do next steps for all vertices in color classes...
                 [[maybe_unused]] int reduced_verts_last = 0;
-
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = col.lab[color + j];
 
@@ -5254,13 +5255,25 @@ namespace sassy {
 
     public:
 
+        /**
+         * Main routine of the preprocessor. Reduces the graph \p g using various techniques.
+         *
+         * @param g the graph
+         * @param hook user-provided function which is used to return the computed automorphisms
+         * @param schedule optional parameter which defines the order of applied techniques
+         */
         void reduce(dejavu::static_graph *g, dejavu_hook* hook, std::vector<preop> *schedule = nullptr) {
             reduce(g->get_sgraph(), g->get_coloring(), hook, schedule);
         }
 
-
-        // main routine of the preprocessor, reduces (g, colmap) -- returns automorphisms through hook
-        // optional parameter schedule defines the order of applied techniques
+        /**
+         * Main routine of the preprocessor. Reduces the graph \p g using various techniques.
+         *
+         * @param g the graph
+         * @param colmap vertex coloring of the graph \p g
+         * @param hook user-provided function which is used to return the computed automorphisms
+         * @param schedule optional parameter which defines the order of applied techniques
+         */
         void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule =
                     {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2};

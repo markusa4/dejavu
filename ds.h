@@ -516,12 +516,6 @@ namespace dejavu {
                     }
                 }
 
-               /*for(int i = 0; i < c.domain_size; ++i) {
-                    ++s_vertices_active;
-                    test_vertices_active.set(i);
-                }*/
-
-                //std::cout << "compress Schreier: " << s_vertices_active << "/" << c.domain_size << std::endl;
                 map_to_small.resize(c.domain_size);
                 map_to_big.resize(s_vertices_active);
                 int next_active_v_maps_to = 0;

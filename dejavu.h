@@ -244,6 +244,8 @@ namespace dejavu {
                 const bool can_keep_previous = (s_restarts >= 3) && !s_inprocessed; /*< do we want to try to keep
                                                                                      *  automorphisms previous? */
                 // maybe we want to compress the Schreier structure
+                sh_schreier->h_min_compression_ratio = g->v_size > 1000000? 0.7 : 0.4; /*<if graph is large, we want to
+                                                                                        * use compression aggressively*/
                 m_compress.determine_compression_map(*root_save.get_coloring(), base, dfs_level);
 
                 const bool reset_prob =
