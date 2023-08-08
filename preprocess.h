@@ -215,7 +215,7 @@ namespace sassy {
     static preprocessor* save_preprocessor;
 
     enum preop {
-        deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop, deg2densify
+        deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop, densify2
     };
 
     // preprocessor for symmetry detection
@@ -936,6 +936,15 @@ namespace sassy {
             }
         }
 
+        /**
+         * Attaches a canonical recovery string to an edge of the original graph. The edge does not actually have to be
+         * in the graph, but when p is the automorphism, the string attached to {v1,v2} is mapped to {p(v1), p(v2)}.
+         * Note that the edges are unordered.
+         *
+         * @param v1 first vertex of edge
+         * @param v2 second v ertex of edge
+         * @param recovery canonical recovery string attached to {v1, v2} -- vector will be cleared by the function
+         */
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
             recovery_edge_attached.push_back({{v1, v2}, {}});
             const int id = static_cast<int>(recovery_edge_attached.size()-1);
@@ -945,6 +954,15 @@ namespace sassy {
             recovery_edge_adjacent[v2].emplace_back(v1,id);
         }
 
+        /**
+         * Adds the canonical recovery information attached to neighbors of \p v to the given \p automorphism with
+         * support \p automorphism_supp.
+         *
+         * @param v vertex to consider
+         * @param automorphism given automorphism to be extended with canonical recovery information
+         * @param automorphism_supp support worklist of \p automorphism
+         * @param help_array an array of `domain_size` required for auxiliary data
+         */
         void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::work_list* automorphism_supp,
                                                      dejavu::ds::work_list* help_array) {
             if(recovery_edge_adjacent[v].empty()) return;
@@ -1002,7 +1020,12 @@ namespace sassy {
             }
         }
 
-        // remove paths by introducing "hub vertices" that encode multiple paths
+        /**
+         * Summarizes paths of a graph \p g by introducing "hub vertices" that encode multiple paths at once.
+         *
+         * @param g the graph
+         * @param colmap vertex coloring of the graph \p g
+         */
         void red_deg2_densify(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2) return;
 
@@ -1017,13 +1040,10 @@ namespace sassy {
             }
 
             del.reset();
-
             worklist_deg1.reset();
 
             dejavu::work_list endpoint_cnt(g->v_size);
-            for (int i = 0; i < g->v_size; ++i) {
-                endpoint_cnt.push_back(0);
-            }
+            for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
             dejavu::mark_set  path_done(g->v_size);
             dejavu::work_list color_pos(g->v_size);
@@ -1035,6 +1055,7 @@ namespace sassy {
             dejavu::work_list path(g->v_size);
             dejavu::work_list connected_paths(g->e_size);
             dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::mark_set  duplicate_endpoints(g->v_size);
 
             // collect and count endpoints
             int total_paths = 0;
@@ -1111,6 +1132,8 @@ namespace sassy {
                 // check which neighbouring paths have non-unique color
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    const int endpoint      = connected_endpoints[g->v[test_vertex] + j];
+
                     assert(g->d[neighbour] == 2);
                     const int neighbour_col = col.vertex_to_col[neighbour];
                     if(color_test.get(neighbour_col) && !path_done.get(neighbour)) {
@@ -1122,9 +1145,31 @@ namespace sassy {
                     color_test.set(neighbour_col);
                 }
 
-                // TODO make sure no duplicate endpoints!
+                // Make sure there are no duplicate endpoints, i.e., paths going from the same vertex to the same
+                // vertex!
+                bool duplicate_endpoint_flag = false;
+                for(int j = 0; j < color_size; ++j) {
+                    const int endpt_test_vertex = col.lab[color + j];
+                    duplicate_endpoints.reset();
+                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    for (int k = 0; k < endpoints; ++k) {
+                        const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
+                        assert(g->d[neighbour] == 2);
+                        const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
+                        if(duplicate_endpoints.get(endpoint)) {
+                            duplicate_endpoint_flag = true;
+                            break;
+                        }
+                        duplicate_endpoints.set(endpoint);
+                    }
+                    if(duplicate_endpoint_flag) break;
+                }
+
+                // There were duplicate endpoints, so we should stop with this color class!
+                if(duplicate_endpoint_flag) continue;
+
                 filter.reset();
-                // filter to indices with non-unique colors
+                // Filter to indices with non-unique colors
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
                     assert(g->d[neighbour] == 2);
@@ -1137,12 +1182,11 @@ namespace sassy {
                     }
                 }
 
+
                 path.reset();
                 color_test.reset();
                 color_unique.reset();
 
-                // sort filter after color...
-                filter.sort_after_map(col.vertex_to_col);
                 int use_pos = 0;
                 for(int k = 0; k < filter.cur_pos; ++k) {
                     const int filter_col = col.vertex_to_col[connected_paths[g->v[test_vertex] + filter[k]]];
@@ -5219,7 +5263,7 @@ namespace sassy {
         // optional parameter schedule defines the order of applied techniques
         void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule =
-                    {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, deg2densify};
+                    {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2};
 
             if(schedule == nullptr) {
                 schedule = &default_schedule;
@@ -5445,11 +5489,13 @@ namespace sassy {
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
-                        case preop::deg2densify: {
+                        case preop::densify2: {
                             if(!has_deg_2 && !graph_changed) break;
+                            g->sanity_check();
                             red_deg2_densify(g, colmap);
                             perform_del_add_edge_general(g, colmap);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "deg2densify" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                            g->sanity_check();
+                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "densify2" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
