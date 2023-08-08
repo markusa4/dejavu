@@ -68,28 +68,22 @@ namespace dejavu {
                 return sm_col;
             }
 
-            int __attribute__ ((noinline)) next_cell(work_set_int *queue_pointer, coloring *c, work_list_t<int> *singleton_hint) {
+            int next_cell(work_set_int *queue_pointer, coloring *c, work_list_t<int> *singleton_hint) {
                 // use singleton_hint
                 int sm_j = -1;
-                while (!singleton_hint->empty()) {
+                while (!singleton_hint->empty() && sm_j == -1) {
                     const int next_hint = singleton_hint->pop_back();
                     sm_j = queue_pointer->get(next_hint);
-                    if (sm_j == -1)
-                        continue;
-                    else
-                        break;
                 }
 
                 // look at first 12 positions and pick the (first) smallest cell within these entries
                 if (sm_j == -1) {
                     sm_j = cur_pos - 1;
                     for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
-                        //bool smaller_d = g->d[arr[j]] > g->d[arr[sm_j]];
                         const int size_sm_j = c->ptn[arr[sm_j]];
-                        if (size_sm_j == 0) break;
                         const bool smaller = (c->ptn[arr[j]] < size_sm_j);
-                        //bool eq        = (c->ptn[arr[j]] == c->ptn[arr[sm_j]]);
                         sm_j = smaller ? j : sm_j;
+                        if (size_sm_j - smaller <= 0) break;
                     }
                 }
 
