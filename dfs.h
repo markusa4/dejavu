@@ -69,11 +69,13 @@ namespace dejavu {
                 while ((size_t) state->s_base_pos < state->compare_base_color.size()) {
                     const int col    = state->compare_base_color[state->s_base_pos]; // the base color
                     const int col_sz = state->c->ptn[col] + 1;
+
                     if (col_sz < 2) return {false, false}; // color of original base is trivial here, abort
                     const int ind_v = state->c->lab[col];
 
                     // individualize a vertex of base color
                     state->move_to_child(g, ind_v);
+
                     const int pos_start = state->base_singleton_pt[state->base_singleton_pt.size() - 1];
                     const int pos_end   = (int) state->singletons.size();
 
@@ -154,50 +156,60 @@ namespace dejavu {
                     // remember which color we are individualizing
                     const int col = local_state.base_color[local_state.s_base_pos];
                     const int col_sz = local_state.c->ptn[col] + 1;
-                    const int vert = local_state.base_vertex[local_state.s_base_pos]; // base vertex
+                    const int base_vertex = local_state.base_vertex[local_state.s_base_pos]; // base vertex
 
                     // iterate over current color class
                     for (int i = col_sz - 1; i >= 0; --i) {
                         const int ind_v = local_state.leaf_color.lab[col + i];
-                        assert(local_state.c->vertex_to_col[vert] == local_state.c->vertex_to_col[ind_v]);
+                        assert(local_state.c->vertex_to_col[base_vertex] == local_state.c->vertex_to_col[ind_v]);
 
                         // only consider every orbit once
-                        if (ind_v == vert || !orbs.represents_orbit(ind_v))  continue;
-                        if (orbs.are_in_same_orbit(ind_v, vert))        continue;
+                        if (ind_v == base_vertex || !orbs.represents_orbit(ind_v)) continue;
+                        if (orbs.are_in_same_orbit(ind_v, base_vertex))            continue;
 
                         // track cost of this refinement for whatever is to come
                         const int cost_start = local_state.T->get_position();
 
                         // perform individualization-refinement
                         const int prev_base_pos = local_state.s_base_pos;
-                        local_state.T->reset_trace_equal();
+                        local_state.reset_trace_equal();
+                        local_state.use_trace_early_out(true);
                         local_state.move_to_child(g, ind_v);
-                        assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[vert]);
 
-                        // write singleton diff into automorphism...
-                        const int wr_pos_st = local_state.base_singleton_pt[local_state.base_singleton_pt.size() - 1];
-                        const int wr_pos_end= (int) local_state.singletons.size();
+                        bool pruned     = !local_state.T->trace_equal();
 
-                        // ... and then check whether this implies a (sparse) automorphism
-                        ws_automorphism->write_singleton(&local_state.compare_singletons,
-                                                         &local_state.singletons, wr_pos_st,
-                                                         wr_pos_end);
-                        bool found_auto = local_state.certify(g, *ws_automorphism);
-                        assert(ws_automorphism->perm()[vert] == ind_v);
-                        // if no luck with sparse automorphism, try more proper walk to leaf node
-                        if (!found_auto) {
-                            auto [success, certified] = recurse_to_equal_leaf(g, initial_colors,
-                                                                              &local_state);
-                            found_auto = (success && certified);
-                            if (success && !certified) {
-                                ws_automorphism->reset();
-                                assert(ws_automorphism->perm()[vert] == vert);
-                                assert(ws_automorphism->perm()[ind_v] == ind_v);
-                                assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[vert]);
-                                ws_automorphism->write_color_diff(local_state.c->vertex_to_col,
-                                                                  local_state.leaf_color.lab);
-                                assert(ws_automorphism->perm()[ind_v] == vert || ws_automorphism->perm()[vert] == ind_v);
-                                found_auto = local_state.certify(g, *ws_automorphism);
+                        bool found_auto = false;
+                        assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[base_vertex]);
+
+                        if(!pruned) {
+                            // write singleton diff into automorphism...
+                            const int wr_pos_st = local_state.base_singleton_pt[local_state.base_singleton_pt.size() -
+                                                                                1];
+                            const int wr_pos_end = (int) local_state.singletons.size();
+
+                            // ... and then check whether this implies a (sparse) automorphism
+                            ws_automorphism->write_singleton(&local_state.compare_singletons,
+                                                             &local_state.singletons, wr_pos_st,
+                                                             wr_pos_end);
+                            found_auto = local_state.certify(g, *ws_automorphism);
+                            assert(ws_automorphism->perm()[base_vertex] == ind_v);
+                            // if no luck with sparse automorphism, try more proper walk to leaf node
+                            if (!found_auto) {
+                                auto [success, certified] = recurse_to_equal_leaf(g, initial_colors,
+                                                                                  &local_state);
+                                found_auto = (success && certified);
+                                if (success && !certified) {
+                                    ws_automorphism->reset();
+                                    assert(ws_automorphism->perm()[base_vertex] == base_vertex);
+                                    assert(ws_automorphism->perm()[ind_v] == ind_v);
+                                    assert(local_state.c->vertex_to_col[ind_v] ==
+                                           local_state.leaf_color.vertex_to_col[base_vertex]);
+                                    ws_automorphism->write_color_diff(local_state.c->vertex_to_col,
+                                                                      local_state.leaf_color.lab);
+                                    assert(ws_automorphism->perm()[ind_v] == base_vertex ||
+                                           ws_automorphism->perm()[base_vertex] == ind_v);
+                                    found_auto = local_state.certify(g, *ws_automorphism);
+                                }
                             }
                         }
 
@@ -209,7 +221,7 @@ namespace dejavu {
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
                             assert(ws_automorphism->nsupport() > 0);
-                            assert(ws_automorphism->perm()[ind_v] == vert || ws_automorphism->perm()[vert] == ind_v);
+                            assert(ws_automorphism->perm()[ind_v] == base_vertex || ws_automorphism->perm()[base_vertex] == ind_v);
                             if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
                                              ws_automorphism->support());
                             orbs.add_automorphism_to_orbit(*ws_automorphism);
@@ -222,22 +234,22 @@ namespace dejavu {
                         }
 
                         // if no automorphism could be determined we would have to backtrack -- so stop!
-                        if (!found_auto) {
+                        if (!found_auto && !pruned) {
                             fail = true;
                             break;
                         }
 
                         // if orbit size equals color size now, we are done on this DFS level
-                        if (orbs.orbit_size(vert) == col_sz) break;
+                        if (orbs.orbit_size(base_vertex) == col_sz) break;
                     }
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
                         if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col &&
-                           initial_colors->ptn[col] + 1 == col_sz) {
+                           initial_colors->ptn[col] + 1 == col_sz && col_sz == orbs.orbit_size(base_vertex) == col_sz) {
                             save_to_individualize->emplace_back(local_state.base_vertex[local_state.s_base_pos], col_sz);
                         }
-                        s_grp_sz.multiply(col_sz);
+                        s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }
                 }
 

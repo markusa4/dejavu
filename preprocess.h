@@ -285,18 +285,17 @@ namespace sassy {
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
 
-        std::vector<std::pair<std::pair<int,int>, std::vector<int>>> recovery_edge_attached;
+        std::vector<std::vector<int>>                recovery_edge_attached;
         std::vector<std::vector<std::pair<int,int>>> recovery_edge_adjacent;
 
-        std::vector<int> quotient_component_worklist_col;
-        std::vector<int> quotient_component_worklist_col_sz;
-        std::vector<int> quotient_component_worklist_v;
+        std::vector<int>                 quotient_component_worklist_col;
+        std::vector<int>                 quotient_component_worklist_col_sz;
+        std::vector<int>                 quotient_component_worklist_v;
         std::vector<std::pair<int, int>> quotient_component_worklist_boundary;
         std::vector<std::pair<int, int>> quotient_component_worklist_boundary_swap;
-        std::vector<int> quotient_component_workspace;
-
-        std::vector<int> quotient_component_touched;
-        std::vector<int> quotient_component_touched_swap;
+        std::vector<int>                 quotient_component_workspace;
+        std::vector<int>                 quotient_component_touched;
+        std::vector<int>                 quotient_component_touched_swap;
 
         dejavu::mark_set seen_vertex;
         dejavu::mark_set seen_color;
@@ -512,8 +511,8 @@ namespace sassy {
                             continue;
                         }
 
-                        edge_scratch[already_match_pt1 +
-                                     worklist_deg0[col_n1]] = col_n2; // overwrites itself, need canonical vertex for color
+                        edge_scratch[already_match_pt1 + worklist_deg0[col_n1]] = col_n2;
+                        // overwrites itself, need canonical vertex for color
                         edge_scratch[already_match_pt2 + worklist_deg0[col_n2]] = col_n1;
                         ++worklist_deg0[col_n1];
                         ++worklist_deg0[col_n2];
@@ -946,10 +945,10 @@ namespace sassy {
          * @param recovery canonical recovery string attached to {v1, v2} -- vector will be cleared by the function
          */
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
-            recovery_edge_attached.push_back({{v1, v2}, {}});
+            recovery_edge_attached.push_back({});
             const int id = static_cast<int>(recovery_edge_attached.size()-1);
             assert(recovery.size() != 0);
-            recovery_edge_attached[id].second.swap(recovery);
+            recovery_edge_attached[id].swap(recovery);
             recovery_edge_adjacent[v1].emplace_back(v2,id);
             recovery_edge_adjacent[v2].emplace_back(v1,id);
         }
@@ -964,7 +963,8 @@ namespace sassy {
          * @param help_array an array of `domain_size` required for auxiliary data
          */
         void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::work_list* automorphism_supp,
-                                                     dejavu::ds::work_list* help_array) {
+                                                     dejavu::ds::work_list* help_array1,
+                                                     dejavu::ds::work_list* help_array2) {
             if(recovery_edge_adjacent[v].empty()) return;
             const int v_map     = automorphism[v];
 
@@ -976,7 +976,8 @@ namespace sassy {
                 const int other_map = automorphism[other];
 
                 assert((*help_array)[other_map] == other_map);
-                (*help_array)[other_map] = id;
+                (*help_array1)[other_map] = id;
+                (*help_array2)[other_map] = other;
             }
 
             assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
@@ -986,14 +987,12 @@ namespace sassy {
                 const int id        = recovery_edge_adjacent[v_map][j].second;
 
                 assert(other_map != v_map);
-                const int orig_id = (*help_array)[other_map];
-                (*help_array)[other_map] = other_map;
+                const int orig_id = (*help_array1)[other_map];
+                (*help_array1)[other_map] = other_map;
 
                 assert((recovery_edge_attached[orig_id].first.first == v) ||
                        (recovery_edge_attached[orig_id].first.second == v));
-                const int other = recovery_edge_attached[orig_id].first.first == v?
-                                  recovery_edge_attached[orig_id].first.second :
-                                  recovery_edge_attached[orig_id].first.first;
+                const int other = (*help_array2)[other_map];
 
                 assert(v_map     == automorphism[v]);
                 assert(other_map == automorphism[other]);
@@ -1001,8 +1000,8 @@ namespace sassy {
                 if(v_map == v && other_map == other) continue;
                 if(v_map != v && other_map != other && v > other) continue;
 
-                std::vector<int>* recovery_my    = &recovery_edge_attached[orig_id].second;
-                std::vector<int>* recovery_other = &recovery_edge_attached[id].second;
+                std::vector<int>* recovery_my    = &recovery_edge_attached[orig_id];
+                std::vector<int>* recovery_other = &recovery_edge_attached[id];
 
                 assert(recovery_other != nullptr);
                 assert(recovery_my->size() == recovery_other->size());
@@ -1153,6 +1152,7 @@ namespace sassy {
                 for(int j = 0; j < color_size; ++j) {
                     const int endpt_test_vertex = col.lab[color + j];
                     duplicate_endpoints.reset();
+                    duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
                     assert(endpoint_cnt[endpt_test_vertex] == endpoints);
                     for (int k = 0; k < endpoints; ++k) {
                         const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
@@ -1266,7 +1266,6 @@ namespace sassy {
                         // connect endpoints of path to hub vertex (the canonical vertex)
                         // make sure not do double up on hub_vertex original path
                         if(!is_adjacent(g, hub_vertex, other_endpoint)) {
-                            //std::cout << hub_vertex << "<->" << other_endpoint << std::endl;
                             add_edge_buff[other_endpoint].push_back(hub_vertex);
                             add_edge_buff_act.set(other_endpoint);
                             add_edge_buff[hub_vertex].push_back(other_endpoint);
@@ -1291,6 +1290,234 @@ namespace sassy {
                             assert(path_v_orig < domain_size);
                             recovery.push_back(path_v_orig);
                             assert(path_v_orig != hub_vertex_orig? recovery_strings[path_v_orig].size() == 0: true);
+                        }
+
+                        recovery_attach_to_edge(translate_back(vertex), translate_back(other_endpoint), recovery);
+                    }
+                }
+            }
+        }
+
+        void red_deg2_densifysc1(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2) return;
+
+            coloring col;
+            g->initialize_coloring(&col, colmap);
+            add_edge_buff_act.reset();
+            for (int i = 0; i < g->v_size; ++i) add_edge_buff[i].clear();
+
+            del.reset();
+            worklist_deg1.reset();
+
+            dejavu::work_list endpoint_cnt(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
+
+            dejavu::mark_set  path_done(g->v_size);
+            dejavu::work_list filter(g->v_size);
+            dejavu::work_list path_list(g->v_size);
+            dejavu::work_list path(g->v_size);
+            dejavu::work_list connected_paths(g->e_size);
+            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::mark_set  duplicate_endpoints(g->v_size);
+
+            // collect and count endpoints
+            int total_paths = 0;
+            int total_deleted_vertices = 0;
+            int total_paths_excluded_not_unique = 0;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                if(g->d[i] == 2) {
+                    if(path_done.get(i))
+                        continue;
+                    const int n1 = g->e[g->v[i] + 0];
+                    const int n2 = g->e[g->v[i] + 1];
+                    // n1 or n2 is endpoint? then walk to other endpoint and collect information...
+                    if(g->d[n1] != 2 && g->d[n2] != 2) { // only want paths of length 1
+                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done);
+                        if(other_endpoint.first == n1) // big self-loop
+                            continue;
+                        connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
+                        connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
+                        ++endpoint_cnt[n1];
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n1);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n1 != other_endpoint.first);
+                        ++total_paths;
+                    }
+                }
+            }
+
+            // let's not apply this reduction unless there is a substantial amount of degree 2 vertices -- performing
+            // the technique adds some bloat to the lifting process, so we should not overdo it
+            if(total_paths < g->v_size/10) return;
+
+            recovery_edge_adjacent.resize(domain_size);
+            path_done.reset();
+
+            // iterate over color classes
+            for(int i = 0; i < g->v_size;) {
+                const int color      = i;
+                const int color_size = col.ptn[color] + 1;
+                i += color_size;
+                const int test_vertex = col.lab[color];
+                const int endpoints   = endpoint_cnt[test_vertex];
+
+                for(int j = 0; j < color_size; ++j) {
+                    assert(endpoint_cnt[col.lab[color + j]] == endpoints);
+                }
+
+                // only want to look at endpoints of paths
+                if(endpoints == 0) continue;
+
+                // only interested in paths with non-unique color, otherwise we could use unique endpoint algorithm
+                // check which neighbouring paths have non-unique color
+                int color_deg_single = 0;
+                bool only_one = true;
+                int relevant_neighbour_color = -1;
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    const int endpoint      = connected_endpoints[g->v[test_vertex] + j];
+                    assert(g->d[endpoint] != 2);
+                    assert(g->d[neighbour] == 2);
+                    const int endpoint_col = col.vertex_to_col[endpoint];
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    if(!path_done.get(neighbour) && endpoint_col == color) {
+                        if(relevant_neighbour_color == -1) {
+                            relevant_neighbour_color = neighbour_col;
+                        }
+                        only_one = only_one && (relevant_neighbour_color == neighbour_col);
+                        color_deg_single += 1;
+                    }
+                }
+
+                if(!only_one || color_deg_single == 0) continue;
+
+                bool duplicate_endpoint_flag = false;
+                // Make sure there is no self-connection to own color already!
+                for(int j = g->v[test_vertex]; j < g->v[test_vertex] + g->d[test_vertex]; ++j) {
+                    const int neighbour = g->e[j];
+                    if(col.vertex_to_col[neighbour] == color) {
+                        duplicate_endpoint_flag = true;
+                        break;
+                    }
+                }
+
+                // Make sure there are no duplicate endpoints, i.e., paths going from the same vertex to the same
+                // vertex!
+                for(int j = 0; j < color_size; ++j) {
+                    const int endpt_test_vertex = col.lab[color + j];
+                    duplicate_endpoints.reset();
+                    duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
+                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    for (int k = 0; k < endpoints; ++k) {
+                        const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
+                        const int neighbour_col = col.vertex_to_col[neighbour];
+                        if(neighbour_col != relevant_neighbour_color) continue;
+                        assert(g->d[neighbour] == 2);
+                        const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
+                        assert(col.vertex_to_col[endpoint] == color);
+                        if(duplicate_endpoints.get(endpoint)) {
+                            duplicate_endpoint_flag = true;
+                            break;
+                        }
+                        duplicate_endpoints.set(endpoint);
+                    }
+                    if(duplicate_endpoint_flag) break;
+                }
+
+                // There were duplicate endpoints, so we should stop with this color class!
+                if(duplicate_endpoint_flag) continue;
+
+                filter.reset();
+                // Filter to indices with non-unique colors
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    assert(g->d[neighbour] == 2);
+                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    if(neighbour_col == relevant_neighbour_color) { // if unique
+                        assert(neighbour_col == relevant_neighbour_color);
+                        filter.push_back(j); // add index to filter
+                    }
+                }
+
+                path.reset();
+
+                int use_pos = 0;
+                const int num_paths = filter.cur_pos;
+
+                // do next steps for all vertices in color classes...
+                [[maybe_unused]] int reduced_verts_last = 0;
+                for(int j = 0; j < color_size; ++j) {
+                    const int vertex = col.lab[color + j];
+
+                    // reset color_deg to 0
+                    int next_pos = 0;
+
+                    [[maybe_unused]] int sanity_check_num_paths = 0;
+
+                    for(int k = 0; k < g->d[vertex]; ++k) {
+                        const int neighbour     = g->e[g->v[vertex] + k];
+                        const int neighbour_col = col.vertex_to_col[neighbour];
+                        if(neighbour_col == relevant_neighbour_color) {
+                            const int pos = next_pos;
+                            path_list[pos] = neighbour;
+                            assert(g->d[neighbour] == 2);
+                            ++next_pos;
+                            ++sanity_check_num_paths;
+                        }
+                    }
+
+                    assert(num_paths == sanity_check_num_paths);
+
+                    for(int k = 0; k < num_paths; ++k) {
+                        const int path_start_vertex = path_list[k];
+                        assert(g->d[path_start_vertex] == 2);
+                        if(path_done.get(path_start_vertex)) {
+                            continue;
+                        }
+
+                        // get path and endpoint
+                        path.reset();
+                        const int other_endpoint = walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
+                        assert(path.cur_pos > 0);
+                        assert(vertex != other_endpoint);
+                        assert(other_endpoint != path_start_vertex);
+
+                        // mark path for deletion
+                        for(int l = 0; l < path.cur_pos; ++l) {
+                            const int del_v = path[l];
+                            assert(g->d[del_v] == 2);
+                            assert(!del.get(del_v));
+                            del.set(del_v);
+                            assert(!path_done.get(del_v));
+                            path_done.set(del_v);
+                            ++total_deleted_vertices;
+                        }
+
+                        // connect endpoints of path to hub vertex (the canonical vertex)
+                        // make sure not do double up on hub_vertex original path
+                        if(!is_adjacent(g, vertex, other_endpoint)) {
+                            add_edge_buff[other_endpoint].push_back(vertex);
+                            add_edge_buff_act.set(other_endpoint);
+                            add_edge_buff[vertex].push_back(other_endpoint);
+                            add_edge_buff_act.set(vertex);
+                        }
+
+                        // write path into recovery_strings
+                        std::vector<int> recovery;
+                        for (int l = 0; l < path.cur_pos; ++l) {
+                            assert(path[l] >= 0);
+                            assert(path[l] < g->v_size);
+                            const int path_v_orig = translate_back(path[l]);
+                            assert(path_v_orig >= 0);
+                            assert(path_v_orig < domain_size);
+                            recovery.push_back(path_v_orig);
+                            for(int f = 0; f < recovery_strings[path_v_orig].size(); ++f) {
+                                recovery.push_back(recovery_strings[path_v_orig][f]);
+                            }
                         }
 
                         recovery_attach_to_edge(translate_back(vertex), translate_back(other_endpoint), recovery);
@@ -2165,6 +2392,7 @@ namespace sassy {
             g->initialize_coloring(&test_col, colmap);
 
             std::vector<int> test_vec;
+            test_vec.reserve(g->v_size);
             for (int y = 0; y < g->v_size; ++y)
                 test_vec.push_back(0);
 
@@ -3274,17 +3502,12 @@ namespace sassy {
 
             const int end_pos = automorphism_supp.cur_pos;
 
-            if(recovery_edge_attached.size() > 0) {
-                //std::cout << "recovering (" << automorphism_supp.cur_pos << ")" << std::endl;
+            if(!recovery_edge_attached.empty()) {
                 for (int i = 0; i < end_pos; ++i) {
-                    //if(i % 10000 == 0) std::cout << i << "/" << end_pos << std::endl;
                     recovery_attached_edges_to_automorphism(automorphism_supp[i], automorphism.get_array(),
-                                                            &automorphism_supp, &aux_automorphism);
+                                                            &automorphism_supp, &aux_automorphism, &before_move);
                 }
             }
-
-            //std::cout << "recovered automorphism..." << std::endl;
-
 
             if(hook != nullptr)
                 (*hook)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos, automorphism_supp.get_array());
@@ -3301,6 +3524,8 @@ namespace sassy {
             }
 
             meld_translation_layers();
+            // TODO what this should really do is bake recovery_strings into a single string, and edge attachmenets to
+            // TODO a proper non-linked graph structure
             pre_hook(_n, _automorphism, _supp, _automorphism_supp, hook);
             return;
 
@@ -5196,7 +5421,7 @@ namespace sassy {
                         break;
                 }
             }
-            //std::cout << *deg0 << ", " << *deg1 << ", " << *deg2 << std::endl;
+            // std::cout << *deg0 << ", " << *deg1 << ", " << *deg2 << std::endl;
         }
 
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
@@ -5276,7 +5501,9 @@ namespace sassy {
          */
         void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule =
-                    {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2};
+                    {deg01, qcedgeflip, deg2ma, deg2ue, densify2};
+            // deg01, qcedgeflip, deg2ma, deg2ue, redloop, densify2
+            //deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2
 
             if(schedule == nullptr) {
                 schedule = &default_schedule;
@@ -5508,6 +5735,11 @@ namespace sassy {
                             red_deg2_densify(g, colmap);
                             perform_del_add_edge_general(g, colmap);
                             g->sanity_check();
+
+                            red_deg2_densifysc1(g, colmap);
+                            perform_del_add_edge_general(g, colmap);
+                            g->sanity_check();
+
                             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "densify2" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
