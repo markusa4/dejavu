@@ -9,6 +9,8 @@
 #define SASSY_VERSION_MINOR 0
 
 #include "graph.h"
+#include "ds.h"
+#include "refinement.h"
 #include <vector>
 #include <iomanip>
 #include <ctime>
@@ -2940,13 +2942,6 @@ namespace sassy {
             if (!ir_quotient_component_init) {
                 touched_color_cache.initialize(g->v_size);
                 ir_quotient_component_init = true;
-            }
-        }
-
-        // adds a given automorphism to the orbit structure
-        void add_automorphism_to_orbit(dejavu::groups::orbit *orbit, int *automorphism, int nsupp, int *supp) {
-            for (int i = 0; i < nsupp; ++i) {
-                orbit->combine_orbits(automorphism[supp[i]], supp[i]);
             }
         }
 
