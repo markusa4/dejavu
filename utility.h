@@ -32,13 +32,14 @@
     #define OS_LINUX
 #endif
 
-#define INV_MARK_ENDREF    (INT32_MAX - 5)
-#define INV_MARK_STARTCELL (INT32_MAX - 6)
-#define INV_MARK_ENDCELL   (INT32_MAX - 7)
-
 #define PRINT(str) std::cout << str << std::endl;
 
-// TODO maybe can be done faster
+/**
+ * Hash function for unsigned integers.
+ *
+ * @param x the unsigned integer
+ * @return hashed integer
+ */
 static unsigned int hash(unsigned int x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
@@ -46,6 +47,13 @@ static unsigned int hash(unsigned int x) {
     return x;
 }
 
+/**
+ * Accumulate a hash, for example to be used to hash strings of integers.
+ *
+ * @param hash hash computed so far
+ * @param d integer to accumulate to \p hash
+ * @return the new hash
+ */
 static unsigned long add_to_hash(unsigned long hash, const int d) {
     const unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
     hash    = hash << 8;                    // shift hash left by 5 bits
@@ -55,6 +63,12 @@ static unsigned long add_to_hash(unsigned long hash, const int d) {
     return hash;
 }
 
+/**
+ * Does the file with filename \p name exist?
+ *
+ * @param name filename to look for
+ * @return whether file \p name exists
+ */
 static inline bool file_exists(const std::string& name) {
     std::ifstream f(name.c_str());
     return f.good();

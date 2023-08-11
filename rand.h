@@ -62,7 +62,9 @@ namespace dejavu::search_strategy {
             // Outer loop to handle hash collisions -- at most h_hash_col_limit will be checked and stored
             for(int hash_offset = 0; hash_offset < h_hash_col_limit; ++hash_offset) {
                 // After first hash collision, we write a stronger invariant
-                if(hash_offset == 1) local_state.write_strong_invariant(g); // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do this before the loop if that flag is set
+                if(hash_offset == 1) local_state.write_strong_invariant(g);
+                // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do
+                //  this before the loop if that flag is set
 
                 // First, test whether leaf with same hash has already been stored
                 const long hash_c = local_state.T->get_hash() + hash_offset; // '+hash_offset' is for hash collisions
@@ -108,17 +110,6 @@ namespace dejavu::search_strategy {
                     // Sift into Schreier structure
                     bool sift = group.sift(*gws_schreierw, *gws_automorphism, uniform);
                     gws_automorphism->reset();
-
-                    if(sift) {
-                        /*const bool test1 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
-                        std::cout << "test: " << test1 << std::endl;
-                        const bool test2 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
-                        std::cout << "test: " << test2 << std::endl;
-                        const bool test3 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
-                        std::cout << "test: " << test3 << std::endl;
-                        const bool test4 = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
-                        std::cout << "test: " << test4 << std::endl;*/
-                    }
 
                     if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.025) {
                         int fail = 3; // 3
@@ -207,8 +198,6 @@ namespace dejavu::search_strategy {
             }
         }
 
-        // TODO setting to escape base aligned search for more preprocessing? could even return skiplevel-coloring
-        // TODO preprocess using that, reset schreier structure, continue... ("in-in-processing" lol)
         /**
          * Performs Monte Carlo IR search.
          *
@@ -257,8 +246,6 @@ namespace dejavu::search_strategy {
 
                     if(s_cells_now - s_cell_initial > 10000) {
                         std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
-                        //std::cout << "reducing..." << std::endl;
-                        //group.consider_compress_more_from_start(*gws_schreierw, local_state.s_base_pos, *local_state.c);
 
                         // TODO we should at least recompress the Schreier structure here
                         // TODO probably also inprocess the graph...
@@ -266,13 +253,8 @@ namespace dejavu::search_strategy {
                         // TODO and restart? should be way easier to implement, although not as efficient because we throw
                         // TODO away DFS unnecessarily
 
-                        //root_save->get_coloring()->copy_any(start_from->get_coloring());
-                        //return;
                         s_cell_initial = s_cells_now;
                     }
-                    //std::cout << "start from: " << local_state.s_base_pos << ", cells: " << local_state.c->cells << ", " << h_randomize_up_to << "-" << group.base_size() << std::endl;
-                    //ir::domain_compressor m_compress;
-                    //m_compress.determine_compression_map(*start_from->get_coloring(), local_state.base_vertex, group.base_size());
                 }
 
                 const int start_from_base_pos = local_state.s_base_pos;
@@ -292,7 +274,7 @@ namespace dejavu::search_strategy {
                     // if we are beyond where we need to sift, and we don't want to sample uniformly at random, we
                     // stop picking random elements whatsoever
                     if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
-                       base_pos < local_state.compare_base.size()) {
+                       base_pos < static_cast<int>(local_state.compare_base.size())) {
                         uniform    = false; // sampled leaf not uniform anymore now
                         choose_pos = col;   // just pick first vertex of color
 
@@ -313,8 +295,8 @@ namespace dejavu::search_strategy {
                         }
                         group.reduce_to_unfinished(*gws_schreierw, heuristic_reroll, base_pos);
                         if(!heuristic_reroll.empty()) {
-                            const int rand = ((int) generator()) % heuristic_reroll.size();
-                            v = heuristic_reroll[rand];
+                            const int rand_reroll = ((int) generator()) % heuristic_reroll.size();
+                            v = heuristic_reroll[rand_reroll];
                         }
                     }
 

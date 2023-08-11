@@ -5,8 +5,8 @@
 #ifndef SASSY_H
 #define SASSY_H
 
-#define SASSY_VERSION_MAJOR 1
-#define SASSY_VERSION_MINOR 1
+#define SASSY_VERSION_MAJOR 2
+#define SASSY_VERSION_MINOR 0
 
 #include "graph.h"
 #include <vector>
@@ -14,7 +14,6 @@
 #include <ctime>
 
 namespace sassy {
-
     using dejavu::ds::coloring;
 
     class preprocessor;
@@ -74,8 +73,8 @@ namespace sassy {
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
 
-        std::vector<std::vector<int>>                recovery_edge_attached;
-        std::vector<std::vector<std::pair<int,int>>> recovery_edge_adjacent;
+        std::vector<int>                                  recovery_edge_attached;
+        std::vector<std::vector<std::tuple<int,int,int>>> recovery_edge_adjacent;
 
         dejavu::work_list _automorphism;
         dejavu::work_list _automorphism_supp;
@@ -115,13 +114,12 @@ namespace sassy {
             }
 
 
-            backward_translation.reserve(layers - 1);
             const int reduced_size = static_cast<int>(backward_translation_layers[layers - 1].size());
-            for (int i = 0; i < reduced_size; ++i)
-                backward_translation.push_back(i);
+            backward_translation.reserve(reduced_size);
+            for (int i = 0; i < reduced_size; ++i) backward_translation.push_back(i);
             for (int i = 0; i < reduced_size; ++i) {
                 int next_v = i;
-                for (int l = layers - 1; l >= 0; --l) {
+                for (int l = layers - 1; l >= 0; --l) { // TODO inefficient
                     next_v = backward_translation_layers[l][next_v];
                 }
                 backward_translation[i] = next_v;
@@ -714,12 +712,14 @@ namespace sassy {
          * @param recovery canonical recovery string attached to {v1, v2} -- vector will be cleared by the function
          */
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
-            recovery_edge_attached.push_back({});
-            const int id = static_cast<int>(recovery_edge_attached.size()-1);
+            const int pos = static_cast<int>(recovery_edge_attached.size());
             assert(recovery.size() != 0);
-            recovery_edge_attached[id].swap(recovery);
-            recovery_edge_adjacent[v1].emplace_back(v2,id);
-            recovery_edge_adjacent[v2].emplace_back(v1,id);
+            for(int i = 0; i < recovery.size(); ++i) {
+                recovery_edge_attached.push_back(recovery[i]);
+            }
+            const int len = static_cast<int>(recovery.size());
+            recovery_edge_adjacent[v1].emplace_back(v2,pos,len);
+            recovery_edge_adjacent[v2].emplace_back(v1,pos,len);
         }
 
         /**
@@ -738,8 +738,8 @@ namespace sassy {
             const int v_map     = automorphism[v];
 
             for(int j = 0; j < recovery_edge_adjacent[v].size(); ++j) {
-                const int other = recovery_edge_adjacent[v][j].first;
-                const int id    = recovery_edge_adjacent[v][j].second;
+                const int other = std::get<0>(recovery_edge_adjacent[v][j]);
+                const int id    = std::get<1>(recovery_edge_adjacent[v][j]);
 
                 assert(other != v);
                 const int other_map = automorphism[other];
@@ -752,8 +752,9 @@ namespace sassy {
             assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
 
             for(int j = 0; j < recovery_edge_adjacent[v_map].size(); ++j) {
-                const int other_map = recovery_edge_adjacent[v_map][j].first;
-                const int id        = recovery_edge_adjacent[v_map][j].second;
+                const int other_map = std::get<0>(recovery_edge_adjacent[v_map][j]);
+                const int id        = std::get<1>(recovery_edge_adjacent[v_map][j]);
+                const int len       = std::get<2>(recovery_edge_adjacent[v_map][j]);
 
                 assert(other_map != v_map);
                 const int orig_id = (*help_array1)[other_map];
@@ -769,15 +770,15 @@ namespace sassy {
                 if(v_map == v && other_map == other) continue;
                 if(v_map != v && other_map != other && v > other) continue;
 
-                std::vector<int>* recovery_my    = &recovery_edge_attached[orig_id];
-                std::vector<int>* recovery_other = &recovery_edge_attached[id];
+                //std::vector<int>* recovery_my    = &recovery_edge_attached[orig_id];
+                //std::vector<int>* recovery_other = &recovery_edge_attached[id];
 
                 assert(recovery_other != nullptr);
                 assert(recovery_my->size() == recovery_other->size());
 
-                for(int k = 0; k < recovery_my->size(); ++k) {
-                    const int v_from = (*recovery_my)[k];
-                    const int v_to   = (*recovery_other)[k];
+                for(int k = 0; k < len; ++k) {
+                    const int v_from = recovery_edge_attached[orig_id + k];
+                    const int v_to   = recovery_edge_attached[id      + k];
                     if(v_from != v_to) {
                         if(automorphism[v_from] == v_from) { // I'm doing it from both sides right now...
                             automorphism[v_from] = v_to;
@@ -2088,67 +2089,43 @@ namespace sassy {
 
         // perform edge flips according to quotient graph
         void red_quotient_edge_flip(dejavu::sgraph *g, int *colmap) { // TODO could still optimize further ...
-            if (g->v_size <= 1)
-                return;
+            if (g->v_size <= 1) return;
 
             del_e.reset();
+            worklist_deg0.reset(); // serves as the "test vector"
 
-            worklist_deg0.reset();
-            worklist_deg1.reset();
-
-            dejavu::mark_set connected_col(g->v_size);
-            dejavu::mark_set is_not_matched(g->v_size);
             coloring test_col;
             g->initialize_coloring(&test_col, colmap);
 
-            std::vector<int> test_vec;
-            test_vec.reserve(g->v_size);
-            for (int y = 0; y < g->v_size; ++y)
-                test_vec.push_back(0);
+            for (int y = 0; y < g->v_size; ++y) worklist_deg0[y] = 0;
 
             for (int i = 0; i < g->v_size;) {
-                connected_col.reset();
-                is_not_matched.reset();
-
                 int v = test_col.lab[i];
                 for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
                     const int v_neigh = g->e[f];
-                    if (!connected_col.get(test_col.vertex_to_col[v_neigh])) {
-                        assert(test_col.vertex_to_col[v_neigh] >= 0);
-                        assert(test_col.vertex_to_col[v_neigh] < g->v_size);
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] == 0);
-                        connected_col.set(test_col.vertex_to_col[v_neigh]);
-                    } else {
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] > 0);
-                        is_not_matched.set(test_col.vertex_to_col[v_neigh]);
-                    }
-                    test_vec[test_col.vertex_to_col[v_neigh]] += 1;
+                    worklist_deg0[test_col.vertex_to_col[v_neigh]] += 1;
                 }
 
                 for (int ii = 0; ii < test_col.ptn[i] + 1; ++ii) {
                     const int vx = test_col.lab[i + ii];
+                    bool skipped_none = true;
                     for (int f = g->v[vx]; f < g->v[vx] + g->d[vx]; ++f) {
                         const int v_neigh = g->e[f];
 
                         assert(test_vec[test_col.vertex_to_col[v_neigh]] >= 0);
                         assert(test_vec[test_col.vertex_to_col[v_neigh]] < g->v_size);
-                        if (test_vec[test_col.vertex_to_col[v_neigh]] ==
+                        if (worklist_deg0[test_col.vertex_to_col[v_neigh]] ==
                             test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
                             del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
-                        }
-
-                        if (ii == 0) {
-                            if (test_col.ptn[test_col.vertex_to_col[v_neigh]] == test_col.ptn[i] &&
-                                test_vec[test_col.vertex_to_col[v_neigh]] ==
-                                test_col.ptn[test_col.vertex_to_col[v_neigh]]) {
-                            }
+                            skipped_none = false;
                         }
                     }
+                    if(skipped_none) break;
                 }
 
                 for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
                     const int v_neigh = g->e[f];
-                    test_vec[test_col.vertex_to_col[v_neigh]] = 0;
+                    worklist_deg0[test_col.vertex_to_col[v_neigh]] = 0;
                 }
 
                 i += test_col.ptn[i] + 1;
@@ -2813,12 +2790,8 @@ namespace sassy {
             meld_translation_layers();
             // TODO what this should really do is bake recovery_strings into a single string, and edge attachmenets to
             // TODO a proper non-linked graph structure
-            pre_hook(_n, _automorphism, _supp, _automorphism_supp, hook);
-            return;
-
 
             automorphism_supp.reset();
-
             bool use_aux_auto = false;
 
             if(_supp >= 0) {
@@ -2849,13 +2822,11 @@ namespace sassy {
                            recovery_strings[orig_v_from].size());
 
                     for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
-                        /*const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t = recovery_strings[orig_v_to][j];
-                        assert(automorphism[v_from_t] == v_from_t);
-                        automorphism[v_from_t] = v_to_t;
-                        automorphism_supp.push_back(v_from_t);*/
                         const int v_from_t = recovery_strings[orig_v_from][j];
                         const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        if(v_from_t == INT32_MAX) continue;
+
                         assert(v_from_t >  0?v_to_t >= 0:true);
                         assert(v_to_t   >  0?v_from_t >= 0:true);
                         assert(v_from_t <  0?v_to_t <= 0:true);
@@ -2905,6 +2876,9 @@ namespace sassy {
                     for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
                         const int v_from_t = recovery_strings[orig_v_from][j];
                         const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        if(v_from_t == INT32_MAX) continue;
+
                         assert(v_from_t >  0?v_to_t >= 0:true);
                         assert(v_to_t   >  0?v_from_t >= 0:true);
                         assert(v_from_t <  0?v_to_t <= 0:true);
@@ -2941,6 +2915,15 @@ namespace sassy {
                 }
                 reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos, aux_automorphism_supp.get_array());
                 aux_automorphism_supp.reset();
+            }
+
+            const int end_pos = automorphism_supp.cur_pos;
+
+            if(!recovery_edge_attached.empty()) {
+                for (int i = 0; i < end_pos; ++i) {
+                    recovery_attached_edges_to_automorphism(automorphism_supp[i], automorphism.get_array(),
+                                                            &automorphism_supp, &aux_automorphism, &before_move);
+                }
             }
 
             if(hook != nullptr) {
