@@ -11,6 +11,7 @@
 #include "graph.h"
 #include "ds.h"
 #include "refinement.h"
+#include "components.h"
 #include <vector>
 #include <iomanip>
 #include <ctime>
@@ -84,6 +85,9 @@ namespace sassy {
 
         dejavu::work_list before_move;
 
+        dejavu::ir::graph_decomposer* decomposer = nullptr;
+        int current_component = 0;
+
         bool ir_quotient_component_init = false;
     public:
         // for a vertex v of reduced graph, return corresponding vertex of the original graph
@@ -99,6 +103,12 @@ namespace sassy {
         void multiply_to_group_size(int n) {
             grp_sz.multiply(n);
         }
+
+        void inject_decomposer(dejavu::ir::graph_decomposer* new_decomposer, int component) {
+            decomposer = new_decomposer;
+            current_component = component;
+        }
+
     private:
         // combine translation layers
         void meld_translation_layers() {
@@ -746,7 +756,6 @@ namespace sassy {
                 assert(other != v);
                 const int other_map = automorphism[other];
 
-                assert((*help_array)[other_map] == other_map);
                 (*help_array1)[other_map] = id;
                 (*help_array2)[other_map] = other;
             }
@@ -762,8 +771,6 @@ namespace sassy {
                 const int orig_id = (*help_array1)[other_map];
                 (*help_array1)[other_map] = other_map;
 
-                assert((recovery_edge_attached[orig_id].first.first == v) ||
-                       (recovery_edge_attached[orig_id].first.second == v));
                 const int other = (*help_array2)[other_map];
 
                 assert(v_map     == automorphism[v]);
@@ -771,12 +778,6 @@ namespace sassy {
 
                 if(v_map == v && other_map == other) continue;
                 if(v_map != v && other_map != other && v > other) continue;
-
-                //std::vector<int>* recovery_my    = &recovery_edge_attached[orig_id];
-                //std::vector<int>* recovery_other = &recovery_edge_attached[id];
-
-                assert(recovery_other != nullptr);
-                assert(recovery_my->size() == recovery_other->size());
 
                 for(int k = 0; k < len; ++k) {
                     const int v_from = recovery_edge_attached[orig_id + k];
@@ -2113,9 +2114,6 @@ namespace sassy {
                     bool skipped_none = true;
                     for (int f = g->v[vx]; f < g->v[vx] + g->d[vx]; ++f) {
                         const int v_neigh = g->e[f];
-
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] >= 0);
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] < g->v_size);
                         if (worklist_deg0[test_col.vertex_to_col[v_neigh]] ==
                             test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
                             del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
@@ -2798,10 +2796,12 @@ namespace sassy {
 
             if(_supp >= 0) {
                 for (int i = 0; i < _supp; ++i) {
-                    const int v_from = _automorphism_supp[i];
+                    const int _v_from = _automorphism_supp[i];
+                    const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     assert(v_from >= 0 && v_from < domain_size);
                     const int orig_v_from = backward_translation[v_from];
-                    const int v_to = _automorphism[v_from];
+                    const int _v_to = _automorphism[_v_from];
+                    const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     assert(v_from != v_to);
                     const int orig_v_to = backward_translation[v_to];
                     assert((unsigned int)v_from < backward_translation.size());
@@ -2824,10 +2824,17 @@ namespace sassy {
                            recovery_strings[orig_v_from].size());
 
                     for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
+                        assert(j <= recovery_strings[orig_v_from].size());
+                        assert(j <= recovery_strings[orig_v_to].size());
                         const int v_from_t = recovery_strings[orig_v_from][j];
                         const int v_to_t   = recovery_strings[orig_v_to][j];
 
                         if(v_from_t == INT32_MAX) continue;
+
+                        assert(abs(v_from_t) >= 0);
+                        assert(abs(v_from_t) <  domain_size);
+                        assert(abs(v_to_t) >= 0);
+                        assert(abs(v_to_t) <  domain_size);
 
                         assert(v_from_t >  0?v_to_t >= 0:true);
                         assert(v_to_t   >  0?v_from_t >= 0:true);
@@ -2852,9 +2859,11 @@ namespace sassy {
                 }
             } else {
                 for (int i = 0; i < _n; ++i) {
-                    const int v_from = i;
+                    const int _v_from = i;
+                    const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     const int orig_v_from = backward_translation[v_from];
-                    const int v_to = _automorphism[v_from];
+                    const int _v_to = _automorphism[_v_from];
+                    const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     if(v_from == v_to)
                         continue;
                     const int orig_v_to = backward_translation[v_to];
@@ -3084,7 +3093,7 @@ namespace sassy {
          */
         void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule =
-                    {deg01, qcedgeflip, deg2ma, deg2ue, densify2};
+                    {deg01, qcedgeflip, deg01, deg2ma, deg2ue, densify2};
             // deg01, qcedgeflip, deg2ma, deg2ue, redloop, densify2
             //deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2
 

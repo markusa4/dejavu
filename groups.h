@@ -1109,7 +1109,7 @@ namespace dejavu {
                                                        coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
-                    if(transversals[i]->size() == corresponding_root_color_sz && corresponding_root_color_sz > 1) {
+                    if(transversals[i]->size() >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
                         save_to_individualize->emplace_back(transversals[i]->fixed_point(), corresponding_root_color_sz);
                     }
                 }
@@ -1253,7 +1253,6 @@ namespace dejavu {
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
                              std::default_random_engine& rn_generator) {
                 if(generators.size() <= 0) {
-                    std::cout << "no generators" << std::endl;
                     return false;
                 }
                 automorphism.reset();
@@ -1460,7 +1459,7 @@ namespace dejavu {
 
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[original_base[i]]] + 1;
-                    if(internal_schreier.get_base_orbit_size(i) == corresponding_root_color_sz && corresponding_root_color_sz > 1) {
+                    if(internal_schreier.get_base_orbit_size(i) >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
                         save_to_individualize->emplace_back(original_base[i], corresponding_root_color_sz);
                     }
                 }

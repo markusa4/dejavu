@@ -249,7 +249,7 @@ namespace dejavu {
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
                         if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col &&
-                           initial_colors->ptn[col] + 1 == col_sz && col_sz == orbs.orbit_size(base_vertex) == col_sz) {
+                                (initial_colors->ptn[col] + 1 == col_sz) && (col_sz == orbs.orbit_size(base_vertex))) {
                             save_to_individualize->emplace_back(local_state.base_vertex[local_state.s_base_pos], col_sz);
                         }
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));

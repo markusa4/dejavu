@@ -1184,11 +1184,11 @@ namespace dejavu {
                             node_invariant[v] += hash(j);
                         }
                     }
-                    /*for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
+                    for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
                         auto node = tree_data_jump_map[1][i];
                         const int v = node->get_save()->get_base()[0];
                         node_invariant[v] += node->get_hash();
-                    }*/
+                    }
                 }
             }
 

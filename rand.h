@@ -111,7 +111,7 @@ namespace dejavu::search_strategy {
                     bool sift = group.sift(*gws_schreierw, *gws_automorphism, uniform);
                     gws_automorphism->reset();
 
-                    if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.025) {
+                    if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.1) { // 025
                         int fail = 3; // 3
                         while(fail >= 0) {
                             const bool sift_changed = group.sift_random(*gws_schreierw, *gws_automorphism, generator);

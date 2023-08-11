@@ -33,6 +33,7 @@
 #endif
 
 #define PRINT(str) std::cout << str << std::endl;
+//#define PRINT(str) {};
 
 /**
  * Hash function for unsigned integers.
