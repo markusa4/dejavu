@@ -158,6 +158,8 @@ namespace dejavu {
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int base_vertex = local_state.base_vertex[local_state.s_base_pos]; // base vertex
 
+                    int prune_cost_snapshot = 0;
+
                     // iterate over current color class
                     for (int i = col_sz - 1; i >= 0; --i) {
                         const int ind_v = local_state.leaf_color.lab[col + i];
@@ -176,7 +178,7 @@ namespace dejavu {
                         local_state.use_trace_early_out(true);
                         local_state.move_to_child(g, ind_v);
 
-                        bool pruned     = !local_state.T->trace_equal();
+                        bool pruned     = !local_state.T->trace_equal(); // TODO keep track of cost here as well!
 
                         bool found_auto = false;
                         assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[base_vertex]);
@@ -217,6 +219,7 @@ namespace dejavu {
                         const int cost_end   = local_state.T->get_position();
                         double cost_partial  = (cost_end - cost_start) / (cost_snapshot*1.0);
                         recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
+                        prune_cost_snapshot += pruned?(cost_end - cost_start):0;
 
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
@@ -234,7 +237,7 @@ namespace dejavu {
                         }
 
                         // if no automorphism could be determined we would have to backtrack -- so stop!
-                        if (!found_auto && !pruned) {
+                        if ((!found_auto && !pruned) || 4*prune_cost_snapshot > cost_snapshot) {
                             fail = true;
                             break;
                         }
