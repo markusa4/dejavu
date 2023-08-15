@@ -135,6 +135,9 @@ namespace dejavu {
  * graphs of the initial size, or smaller.
 */
         class refinement {
+            bool g_early_out = false;
+            const std::function<type_split_color_hook>* g_split_hook;
+
         public:
             /**
          * The color refinement algorithm. Refines a given coloring with respect to a given graph.
@@ -150,11 +153,9 @@ namespace dejavu {
          * can be used to skip refinement of that color class.
          */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
-                                 const std::function<type_split_color_hook>    &split_hook = nullptr,
+                                 const std::function<type_split_color_hook>* split_hook = nullptr,
                                  const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
-                singleton_hint.reset();
                 assure_initialized(g);
-
                 cell_todo.reset(&queue_pointer);
 
                 if (init_color < 0) {
@@ -162,9 +163,6 @@ namespace dejavu {
                     for (int i = 0; i < c->domain_size;) {
                         cell_todo.add_cell(&queue_pointer, i);
                         const int col_sz = c->ptn[i];
-                        if (col_sz == 0) {
-                            //singleton_hint.push_back(i);
-                        }
                         i += col_sz + 1;
 
                     }
@@ -172,104 +170,68 @@ namespace dejavu {
                     const int col_sz = c->ptn[init_color];
                     assert(c->vertex_to_col[c->lab[init_color]] == init_color);
                     cell_todo.add_cell(&queue_pointer, init_color);
-                    if (col_sz == 0) {
-                        //singleton_hint.push_back(init_color);
-                    }
                 }
 
+                g_early_out  = false;
+                g_split_hook = split_hook;
+
                 while (!cell_todo.empty()) {
-                    color_class_splits.reset();
-                    const int next_color_class = cell_todo.next_cell(&queue_pointer, c);
+                    const int next_color_class    = cell_todo.next_cell(&queue_pointer, c);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
 
-                    if (worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) {
-                        continue;
-                    }
-
-                    const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
+                    if (worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) continue;
 
                     // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
+                    const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
                     if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
                         // singleton
-                        refine_color_class_singleton(g, c, next_color_class,&color_class_splits);
+                        refine_color_class_singleton(g, c, next_color_class);
                     } else if (g->dense) {
                         if (very_dense) { // dense-dense
-                            refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz,
-                                                           &color_class_splits);
+                            refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz);
                         } else { // dense-sparse
-                            refine_color_class_dense(g, c, next_color_class, next_color_class_sz,
-                                                     &color_class_splits);
+                            refine_color_class_dense(g, c, next_color_class, next_color_class_sz);
                         }
                     } else { // sparse
-                        refine_color_class_sparse(g, c, next_color_class, next_color_class_sz,
-                                                  &color_class_splits);
+                        refine_color_class_sparse(g, c, next_color_class, next_color_class_sz);
                     }
 
-                    // add all new classes except for the first, largest one
-                    int latest_old_class = -1;
-                    bool skipped_largest = false;
-                    bool early_out = false;
-
-                    // color class splits are sorted in reverse
-                    // the old color class will always come last
-                    while (!color_class_splits.empty()) {
-                        int old_class = color_class_splits.last()->first.first;
-                        int new_class = color_class_splits.last()->first.second;
-                        bool is_largest = color_class_splits.last()->second;
-
-                        c->cells += (old_class != new_class);
-                        int class_size = c->ptn[new_class];
-
-                        if (split_hook && !split_hook(old_class, new_class, c->ptn[new_class] + 1)) {
-                            early_out = true;
-                        }
-
-                        if (latest_old_class != old_class) {
-                            latest_old_class = old_class;
-                            skipped_largest = false;
-                        }
-
-                        // management code for skipping largest class resulting from old_class
-                        color_class_splits.pop_back();
-                        //int new_class_sz = c->ptn[new_class] + 1;
-
-                        if (skipped_largest || !is_largest) {
-                            cell_todo.add_cell(&queue_pointer, new_class);
-                            //if(new_class_sz == 1)
-                            //singleton_hint.push_back(new_class);
-                        } else {
-                            skipped_largest = true;
-
-                            // since old color class will always appear last, the queue pointer of old color class is still valid!
-                            int i = queue_pointer.get(old_class);
-                            if (i >= 0) {
-                                cell_todo.replace_cell(&queue_pointer, old_class, new_class);
-                                //if(new_class_sz == 1)
-                                //    singleton_hint.push_back(new_class);
-                            }
-                        }
-                    }
-
-                    if (early_out) {
-                        color_class_splits.reset();
+                    if (g_early_out) {
                         cell_todo.reset(&queue_pointer);
                         break;
                     }
 
                     // detection if coloring is discrete
                     if (c->cells == g->v_size) {
-                        color_class_splits.reset();
                         cell_todo.reset(&queue_pointer);
                         break;
                     }
 
                     // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
                     if (c->cells == color_limit) {
-                        color_class_splits.reset();
                         cell_todo.reset(&queue_pointer);
                         break;
                     }
+                }
+            }
+
+            void report_split_color_class(coloring* c, const int old_class, const int new_class, const int new_class_sz,
+                                          const bool is_largest) {
+                c->cells += (old_class != new_class);
+                assert(c->ptn[new_class] + 1 == new_class_sz);
+
+                if ((g_split_hook != nullptr) && !(*g_split_hook)(old_class, new_class, new_class_sz)) {
+                    g_early_out = true;
+                }
+
+                if (!is_largest && old_class != new_class) {
+                    cell_todo.add_cell(&queue_pointer, new_class);
+                } else if(is_largest) {
+                    // since old color class is skipped above, this should be safe
+                    int i = queue_pointer.get(old_class);
+                    if (i >= 0)                cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                    if(old_class != new_class) cell_todo.add_cell(&queue_pointer, old_class);
                 }
             }
 
@@ -312,7 +274,7 @@ namespace dejavu {
 
             // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
             // techniques -- meant to be used as the first refinement in automorphism computation
-            bool refine_coloring_first(sgraph *g, coloring *c, int init_color_class = -1) {
+            void refine_coloring_first(sgraph *g, coloring *c, int init_color_class = -1) {
                 assure_initialized(g);
                 singleton_hint.reset();
 
@@ -332,88 +294,50 @@ namespace dejavu {
                 }
 
                 while (!cell_todo.empty()) {
-                    color_class_splits.reset();
                     const int next_color_class = cell_todo.next_cell(&queue_pointer, c, &singleton_hint);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
                     const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
                     if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
                         // singleton
-                        refine_color_class_singleton_first(g, c, next_color_class,&color_class_splits);
+                        refine_color_class_singleton_first(g, c, next_color_class);
                     } else if (g->dense) {
                         if (very_dense) { // dense-dense
-                            refine_color_class_dense_dense_first(g, c, next_color_class, next_color_class_sz,
-                                                                 &color_class_splits);
+                            refine_color_class_dense_dense_first(g, c, next_color_class, next_color_class_sz);
                         } else { // dense-sparse
-                            refine_color_class_dense_first(g, c, next_color_class, next_color_class_sz,
-                                                           &color_class_splits);
+                            refine_color_class_dense_first(g, c, next_color_class, next_color_class_sz);
                         }
                     } else { // sparse
-                        refine_color_class_sparse_first(g, c, next_color_class, next_color_class_sz,
-                                                        &color_class_splits);
+                        refine_color_class_sparse_first(g, c, next_color_class, next_color_class_sz);
                     }
 
-                    // add all new classes except for the first, largest one
-                    int latest_old_class = -1;
-                    bool skipped_largest = false;
-
-                    // color class splits are sorted in reverse
-                    // the old color class will always come last
-                    while (!color_class_splits.empty()) {
-                        const int old_class = color_class_splits.last()->first.first;
-                        const int new_class = color_class_splits.last()->first.second;
-                        const bool is_largest = color_class_splits.last()->second;
-
-                        c->cells += (old_class != new_class);
-                        const int class_size = c->ptn[new_class] + 1;
-
-#ifndef NDEBUG // debug code
-                        if(color_class_splits.empty()) {
-int actual_cells = 0;
-for (int i = 0; i < c->domain_size;) {
-actual_cells += 1;
-i += c->ptn[i] + 1;
-}
-
-assert(c->cells == actual_cells);
-}
-#endif
-
-                        if (c->cells == g->v_size) {
-                            color_class_splits.reset();
-                            cell_todo.reset(&queue_pointer);
-                            return true;
-                        }
-
-                        if (latest_old_class != old_class) {
-                            latest_old_class = old_class;
-                            skipped_largest = false;
-                        }
-
-                        color_class_splits.pop_back();
-                        const int new_class_sz = c->ptn[new_class] + 1;
-
-
-                        if (skipped_largest || !is_largest) {
-                            cell_todo.add_cell(&queue_pointer, new_class);
-                            if (new_class_sz == 1)
-                                singleton_hint.push_back(new_class);
-                        } else {
-                            skipped_largest = true;
-
-                            // since old color class will always appear last, the queue pointer of old color class is still valid!
-                            int i = queue_pointer.get(old_class);
-                            if (i >= 0) {
-                                cell_todo.replace_cell(&queue_pointer, old_class, new_class);
-                                if (new_class_sz == 1)
-                                    singleton_hint.push_back(new_class);
-                            }
-                        }
+                    if (c->cells == g->v_size) {
+                        cell_todo.reset(&queue_pointer);
+                        return;
                     }
                 }
+            }
 
-                // assert(assert_is_equitable(g, c));
-                return true;
+            void report_split_color_class_first(coloring* c, int old_class, int new_class, int new_class_sz,
+                                                bool is_largest) {
+                c->cells += (old_class != new_class);
+                assert(c->ptn[new_class] + 1 == new_class_sz);
+
+                if (!is_largest && old_class != new_class) {
+                    cell_todo.add_cell(&queue_pointer, new_class);
+                    if (new_class_sz == 1) singleton_hint.push_back(new_class);
+                } else if(is_largest) {
+                    // since old color class is skipped above, this should be safe
+                    int i = queue_pointer.get(old_class);
+                    if (i >= 0) {
+                        cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                        if(new_class_sz == 1) singleton_hint.push_back(new_class);
+                    }
+                    if(old_class != new_class) {
+                        cell_todo.add_cell(&queue_pointer, old_class);
+                        if(c->ptn[old_class] + 1 == 1) singleton_hint.push_back(old_class);
+                    }
+                }
             }
 
             // certify an automorphism on a graph
@@ -682,7 +606,6 @@ assert(c->cells == actual_cells);
             work_set_t<int> neighbour_sizes;
             work_list_t<int> singleton_hint;
             work_list_t<int> old_color_classes;
-            work_list_pair_bool color_class_splits;
 
             int *scratch = nullptr;
             int *workspace_int = nullptr;
@@ -708,7 +631,6 @@ assert(c->cells == actual_cells);
                     //scratch_set.initialize_from_array(workspace_int + n, n);
                     scratch_set.initialize(n);
 
-                    color_class_splits.allocate(n);
                     cell_todo.initialize(n * 2);
 
                     memset(scratch, 0, n * sizeof(int));
@@ -716,6 +638,139 @@ assert(c->cells == actual_cells);
                 }
             }
 
+            void refine_color_class_sparse(sgraph *g, coloring *c, int color_class,
+                                           int class_size) {
+                // for all vertices of the color class...
+                bool mark_as_largest;
+                int i, j, cc, end_cc, largest_color_class_size, acc;
+                int *vertex_to_lab = c->vertex_to_lab;
+                int *lab = c->lab;
+                int *ptn = c->ptn;
+                int *vertex_to_col = c->vertex_to_col;
+
+                cc = color_class; // iterate over color class
+
+                old_color_classes.reset();
+                neighbours.reset();
+                color_vertices_considered.reset();
+
+                end_cc = color_class + class_size;
+                while (cc < end_cc) { // increment value of neighbours of vc by 1
+                    const int vc = lab[cc];
+                    const int pe = g->v[vc];
+                    const int end_i = pe + g->d[vc];
+                    for (i = pe; i < end_i; i++) {
+                        const int v = g->e[i];
+                        const int col = vertex_to_col[v];
+                        if (ptn[col] == 0) {
+                            continue;
+                        }
+                        neighbours.inc_nr(v);
+                        if (neighbours.get(v) == 0) {
+                            color_vertices_considered.inc_nr(col);
+                            assert(col + color_vertices_considered.get(col) < g->v_size);
+                            scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
+                            // TODO could consolidate or checkerboard color_vertices_considered and scratch?
+                            if (color_vertices_considered.get(col) == 0) { // TODO use color_vertices_considered[col] == 0?
+                                old_color_classes.push_back(col);
+                            }
+                        }
+                    }
+                    cc += 1;
+                }
+
+                // sort split color classes
+                old_color_classes.sort();
+
+                // split color classes according to neighbour count
+                while (!old_color_classes.empty()) {
+                    const int _col = old_color_classes.pop_back();
+                    const int _col_sz = ptn[_col] + 1;
+                    neighbour_sizes.reset();
+                    vertex_worklist.reset();
+
+                    for (i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
+                        const int v = scratch[_col + i];
+                        const int index = neighbours.get(v) + 1;
+                        if (neighbour_sizes.inc(index) == 0)
+                            vertex_worklist.push_back(index);
+                    }
+
+                    vertex_worklist.sort();
+
+                    // enrich neighbour_sizes to accumulative counting array
+                    acc = 0;
+                    while (!vertex_worklist.empty()) {
+                        const int k = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(k) + 1;
+                        if (val >= 1) {
+                            neighbour_sizes.set(k, val + acc);
+                            acc += val;
+                            const int _ncol = _col + _col_sz - (neighbour_sizes.get(k));
+                            if (_ncol != _col)
+                                ptn[_ncol] = -1;
+                        }
+                    }
+
+                    const int vcount = color_vertices_considered.get(_col);
+
+                    vertex_worklist.reset();
+                    j = 0;
+                    color_vertices_considered.set(_col, -1);
+
+                    // determine colors and rearrange vertices
+                    while (j < vcount + 1) {
+                        const int v = scratch[_col + j];
+                        ++j;
+                        if ((neighbours.get(v) == -1))
+                            continue;
+                        const int v_new_color = _col + _col_sz - neighbour_sizes.get(neighbours.get(v) + 1);
+                        neighbours.set(v, -1);
+                        if (v_new_color == _col)
+                            continue;
+
+                        const int lab_pt = v_new_color + ptn[v_new_color] + 1;
+                        ptn[v_new_color] += 1;
+                        ptn[_col] -= (_col != v_new_color);
+
+                        const int vertex_old_pos = vertex_to_lab[v];
+                        const int vertex_at_pos = lab[lab_pt];
+                        lab[vertex_old_pos] = vertex_at_pos;
+                        vertex_to_lab[vertex_at_pos] = vertex_old_pos;
+                        lab[lab_pt] = v;
+                        vertex_to_col[v] = v_new_color;
+                        vertex_to_lab[v] = lab_pt;
+                    }
+
+                    // add new colors to worklist
+                    largest_color_class_size = -1;
+                    int largest_color_class = -1;
+                    for (i = _col; i < _col + _col_sz;) {
+                        assert(i >= 0 && i < c->domain_size);
+                        assert(c->ptn[i] + 1 > 0);
+                        const bool new_largest = largest_color_class_size < (ptn[i] + 1);
+                        largest_color_class_size = new_largest? (ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        i += ptn[i] + 1;
+                    }
+                    assert(largest_color_class >= _col);
+                    assert(largest_color_class < _col + _col_sz);
+
+                    int debug_largest = 0;
+
+                    for (i = _col; i < _col + _col_sz;) {
+                        const int i_sz = ptn[i] + 1;
+                        const bool is_largest = i == largest_color_class;
+                        report_split_color_class(c, _col, i, i_sz, is_largest);
+                        debug_largest += is_largest;
+                        i += i_sz;
+                    }
+                    assert(debug_largest == 1);
+                }
+
+                neighbour_sizes.reset();
+                vertex_worklist.reset();
+            }
             bool refine_color_class_sparse(sgraph *g, coloring *c, int color_class, int class_size,
                                            work_list_pair_bool *report_splits) {
                 // for all vertices of the color class...
@@ -749,7 +804,7 @@ assert(c->cells == actual_cells);
                             color_vertices_considered.inc_nr(col);
                             assert(col + color_vertices_considered.get(col) < g->v_size);
                             scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
-                                                                                  // TODO could consolidate or checkerboard color_vertices_considered and scratch?
+                            // TODO could consolidate or checkerboard color_vertices_considered and scratch?
                             if (color_vertices_considered.get(col) == 0) { // TODO use color_vertices_considered[col] == 0?
                                 old_color_classes.push_back(col);
                             }
@@ -842,8 +897,7 @@ assert(c->cells == actual_cells);
                 return comp;
             }
 
-            bool refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size,
-                                          work_list_pair_bool *report_splits) {
+            void refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size) {
                 bool comp;
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
@@ -967,29 +1021,30 @@ assert(c->cells == actual_cells);
                     }
 
                     largest_color_class_size = -1;
-
-                    // determine largest class to throw away and finish (fourth iteration)
+                    int largest_color_class  = 0;
+                    // determine largest class to throw away
                     for (i = col; i < col + col_sz;) {
                         assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
-                        const int v_color = i;
-                        const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
-                        largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
-
-                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                                std::pair<int, int>(col, i), mark_as_largest));
-                        if (v_color != 0)
-                            c->ptn[v_color - 1] = 0;
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
-                }
+                    assert(largest_color_class >= col);
+                    assert(largest_color_class < col + col_sz);
 
-                return comp;
+                    // report splits
+                    for (i = col; i < col + col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class(c, col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
+                    }
+                }
             }
 
-            bool refine_color_class_dense_dense(sgraph *g, coloring *c,
-                                                int color_class, int class_size,
-                                                work_list_pair_bool *report_splits) {
+            void refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size) {
                 bool comp;
                 int i, j, acc, cc, largest_color_class_size;
                 cc = color_class; // iterate over color class
@@ -1085,26 +1140,131 @@ assert(c->cells == actual_cells);
                     }
 
                     largest_color_class_size = -1;
+                    int largest_color_class  =  0;
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
                         assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
-                        const int v_color = i;
-                        const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
-                        largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
-
-                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                                std::pair<int, int>(col, i), mark_as_largest));
-                        if (v_color != 0)
-                            c->ptn[v_color - 1] = 0;
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
+                    }
+                    assert(largest_color_class >= col);
+                    assert(largest_color_class < col + col_sz);
+
+                    // report splits
+                    for (i = col; i < col + col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class(c, col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
                     }
                 }
 
                 neighbours.reset_hard();
-                return comp;
             }
+
+            void refine_color_class_singleton(sgraph *g, coloring *c, int color_class) {
+                int i, cc, deg1_write_pos, deg1_read_pos;
+                cc = color_class; // iterate over color class
+
+                neighbours.reset();
+                vertex_worklist.reset();
+                old_color_classes.reset();
+
+                const int vc = c->lab[cc];
+                const int pe = g->v[vc];
+                const int end_i = pe + g->d[vc];
+
+                for (i = pe; i < end_i; i++) {
+                    const int v = g->e[i];
+                    const int col = c->vertex_to_col[v];
+
+                    if (c->ptn[col] == 0) {
+                        // if full invariant, sort -- else use a hash value
+                        continue;
+                    }
+
+                    if(neighbours.get(col) == -1) {
+                        old_color_classes.push_back(col);
+                        // neighbours acts as the write position for degree 1 vertices of col in the scratchpad
+                        neighbours.set(col, col);
+                    }
+                    // write vertex to scratchpad for later use
+                    scratch[neighbours.get(col)] = v;
+                    neighbours.inc_nr(col); // we reset neighbours later, since old_color_classes for reset
+                }
+
+                old_color_classes.sort();
+
+                for(int j = 0; j < old_color_classes.cur_pos; ++j) {
+                    const int deg0_col = old_color_classes[j];
+                    const int deg1_col_sz = neighbours.get(deg0_col) - deg0_col;
+                    const int deg0_col_sz = (c->ptn[deg0_col] + 1) - deg1_col_sz;
+                    const int deg1_col = deg0_col + deg0_col_sz;
+
+                    assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+
+                    // no split? done...
+                    if (deg0_col == deg1_col) {
+                        neighbours.set(deg1_col, -1);
+                        assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+                        continue;
+                    }
+
+                    assert(deg0_col_sz + deg1_col_sz - 1 == c->ptn[deg0_col]);
+
+                    // set ptn
+                    c->ptn[deg0_col] = deg0_col_sz - 1;
+                    c->ptn[deg1_col] = deg1_col_sz - 1;
+                    c->ptn[deg1_col - 1] = 0;
+
+                    deg1_write_pos = deg1_col;
+                    deg1_read_pos = neighbours.get(deg0_col) - 1;
+
+                    //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
+
+                    // rearrange vertices of deg1 to the back of deg0 color
+                    assert(deg1_read_pos >= deg0_col);
+
+                    while (deg1_read_pos >= deg0_col) {
+                        const int v = scratch[deg1_read_pos];
+                        const int vertex_at_pos = c->lab[deg1_write_pos];
+                        const int lab_pos = c->vertex_to_lab[v];
+
+                        c->lab[deg1_write_pos] = v;
+                        c->vertex_to_lab[v] = deg1_write_pos;
+                        c->vertex_to_col[v] = deg1_col;
+
+                        c->lab[lab_pos] = vertex_at_pos;
+                        c->vertex_to_lab[vertex_at_pos] = lab_pos;
+
+                        deg1_write_pos++;
+                        deg1_read_pos--;
+                    }
+
+                    assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+                    assert(c->vertex_to_col[c->lab[deg1_col]] == deg1_col);
+
+                    // add new classes to report_splits
+                    const bool leq = deg1_col_sz > deg0_col_sz;
+                    /*report_splits->push_back(std::pair<std::pair<int, int>, bool>(
+                            std::pair<int, int>(deg0_col, deg0_col), !leq));
+                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
+                            std::pair<int, int>(deg0_col, deg1_col), leq));*/
+
+                    report_split_color_class(c, deg0_col, deg1_col, deg1_col_sz, leq);
+                    report_split_color_class(c, deg0_col, deg0_col, deg0_col_sz, !leq);
+
+                    // reset neighbours count to -1
+                    neighbours.set(deg0_col, -1);
+                }
+
+                old_color_classes.reset();
+            }
+
 
             void refine_color_class_singleton(sgraph *g, coloring *c, int color_class,
                                               work_list_pair_bool *report_splits) {
@@ -1211,12 +1371,9 @@ assert(c->cells == actual_cells);
                 }
             }
 
-            bool refine_color_class_singleton_first(sgraph *g, coloring *c, int color_class,
-                                                    work_list_pair_bool *report_splits) {
-                bool comp;
+            void refine_color_class_singleton_first(sgraph *g, coloring *c, int color_class) {
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 neighbours.reset();
                 scratch_set.reset();
@@ -1246,8 +1403,8 @@ assert(c->cells == actual_cells);
                     // old_color_classes can be used as reset information
                 }
 
-                while (!old_color_classes.empty()) {
-                    const int deg0_col = old_color_classes.pop_back();
+                for(int j = 0; j < old_color_classes.cur_pos; ++j) {
+                    const int deg0_col = old_color_classes[j];
                     const int deg1_col_sz = neighbours.get(deg0_col) - deg0_col;
                     const int deg0_col_sz = (c->ptn[deg0_col] + 1) - deg1_col_sz;
                     const int deg1_col = deg0_col + deg0_col_sz;
@@ -1284,21 +1441,22 @@ assert(c->cells == actual_cells);
 
                     // add new classes to report_splits
                     const bool leq = deg1_col_sz > deg0_col_sz;
-                    report_splits->push_back(std::pair<std::pair<int, int>, bool>(
+                    /*report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg0_col), !leq));
                     report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                            std::pair<int, int>(deg0_col, deg1_col), leq));
+                            std::pair<int, int>(deg0_col, deg1_col), leq));*/
+
+                    report_split_color_class_first(c, deg0_col, deg0_col, deg0_col_sz, !leq);
+                    report_split_color_class_first(c, deg0_col, deg1_col, deg1_col_sz, leq);
 
                     // reset neighbours count to -1
                     neighbours.set(deg0_col, -1);
                 }
 
-                return comp;
+                old_color_classes.reset();
             }
 
-            bool refine_color_class_dense_first(sgraph *g, coloring *c,
-                                                int color_class, int class_size,
-                                                work_list_pair_bool *report_splits) {
+            void refine_color_class_dense_first(sgraph *g, coloring *c, int color_class, int class_size) {
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
 
@@ -1393,29 +1551,29 @@ assert(c->cells == actual_cells);
                     }
 
                     largest_color_class_size = -1;
+                    int largest_color_class      = -1;
 
-                    // determine largest class to throw away and finish (fourth iteration)
+                    // determine largest class to throw away
                     for (i = col; i < col + col_sz;) {
                         assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
-                        const int v_color = i;
-                        const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
-                        largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
-
-                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                                std::pair<int, int>(col, i), mark_as_largest));
-                        if (v_color != 0)
-                            c->ptn[v_color - 1] = 0;
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
-                }
 
-                return true;
+                    // report splits
+                    for (i = col; i < col + col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class_first(c, col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
+                    }
+                }
             }
 
-            bool refine_color_class_dense_dense_first(sgraph *g, coloring *c,
-                                                      int color_class, int class_size,
-                                                      work_list_pair_bool *report_splits) {
+            void refine_color_class_dense_dense_first(sgraph *g, coloring *c, int color_class, int class_size) {
                 // for all vertices of the color class...
                 int i, j, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
@@ -1500,30 +1658,31 @@ assert(c->cells == actual_cells);
                     }
 
                     largest_color_class_size = -1;
+                    int largest_color_class  =  0;
 
                     // determine largest class to throw away and finish (fourth iteration)
                     for (i = col; i < col + col_sz;) {
                         assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
-                        const int v_color = i;
-                        const bool mark_as_largest = largest_color_class_size < c->ptn[i] + 1;
-                        largest_color_class_size = mark_as_largest ? c->ptn[i] + 1 : largest_color_class_size;
-
-                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                                std::pair<int, int>(col, i), mark_as_largest));
-                        if (v_color != 0)
-                            c->ptn[v_color - 1] = 0;
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
+                    }
+
+                    // report splits
+                    for (i = col; i < col + col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class_first(c, col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
                     }
                 }
 
                 neighbours.reset_hard();
-                return true;
             }
 
-            bool refine_color_class_sparse_first(sgraph *g, coloring *c,
-                                                 int color_class, int class_size,
-                                                 work_list_pair_bool *report_splits) {
+            void refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size) {
                 bool comp;
                 int v_new_color, cc, largest_color_class_size, acc;
 
@@ -1633,28 +1792,31 @@ assert(c->cells == actual_cells);
 
                     // add new colors to worklist
                     largest_color_class_size = -1;
+                    int largest_color_class      = -1;
                     int i;
                     for (i = _col; i < _col + _col_sz;) {
                         assert(i >= 0 && i < c->domain_size);
                         assert(c->ptn[i] + 1 > 0);
-                        const bool mark_as_largest = largest_color_class_size < (c->ptn[i] + 1);
-                        largest_color_class_size = mark_as_largest ? (c->ptn[i] + 1) : largest_color_class_size;
-
-                        report_splits->push_back(std::pair<std::pair<int, int>, bool>(
-                                std::pair<int, int>(_col, i), mark_as_largest));
-                        if (i != 0)
-                            c->ptn[i - 1] = 0;
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        //report_splits->push_back(std::pair<std::pair<int, int>, bool>(
+                        //        std::pair<int, int>(_col, i), mark_as_largest));
+                        if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
+                    if (i != 0) c->ptn[i - 1] = 0;
 
-                    if (i != 0)
-                        c->ptn[i - 1] = 0;
+
+                    for (i = _col; i < _col + _col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class_first(c, _col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
+                    }
                 }
 
                 neighbour_sizes.reset();
                 vertex_worklist.reset();
-
-                return comp;
             }
         };
     }

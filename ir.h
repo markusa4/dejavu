@@ -147,6 +147,15 @@ namespace dejavu {
             work_list touched_color_list;
             work_list prev_color_list;
 
+            mark_set  diff_tester;
+            mark_set  diff_colors;
+            mark_set  diff_colors_checked;
+            work_list diff_colors_list;
+            work_list diff_colors_list_pt;
+            bool diff_diverge = false;
+            int num_diffs = 0;
+            int singleton_pt_start = 0;
+
             std::function<type_split_color_hook>     my_split_hook;
             std::function<type_worklist_color_hook>  my_worklist_hook;
 
@@ -160,6 +169,8 @@ namespace dejavu {
             bool h_trace_early_out = false;       /*< use trace early out                */
             bool h_deviation_inc_active  = false; /*< use increased trace deviation      */
             int  s_deviation_inc_current = 0;     /*< number of current trace deviations */
+
+
 
             void touch_initial_colors() {
                 int i = 0;
@@ -194,9 +205,7 @@ namespace dejavu {
                     }
 
                     // write singletons to singleton list
-                    if (new_color_sz == 1) {
-                        singletons.push_back(c->lab[new_color]);
-                    }
+                    if (new_color_sz == 1) singletons.push_back(c->lab[new_color]);
 
                     // record colors that were changed
                     if (!touched_color.get(new_color)) {
@@ -213,8 +222,8 @@ namespace dejavu {
                 s_deviation_inc_current += (!cont);
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
-                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal() &&
-                                    compare_base_cells[s_base_pos - 1] == c->cells);
+                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
+                                    && compare_base_cells[s_base_pos - 1] == c->cells);
                 return ndone && (cont || deviation_override);
             }
 
@@ -230,7 +239,7 @@ namespace dejavu {
                     s_cell_active = false;
                 }
 
-                // update some heuristic values
+                // blueprints
                 if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
                     T->blueprint_skip_to_next_cell();
                     return false;
@@ -272,8 +281,23 @@ namespace dejavu {
 
                 my_split_hook = self_split_hook();
                 my_worklist_hook = self_worklist_hook();
+
+                diff_tester.initialize(c->domain_size);
+                diff_colors_checked.initialize(c->domain_size);
+                diff_colors.initialize(c->domain_size);
+                diff_colors_list.resize(c->domain_size);
+                diff_colors_list_pt.resize(c->domain_size);
+                num_diffs = 0;
+                singleton_pt_start = 0;
             }
 
+            work_list* get_touched_colors() {
+                return &touched_color_list;
+            }
+
+            mark_set* get_touched_colors_test() {
+                return &touched_color;
+            }
             /**
              * Sets internal trace into recording mode. We write a trace which we might want to compare to later.
              *
@@ -295,6 +319,223 @@ namespace dejavu {
              */
             void mode_compare_base() {
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
+            }
+
+            void add_diff_color(int col) {
+                if(!diff_colors.get(col)) {
+                    diff_colors.set(col);
+                    diff_colors_list.push_back(col);
+                    diff_colors_list_pt[col] = diff_colors_list.cur_pos - 1;
+                }
+            }
+
+            void remove_diff_color(int col) {
+                if(diff_colors.get(col)) {
+                    const int pt      = diff_colors_list_pt[col];
+                    assert(diff_colors_list[pt] == col);
+
+                    // which element is in the back?
+                    const int back_pt  = diff_colors_list.cur_pos-1;
+                    const int back_col = diff_colors_list[back_pt];
+
+                    // now swap back_col to col
+                    diff_colors_list[pt] = back_col;
+                    assert(diff_colors.get(back_col));
+                    assert(diff_colors_list_pt[back_col] == back_pt);
+                    diff_colors_list_pt[back_col] = pt;
+                    diff_colors_list_pt[col] = -1; // I don't trust myself
+
+                    diff_colors.unset(col);
+                    --diff_colors_list.cur_pos;
+                }
+
+            }
+
+            bool is_diff_color(int col) {
+                return diff_colors.get(col);
+            }
+
+            int get_diff_color() {
+                assert(diff_colors_list.cur_pos > 0);
+                int best_diff_color    = diff_colors_list[0];
+                return best_diff_color;
+                /*int best_diff_color_sz = diff_colors_list[0];
+
+                for(int i = 0; i < diff_colors_list.cur_pos && i < 12; ++i) {
+                }
+                reurn ;*/
+            }
+
+            bool __attribute__((noinline)) color_is_different(controller* state, int col) {
+                diff_tester.reset();
+                if(c->ptn[col] != state->c->ptn[col]) {
+                    assert(false);
+                    return true;
+                }
+
+                if(c->ptn[col] == 0) return false;
+                for(int i = 0; i < c->ptn[col] + 1; ++i) {
+                    diff_tester.set(c->lab[col + i]);
+                }
+
+                bool equal = true;
+                for(int i = 0; i < state->c->ptn[col] + 1 && equal; ++i) {
+                    equal = equal && diff_tester.get(state->c->lab[col + i]);
+                }
+                return !equal;
+            }
+
+            std::pair<int, int> color_diff_pair(controller* state, int col) {
+                diff_tester.reset();
+                assert(c->ptn[col] == state->c->ptn[col]);
+                int left  = -1;
+                int right = -1;
+
+                for(int i = 0; i < c->ptn[col] + 1; ++i) {
+                    diff_tester.set(c->lab[col + i]);
+                }
+                for(int i = 0; i < state->c->ptn[col] + 1 && left == -1; ++i) {
+                    if(!diff_tester.get(state->c->lab[col + i])) left = state->c->lab[col + i];
+                }
+
+                diff_tester.reset();
+                for(int i = 0; i < c->ptn[col] + 1; ++i) {
+                    diff_tester.set(state->c->lab[col + i]);
+                }
+                for(int i = 0; i < c->ptn[col] + 1 && right == -1; ++i) {
+                    if(!diff_tester.get(c->lab[col + i])) right = c->lab[col + i];
+                }
+
+                return {left, right};
+            }
+
+            void reset_diff() {
+                diff_colors_checked.initialize(c->domain_size);
+                diff_colors.reset();
+                diff_colors_list.reset();
+                diff_tester.reset();
+                singleton_pt_start = singletons.size();
+
+                diff_diverge = false;
+            }
+
+            void singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
+                automorphism->reset();
+                for(int i = singleton_pt_start; i < singletons.size(); ++i) {
+                    automorphism->write_single_map(singletons[i], state->singletons[i]);
+                }
+            }
+
+
+            int get_diff_diverge() {
+                return diff_diverge;
+            }
+
+            // returns whether there is diff cells
+            bool update_diff_last_individualization(controller* other_state) {
+                diff_colors_checked.reset();
+                int i = base_touched_color_list_pt[base_touched_color_list_pt.size()-1];
+                assert(touched_color_list.cur_pos == other_state->touched_color_list.cur_pos);
+                for(;i < touched_color_list.cur_pos; ++i) {
+                    const int old_color    = prev_color_list[i];
+                    const int new_color    = touched_color_list[i];
+
+                    if((prev_color_list[i]    != other_state->prev_color_list[i]) ||
+                       (touched_color_list[i] != other_state->touched_color_list[i])) {
+                        diff_diverge = true;
+                        return true;
+                    }
+
+                    const int old_color_sz = c->ptn[old_color] + 1;
+                    const int new_color_sz = c->ptn[new_color] + 1;
+
+                    const int other_old_color_sz = other_state->c->ptn[old_color] + 1;
+                    const int other_new_color_sz = other_state->c->ptn[new_color] + 1;
+
+                    assert(old_color_sz == other_old_color_sz);
+                    assert(new_color_sz == other_new_color_sz);
+
+                    if(!diff_colors_checked.get(old_color)) {
+                        if (old_color_sz == 1 || !color_is_different(other_state, old_color)) {
+                            remove_diff_color(old_color);
+                        } else {
+                            add_diff_color(old_color);
+                        }
+                        diff_colors_checked.set(old_color);
+                    }
+
+                    if(new_color_sz == 1 || !color_is_different(other_state, new_color)) {
+                        remove_diff_color(new_color);
+                    } else {
+                        add_diff_color(new_color);
+                    }
+                    /*if(is_diff_color(old_color)) {
+                        assert(!is_diff_color(new_color));
+                        if(new_color_sz != 1 && color_diffs(other_state, new_color))  add_diff_color(new_color);
+                        if(!color_diffs(other_state, old_color)) remove_diff_color(old_color);
+
+                    } else {
+                        // need to check whether they still match! if one part matches, the other does too?
+                        if(color_is_different(other_state, new_color)) {
+                            if(new_color_sz != 1) add_diff_color(new_color);
+                            if(old_color_sz != 1) add_diff_color(old_color);
+                        }
+                    }
+                    if(old_color_sz == 1) remove_diff_color(old_color);
+                    if(new_color_sz == 1) remove_diff_color(new_color);*/
+                }
+
+                /*int num = 0;
+                for(int j = 0; j < other_state->c->domain_size;) {
+                    const int colsz = other_state->c->ptn[j] + 1;
+                    if(colsz > 1) {
+                        num += color_is_different(other_state, j);
+                        assert(color_is_different(other_state, j) == diff_colors.get(j));
+                    }
+                    j += colsz;
+                }
+                assert(num == diff_colors_list.cur_pos);*/
+
+                return (diff_colors_list.cur_pos != 0); // there is a diff!
+            }
+
+            void copy(controller* state) {
+                this->c->copy_any(state->c);
+
+                T->set_compare(true);
+                T->set_record(false);
+                T->set_compare_trace(state->T->get_compare_trace());
+                T->set_position(state->T->get_position());
+                T->set_hash(state->T->get_hash());
+
+                compare_base_color = state->compare_base_color;
+                compare_base_cells = state->compare_base_cells;
+                compare_singletons = state->compare_singletons;
+                compare_base       = state->compare_base;
+
+                leaf_color.copy_any(&state->leaf_color);
+                mode = state->mode;
+
+                base_color  = state->base_color;
+                base_vertex = state->base_vertex;
+                base_cells  = state->base_cells;
+                base_color_sz = state->base_color_sz;
+                base_touched_color_list_pt = state->base_touched_color_list_pt;
+                base_singleton_pt = state->base_singleton_pt;
+                touched_color.copy(&state->touched_color);
+                prev_color_list.copy(&state->prev_color_list);
+                touched_color_list.copy(&state->touched_color_list);
+                base_touched_color_list_pt = state->base_touched_color_list_pt;
+                singletons = state->singletons;
+
+                diff_tester.copy(&state->diff_tester);
+                diff_colors.copy(&state->diff_colors);
+                diff_colors_list.copy(&state->diff_colors_list);
+                diff_colors_list_pt.copy(&state->diff_colors_list_pt);
+
+                s_base_pos = state->s_base_pos;
+
+                this->R = state->R;
             }
 
             /**
@@ -325,7 +566,6 @@ namespace dejavu {
                 std::copy(base_vertex.begin(), base_vertex.end(), compare_base.begin());
 
                 leaf_color.copy_any(c);
-
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
 
@@ -469,6 +709,21 @@ namespace dejavu {
                 }
             }
 
+            void write_strong_invariant_singleton(const sgraph* g) const {
+                for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
+                    if(c->ptn[l] != 0) continue;
+                    const int v = c->lab[l];
+                    unsigned int inv1 = 0;
+                    const int start_pt = g->v[v];
+                    const int end_pt   = start_pt + g->d[v];
+                    for(int pt = start_pt; pt < end_pt; ++pt) {
+                        const int other_v = g->e[pt];
+                        inv1 += hash((unsigned int) c->vertex_to_col[other_v]);
+                    }
+                    T->op_additional_info((int) inv1);
+                }
+            }
+
             /**
              * Move IR node kept in this controller to a child, specified by a vertex to be individualized.
              *
@@ -498,12 +753,12 @@ namespace dejavu {
                 T->op_refine_start();
 
                 if (mode == IR_MODE_RECORD_TRACE) {
-                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
+                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
                     if (s_cell_active) T->op_refine_cell_end();
                     T->op_refine_end();
                 } else {
-                    R->refine_coloring(g, c, init_color_class, -1, my_split_hook,
+                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
                     if (T->trace_equal() && c->cells==compare_base_cells[s_base_pos - 1]) {
                         T->skip_to_individualization();
@@ -645,6 +900,7 @@ namespace dejavu {
             const int locked_lim = 512;
 
             std::vector<int> saved_color_base;
+            std::vector<int> saved_color_sizes;
             std::function<type_selector_hook> dynamic_seletor;
             mark_set test_set;
             std::vector<int> candidates;
@@ -686,16 +942,21 @@ namespace dejavu {
              */
             int dynamic_selector_first(const coloring *c, const int base_pos) {
                 if (base_pos >= 0 && base_pos < (int) saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0 &&
-                    c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos]) {
+                    c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos] &&
+                        c->ptn[saved_color_base[base_pos]] + 1 == saved_color_sizes[base_pos]) {
                     return saved_color_base[base_pos];
                 }
+                int best_score = -1;
+                int best_color = -1;
                 for (int i = 0; i < c->domain_size;) {
-                    if (c->ptn[i] > 0) {
-                        return i;
+                    if (c->ptn[i] > best_score && c->ptn[i] > 0) {
+                        best_score = c->ptn[i];
+                        best_color = i;
                     }
+                    if(best_color >= 0) break;
                     i += c->ptn[i] + 1;
                 }
-                return -1;
+                return best_color;
             }
 
             /**
@@ -712,18 +973,28 @@ namespace dejavu {
             }
 
             void find_base(sgraph *g, controller *state, const int h_choose) {
-                switch(h_choose % 3) {
+                int perturbe = 0;
+                if(h_choose > 6) {
+                    perturbe = (int) (hash(h_choose) % 256);
+                }
+                switch(h_choose % 4) {
                     case 0:
-                        find_sparse_optimized_base(g, state);
+                        //find_sparse_optimized_base(g, state, 0);
+                        find_first_base(g, state);
                         break;
                     case 1:
-                        find_combinatorial_optimized_base(g, state);
+                        find_combinatorial_optimized_base_recurse(g, state, perturbe);
                         break;
                     case 2:
-                        find_small_optimized_base(g, state);
+                        find_small_optimized_base(g, state, perturbe);
+                        break;
+                    case 3:
+                        find_combinatorial_optimized_base(g, state);
                         break;
                 }
 
+
+                saved_color_sizes = state->base_color_sz;
                 ir_tree_size_estimate.mantissa = 1.0;
                 ir_tree_size_estimate.exponent = 0;
                 for(auto col_sz : state->base_color_sz) {
@@ -738,14 +1009,10 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_sparse_optimized_base(sgraph *g, controller *state) {
+            void find_sparse_optimized_base(sgraph *g, controller *state, int perturbe) {
                 state->mode_write_base();
 
-                test_set.initialize(g->v_size);
-                candidates.clear();
-                candidates.reserve(locked_lim);
                 int prev_color = -1;
-
                 assert(state->s_base_pos == 0);
                 assert(state->base_vertex.size() == 0);
                 assert(state->base_color.size() == 0);
@@ -753,11 +1020,13 @@ namespace dejavu {
                 assert(state->base_touched_color_list_pt.size() == 0);
                 assert(state->base_singleton_pt.size() == 0);
 
-                mark_set neighbour_color;
-                neighbour_color.initialize(g->v_size);
+                test_set.initialize(g->v_size);
+
+                int start_test_from = 0;
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
+                    int test_lim   = 512;
 
                     // pick previous color if possible
                     if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
@@ -768,41 +1037,29 @@ namespace dejavu {
                             const int other_vertex = g->e[g->v[test_vertex] + i];
                             const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
                             if (state->get_coloring()->ptn[other_color] > 0) {
-                                neighbour_color.set(other_color);
                                 best_color = other_color;
-                                //break;
                             }
                         }
                     }
 
                     // heuristic, try to pick "good" color
                     if (best_color == -1) {
-                        candidates.clear();
                         int best_score = -1;
 
-                        for (int i = 0; i < state->get_coloring()->domain_size;) {
-                            if (state->get_coloring()->ptn[i] > 0) {
-                                candidates.push_back(i);
+                        for (int i = start_test_from; i < state->get_coloring()->domain_size && test_lim >= 0;) {
+                            const int col_sz = state->get_coloring()->ptn[i];
+
+                            if (col_sz > 0) {
+                                --test_lim;
+                                const int test_score = color_score(g, state, i);
+                                if (test_score > best_score) {
+                                    best_color = i;
+                                    best_score = test_score;
+                                }
                             }
 
-                            if (candidates.size() >= (size_t) locked_lim)
-                                break;
-
-                            i += state->get_coloring()->ptn[i] + 1;
-                        }
-
-                        while (!candidates.empty()) {
-                            const int test_color = candidates.back();
-                            candidates.pop_back();
-
-                            int test_score = color_score(g, state, test_color);
-                            if (neighbour_color.get(test_color)) {
-                                test_score *= 10;
-                            }
-                            if (test_score > best_score) {
-                                best_color = test_color;
-                                best_score = test_score;
-                            }
+                            if(col_sz == 0 && start_test_from == i) start_test_from += col_sz + 1;
+                            i += col_sz + 1;
                         }
                     }
 
@@ -810,6 +1067,208 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base  = state->base_color;
+            }
+
+            void find_split_driven_base(sgraph *g, controller *state, int perturbe) {
+                state->mode_write_base();
+
+                int prev_color = -1;
+                assert(state->s_base_pos == 0);
+                assert(state->base_vertex.size() == 0);
+                assert(state->base_color.size() == 0);
+                assert(state->base_cells.size() == 0);
+                assert(state->base_touched_color_list_pt.size() == 0);
+                assert(state->base_singleton_pt.size() == 0);
+
+                test_set.initialize(g->v_size);
+
+                int start_test_from    = state->get_touched_colors()->cur_pos;
+                int start_test_from_cl = 0;
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+                    int best_score = INT32_MIN;
+                    int test_lim   = 64;
+
+                    // pick previous color if possible
+                    if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
+                        best_color = prev_color;
+                    } else if (prev_color >= 0) { // pick neighbour of previous color if possible
+                        const int test_vertex = state->get_coloring()->lab[prev_color];
+                        for (int i = 0; i < g->d[test_vertex]; ++i) {
+                            const int other_vertex = g->e[g->v[test_vertex] + i];
+                            const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
+                            if (state->get_coloring()->ptn[other_color] > 0 &&
+                                state->get_touched_colors_test()->get(other_color)) {
+                                best_color = other_color;
+                            }
+                        }
+                    }
+
+                    if(best_color == -1) {
+                        for(int i = start_test_from; i < state->get_touched_colors()->cur_pos && test_lim >= 0;) {
+                            const int col    = (*state->get_touched_colors())[i];
+                            const int col_sz = state->get_coloring()->ptn[col];
+
+                            if (col_sz > 0) {
+                                --test_lim;
+                                const int test_score = color_score_size(state, col);
+                                if(test_score > best_score) {
+                                    best_color = col;
+                                    best_score = test_score;
+                                }
+                                break;
+                            }
+
+                            if(col_sz == 0 && start_test_from == i) start_test_from += 1;
+                            i += 1;
+                        }
+                    }
+
+                    // heuristic, try to pick "good" color
+                    if (best_color == -1) {
+                        for (int i = start_test_from_cl; i < state->get_coloring()->domain_size && test_lim >= 0;) {
+                            const int col_sz = state->get_coloring()->ptn[i];
+
+                            if (col_sz > 0) {
+                                --test_lim;
+                                const int test_score = color_score_size(state, i);
+                                if (test_score > best_score) {
+                                    best_color = i;
+                                    best_score = test_score;
+                                }
+                            }
+
+                            if(col_sz == 0 && start_test_from_cl == i) start_test_from_cl += col_sz + 1;
+                            i += col_sz + 1;
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color = best_color;
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base  = state->base_color;
+            }
+
+            void find_first_base(sgraph *g, controller *state) {
+                state->mode_write_base();
+
+                int prev_color = -1;
+                assert(state->s_base_pos == 0);
+                assert(state->base_vertex.size() == 0);
+                assert(state->base_color.size() == 0);
+                assert(state->base_cells.size() == 0);
+                assert(state->base_touched_color_list_pt.size() == 0);
+                assert(state->base_singleton_pt.size() == 0);
+
+                test_set.initialize(g->v_size);
+
+                int start_test_from = 0;
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+                    int test_lim   = 512;
+
+
+                    for (int i = start_test_from; i < state->get_coloring()->domain_size && test_lim >= 0;) {
+                        const int col_sz = state->get_coloring()->ptn[i];
+
+                        if (col_sz > 0) {
+                                best_color = i;
+                                break;
+                        }
+
+                        if(col_sz == 0 && start_test_from == i) start_test_from += col_sz + 1;
+                        i += col_sz + 1;
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color = best_color;
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base  = state->base_color;
+            }
+
+            /**
+             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for simple,
+             * sparse graphs.
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_sparse_optimized_base_recurse(sgraph *g, controller *state, int perturbe) {
+                state->mode_write_base();
+
+                test_set.initialize(g->v_size);
+                int prev_color    = -1;
+                int prev_color_sz = 0;
+
+                assert(state->s_base_pos == 0);
+                assert(state->base_vertex.size() == 0);
+                assert(state->base_color.size() == 0);
+                assert(state->base_cells.size() == 0);
+                assert(state->base_touched_color_list_pt.size() == 0);
+                assert(state->base_singleton_pt.size() == 0);
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+                    int test_lim   = 512;
+
+                    // recurse into previous color if possible
+                    if(prev_color >= 0) {
+                        for (int i = 0; i < prev_color + prev_color_sz;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                best_color = i;
+                                break;
+                            }
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+                    }
+
+                    if (prev_color >= 0 && best_color == -1) { // pick neighbour of previous color if possible
+                        const int test_vertex = state->get_coloring()->lab[prev_color];
+                        for (int i = 0; i < g->d[test_vertex]; ++i) {
+                            const int other_vertex = g->e[g->v[test_vertex] + i];
+                            const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
+                            if (state->get_coloring()->ptn[other_color] > 0) {
+                                best_color = other_color;
+                            }
+                        }
+                    }
+
+                    // heuristic, try to pick "good" color
+                    if (best_color == -1) {
+                        int best_score = -1;
+
+                        for (int i = 0; i < state->get_coloring()->domain_size && test_lim >= 0;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                int test_score = color_score(g, state, i);
+                                if (test_score > best_score) {
+                                    best_color = i;
+                                    best_score = test_score;
+                                }
+                                --test_lim;
+                            }
+
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color    = best_color;
+                    prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
+                    state->move_to_child(g, state->get_coloring()->lab[(best_color +
+                                                                        (perturbe%state->get_coloring()->ptn[best_color]))]);
                 }
 
                 saved_color_base = state->base_color;
@@ -823,43 +1282,33 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_small_optimized_base(sgraph *g, controller *state) {
+            void find_small_optimized_base(sgraph *g, controller *state, int perturbe) {
                 state->mode_write_base();
-
-                test_set.initialize(g->v_size);
-                candidates.clear();
-                candidates.reserve(locked_lim);
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
+                    int test_lim = 256;
 
                     // heuristic, try to pick "good" color
-                    candidates.clear();
                     int best_score = INT32_MIN;
-                    for (int i = 0; i < state->get_coloring()->domain_size;) {
+                    for (int i = 0; i < state->get_coloring()->domain_size && test_lim >= 0;) {
                         if (state->get_coloring()->ptn[i] > 0) {
-                            candidates.push_back(i);
+                            int test_score = color_score_anti_size(state, i);
+                            if (test_score > best_score || best_color == -1) {
+                                best_color = i;
+                                best_score = test_score;
+                                --test_lim;
+                                if(best_score == INT32_MAX - 1) break;
+                            }
                         }
-
-                        if (candidates.size() >= (size_t) locked_lim)
-                            break;
 
                         i += state->get_coloring()->ptn[i] + 1;
-                    }
-                    while (!candidates.empty()) {
-                        const int test_color = candidates.back();
-                        candidates.pop_back();
-
-                        int test_score = color_score_anti_size(state, test_color);
-                        if (test_score > best_score || best_color == -1) {
-                            best_color = test_color;
-                            best_score = test_score;
-                        }
                     }
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
-                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                    state->move_to_child(g, state->get_coloring()->lab[(best_color +
+                                                                    (perturbe%state->get_coloring()->ptn[best_color]))]);
                 }
 
                 saved_color_base = state->base_color;
@@ -873,6 +1322,34 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
+            void find_combinatorial_optimized_base(sgraph *g, controller *state, int perturbe) {
+                state->mode_write_base();
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+
+                    // heuristic, try to pick "good" color
+                    int best_score = -1;
+                    int skip = perturbe % 3;
+                    for (int i = 0; i < state->get_coloring()->domain_size;) {
+                        if (state->get_coloring()->ptn[i] > 0) {
+                            int test_score = color_score_size(state, i);
+                            if (test_score > best_score) {
+                                best_color = i;
+                                best_score = test_score;
+                            }
+                        }
+                        i += state->get_coloring()->ptn[i] + 1;
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base = state->base_color;
+            }
+
             void find_combinatorial_optimized_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
@@ -893,10 +1370,6 @@ namespace dejavu {
                         if (state->get_coloring()->ptn[i] > 0) {
                             candidates.push_back(i);
                         }
-
-                        //if (candidates.size() >= (size_t) locked_lim)
-                        //    break;
-
                         i += state->get_coloring()->ptn[i] + 1;
                     }
                     while (!candidates.empty()) {
@@ -907,7 +1380,7 @@ namespace dejavu {
                         if (neighbour_color.get(test_color)) {
                             test_score *= 10;
                         }
-                        if (test_score > best_score) {
+                        if (test_score >= best_score) {
                             best_color = test_color;
                             best_score = test_score;
                         }
@@ -916,6 +1389,63 @@ namespace dejavu {
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
+                }
+
+                saved_color_base = state->base_color;
+            }
+
+
+
+            /**
+             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for
+             * combinatorial graphs solved by bfs/random walks (i.e., by choosing large colors).
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_combinatorial_optimized_base_recurse(sgraph *g, controller *state, int perturbe) {
+                state->mode_write_base();
+
+                int prev_color    = -1;
+                int prev_color_sz = 0;
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+                    int best_score = -1;
+
+                    // recurse into previous color if possible
+                    if(prev_color >= 0) {
+                        for (int i = 0; i < prev_color + prev_color_sz;) {
+                            const int col_sz = state->get_coloring()->ptn[i];
+                            int test_score = color_score_size(state, i);
+                            if (test_score >= best_score && col_sz > 0) {
+                                best_color = i;
+                                best_score = test_score;
+                            }
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+                    }
+
+                    if(best_color == -1) {
+                        // heuristic, try to pick "good" color
+                        for (int i = 0; i < state->get_coloring()->domain_size;) {
+                            const int col_sz = state->get_coloring()->ptn[i];
+                            int test_score = color_score_size(state, i);
+                            if (test_score > best_score && col_sz > 0) {
+                                best_color = i;
+                                best_score = test_score;
+                            }
+
+                            i += col_sz + 1;
+                        }
+                    }
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    prev_color    = best_color;
+                    prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
+                    state->move_to_child(g, state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))]);
                 }
 
                 saved_color_base = state->base_color;
@@ -1184,11 +1714,11 @@ namespace dejavu {
                             node_invariant[v] += hash(j);
                         }
                     }
-                    for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
+                    /*for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
                         auto node = tree_data_jump_map[1][i];
                         const int v = node->get_save()->get_base()[0];
                         node_invariant[v] += node->get_hash();
-                    }
+                    }*/
                 }
             }
 

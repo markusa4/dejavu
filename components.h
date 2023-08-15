@@ -20,7 +20,10 @@ namespace dejavu::ir {
      * components - 1
      * @returns number of components
      */
-    static int quotient_components(sgraph *g, ds::coloring *c, ds::work_list *vertex_to_component) {
+    static int quotient_components(sgraph *g, int* colmap, ds::work_list *vertex_to_component) {
+        coloring c;
+        g->initialize_coloring(&c, colmap);
+
         ds::mark_set  handled(g->v_size);
         ds::mark_set  col_handled(g->v_size);
         ds::work_list wl(g->v_size);
@@ -38,8 +41,8 @@ namespace dejavu::ir {
             while(!wl.empty()) {
                 const int k = wl.pop_back();
 
-                const int col    = c->vertex_to_col[k];
-                const int col_sz = c->ptn[col] + 1;
+                const int col    = c.vertex_to_col[k];
+                const int col_sz = c.ptn[col] + 1;
 
                 if(col_sz == 1) {
                     (*vertex_to_component)[k] = -1;
@@ -61,7 +64,7 @@ namespace dejavu::ir {
                 if(!col_handled.get(col)) {
                     col_handled.set(col);
                     for (int j = col; j < col + col_sz; ++j) {
-                        const int neighbour = c->lab[j];
+                        const int neighbour = c.lab[j];
                         if (!handled.get(neighbour)) {
                             handled.set(neighbour);
                             wl.push_back(neighbour);
@@ -85,7 +88,7 @@ namespace dejavu::ir {
 
     /**
      * \brief Decomposes graphs and manages decomposition information
-     * 
+     *
      */
     class graph_decomposer {
         int num_components = 0;
@@ -118,9 +121,9 @@ namespace dejavu::ir {
          * @param vertex_to_component maps vertices of \p g to their components
          * @param new_num_components how many components
          */
-        void decompose(sgraph *g, ds::coloring& c, ds::work_list& vertex_to_component, int new_num_components) {
+        void decompose(sgraph *g, int* colmap, ds::work_list& vertex_to_component, int new_num_components) {
             // set up forward / backward maps
-            num_components = new_num_components;
+            num_components = new_num_components; // new_num_components
             if(num_components <= 1) return;
 
             std::vector<int> vertices_in_component;
@@ -135,7 +138,7 @@ namespace dejavu::ir {
                 const int component = vertex_to_component[v];
                 if(component  < 0) {
                     forward_translation[v] = -1;
-                    assert(false);
+                    //assert(false);
                     continue;
                 }
                 const int v_in_component = vertices_in_component[component];
@@ -166,11 +169,16 @@ namespace dejavu::ir {
             for(int v = 0; v < g->v_size; ++v) {
                 const int deg = g->d[v];
                 const int vpt = g->v[v];
+                int ept = vpt;
                 for (int j = vpt; j < vpt + deg; ++j) {
                     const int neighbour = g->e[j];
-                    assert(vertex_to_component[v] == vertex_to_component[neighbour]);
-                    g->e[j] = forward_translation[neighbour];
-                    assert(g->e[j] >= 0 && g->e[j] < vertices_in_component[vertex_to_component[v]]);
+                    const int fwd_neighbour = forward_translation[neighbour];
+                    if(fwd_neighbour >= 0) {
+                        g->e[ept] = fwd_neighbour;
+                        assert(vertex_to_component[v] == vertex_to_component[neighbour]);
+                        //assert(g->e[ept] >= 0 && g->e[ept] < vertices_in_component[vertex_to_component[ept]]);
+                        ++ept;
+                    }
                 }
             }
 
@@ -190,6 +198,8 @@ namespace dejavu::ir {
                 g->d[bw_translate + v_in_component] = original_d[v];
             }
 
+            for(int v = 0; v < g->v_size; ++v) original_v[v] = colmap[v];
+
             components_graph.reserve(num_components);
             for(int i = 0; i < num_components; ++i) {
                 const int bw_translate = component_to_backward_translation[i];
@@ -202,12 +212,12 @@ namespace dejavu::ir {
                 component_i->e = g->e;
                 component_i->initialized = false;
 
-                int* col = new int[vertices_in_component[i]]; // TODO do this properly (work_list? smart pointer?)
                 for(int j = 0; j < vertices_in_component[i]; ++j) {
-                    col[j] = c.vertex_to_col[backward_translation[bw_translate + j]];
+                    colmap[bw_translate + j] = original_v[backward_translation[bw_translate + j]];
                 }
-                components_coloring.push_back(col);
+                components_coloring.push_back(colmap + bw_translate);
             }
+
         }
 
         /**

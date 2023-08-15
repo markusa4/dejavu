@@ -123,7 +123,7 @@ namespace dejavu::search_strategy {
                     gws_automorphism->reset();
                     return sift;
                 } else {
-                    if(hash_offset > 0) std::cout << "cert fail " << other_leaf->get_store_type() << "/" << ir::stored_leaf::STORE_LAB << std::endl;
+                    //if(hash_offset > 0) std::cout << "cert fail " << other_leaf->get_store_type() << "/" << ir::stored_leaf::STORE_LAB << std::endl;
                     // If we used the more involved loading procedure, break for now
                     if(used_load) {
                         ++s_paths_failany;

@@ -6,11 +6,11 @@
 
 namespace dejavu {
     namespace ir {
-        #define TRACE_MARKER_INDIVIDUALIZE     (INT32_MAX-7)
-        #define TRACE_MARKER_REFINE_START      (INT32_MAX-2)
-        #define TRACE_MARKER_REFINE_END        (INT32_MAX-3)
-        #define TRACE_MARKER_REFINE_CELL_START (INT32_MAX-4)
-        #define TRACE_MARKER_REFINE_CELL_END   (INT32_MAX-5)
+#define TRACE_MARKER_INDIVIDUALIZE     (INT32_MAX-7)
+#define TRACE_MARKER_REFINE_START      (INT32_MAX-2)
+#define TRACE_MARKER_REFINE_END        (INT32_MAX-3)
+#define TRACE_MARKER_REFINE_CELL_START (INT32_MAX-4)
+#define TRACE_MARKER_REFINE_CELL_END   (INT32_MAX-5)
 
         /**
          * \brief The trace invariant.
@@ -35,7 +35,7 @@ namespace dejavu {
 
             // mode
             bool compare = false; /**< whether to compare operations to a stored trace*/
-            bool record = false; /**< whether to record a trace */
+            bool record  = false; /**< whether to record a trace */
 
             // housekeeping
             int cell_act_spot      = -1;
@@ -47,7 +47,7 @@ namespace dejavu {
             int position = 0;
             bool comp = true;
 
-            void add_to_hash(int d) {
+            void inline add_to_hash(int d) {
                 unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
                 hash    = hash << 8;                    // shift hash left by 5 bits
                 hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
@@ -55,23 +55,18 @@ namespace dejavu {
             }
 
             void write_compare(int d) {
-                d = d % (INT32_MAX-10);
+                //d = d % (INT32_MAX-10);
+                //d = d & 0x0FFFFFFF;
+                d = std::min(INT32_MAX-10,d);
                 assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 write_compare_no_limit(d);
             }
 
             void write_compare_no_limit(int d) {
                 add_to_hash(d);
-                if (record)
-                    data.push_back(d);
-                if (compare) {
-                    if(position < (int) compare_trace->data.size()) {
-                        assert(compare_trace->data.size() > position);
-                        comp = comp && compare_trace->data[position] == d;
-                    } else {
-                        comp = false;
-                    }
-                }
+                if (record)  data.push_back(d);
+                if (compare) comp = comp && (position < ((int) compare_trace->data.size()))
+                                    && (compare_trace->data[position] == d);
                 ++position;
             }
 
@@ -82,6 +77,10 @@ namespace dejavu {
             }
 
         public:
+
+            trace* get_compare_trace() {
+                return compare_trace;
+            }
 
             /**
              * Records an individualization.
@@ -191,17 +190,19 @@ namespace dejavu {
              * Rewinds the \a position to the previous individualization.
              */
             void rewind_to_individualization() {
+                assert_cell_act = false;
+                assert_refine_act = false;
                 if (record) {
-                    int read_pt = (int) data.size() - 1;
-                    while (read_pt >= 0 && data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                    int read_pt = std::max((int) data.size() - 1, 0);
+                    while (read_pt > 0 && data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         --read_pt;
                     }
                     data.resize(read_pt);
                     position = read_pt;
                 }
                 if (compare) {
-                    int read_pt = position - 1;
-                    while (read_pt >= 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                    int read_pt = std::max(position - 1, 0);
+                    while (read_pt > 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         --read_pt;
                     }
                     position = read_pt;
@@ -272,6 +273,12 @@ namespace dejavu {
              */
             void reset_trace_equal() {
                 comp = true;
+            }
+            /**
+ * Resets the trace to find new deviations from the stored trace.
+ */
+            void reset_trace_unequal() {
+                comp = false;
             }
 
             void reset() {

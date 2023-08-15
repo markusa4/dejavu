@@ -33,6 +33,7 @@ namespace dejavu::search_strategy {
         big_number s_grp_sz; /**< group size */
 
         std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized           */
+        std::vector<std::pair<int, int>> inproc_maybe_individualize; /**< vertices that can be individualized         */
         std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
 
         /**
@@ -157,7 +158,8 @@ namespace dejavu::search_strategy {
 
             group->determine_potential_individualization(&inproc_can_individualize,
                                                          local_state.get_coloring());
-            if (!inproc_can_individualize.empty()) {
+            if (!inproc_can_individualize.empty() || !inproc_maybe_individualize.empty()) {
+                int num_inds = 0;
                 for (auto &i: inproc_can_individualize) {
                     const int ind_v = i.first;
                     const int ind_col = local_state.c->vertex_to_col[ind_v];
@@ -165,10 +167,25 @@ namespace dejavu::search_strategy {
                     s_grp_sz.multiply(local_state.c->ptn[ind_col] + 1);
                     local_state.move_to_child_no_trace(g, ind_v);
                     inproc_fixed_points.push_back(ind_v);
+                    ++num_inds;
                 }
-                progress_print("inpr_ind", "_",
-                               std::to_string(local_state.c->cells));
-                inproc_can_individualize.clear();
+                for (auto &i: inproc_maybe_individualize) {
+                    const int ind_v      = i.first;
+                    const int ind_col    = local_state.c->vertex_to_col[ind_v];
+                    const int ind_col_sz = local_state.c->ptn[ind_col] + 1;
+                    const int orb_sz_det = i.second;
+                    if(ind_col_sz > 1 && ind_col_sz == orb_sz_det) {
+                        s_grp_sz.multiply(ind_col_sz);
+                        local_state.move_to_child_no_trace(g, ind_v);
+                        inproc_fixed_points.push_back(ind_v);
+                        ++num_inds;
+                    }
+                }
+                if(num_inds > 0) {
+                    progress_print("inpr_ind", "_",
+                                   std::to_string(local_state.c->cells));
+                    inproc_can_individualize.clear();
+                }
             }
 
             inproc_can_individualize.clear();

@@ -139,6 +139,7 @@ namespace dejavu {
                 local_state.reset_trace_equal();
                 local_state.use_reversible(g->v_size >= 2000);
                 local_state.use_trace_early_out(true);
+
                 local_state.move_to_child(g, v);
 
                 // we want to keep track of whether we are on the base or not

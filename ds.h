@@ -130,6 +130,15 @@ namespace dejavu {
                 allocate(size);
             }
 
+            void copy(work_list_t<T>* other) {
+                alloc(other->arr_sz);
+                for(int i = 0; i < other->arr_sz; ++i) {
+                    arr[i] = other->arr[i];
+                }
+                arr_sz  = other->arr_sz;
+                cur_pos = other->cur_pos;
+            }
+
             /**
              * Allocates the internal array with size \p size. The allocated memory is not
              * initialized. Initializes the internal position \a cur_pos of the array at 0.
@@ -217,7 +226,7 @@ namespace dejavu {
                 if (old_arr != nullptr) {
                     int cp_pt = std::min(old_arr_sz, arr_sz);
                     memcpy(arr, old_arr, cp_pt * sizeof(T));
-                    free(old_arr);
+                    delete[] old_arr;
                 }
             }
 
@@ -469,6 +478,15 @@ namespace dejavu {
             void reset() {
                 if(mark == -1) full_reset();
                 ++mark;
+            }
+
+            void copy(mark_set* other) {
+                initialize(other->sz);
+                for(int i = 0; i < other->sz; ++i) {
+                    s[i] = other->s[i];
+                }
+                mark = other->mark;
+                sz   = other->sz;
             }
 
             ~mark_set() {
