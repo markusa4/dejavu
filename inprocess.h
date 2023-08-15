@@ -61,7 +61,7 @@ namespace dejavu::search_strategy {
                 mark_set is_pruned(g->v_size);
                 tree->mark_first_level(is_pruned);
 
-                tree->make_node_invariant(); // "compresses" node invariant from all levels into first level
+                tree->make_node_invariant(g->v_size); // "compresses" node invariant from all levels into first level
 
 
                 for (int i = 0; i < g->v_size; ++i) {

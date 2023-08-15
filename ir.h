@@ -1639,7 +1639,7 @@ namespace dejavu {
             };
 
             // TODO: move this to inprocessor
-            void make_node_invariant() {
+            void make_node_invariant(int domain_size) {
                 if(finished_up_to > 1) {
                     for(int j = finished_up_to; j >= 1; --j) {
                         finish_level(j);
@@ -1650,7 +1650,7 @@ namespace dejavu {
                             node_invariant[v] += hash(j);
                         }
                     }
-                    /*for(int i = 0; i < tree_data_jump_map[1].size(); ++i) {
+                    /*for(int i = 0; i < domain_size; ++i) {
                         auto node = tree_data_jump_map[1][i];
                         const int v = node->get_save()->get_base()[0];
                         node_invariant[v] += node->get_hash();
