@@ -227,7 +227,7 @@ namespace dejavu {
              * @param pos_start start reading the vectors at this position
              * @param pos_end stop reading the vecvtors at this position.
              */
-            void write_singleton(const std::vector<int> *singletons1, const std::vector<int> *singletons2,
+            void __attribute__((noinline))  write_singleton(const std::vector<int> *singletons1, const std::vector<int> *singletons2,
                                  const int pos_start, const int pos_end) {
                 for (int i = pos_start; i < pos_end; ++i) {
                     const int from = (*singletons1)[i];
@@ -289,11 +289,11 @@ namespace dejavu {
          * Keeps track of an orbit partition, and provides tools to manipulate the orbits within.
          */
         class orbit {
-            int               sz = 0;
-            mark_set          touched;
-            work_list_t<int>  reset_arr;
-            work_list_t<int>  map_arr;
-            work_list_t<int>  orb_sz;
+            int        sz = 0;
+            mark_set   touched;
+            work_list  reset_arr;
+            work_list  map_arr;
+            work_list  orb_sz;
         public:
 
             /**
@@ -305,11 +305,14 @@ namespace dejavu {
             int find_orbit(const int v) {
                 assert(v >= 0);
                 assert(v < sz);
-                int orbit1 = map_arr[v];
-                while(orbit1 != map_arr[orbit1])
-                    orbit1 = map_arr[orbit1];
-                map_arr[v] = orbit1;
-                return orbit1;
+                int last_map;
+                int next_map = v;
+                do {
+                    last_map = next_map;
+                    next_map = map_arr[last_map];
+                } while(next_map != last_map);
+                map_arr[v] = next_map;
+                return next_map;
             }
 
             /**
@@ -346,16 +349,13 @@ namespace dejavu {
                 assert(v1 < sz);
                 assert(v2 < sz);
                 if(v1 != v2) {
-                    if(!touched.get(v1))
-                        reset_arr.push_back(v1);
-                    if(!touched.get(v2))
-                        reset_arr.push_back(v2);
+                    if(!touched.get(v1)) reset_arr.push_back(v1);
+                    if(!touched.get(v2)) reset_arr.push_back(v2);
                     touched.set(v1);
                     touched.set(v2);
                     int orbit1 = find_orbit(v1);
                     int orbit2 = find_orbit(v2);
-                    if(orbit1 == orbit2)
-                        return;
+                    if(orbit1 == orbit2) return;
                     if(orbit1 < orbit2) {
                         map_arr[orbit2] = orbit1;
                         orb_sz[orbit1] += orb_sz[orbit2];
@@ -379,8 +379,7 @@ namespace dejavu {
                 assert(v2 >= 0);
                 assert(v1 < sz);
                 assert(v2 < sz);
-                if(v1 == v2)
-                    return true;
+                if(v1 == v2) return true;
                 const int orbit1 = find_orbit(v1);
                 const int orbit2 = find_orbit(v2);
                 return (orbit1 == orbit2);
@@ -400,7 +399,7 @@ namespace dejavu {
              *
              * @param aut Automorphism workspace which is applied.
              */
-            void add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
+            void __attribute__((noinline))  add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
                 const int  nsupp = aut.nsupport();
                 const int* supp  = aut.support();
                 const int* p     = aut.perm();

@@ -3503,14 +3503,11 @@ namespace sassy {
                         }
                         case preop::densify2: {
                             if(!has_deg_2 && !graph_changed) break;
-                            g->sanity_check();
                             red_deg2_densify(g, colmap);
                             perform_del_add_edge_general(g, colmap);
-                            g->sanity_check();
 
                             red_deg2_densifysc1(g, colmap);
                             perform_del_add_edge_general(g, colmap);
-                            g->sanity_check();
 
                             PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "densify2" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);

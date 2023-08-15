@@ -261,9 +261,11 @@ namespace dejavu {
                     const int s_trace_full_cost = local_state.T->get_position(); /*< total trace cost of this base */
 
                     // we first perform a depth-first search, starting from the computed leaf in local_state
-                    m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.5 : 0.25; // set up DFS heuristic
-                    dfs_level = s_last_base_eq?dfs_level:m_dfs.do_dfs(hook, g, root_save.get_coloring(), local_state_left,
-                                                                      local_state, &m_inprocess.inproc_maybe_individualize);
+                    m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
+                    dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, root_save.get_coloring(),
+                                                                              local_state_left,
+                                                                              local_state,
+                                                                              &m_inprocess.inproc_maybe_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
@@ -382,6 +384,10 @@ namespace dejavu {
                         if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                             s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
                             h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
+                        // silly case in which the base is so large, that an unnecessary restart has fairly high cost
+                        // attached -- so if BFS can be successful, let's do that first...
+                        if (h_next_routine == restart && 2*base_size > s_bfs_next_level_nodes
+                            && s_trace_cost1_avg < base_size && s_path_fail1_avg > 0.01) h_next_routine = bfs_ir;
 
                         // ... but if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done"

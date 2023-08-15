@@ -148,12 +148,13 @@ namespace dejavu {
             work_list prev_color_list;
 
             mark_set  diff_tester;
-            mark_set  diff_colors;
-            mark_set  diff_colors_checked;
-            work_list diff_colors_list;
-            work_list diff_colors_list_pt;
+
+            mark_set  diff_vertices;
+            mark_set  diff_is_singleton;
+            work_list diff_vertices_list;
+            work_list diff_vertices_list_pt;
+
             bool diff_diverge = false;
-            int num_diffs = 0;
             int singleton_pt_start = 0;
 
             std::function<type_split_color_hook>     my_split_hook;
@@ -223,7 +224,7 @@ namespace dejavu {
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
-                                    && compare_base_cells[s_base_pos - 1] == c->cells);
+                                    && compare_base_cells[s_base_pos - 1] == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
                 return ndone && (cont || deviation_override);
             }
 
@@ -283,11 +284,12 @@ namespace dejavu {
                 my_worklist_hook = self_worklist_hook();
 
                 diff_tester.initialize(c->domain_size);
-                diff_colors_checked.initialize(c->domain_size);
-                diff_colors.initialize(c->domain_size);
-                diff_colors_list.resize(c->domain_size);
-                diff_colors_list_pt.resize(c->domain_size);
-                num_diffs = 0;
+
+                diff_vertices.initialize(c->domain_size);
+                diff_vertices_list.resize(c->domain_size);
+                diff_vertices_list_pt.resize(c->domain_size);
+                diff_is_singleton.initialize(c->domain_size);
+
                 singleton_pt_start = 0;
             }
 
@@ -321,105 +323,83 @@ namespace dejavu {
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
 
-            void add_diff_color(int col) {
-                if(!diff_colors.get(col)) {
-                    diff_colors.set(col);
-                    diff_colors_list.push_back(col);
-                    diff_colors_list_pt[col] = diff_colors_list.cur_pos - 1;
+            void add_diff_vertex(int v) {
+                if(!diff_vertices.get(v) && !diff_is_singleton.get(v)) {
+                    diff_vertices.set(v);
+                    diff_vertices_list.push_back(v);
+                    diff_vertices_list_pt[v] = diff_vertices_list.cur_pos - 1;
                 }
             }
 
-            void remove_diff_color(int col) {
-                if(diff_colors.get(col)) {
-                    const int pt      = diff_colors_list_pt[col];
-                    assert(diff_colors_list[pt] == col);
+            void remove_diff_vertex(int v) {
+                if(diff_vertices.get(v)) {
+                    const int pt      = diff_vertices_list_pt[v];
+                    assert(diff_vertices_list[pt] == v);
 
                     // which element is in the back?
-                    const int back_pt  = diff_colors_list.cur_pos-1;
-                    const int back_col = diff_colors_list[back_pt];
+                    const int back_pt  = diff_vertices_list.cur_pos-1;
+                    const int back_v = diff_vertices_list[back_pt];
 
                     // now swap back_col to col
-                    diff_colors_list[pt] = back_col;
-                    assert(diff_colors.get(back_col));
-                    assert(diff_colors_list_pt[back_col] == back_pt);
-                    diff_colors_list_pt[back_col] = pt;
-                    diff_colors_list_pt[col] = -1; // I don't trust myself
+                    diff_vertices_list[pt] = back_v;
+                    assert(diff_vertices.get(back_v));
+                    assert(diff_vertices_list_pt[back_v] == back_pt);
+                    diff_vertices_list_pt[back_v] = pt;
+                    diff_vertices_list_pt[v] = -1; // I don't trust myself
 
-                    diff_colors.unset(col);
-                    --diff_colors_list.cur_pos;
+                    diff_vertices.unset(v);
+                    --diff_vertices_list.cur_pos;
                 }
-
             }
 
-            bool is_diff_color(int col) {
-                return diff_colors.get(col);
-            }
-
-            int get_diff_color() {
-                assert(diff_colors_list.cur_pos > 0);
-                int best_diff_color    = diff_colors_list[0];
-                return best_diff_color;
-                /*int best_diff_color_sz = diff_colors_list[0];
-
-                for(int i = 0; i < diff_colors_list.cur_pos && i < 12; ++i) {
-                }
-                reurn ;*/
-            }
-
-            bool __attribute__((noinline)) color_is_different(controller* state, int col) {
-                diff_tester.reset();
-                if(c->ptn[col] != state->c->ptn[col]) {
+            void __attribute__((noinline)) color_fix_difference(controller* state, int col) {
+                const int col_sz = c->ptn[col] + 1;
+                if(col_sz != state->c->ptn[col] + 1) {
                     assert(false);
-                    return true;
+                    return;
                 }
 
-                if(c->ptn[col] == 0) return false;
-                for(int i = 0; i < c->ptn[col] + 1; ++i) {
-                    diff_tester.set(c->lab[col + i]);
+                if(col_sz == 1) {
+                    add_diff_vertex(state->c->lab[col]);
+                    remove_diff_vertex(c->lab[col]);
+                    if(!diff_is_singleton.get(c->lab[col])) {
+                        diff_is_singleton.set(c->lab[col]);
+                    }
+                    return;
                 }
 
-                bool equal = true;
-                for(int i = 0; i < state->c->ptn[col] + 1 && equal; ++i) {
-                    equal = equal && diff_tester.get(state->c->lab[col + i]);
-                }
-                return !equal;
+                diff_tester.reset();
+                for(int i = 0; i < col_sz; ++i) diff_tester.set(state->c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i) if(!diff_tester.get(c->lab[col + i]))        add_diff_vertex(c->lab[col + i]);
+
+                diff_tester.reset();
+                for(int i = 0; i < col_sz; ++i) diff_tester.set(c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i) if(!diff_tester.get(state->c->lab[col + i])) add_diff_vertex(state->c->lab[col + i]);
             }
 
-            std::pair<int, int> color_diff_pair(controller* state, int col) {
+            std::pair<int, int> diff_pair(controller* state) {
                 diff_tester.reset();
-                assert(c->ptn[col] == state->c->ptn[col]);
-                int left  = -1;
-                int right = -1;
+                assert(diff_vertices_list.cur_pos > 0);
 
-                for(int i = 0; i < c->ptn[col] + 1; ++i) {
-                    diff_tester.set(c->lab[col + i]);
-                }
-                for(int i = 0; i < state->c->ptn[col] + 1 && left == -1; ++i) {
-                    if(!diff_tester.get(state->c->lab[col + i])) left = state->c->lab[col + i];
-                }
-
-                diff_tester.reset();
-                for(int i = 0; i < c->ptn[col] + 1; ++i) {
-                    diff_tester.set(state->c->lab[col + i]);
-                }
-                for(int i = 0; i < c->ptn[col] + 1 && right == -1; ++i) {
-                    if(!diff_tester.get(c->lab[col + i])) right = c->lab[col + i];
-                }
+                const int right = diff_vertices_list[0];
+                const int right_col = c->vertex_to_col[right];
+                const int left = state->c->lab[right_col];
 
                 return {left, right};
             }
 
             void reset_diff() {
-                diff_colors_checked.initialize(c->domain_size);
-                diff_colors.reset();
-                diff_colors_list.reset();
+                diff_vertices.reset();
+                diff_vertices_list.reset();
+                diff_is_singleton.reset();
+
                 diff_tester.reset();
                 singleton_pt_start = singletons.size();
 
                 diff_diverge = false;
             }
 
-            void singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
+            void __attribute__((noinline))  singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
                 for(int i = singleton_pt_start; i < singletons.size(); ++i) {
                     automorphism->write_single_map(singletons[i], state->singletons[i]);
@@ -431,72 +411,32 @@ namespace dejavu {
                 return diff_diverge;
             }
 
+
             // returns whether there is diff cells
-            bool update_diff_last_individualization(controller* other_state) {
-                diff_colors_checked.reset();
+            bool __attribute__((noinline))  update_diff_vertices_last_individualization(controller* other_state) {
                 int i = base_touched_color_list_pt[base_touched_color_list_pt.size()-1];
                 assert(touched_color_list.cur_pos == other_state->touched_color_list.cur_pos);
                 for(;i < touched_color_list.cur_pos; ++i) {
-                    const int old_color    = prev_color_list[i];
-                    const int new_color    = touched_color_list[i];
+                    const int old_color = prev_color_list[i];
+                    const int new_color = touched_color_list[i];
 
-                    if((prev_color_list[i]    != other_state->prev_color_list[i]) ||
-                       (touched_color_list[i] != other_state->touched_color_list[i])) {
-                        diff_diverge = true;
-                        return true;
-                    }
+                    assert(old_color != new_color);
 
                     const int old_color_sz = c->ptn[old_color] + 1;
                     const int new_color_sz = c->ptn[new_color] + 1;
 
-                    const int other_old_color_sz = other_state->c->ptn[old_color] + 1;
-                    const int other_new_color_sz = other_state->c->ptn[new_color] + 1;
+                    const int old_color_sz_other = other_state->c->ptn[old_color] + 1;
+                    const int new_color_sz_other = other_state->c->ptn[new_color] + 1;
 
-                    assert(old_color_sz == other_old_color_sz);
-                    assert(new_color_sz == other_new_color_sz);
+                    diff_diverge = diff_diverge || (old_color_sz != old_color_sz_other)
+                                   || (new_color_sz != new_color_sz_other);
 
-                    if(!diff_colors_checked.get(old_color)) {
-                        if (old_color_sz == 1 || !color_is_different(other_state, old_color)) {
-                            remove_diff_color(old_color);
-                        } else {
-                            add_diff_color(old_color);
-                        }
-                        diff_colors_checked.set(old_color);
-                    }
-
-                    if(new_color_sz == 1 || !color_is_different(other_state, new_color)) {
-                        remove_diff_color(new_color);
-                    } else {
-                        add_diff_color(new_color);
-                    }
-                    /*if(is_diff_color(old_color)) {
-                        assert(!is_diff_color(new_color));
-                        if(new_color_sz != 1 && color_diffs(other_state, new_color))  add_diff_color(new_color);
-                        if(!color_diffs(other_state, old_color)) remove_diff_color(old_color);
-
-                    } else {
-                        // need to check whether they still match! if one part matches, the other does too?
-                        if(color_is_different(other_state, new_color)) {
-                            if(new_color_sz != 1) add_diff_color(new_color);
-                            if(old_color_sz != 1) add_diff_color(old_color);
-                        }
-                    }
-                    if(old_color_sz == 1) remove_diff_color(old_color);
-                    if(new_color_sz == 1) remove_diff_color(new_color);*/
+                    color_fix_difference(other_state, new_color);
+                    //color_fix_difference(other_state, old_color);
+                    if(old_color_sz == 1) color_fix_difference(other_state, old_color);
                 }
 
-                /*int num = 0;
-                for(int j = 0; j < other_state->c->domain_size;) {
-                    const int colsz = other_state->c->ptn[j] + 1;
-                    if(colsz > 1) {
-                        num += color_is_different(other_state, j);
-                        assert(color_is_different(other_state, j) == diff_colors.get(j));
-                    }
-                    j += colsz;
-                }
-                assert(num == diff_colors_list.cur_pos);*/
-
-                return (diff_colors_list.cur_pos != 0); // there is a diff!
+                return (diff_vertices_list.cur_pos != 0) || diff_diverge; // there is a diff!
             }
 
             void copy(controller* state) {
@@ -529,10 +469,6 @@ namespace dejavu {
                 singletons = state->singletons;
 
                 diff_tester.copy(&state->diff_tester);
-                diff_colors.copy(&state->diff_colors);
-                diff_colors_list.copy(&state->diff_colors_list);
-                diff_colors_list_pt.copy(&state->diff_colors_list_pt);
-
                 s_base_pos = state->s_base_pos;
 
                 this->R = state->R;
@@ -731,7 +667,7 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void move_to_child(sgraph *g, int v) {
+            void __attribute__((noinline))  move_to_child(sgraph *g, int v) {
                 ++s_base_pos;
                 base_vertex.push_back(v); // always keep track of base (needed for BFS)
 
@@ -794,7 +730,7 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void move_to_parent() {
+            void __attribute__((noinline)) move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
                 assert(base_touched_color_list_pt.size() > 0);
 
@@ -866,7 +802,7 @@ namespace dejavu {
              * @param automorphism The automorphism.
              * @return Whether \p automorphism is an automorphism of \p g.
              */
-            bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
+            bool __attribute__((noinline))  certify(sgraph* g, groups::automorphism_workspace& automorphism) {
                 if(automorphism.nsupport() > g->v_size/4) {
                     return R->certify_automorphism(g, automorphism.perm());
                 } else {
@@ -979,8 +915,8 @@ namespace dejavu {
                 }
                 switch(h_choose % 4) {
                     case 0:
-                        //find_sparse_optimized_base(g, state, 0);
-                        find_first_base(g, state);
+                        find_sparse_optimized_base(g, state, 0);
+                        //find_first_base(g, state);
                         break;
                     case 1:
                         find_combinatorial_optimized_base_recurse(g, state, perturbe);

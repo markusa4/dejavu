@@ -169,40 +169,59 @@ namespace dejavu {
                 }
             }
 
-            int dual_recurse_to_equal_leaf(sgraph *g, ir::controller *state_left, ir::controller *state_right) {
+            int __attribute__((noinline))  paired_recurse_to_equal_leaf(sgraph *g, ir::controller *state_left, ir::controller *state_right) {
+                //const bool is_diffed_pre = state_left->update_diff_last_individualization(state_right);
+                const bool is_diffed_pre = state_right->update_diff_vertices_last_individualization(state_left);
+                if(!is_diffed_pre) {
+                    std::cout << "diffed pre" << std::endl;
+                    return 2;
+                }
+                if(state_left->get_diff_diverge()) {
+                    std::cout << "diff diverge" << std::endl;
+                    return 0;
+                }
 
-                const bool is_diffed_pre = state_left->update_diff_last_individualization(state_right);
-                if(!is_diffed_pre)                 return 2;
-                if(state_left->get_diff_diverge()) return 0;
+                //assert_equitable(g, state_right->c);
+                //assert_equitable(g, state_left->c);
 
                 int depth = 0;
                 while ((size_t) state_right->c->cells < g->v_size) {
-                    //const int col    = state_right->compare_base_color[state_right->s_base_pos]; // the base color
                     // pick a color that prevents the "matching OPP"
-                    const int col = state_left->get_diff_color();
+
+                    // pick vertices that differ in the color
+                    int ind_v_right, ind_v_left;
+                    //std::tie(ind_v_left, ind_v_right) = state_right->color_diff_pair(state_left, col);
+                    std::tie(ind_v_left, ind_v_right) = state_right->diff_pair(state_left);
+
+                    const int col = state_left->c->vertex_to_col[ind_v_left];
+                    //const int col = state_left->get_diff_color();
                     ++depth;
 
                     assert(col >= 0);
                     assert(col < g->v_size);
                     const int col_sz_right = state_right->c->ptn[col] + 1;
-                    const int col_sz_left  = state_left->c->ptn[col] + 1;
+                    const int col_sz_left  = state_left->c->ptn[col]  + 1;
 
                     assert(col_sz_right > 1);
                     assert(col_sz_left  > 1);
 
                     if (col_sz_right < 2 || col_sz_left != col_sz_right) return 0;
 
-                    // pick vertices that differ in the color
-                    int ind_v_right, ind_v_left;
-                    std::tie(ind_v_left, ind_v_right) = state_right->color_diff_pair(state_left, col);
+                    assert(ind_v_left >= -1);
+                    assert(ind_v_right >= -1);
 
-                    assert(state_left->color_is_different(state_right, col));
+                    assert(state_left->c->vertex_to_col[ind_v_left] == col);
+                    assert(state_right->c->vertex_to_col[ind_v_right] == col);
+                    assert(state_left->c->vertex_to_col[ind_v_right] != col);
+                    //assert(state_right->c->vertex_to_col[ind_v_left] != col);
 
                     state_right->use_trace_early_out(false);
                     state_left->use_trace_early_out(false);
                     state_right->T->set_hash(0);
                     state_left->T->set_hash(0);
-                    
+                    state_right->T->reset_trace_unequal();
+                    state_left->T->reset_trace_unequal();
+
                     // individualize a vertex of base color
                     state_right->move_to_child(g, ind_v_right);
                     state_left->move_to_child(g,  ind_v_left);
@@ -212,15 +231,15 @@ namespace dejavu {
 
                     // can not perform diff udpates on this (AKA invariant should have differed, but is not
                     // guaranteed to differ always)
-                    const bool is_diffed = state_left->update_diff_last_individualization(state_right);
+                    //const bool is_diffed = state_left->update_diff_last_individualization(state_right);
+                    const bool is_diffed = state_right->update_diff_vertices_last_individualization(state_left);
                     if(state_left->get_diff_diverge()) return 0;
 
                     // no difference? check for automorphism now -- if it doesn't succeed there is no hope on this path
                     if(!is_diffed) {
                         ws_automorphism->reset();
-                        state_left->singleton_automorphism(state_right, ws_automorphism);
+                        state_right->singleton_automorphism(state_left, ws_automorphism);
                         const bool found_auto = state_right->certify(g, *ws_automorphism);
-                        //std::cout << "depth: " << depth << " (leaf: " << (g->v_size == state_right->c->cells) << ")" << std::endl;
                         return found_auto;
                     }
 
@@ -254,174 +273,13 @@ namespace dejavu {
                 return diff;
             }
 
-            /**
-             * Performs DFS from a given leaf node. Does not backtrack and returns the level up to which DFS succeeded.
-             *
-             * @param g The graph.
-             * @param initial_colors The initial coloring of the graph \p g.
-             * @param local_state The state from which DFS will be performed. Must be a leaf node of the IR shared_tree.
-             * @return The level up to which DFS succeeded.
-             */
-            int do_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &local_state,
-                       std::vector<std::pair<int, int>>* save_to_individualize) {
+            int do_paired_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &state_left,
+                              ir::controller &state_right, std::vector<std::pair<int, int>>* save_to_individualize) {
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
 
                 // orbit algorithm structure
                 groups::orbit orbs(g->v_size);
-                singleton_diffs.initialize(g->v_size);
-
-                // automorphism workspace
-                ws_automorphism->reset();
-
-                // we want to terminate if things become to costly, we save the current trace position to track cost
-                cost_snapshot = local_state.T->get_position();
-
-                // tell the controller we are performing DFS now
-                local_state.mode_compare_base();
-
-                // abort criteria
-                double recent_cost_snapshot = 0;
-                bool   fail = false;
-
-                // loop that serves to optimize Tinhofer graphs
-                while (recent_cost_snapshot < h_recent_cost_snapshot_limit && local_state.s_base_pos > 0 && !fail) {
-                    // backtrack one level
-                    local_state.move_to_parent();
-                    if(local_state.s_base_pos % 1000 == 0)
-                        std::cout << "                  " << ">partial-cost " << recent_cost_snapshot << "/" << h_recent_cost_snapshot_limit << std::endl;
-
-                    // remember which color we are individualizing
-                    const int col = local_state.base_color[local_state.s_base_pos];
-                    const int col_sz = local_state.c->ptn[col] + 1;
-                    const int base_vertex = local_state.base_vertex[local_state.s_base_pos]; // base vertex
-
-                    int prune_cost_snapshot = 0;
-
-                    // iterate over current color class
-                    for (int i = col_sz - 1; i >= 0; --i) {
-                    //for (int i = 0; i < col_sz - 1; ++i) {
-                        const int ind_v = local_state.leaf_color.lab[col + i];
-                        assert(local_state.c->vertex_to_col[base_vertex] == local_state.c->vertex_to_col[ind_v]);
-
-                        // only consider every orbit once
-                        if (ind_v == base_vertex || !orbs.represents_orbit(ind_v)) continue;
-                        if (orbs.are_in_same_orbit(ind_v, base_vertex))            continue;
-
-                        singleton_diff = 0;
-                        singleton_diffs.reset();
-
-                        // track cost of this refinement for whatever is to come
-                        const int cost_start = local_state.T->get_position();
-
-                        // perform individualization-refinement
-                        const int prev_base_pos = local_state.s_base_pos;
-                        local_state.reset_trace_equal();
-                        local_state.use_trace_early_out(true);
-                        local_state.move_to_child(g, ind_v);
-
-                        bool pruned     = !local_state.T->trace_equal(); // TODO keep track of cost here as well!
-
-                        bool found_auto = false;
-                        assert(local_state.c->vertex_to_col[ind_v] == local_state.leaf_color.vertex_to_col[base_vertex]);
-
-                        if(!pruned) {
-                            // write singleton diff into automorphism...
-                            const int wr_pos_st  = local_state.base_singleton_pt[local_state.base_singleton_pt.size() - 1];
-                            const int wr_pos_end = (int) local_state.singletons.size();
-
-                            // ... and then check whether this implies a (sparse) automorphism
-                            ws_automorphism->write_singleton(&local_state.compare_singletons,
-                                                             &local_state.singletons, wr_pos_st,
-                                                             wr_pos_end);
-
-                            singleton_diff += write_singleton_diffs(&singleton_diffs, &local_state.compare_singletons,
-                                                                     &local_state.singletons, wr_pos_st,
-                                                                     wr_pos_end);
-
-                            if(singleton_diff == 0) {
-                                found_auto = local_state.certify(g, *ws_automorphism);
-                            }
-                            assert(ws_automorphism->perm()[base_vertex] == ind_v);
-                            // if no luck with sparse automorphism, try more proper walk to leaf node
-                            if (!found_auto && !pruned) {
-                                auto [success, certified] = recurse_to_equal_leaf(g, initial_colors,
-                                                                                  &local_state);
-                                found_auto = (success && certified);
-                                if (success && !certified) {
-                                    ws_automorphism->reset();
-                                    assert(ws_automorphism->perm()[base_vertex] == base_vertex);
-                                    assert(ws_automorphism->perm()[ind_v] == ind_v);
-                                    assert(local_state.c->vertex_to_col[ind_v] ==
-                                           local_state.leaf_color.vertex_to_col[base_vertex]);
-                                    ws_automorphism->write_color_diff(local_state.c->vertex_to_col,
-                                                                      local_state.leaf_color.lab);
-                                    assert(ws_automorphism->perm()[ind_v] == base_vertex ||
-                                           ws_automorphism->perm()[base_vertex] == ind_v);
-                                    found_auto = local_state.certify(g, *ws_automorphism);
-                                }
-                            }
-                        }
-
-                        // track cost-based abort criterion
-                        const int cost_end   = local_state.T->get_position();
-                        double cost_partial  = (cost_end - cost_start) / (cost_snapshot*1.0);
-                        recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
-                        prune_cost_snapshot += pruned?(cost_end - cost_start):0;
-
-                        // if we found automorphism, add to orbit and call hook
-                        if (found_auto) {
-                            assert(ws_automorphism->nsupport() > 0);
-                            assert(ws_automorphism->perm()[ind_v] == base_vertex || ws_automorphism->perm()[base_vertex] == ind_v);
-                            if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
-                                             ws_automorphism->support());
-                            orbs.add_automorphism_to_orbit(*ws_automorphism);
-                        }
-                        ws_automorphism->reset();
-
-                        // move state back up where we started in this iteration
-                        while (prev_base_pos < local_state.s_base_pos) {
-                            local_state.move_to_parent();
-                        }
-
-                        // if no automorphism could be determined we would have to backtrack -- so stop!
-                        if ((!found_auto && !pruned) || 4*prune_cost_snapshot > cost_snapshot) {
-                            fail = true;
-                            break;
-                        }
-
-                        // if orbit size equals color size now, we are done on this DFS level
-                        if (orbs.orbit_size(base_vertex) == col_sz) break;
-                    }
-
-                    // if we did not fail, accumulate size of current level to group size
-                    if (!fail) {
-                        //if(initial_colors->vertex_to_col[initial_colors->lab[col]] == col &&
-                        //        (initial_colors->ptn[col] + 1 == col_sz) && (col_sz == orbs.orbit_size(base_vertex))) {
-                            save_to_individualize->emplace_back(local_state.base_vertex[local_state.s_base_pos],
-                                                                orbs.orbit_size(base_vertex));
-                        //}
-                        s_grp_sz.multiply(orbs.orbit_size(base_vertex));
-                    }
-                }
-
-                std::cout << "dfs term: " << fail << std::endl;
-
-                // set reason for termination
-                s_termination = fail? r_fail : r_cost;
-
-                // if DFS failed on current level, we did not finish the current level -- has to be accounted for
-                return local_state.s_base_pos + (fail);
-            }
-
-            int do_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &state_left,
-                       ir::controller &state_right, std::vector<std::pair<int, int>>* save_to_individualize) {
-                s_grp_sz.mantissa = 1.0;
-                s_grp_sz.exponent = 0;
-
-                // orbit algorithm structure
-                groups::orbit orbs(g->v_size);
-                singleton_diffs.initialize(g->v_size);
 
                 // automorphism workspace
                 ws_automorphism->reset();
@@ -444,19 +302,19 @@ namespace dejavu {
                 while (recent_cost_snapshot < h_recent_cost_snapshot_limit && state_right.s_base_pos > 0 && !fail) {
                     // backtrack one level
                     state_right.move_to_parent();
-                    if(state_right.s_base_pos % 1000 == 0)
+                    if((state_right.s_base_pos & 0x00000FFF) == 0)
                         std::cout << "                  " << ">partial-cost " << recent_cost_snapshot << "/" << h_recent_cost_snapshot_limit << std::endl;
 
                     // remember which color we are individualizing
-                    const int col = state_right.base_color[state_right.s_base_pos];
-                    const int col_sz = state_right.c->ptn[col] + 1;
+                    const int col         = state_right.base_color[state_right.s_base_pos];
+                    const int col_sz      = state_right.c->ptn[col] + 1;
                     const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
 
                     int prune_cost_snapshot = 0;
 
                     // iterate over current color class
-                    for (int i = col_sz - 1; i >= 0; --i) {
-                        //for (int i = 0; i < col_sz - 1; ++i) {
+                    //for (int i = col_sz - 1; i >= 0; --i) {
+                    for (int i = 0; i < col_sz; ++i) {
                         const int ind_v = state_right.leaf_color.lab[col + i];
                         assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
 
@@ -467,28 +325,26 @@ namespace dejavu {
                         // track cost of this refinement for whatever is to come
                         const int cost_start = state_right.T->get_position();
 
-                        while (state_left.s_base_pos > state_right.s_base_pos) {
-                            state_left.move_to_parent();
-                        }
+                        // put the "left" state in the correct base position
+                        while (state_left.s_base_pos > state_right.s_base_pos) state_left.move_to_parent();
                         state_left.T->set_position(state_right.T->get_position());
-                        //std::cout << "here@" << state_left.s_base_pos << std::endl;
                         assert(state_left.c->vertex_to_col[base_vertex] == state_left.c->vertex_to_col[ind_v]);
                         assert(state_left.s_base_pos == state_right.s_base_pos);
                         assert(state_left.T->get_position() == state_right.T->get_position());
-                        state_left.reset_diff();
 
-                        // perform individualization-refinement
+                        // reset difference, since state_left and state_right are in the same node of the tree
+                        // now -- so there is no difference
+                        state_right.reset_diff();
+
+                        // perform individualization-refinement in state_right
+                        //TODO make a mode for this in the IR controller module
                         const int prev_base_pos = state_right.s_base_pos;
-                        trace_pos_reset = state_right.T->get_position();
-                        state_right.reset_trace_equal();
+                        trace_pos_reset = state_right.T->get_position(); // TODO is there an elegant solution to this?
+                        state_right.T->reset_trace_equal();
+                        state_right.T->set_hash(0);
                         state_right.use_trace_early_out(true);
                         state_right.move_to_child(g, ind_v);
-
-                        //if(state_right.T->trace_equal()) assert_equitable(g, state_right.c);
-
                         bool pruned     = !state_right.T->trace_equal(); // TODO keep track of cost here as well!
-                        //if(pruned) std::cout << "trace pruned" << std::endl;
-
 
                         bool found_auto = false;
                         assert(state_right.c->vertex_to_col[ind_v] == state_right.leaf_color.vertex_to_col[base_vertex]);
@@ -507,15 +363,18 @@ namespace dejavu {
 
                             assert(ws_automorphism->perm()[base_vertex] == ind_v);
                             // if no luck with sparse automorphism, try more proper walk to leaf node
-                            if (!found_auto && !pruned) {
+                            if (!found_auto) {
                                 ws_automorphism->reset();
 
-                                state_left.reset_trace_equal();
+                                //TODO make a mode for this in the IR controller module
+                                state_left.T->reset_trace_equal();
+                                state_left.T->set_hash(0);
+                                state_left.T->set_position(trace_pos_reset);
                                 state_left.use_trace_early_out(true);
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
                                 assert(state_left.T->trace_equal());
                                 //assert_equitable(g, state_left.c);
-                                auto return_code = dual_recurse_to_equal_leaf(g, &state_left, &state_right);
+                                auto return_code = paired_recurse_to_equal_leaf(g, &state_left, &state_right);
                                 found_auto = (return_code == 1);
                                 pruned     = (return_code == 2);
                             }
@@ -531,9 +390,9 @@ namespace dejavu {
                         if (found_auto) {
                             assert(ws_automorphism->nsupport() > 0);
                             assert(ws_automorphism->perm()[ind_v] == base_vertex || ws_automorphism->perm()[base_vertex] == ind_v);
+                            orbs.add_automorphism_to_orbit(*ws_automorphism);
                             if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
                                              ws_automorphism->support());
-                            orbs.add_automorphism_to_orbit(*ws_automorphism);
                         }
                         ws_automorphism->reset();
 
@@ -544,7 +403,8 @@ namespace dejavu {
                         state_right.T->set_position(trace_pos_reset);
 
                         // if no automorphism could be determined we would have to backtrack -- so stop!
-                        if ((!found_auto && !pruned) || 4*prune_cost_snapshot > cost_snapshot) {
+                        if ((!found_auto && !pruned) || ((4*prune_cost_snapshot > cost_snapshot) &&
+                            (prev_base_pos > 0))) {
                             fail = true;
                             break;
                         }
@@ -560,8 +420,6 @@ namespace dejavu {
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }
                 }
-
-                std::cout << "dfs term: " << fail << std::endl;
 
                 // set reason for termination
                 s_termination = fail? r_fail : r_cost;
