@@ -112,30 +112,30 @@ namespace dejavu {
                 ws_automorphism = automorphism;
             }
 
-            int paired_recurse_to_equal_leaf(sgraph *g, ir::controller *state_left, ir::controller *state_right) {
-                const bool is_diffed_pre = state_right->update_diff_vertices_last_individualization(state_left);
+            int paired_recurse_to_equal_leaf(sgraph *g, ir::controller& state_left, ir::controller& state_right) {
+                const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
                 if(!is_diffed_pre) {
                     return 2;
                 }
-                if(state_left->get_diff_diverge()) {
+                if(state_left.get_diff_diverge()) {
                     return 0;
                 }
 
                 int depth = 0;
-                while ((size_t) state_right->c->cells < g->v_size) {
+                while ((size_t) state_right.c->cells < g->v_size) {
                     // pick a color that prevents the "matching OPP"
 
                     // pick vertices that differ in the color
                     int ind_v_right, ind_v_left;
-                    std::tie(ind_v_left, ind_v_right) = state_right->diff_pair(state_left);
+                    std::tie(ind_v_left, ind_v_right) = state_right.diff_pair(state_left);
 
-                    const int col = state_left->c->vertex_to_col[ind_v_left];
+                    const int col = state_left.c->vertex_to_col[ind_v_left];
                     ++depth;
 
                     assert(col >= 0);
                     assert(col < g->v_size);
-                    const int col_sz_right = state_right->c->ptn[col] + 1;
-                    const int col_sz_left  = state_left->c->ptn[col]  + 1;
+                    const int col_sz_right = state_right.c->ptn[col] + 1;
+                    const int col_sz_left  = state_left.c->ptn[col]  + 1;
 
                     assert(col_sz_right > 1);
                     assert(col_sz_left  > 1);
@@ -150,30 +150,30 @@ namespace dejavu {
                     assert(state_left->c->vertex_to_col[ind_v_right] != col);
                     //assert(state_right->c->vertex_to_col[ind_v_left] != col);
 
-                    state_right->use_trace_early_out(false);
-                    state_left->use_trace_early_out(false);
-                    state_right->T->set_hash(0);
-                    state_left->T->set_hash(0);
-                    state_right->T->reset_trace_unequal();
-                    state_left->T->reset_trace_unequal();
+                    state_right.use_trace_early_out(false);
+                    state_left.use_trace_early_out(false);
+                    state_right.T->set_hash(0);
+                    state_left.T->set_hash(0);
+                    state_right.T->reset_trace_unequal();
+                    state_left.T->reset_trace_unequal();
 
                     // individualize a vertex of base color
-                    state_right->move_to_child(g, ind_v_right);
-                    state_left->move_to_child(g,  ind_v_left);
+                    state_right.move_to_child(g, ind_v_right);
+                    state_left.move_to_child(g,  ind_v_left);
 
                     // invariant differs
-                    if(state_right->T->get_hash() != state_left->T->get_hash()) return 0;
+                    if(state_right.T->get_hash() != state_left.T->get_hash()) return 0;
 
                     // can not perform diff udpates on this (AKA invariant should have differed, but is not
                     // guaranteed to differ always)
-                    const bool is_diffed = state_right->update_diff_vertices_last_individualization(state_left);
-                    if(state_left->get_diff_diverge()) return 0;
+                    const bool is_diffed = state_right.update_diff_vertices_last_individualization(state_left);
+                    if(state_left.get_diff_diverge()) return 0;
 
                     // no difference? check for automorphism now -- if it doesn't succeed there is no hope on this path
                     if(!is_diffed) {
                         ws_automorphism->reset();
-                        state_right->singleton_automorphism(state_left, ws_automorphism);
-                        const bool found_auto = state_right->certify(g, *ws_automorphism);
+                        state_right.singleton_automorphism(state_left, ws_automorphism);
+                        const bool found_auto = state_right.certify(g, *ws_automorphism);
                         return found_auto;
                     }
 
@@ -185,8 +185,8 @@ namespace dejavu {
                 return false;
             }
 
-            int do_paired_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &state_left,
-                              ir::controller &state_right, std::vector<std::pair<int, int>>* save_to_individualize) {
+            int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
+                              std::vector<std::pair<int, int>>& computed_orbits) {
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
 
@@ -289,7 +289,7 @@ namespace dejavu {
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
                                 assert(state_left.T->trace_equal());
                                 //assert_equitable(g, state_left.c);
-                                auto return_code = paired_recurse_to_equal_leaf(g, &state_left, &state_right);
+                                auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
                                 found_auto = (return_code == 1);
                                 pruned     = (return_code == 2);
                             }
@@ -330,8 +330,8 @@ namespace dejavu {
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
-                        save_to_individualize->emplace_back(state_right.base_vertex[state_right.s_base_pos],
-                                                            orbs.orbit_size(base_vertex));
+                        computed_orbits.emplace_back(state_right.base_vertex[state_right.s_base_pos],
+                                                     orbs.orbit_size(base_vertex));
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }
                 }

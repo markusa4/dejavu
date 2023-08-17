@@ -11,6 +11,7 @@
 #include "trace.h"
 
 namespace dejavu {
+
     /**
      * \brief IR fundamentals.
      *
@@ -396,15 +397,15 @@ namespace dejavu {
                 }
             }
 
-            void __attribute__((noinline)) color_fix_difference(controller* state, int col) {
+            void color_fix_difference(const controller& state, int col) {
                 const int col_sz = c->ptn[col] + 1;
-                if(col_sz != state->c->ptn[col] + 1) {
+                if(col_sz != state.c->ptn[col] + 1) {
                     assert(false);
                     return;
                 }
 
                 if(col_sz == 1) {
-                    add_diff_vertex(state->c->lab[col]);
+                    add_diff_vertex(state.c->lab[col]);
                     remove_diff_vertex(c->lab[col]);
                     if(!diff_is_singleton.get(c->lab[col])) {
                         diff_is_singleton.set(c->lab[col]);
@@ -413,21 +414,25 @@ namespace dejavu {
                 }
 
                 diff_tester.reset();
-                for(int i = 0; i < col_sz; ++i) diff_tester.set(state->c->lab[col + i]);
-                for(int i = 0; i < col_sz; ++i) if(!diff_tester.get(c->lab[col + i]))        add_diff_vertex(c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i) diff_tester.set(state.c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i)
+                    if(!diff_tester.get(c->lab[col + i]))       add_diff_vertex(c->lab[col + i]);
 
                 diff_tester.reset();
                 for(int i = 0; i < col_sz; ++i) diff_tester.set(c->lab[col + i]);
-                for(int i = 0; i < col_sz; ++i) if(!diff_tester.get(state->c->lab[col + i])) add_diff_vertex(state->c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i)
+                    if(!diff_tester.get(state.c->lab[col + i])) add_diff_vertex(state.c->lab[col + i]);
             }
 
-            std::pair<int, int> diff_pair(controller* state) {
-                diff_tester.reset();
+            std::pair<int, int> diff_pair(const controller& state) {
                 assert(diff_vertices_list.cur_pos > 0);
 
-                const int right = diff_vertices_list[0];
+                // pick a vertex from the difference list
+                const int right     = diff_vertices_list[0];
                 const int right_col = c->vertex_to_col[right];
-                const int left = state->c->lab[right_col];
+
+                // find a corresponding counterpart in the other coloring
+                const int left      = state.c->lab[right_col];
 
                 return {left, right};
             }
@@ -443,10 +448,10 @@ namespace dejavu {
                 diff_diverge = false;
             }
 
-            void singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
+            void singleton_automorphism(controller& state, groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
                 for(int i = singleton_pt_start; i < singletons.size(); ++i) {
-                    automorphism->write_single_map(singletons[i], state->singletons[i]);
+                    automorphism->write_single_map(singletons[i], state.singletons[i]);
                 }
             }
 
@@ -469,9 +474,9 @@ namespace dejavu {
 
 
             // returns whether there is diff cells
-            bool update_diff_vertices_last_individualization(controller* other_state) {
+            bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
-                assert(touched_color_list.cur_pos == other_state->touched_color_list.cur_pos);
+                assert(touched_color_list.cur_pos == other_state.touched_color_list.cur_pos);
                 for(;i < touched_color_list.cur_pos; ++i) {
                     const int old_color = prev_color_list[i];
                     const int new_color = touched_color_list[i];
@@ -481,8 +486,8 @@ namespace dejavu {
                     const int old_color_sz = c->ptn[old_color] + 1;
                     const int new_color_sz = c->ptn[new_color] + 1;
 
-                    const int old_color_sz_other = other_state->c->ptn[old_color] + 1;
-                    const int new_color_sz_other = other_state->c->ptn[new_color] + 1;
+                    const int old_color_sz_other = other_state.c->ptn[old_color] + 1;
+                    const int new_color_sz_other = other_state.c->ptn[new_color] + 1;
 
                     diff_diverge = diff_diverge || (old_color_sz != old_color_sz_other)
                                    || (new_color_sz != new_color_sz_other);

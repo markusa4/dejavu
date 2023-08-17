@@ -270,16 +270,15 @@ namespace dejavu {
 
                     // we first perform a depth-first search, starting from the computed leaf in local_state
                     m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
-                    dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, root_save.get_coloring(),
-                                                                              local_state_left,
-                                                                              local_state,
-                                                                              &m_inprocess.inproc_maybe_individualize);
+                    dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
+                                                                              m_inprocess.inproc_maybe_individualize);
                     progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
                     if (dfs_level == 0) {
+                        // dfs finished the graph -- we are done!
                         s_term = t_dfs;
-                        break; // DFS finished the graph -- we are done!
+                        break;
                     }
                     const bool s_dfs_backtrack =
                             m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
