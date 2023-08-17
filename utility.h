@@ -159,7 +159,10 @@ namespace dejavu {
     static bool set_first = false;
 
     static void progress_current_method(const std::string print) {
-        PRINT_NO_NEWLINE("\r>" + print);
+        PRINT_NO_NEWLINE("\r>" << print);
+    }
+    static void progress_current_method(const std::string print, double info) {
+        PRINT_NO_NEWLINE("\r>" << print << info);
     }
 
     static void progress_print_split() {

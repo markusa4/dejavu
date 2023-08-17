@@ -278,6 +278,75 @@ namespace dejavu {
                 };
             }
 
+            /**
+             * Vertex v is now differing.
+             * @param v the vertex
+             */
+            void add_diff_vertex(int v) {
+                if(!diff_vertices.get(v) && !diff_is_singleton.get(v)) {
+                    diff_vertices.set(v);
+                    diff_vertices_list.push_back(v);
+                    diff_vertices_list_pt[v] = diff_vertices_list.cur_pos - 1;
+                }
+            }
+
+            /**
+             * Vertex v is now not differing anymore
+             * @param v the vertex
+             */
+            void remove_diff_vertex(int v) {
+                if(diff_vertices.get(v)) {
+                    const int pt      = diff_vertices_list_pt[v];
+                    assert(diff_vertices_list[pt] == v);
+
+                    // which element is in the back?
+                    const int back_pt  = diff_vertices_list.cur_pos-1;
+                    const int back_v = diff_vertices_list[back_pt];
+
+                    // now swap back_col to col
+                    diff_vertices_list[pt] = back_v;
+                    assert(diff_vertices.get(back_v));
+                    assert(diff_vertices_list_pt[back_v] == back_pt);
+                    diff_vertices_list_pt[back_v] = pt;
+                    diff_vertices_list_pt[v] = -1; // I don't trust myself
+
+                    diff_vertices.unset(v);
+                    --diff_vertices_list.cur_pos;
+                }
+            }
+
+            /**
+             * Adds and removes differences of the given color \p col between this state and the given \p state.
+             * @param state the other state
+             * @param col the coloring to check differences on
+             */
+            void color_fix_difference(const controller& state, int col) {
+                const int col_sz = c->ptn[col] + 1;
+                if(col_sz != state.c->ptn[col] + 1) {
+                    assert(false);
+                    return;
+                }
+
+                if(col_sz == 1) {
+                    add_diff_vertex(state.c->lab[col]);
+                    remove_diff_vertex(c->lab[col]);
+                    if(!diff_is_singleton.get(c->lab[col])) {
+                        diff_is_singleton.set(c->lab[col]);
+                    }
+                    return;
+                }
+
+                diff_tester.reset();
+                for(int i = 0; i < col_sz; ++i) diff_tester.set(state.c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i)
+                    if(!diff_tester.get(c->lab[col + i]))       add_diff_vertex(c->lab[col + i]);
+
+                diff_tester.reset();
+                for(int i = 0; i < col_sz; ++i) diff_tester.set(c->lab[col + i]);
+                for(int i = 0; i < col_sz; ++i)
+                    if(!diff_tester.get(state.c->lab[col + i])) add_diff_vertex(state.c->lab[col + i]);
+            }
+
         public:
             /**
              * Initialize this controller using a refinement and a graph coloring for the initial state.
@@ -312,13 +381,6 @@ namespace dejavu {
                 singletons.reserve(c->domain_size);
             }
 
-            work_list* get_touched_colors() {
-                return &touched_color_list;
-            }
-
-            mark_set* get_touched_colors_test() {
-                return &touched_color;
-            }
             /**
              * Sets internal trace into recording mode. We write a trace which we might want to compare to later.
              *
@@ -334,8 +396,22 @@ namespace dejavu {
                 T->set_record(true);
             }
 
-            bool there_is_difference_to_base(int domain_size) {
-                for(int i = 0; i < domain_size;) {
+            /**
+             * We compare to a pre-existing trace, recorded earlier using mode_write_base. Must use \a compare_to_this or
+             * provide a comparison trace in another manner before being able to use this mode in the intended manner.
+             */
+            void mode_compare_base() {
+                mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
+            }
+
+            /**
+             * Checks whether the current coloring matches the coloring on the base (AKA in saucy terms, whether this
+             * ordered partition and the one on the base are matched).
+             *
+             * @return whether the colorings match
+             */
+            [[maybe_unused]] bool there_is_difference_to_base() {
+                for(int i = 0; i < c->domain_size;) {
                     const int col    = i;
                     const int col_sz = c->ptn[col] + 1;
                     i += col_sz;
@@ -354,7 +430,32 @@ namespace dejavu {
                 return false;
             }
 
-            bool there_is_difference_to_base_including_singles(int domain_size) {
+            /**
+             * Make an automorphism with the current singletons and the singletons of the base, i.e., useful when
+             * \a there_is_difference_to_base returns `false`.
+             *
+             * @param automorphism workspace to write the automorphism to
+             */
+            void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
+                automorphism->reset();
+
+                for(int i = 0; i < c->domain_size;) {
+                    const int col_sz =  c->ptn[i] + 1;
+                    if(col_sz == 1 && c->lab[i] != leaf_color.lab[i]) {
+                        automorphism->write_single_map(c->lab[i], leaf_color.lab[i]);
+                    }
+                    i += col_sz;
+                }
+            }
+
+
+            /**
+             * Checks whether the current coloring matches the coloring on the base, including singletons (AKA, whether
+             * the colorings are equal). Useful for debugging.
+             *
+             * @return whether the colorings are equal
+             */
+            [[maybe_unused]] bool there_is_difference_to_base_including_singles(int domain_size) {
                 for(int i = 0; i < domain_size;) {
                     const int col    = i;
                     const int col_sz = c->ptn[col] + 1;
@@ -374,69 +475,12 @@ namespace dejavu {
             }
 
             /**
-             * We compare to a pre-existing trace, recorded earlier using mode_write_base. Must use \a compare_to_this or
-             * provide a comparison trace in another manner before being able to use this mode in the intended manner.
+             * Need to use difference-checking before. Returns a differing pair of vertices of the same non-singleton
+             * color.
+             *
+             * @param state the other state (for which we've checked differences before)
+             * @return
              */
-            void mode_compare_base() {
-                mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
-            }
-
-            void add_diff_vertex(int v) {
-                if(!diff_vertices.get(v) && !diff_is_singleton.get(v)) {
-                    diff_vertices.set(v);
-                    diff_vertices_list.push_back(v);
-                    diff_vertices_list_pt[v] = diff_vertices_list.cur_pos - 1;
-                }
-            }
-
-            void remove_diff_vertex(int v) {
-                if(diff_vertices.get(v)) {
-                    const int pt      = diff_vertices_list_pt[v];
-                    assert(diff_vertices_list[pt] == v);
-
-                    // which element is in the back?
-                    const int back_pt  = diff_vertices_list.cur_pos-1;
-                    const int back_v = diff_vertices_list[back_pt];
-
-                    // now swap back_col to col
-                    diff_vertices_list[pt] = back_v;
-                    assert(diff_vertices.get(back_v));
-                    assert(diff_vertices_list_pt[back_v] == back_pt);
-                    diff_vertices_list_pt[back_v] = pt;
-                    diff_vertices_list_pt[v] = -1; // I don't trust myself
-
-                    diff_vertices.unset(v);
-                    --diff_vertices_list.cur_pos;
-                }
-            }
-
-            void color_fix_difference(const controller& state, int col) {
-                const int col_sz = c->ptn[col] + 1;
-                if(col_sz != state.c->ptn[col] + 1) {
-                    assert(false);
-                    return;
-                }
-
-                if(col_sz == 1) {
-                    add_diff_vertex(state.c->lab[col]);
-                    remove_diff_vertex(c->lab[col]);
-                    if(!diff_is_singleton.get(c->lab[col])) {
-                        diff_is_singleton.set(c->lab[col]);
-                    }
-                    return;
-                }
-
-                diff_tester.reset();
-                for(int i = 0; i < col_sz; ++i) diff_tester.set(state.c->lab[col + i]);
-                for(int i = 0; i < col_sz; ++i)
-                    if(!diff_tester.get(c->lab[col + i]))       add_diff_vertex(c->lab[col + i]);
-
-                diff_tester.reset();
-                for(int i = 0; i < col_sz; ++i) diff_tester.set(c->lab[col + i]);
-                for(int i = 0; i < col_sz; ++i)
-                    if(!diff_tester.get(state.c->lab[col + i])) add_diff_vertex(state.c->lab[col + i]);
-            }
-
             std::pair<int, int> diff_pair(const controller& state) {
                 assert(diff_vertices_list.cur_pos > 0);
 
@@ -450,6 +494,9 @@ namespace dejavu {
                 return {left, right};
             }
 
+            /**
+             * Resets all difference-checking information.
+             */
             void reset_diff() {
                 diff_vertices.reset();
                 diff_vertices_list.reset();
@@ -461,6 +508,13 @@ namespace dejavu {
                 diff_diverge = false;
             }
 
+            /**
+             * Need to use difference-checking before. Makes a singleton automorphism with the singleton difference
+             * between this state and the given \p state.
+             *
+             * @param state the other state
+             * @param automorphism workspace to write the automorphism to
+             */
             void singleton_automorphism(controller& state, groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
                 for(int i = singleton_pt_start; i < singletons.size(); ++i) {
@@ -468,25 +522,26 @@ namespace dejavu {
                 }
             }
 
-            void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
-                automorphism->reset();
-
-                for(int i = 0; i < c->domain_size;) {
-                    const int col_sz =  c->ptn[i] + 1;
-                    if(col_sz == 1 && c->lab[i] != leaf_color.lab[i]) {
-                        automorphism->write_single_map(c->lab[i], leaf_color.lab[i]);
-                    }
-                    i += col_sz;
-                }
-            }
-
-
-            int get_diff_diverge() {
+            /**
+             * Need to use difference-checking before. Returns whether the difference is diverging, i.e., there is no
+             * point in further difference checking since branches are non-isomorphic.
+             *
+             * @return whether states are diverging
+             */
+            [[nodiscard]] int get_diff_diverge() const {
                 return diff_diverge;
             }
 
 
-            // returns whether there is diff cells
+            /**
+             * Difference-checking. Records differences between this state and the given \p other_state. Before using
+             * this, this state and \p other_state should start from the same node of the IR tree, and the difference
+             * should be reset at that point. Then, after each individualization this update function should be called.
+             * The function keeps track of all colors that are non-matching.
+             *
+             * @param other_state the other state
+             * @return whether there is a difference
+             */
             bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
                 assert(touched_color_list.cur_pos == other_state.touched_color_list.cur_pos);
@@ -513,7 +568,14 @@ namespace dejavu {
                 return (diff_vertices_list.cur_pos != 0) || diff_diverge; // there is a diff!
             }
 
-            void copy(controller* state) {
+            /**
+             * Copy the state of another controller. Does not copy the trace, but instead links the trace of this
+             * controller to the comparison state of the other (such that both states compare to the same single
+             * trace).
+             *
+             * @param state the other state which is copied
+             */
+            void copy_link_compare(controller* state) {
                 this->c->copy_any(state->c);
 
                 T->set_compare(true);
@@ -645,6 +707,7 @@ namespace dejavu {
             }
 
             // TODO: hopefully can be deprecated
+            // TODO: problem this fixes: trace state is not reverted properly when moving to parent!
             void load_reduced_state_without_coloring(limited_save &state) {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
@@ -653,14 +716,8 @@ namespace dejavu {
                 s_base_pos  = state.get_base_position();
                 base_vertex = state.get_base();
 
-                // these become meaningless
+                // becomes meaningless
                 base.clear();
-
-                /*base_singleton_pt.clear();
-                base_color.clear();
-                base_color_sz.clear();
-                base_touched_color_list_pt.clear();
-                base_cells.clear();*/
 
                 // deactivate reversability
                 mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
@@ -691,21 +748,6 @@ namespace dejavu {
              */
             void write_strong_invariant(const sgraph* g) const {
                 for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
-                    const int v = c->lab[l];
-                    unsigned int inv1 = 0;
-                    const int start_pt = g->v[v];
-                    const int end_pt   = start_pt + g->d[v];
-                    for(int pt = start_pt; pt < end_pt; ++pt) {
-                        const int other_v = g->e[pt];
-                        inv1 += hash((unsigned int) c->vertex_to_col[other_v]);
-                    }
-                    T->op_additional_info((int) inv1);
-                }
-            }
-
-            void write_strong_invariant_singleton(const sgraph* g) const {
-                for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
-                    if(c->ptn[l] != 0) continue;
                     const int v = c->lab[l];
                     unsigned int inv1 = 0;
                     const int start_pt = g->v[v];
@@ -865,20 +907,6 @@ namespace dejavu {
                                                           automorphism.support());
                 }
             }
-
-            std::tuple<bool, int, int> certify_sparse_report_fail_resume(const sgraph *g, const int *colmap,
-                                              groups::automorphism_workspace& automorphism, int pos_start) {
-                return R->certify_automorphism_sparse_report_fail_resume(g, colmap,
-                                                                         automorphism.perm(),
-                                                                         automorphism.nsupport(),
-                                                                         automorphism.support(),
-                                                                         pos_start);
-            }
-
-            bool check_single_failure(const sgraph *g, const int *colmap, const groups::automorphism_workspace& automorphism,
-                                      int failure) {
-                return R->check_single_failure(g, colmap, automorphism.perm(), failure);
-            }
         };
 
         /**
@@ -895,7 +923,6 @@ namespace dejavu {
             std::function<type_selector_hook> dynamic_seletor;
             mark_set test_set;
             std::vector<int> candidates;
-
             big_number ir_tree_size_estimate;;
 
             int color_score(sgraph *g, controller *state, int color) {
@@ -959,6 +986,9 @@ namespace dejavu {
                 return &dynamic_seletor;
             }
 
+            /**
+             * @return estimate for how large the IR tree of the last computed selector is
+             */
             big_number get_ir_size_estimate() {
                 return ir_tree_size_estimate;
             }
@@ -1063,6 +1093,7 @@ namespace dejavu {
                 }
             }
 
+            /*
             void find_split_driven_base(sgraph *g, controller *state, int perturbe) {
                 state->mode_write_base();
 
@@ -1138,7 +1169,7 @@ namespace dejavu {
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-            }
+            }*/
 
             void find_first_base(sgraph *g, controller *state) {
                 state->mode_write_base();

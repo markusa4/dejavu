@@ -567,7 +567,6 @@ namespace dejavu {
                 }
                 double compression_ratio = 1.0;
                 if(domain_size > 0) compression_ratio = 1.0 * vertices_active / c.domain_size;
-                std::cout << compression_ratio << std::endl;
                 return compression_ratio;
             }
 

@@ -451,12 +451,10 @@ namespace dejavu {
 
                                 // TODO this code is duplicated, let's think about this again...
                                 if(finished_symmetries) {
-                                    if(h_last_routine == random_ir && h_next_routine != random_ir) {
-                                        progress_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
-                                        if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                            progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
-                                                                       std::to_string(sh_schreier->s_densegen()), "_");
-                                        }
+                                    progress_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
+                                    if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
+                                        progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
+                                                                   std::to_string(sh_schreier->s_densegen()), "_");
                                     }
                                 }
                             }

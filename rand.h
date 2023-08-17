@@ -234,7 +234,8 @@ namespace dejavu::search_strategy {
                 int could_start_from = group.finished_up_to_level();
 
                 if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0)
-                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", fail1=" + std::to_string(s_paths_fail1));
+                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", f1=" +
+                                            std::to_string(s_paths_fail1) + ", compress=", group.s_compression_ratio);
 
                 // can start from below the root if we finished Schreier table at the current root
                 if(local_state.s_base_pos <= could_start_from) {
@@ -376,7 +377,8 @@ namespace dejavu::search_strategy {
                     s_paths_failany < fail_limit) {
 
                 if((s_paths & 0x000000FF) == 0)
-                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", fail1=" + std::to_string(s_paths_fail1));
+                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", f1=" +
+                                            std::to_string(s_paths_fail1) + ", compress=", group.s_compression_ratio);
 
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                 local_state.load_reduced_state(*node->get_save());

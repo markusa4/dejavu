@@ -197,7 +197,7 @@ namespace dejavu {
                 ws_automorphism->reset();
 
                 // saucy strategy of paired states
-                state_left.copy(&state_right);
+                state_left.copy_link_compare(&state_right);
 
                 // we want to terminate if things become to costly, we save the current trace position to track cost
                 cost_snapshot = state_right.T->get_position();
@@ -215,9 +215,9 @@ namespace dejavu {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0)
-                        progress_current_method("dfs base_pos=" +std::to_string(state_right.s_base_pos)+", cost_snapshot="+std::to_string(recent_cost_snapshot));
-                        //std::cout << "                  " << ">partial-cost " << recent_cost_snapshot << "/" << h_recent_cost_snapshot_limit << std::endl;
-
+                        progress_current_method("dfs base_pos=" +
+                                                 std::to_string(state_right.compare_base.size() -state_right.s_base_pos)
+                                                 + ", cost_snapshot=", recent_cost_snapshot);
                     // remember which color we are individualizing
                     const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;

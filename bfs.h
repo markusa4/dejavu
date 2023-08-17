@@ -129,13 +129,13 @@ namespace dejavu {
                 }
 
                 // do efficient loading if parent is the same as previous load
-                //if(next_node_save != last_load || g->v_size < 2000) { // TODO heuristic to check how much has changed
-                //    local_state.use_reversible(false); // potentially loads more efficiently
+                if(next_node_save != last_load || g->v_size < 2000) { // TODO heuristic to check how much has changed
+                    local_state.use_reversible(false); // potentially loads more efficiently
                     local_state.load_reduced_state(*next_node_save);
-                //} else {
-                //    local_state.move_to_parent();
-                //    local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
-                //}
+                } else {
+                    local_state.move_to_parent();
+                    local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
+                }
 
                 if(local_state.s_base_pos > 0) local_state.use_increase_deviation(true);
 
@@ -144,8 +144,8 @@ namespace dejavu {
 
                 // do computation
                 local_state.reset_trace_equal();
-                //local_state.use_reversible(g->v_size >= 2000);
-                local_state.use_reversible(false);
+                local_state.use_reversible(g->v_size >= 2000);
+                //local_state.use_reversible(false);
                 local_state.use_trace_early_out(true);
                 local_state.move_to_child(g, v);
 

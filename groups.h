@@ -1383,7 +1383,6 @@ namespace dejavu {
                    compressor->s_compression_ratio > h_min_compression_ratio) compressor = nullptr;
 
                 if(compressor != nullptr) {
-                    std::cout << "                  " << ">schreier-compression-ratio " << compressor->s_compression_ratio << std::endl;
                     // need more management if we are using compression
                     original_base       = new_base;
                     original_base_sizes = new_base_sizes;
