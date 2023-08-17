@@ -22,22 +22,20 @@ namespace sassy {
     class preprocessor;
     static preprocessor* save_preprocessor;
 
-    enum preop {
-        deg01, deg2ue, deg2ma, qcedgeflip, densify2, twins
-    };
-
-    // preprocessor for symmetry detection
-    // see README.md for usage!
+    /**
+     * \brief preprocessor for symmetry detection
+     *
+     * Shrinks a graph using a variety of techniques such as color refinement, low degree vertex detection, twin
+     * removal, or uniform components in the quotient graph.
+     *
+     */
     class preprocessor {
-    public:
-        dejavu::big_number grp_sz;
-        int domain_size = 0;
-
-        bool h_deact_deg1 = false; /**< no degree 0,1 processing */
-        bool h_deact_deg2 = false;  /**< no degree 2   processing */
-        bool h_translate_only = false;
-
     private:
+        /**
+         * Operations of the preprocessor.
+         */
+        enum preop { deg01, deg2ue, deg2ma, qcedgeflip, densify2, twins };
+
         //inline static preprocessor* save_preprocessor;
         dejavu_hook* saved_hook;
 
@@ -89,7 +87,13 @@ namespace sassy {
         int current_component = 0;
 
         bool ir_quotient_component_init = false;
+
     public:
+        dejavu::big_number grp_sz; /**< group size as determined and removed by the preprocessor */
+        int domain_size   = 0;      /**< size of the underlying domain (i.e., number of vertices) */
+        bool h_deact_deg1 = false;  /**< no degree 0,1 processing */
+        bool h_deact_deg2 = false;  /**< no degree 2   processing */
+        bool h_translate_only = false;
         // for a vertex v of reduced graph, return corresponding vertex of the original graph
         int translate_back(int v) {
             const int layers = static_cast<int>(translation_layers.size());
@@ -139,7 +143,7 @@ namespace sassy {
             layers_melded = true;
         }
 
-        int remove_twins(dejavu::sgraph *g, int *colmap, dejavu_hook* consume) {
+        int remove_twins(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
             //coloring col;
             g->initialize_coloring(&c, colmap);
 
@@ -234,8 +238,8 @@ namespace sassy {
                             _automorphism_supp.push_back(vertex);
                             _automorphism_supp.push_back(other_vertex);
 
-                            pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array(),
-                                     consume);
+                            pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                     _automorphism_supp.get_array(), hook);
 
                             reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                                _automorphism_supp.get_array());
@@ -557,7 +561,8 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block, dejavu::work_list* path) {
+        static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block,
+                                                 dejavu::work_list* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -631,7 +636,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -645,7 +651,8 @@ namespace sassy {
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
                         ++endpoint_cnt[n2];
-                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n2);
@@ -817,7 +824,8 @@ namespace sassy {
                         const int unique_endpoint_orig = translate_back(vertex);
                         // attach all represented vertices of path to unique_endpoint_orig in canonical fashion
                         // path.sort_after_map(colmap); // should not be necessary
-                        recovery_strings[unique_endpoint_orig].reserve(2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
+                        recovery_strings[unique_endpoint_orig].reserve(
+                                2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
                         for (int l = 0; l < path.cur_pos; ++l) {
                             assert(path[l] >= 0);
                             assert(path[l] < g->v_size);
@@ -980,7 +988,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -994,7 +1003,8 @@ namespace sassy {
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
                         ++endpoint_cnt[n2];
-                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n2);
@@ -1179,7 +1189,8 @@ namespace sassy {
                         // mark hub vertex in recovery string such that it gets mapped to nothing
                         // TODO should this be handled by translate_back? we can "translate_back" to \epsilon?
                         // TODO just collect hub vertices and "handle this at the end"?
-                        if(recovery_strings[hub_vertex_orig].size() == 0) recovery_strings[hub_vertex_orig].push_back(INT32_MAX);
+                        if(recovery_strings[hub_vertex_orig].empty())
+                            recovery_strings[hub_vertex_orig].push_back(INT32_MAX);
 
                         std::vector<int> recovery;
                         for (int l = 0; l < path.cur_pos; ++l) {
@@ -1240,7 +1251,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -1530,7 +1542,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -1543,7 +1556,8 @@ namespace sassy {
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
                         ++endpoint_cnt[n2];
-                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n2);
@@ -1630,7 +1644,8 @@ namespace sassy {
                     path.reset();
                     if (!color_test.get(endpoint_col)) {
                         color_test.set(endpoint_col);
-                        if (not_unique_analysis[endpoint_col] == not_unique_analysis[neighbour_col] && not_unique_analysis[endpoint_col] == c.ptn[endpoint_col] + 1) {
+                        if (not_unique_analysis[endpoint_col] == not_unique_analysis[neighbour_col] &&
+                            not_unique_analysis[endpoint_col] == c.ptn[endpoint_col] + 1) {
                             // check that path endpoints dont contain duplicates
                             bool all_unique = true;
                             color_unique.reset();
@@ -1647,7 +1662,7 @@ namespace sassy {
                             }
 
                             // test_vertex connects to all vertices of endpoint_col!
-                            if (all_unique && color < endpoint_col) { // col.ptn[endpoint_col] + 1 == 2 && color_size == 2 && only_once
+                            if (all_unique && color < endpoint_col) {
                                 const int path_col = c.vertex_to_col[neighbour];
                                 const int path_col_sz = c.ptn[path_col] + 1;
                                 const int connects_to = not_unique_analysis[endpoint_col];
@@ -1669,7 +1684,8 @@ namespace sassy {
 
                                         if (_neighbour_col == path_col) {
                                             neighbour_list.push_back(_neighbour);
-                                            const auto other_endpoint = walk_to_endpoint(g, _neighbour, col1_vertj, nullptr);
+                                            const auto other_endpoint =
+                                                    walk_to_endpoint(g, _neighbour, col1_vertj, nullptr);
                                             neighbour_to_endpoint[_neighbour] = other_endpoint.first;
                                             if(endpoint_neighbour_col == -1) {
                                                 endpoint_neighbour_col = c.vertex_to_col[other_endpoint.second];
@@ -1713,7 +1729,8 @@ namespace sassy {
                                             assert(path_v_orig < domain_size);
                                             recovery_strings[vert_orig].push_back(path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
-                                                recovery_strings[vert_orig].push_back(recovery_strings[path_v_orig][rsi]);
+                                                recovery_strings[vert_orig].push_back(
+                                                        recovery_strings[path_v_orig][rsi]);
                                             }
                                         }
 
@@ -1731,7 +1748,8 @@ namespace sassy {
                                             assert(path_v_orig < domain_size);
                                             recovery_strings[endpoint_orig].push_back(-path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
-                                                recovery_strings[endpoint_orig].push_back(-abs(recovery_strings[path_v_orig][rsi]));
+                                                recovery_strings[endpoint_orig].push_back(
+                                                        -abs(recovery_strings[path_v_orig][rsi]));
                                             }
                                         }
 
@@ -1746,7 +1764,7 @@ namespace sassy {
         }
 
         // reduce vertices of degree 1 and 0, outputs corresponding automorphisms
-        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, dejavu_hook* consume) {
+        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
             if (h_deact_deg1) return;
 
             g_old_v.clear();
@@ -1872,7 +1890,7 @@ namespace sassy {
                 if (is_pairs) {
                     for (int j = 0; j < parentlist.cur_pos; ++j) {
                         const int first_pair_parent = parentlist[j];
-                        const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                        const int pair_from = first_pair_parent;
                         const int pair_to = pair_match[pair_from];
 
                         stack1.reset();
@@ -1956,8 +1974,8 @@ namespace sassy {
                         assert(del.get(pair_to));
                         assert(del.get(pair_from));
 
-                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array(),
-                                 consume);
+                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                 _automorphism_supp.get_array(), hook);
 
                         reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                            _automorphism_supp.get_array());
@@ -1966,7 +1984,7 @@ namespace sassy {
 
                     for (int j = 0; j < parentlist.cur_pos; ++j) {
                         const int first_pair_parent = parentlist[j];
-                        const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                        const int pair_from = first_pair_parent;
                         const int pair_to = pair_match[pair_from];
 
                         const int original_parent = translate_back(first_pair_parent);
@@ -2117,8 +2135,8 @@ namespace sassy {
                         assert(del.get(child_to));
                         assert(del.get(child_from));
 
-                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array(),
-                                 consume);
+                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                 _automorphism_supp.get_array(), hook);
 
                         reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                            _automorphism_supp.get_array());
@@ -2203,36 +2221,11 @@ namespace sassy {
                     _automorphism_supp.push_back(parent_to);
 
                     pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                             _automorphism_supp.get_array(), consume);
+                             _automorphism_supp.get_array(), hook);
 
                     reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                        _automorphism_supp.get_array());
                     _automorphism_supp.reset();
-
-                    /*const int orig_parent_from = translate_back(parent_from);
-                    const int orig_parent_to = translate_back(parent_to);
-
-                    assert(recovery_strings[orig_parent_to].size() ==
-                           recovery_strings[orig_parent_from].size());
-
-                    automorphism[orig_parent_to] = orig_parent_from;
-                    automorphism[orig_parent_from] = orig_parent_to;
-                    automorphism_supp.push_back(orig_parent_from);
-                    automorphism_supp.push_back(orig_parent_to);
-                    for (size_t k = 0; k < recovery_strings[orig_parent_to].size(); ++k) {
-                        const int str_from = recovery_strings[orig_parent_from][k];
-                        const int str_to = recovery_strings[orig_parent_to][k];
-                        automorphism[str_to] = str_from;
-                        automorphism[str_from] = str_to;
-                        automorphism_supp.push_back(str_from);
-                        automorphism_supp.push_back(str_to);
-                    }
-
-                    (*consume)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos,
-                            automorphism_supp.get_array());
-                    reset_automorphism(automorphism.get_array(), automorphism_supp.cur_pos,
-                                       automorphism_supp.get_array());
-                    automorphism_supp.reset();*/
                 }
             }
         }
@@ -2854,7 +2847,8 @@ namespace sassy {
                 assert(orig_v_to < domain_size);
                 assert(orig_v_to >= 0);
 
-                const bool added_vertex = !recovery_strings[orig_v_from].empty() && recovery_strings[orig_v_from][0] == INT32_MAX;
+                const bool added_vertex = !recovery_strings[orig_v_from].empty() &&
+                                           recovery_strings[orig_v_from][0] == INT32_MAX;
 
                 assert(automorphism[orig_v_from] == orig_v_from || added_vertex);
 
@@ -2907,7 +2901,8 @@ namespace sassy {
                     assert(automorphism[v_from] != before_move[v_from]);
                     automorphism[v_from] = before_move[v_from];
                 }
-                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos, aux_automorphism_supp.get_array());
+                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos,
+                                   aux_automorphism_supp.get_array());
                 aux_automorphism_supp.reset();
             }
 
@@ -3071,7 +3066,8 @@ namespace sassy {
                         automorphism_supp.push_back(v_from);
                     automorphism[v_from] = before_move[v_from];
                 }
-                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos, aux_automorphism_supp.get_array());
+                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos,
+                                   aux_automorphism_supp.get_array());
                 aux_automorphism_supp.reset();
             }
 
