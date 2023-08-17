@@ -55,8 +55,6 @@ namespace dejavu {
             }
 
             void write_compare(int d) {
-                //d = d % (INT32_MAX-10);
-                //d = d & 0x0FFFFFFF;
                 d = std::min(INT32_MAX-10,d);
                 assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 write_compare_no_limit(d);
@@ -86,7 +84,7 @@ namespace dejavu {
              * Records an individualization.
              * @param color The color being individualized.
              */
-            void op_individualize(int old_color, int ind_color) {
+            void op_individualize(const int old_color, const int ind_color) {
                 assert(ind_color >= 0);
                 assert(old_color >= 0);
                 assert(ind_color != old_color);
@@ -158,16 +156,17 @@ namespace dejavu {
              * (i.e., whether the next color is splitting).
              */
             bool blueprint_is_next_cell_active() {
-                if (!compare)
-                    return true;
+                if (!compare || !comp || position > compare_trace->data.size()) return true;
 
                 assert(compare_trace);
                 size_t read_pt = position;
                 assert(compare_trace->data.size() > read_pt);
+                for(; read_pt > 0 && compare_trace->data[read_pt] != TRACE_MARKER_REFINE_CELL_START; --read_pt);
                 assert(compare_trace->data[read_pt] == TRACE_MARKER_REFINE_CELL_START);
                 ++read_pt;
+
                 assert(compare_trace->data.size() > read_pt);
-                assert(compare_trace->data[read_pt] == false || compare_trace->data[read_pt] == true);
+                assert((compare_trace->data[read_pt] == false) || (compare_trace->data[read_pt] == true));
                 return compare_trace->data[read_pt];
             }
 
@@ -178,12 +177,13 @@ namespace dejavu {
              * \a blueprint_is_next_cell_active() determined the current color to be non-splitting.
              */
             void blueprint_skip_to_next_cell() {
-                assert(compare_trace->data[position] == TRACE_MARKER_REFINE_CELL_START);
-                while (compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
+                while (position < compare_trace->data.size() &&
+                       compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
                     assert(compare_trace->data.size() > (size_t) position);
                     ++position;
                 }
                 ++position;
+                assert_cell_act = false;
             }
 
             /**

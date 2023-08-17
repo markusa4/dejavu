@@ -36,6 +36,26 @@ namespace dejavu::search_strategy {
         std::vector<std::pair<int, int>> inproc_maybe_individualize; /**< vertices that can be individualized         */
         std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
 
+        std::vector<int> nodes;
+
+        void sort_nodes_map(std::vector<unsigned long>* map, int* colmap) {
+            struct comparator_map {
+                std::vector<unsigned long> *map;
+                int* colmap;
+
+                explicit comparator_map(std::vector<unsigned  long> *map, int* colmap) {
+                    this->map = map;
+                    this->colmap = colmap;
+                }
+
+                bool operator()(const int &a, const int &b) {
+                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && ((*map)[a] < (*map)[b]));
+                }
+            };
+            auto c = comparator_map(map, colmap);
+            std::sort(nodes.begin(), nodes.end(), c);
+        }
+
         /**
          * Inprocess the (colored) graph using all the available solver data.
          *
@@ -63,14 +83,37 @@ namespace dejavu::search_strategy {
 
                 tree->make_node_invariant(g->v_size); // "compresses" node invariant from all levels into first level
 
+                nodes.reserve(g->v_size);
+                nodes.clear();
 
-                for (int i = 0; i < g->v_size; ++i) {
+                int num_of_hashs = 0;
+
+                for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
+                sort_nodes_map(tree->get_node_invariant(), local_state.c->vertex_to_col);
+                unsigned long last_inv = (*tree->get_node_invariant())[0];
+                int last_col           = local_state.c->vertex_to_col[0];
+                for(int i = 0; i < g->v_size; ++i) {
+                    const int v               = nodes[i];
+                    const unsigned long v_inv = (*tree->get_node_invariant())[v];
+                    const int  v_col = local_state.c->vertex_to_col[v];
+                    if(last_col != v_col) {
+                        last_col = v_col;
+                        last_inv = v_inv;
+                        ++num_of_hashs;
+                    }
+                    if(v_inv != last_inv) {
+                        last_inv = v_inv;
+                        ++num_of_hashs;
+                    }
+                    hash[v] = num_of_hashs;
+                }
+                /*for (int i = 0; i < g->v_size; ++i) {
                     hash[i]  = is_pruned.get(i);
-                    hash[i] += (int) (*tree->get_node_invariant())[i] % 256;
+                    hash[i] += (int) (*tree->get_node_invariant())[i] % 512;
                 }
                 for (int i = 0; i < g->v_size; ++i) {
-                    hash[i] = 257 * local_state.c->vertex_to_col[i] + hash[i];
-                }
+                    hash[i] = 513 * local_state.c->vertex_to_col[i] + hash[i];
+                }*/
                 g->initialize_coloring(local_state.c, hash.get_array());
                 const int cell_after = local_state.c->cells;
                 progress_print("inpr_bfs", std::to_string(cell_prev),
@@ -189,6 +232,7 @@ namespace dejavu::search_strategy {
             }
 
             inproc_can_individualize.clear();
+            inproc_maybe_individualize.clear();
 
 
             if(cell_prev != local_state.c->cells) {

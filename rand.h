@@ -233,6 +233,9 @@ namespace dejavu::search_strategy {
 
                 int could_start_from = group.finished_up_to_level();
 
+                if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0)
+                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", fail1=" + std::to_string(s_paths_fail1));
+
                 // can start from below the root if we finished Schreier table at the current root
                 if(local_state.s_base_pos <= could_start_from) {
                     while (local_state.s_base_pos <= could_start_from) {
@@ -245,7 +248,8 @@ namespace dejavu::search_strategy {
                     const int s_cells_now = start_from->get_coloring()->cells;
 
                     if(s_cells_now - s_cell_initial > 10000) {
-                        std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
+                        progress_current_method("random root_cells=" + std::to_string(1.0 * s_cells_now / g->v_size) + ", base_pos=" + std::to_string(could_start_from));
+                        //std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
 
                         // TODO we should at least recompress the Schreier structure here
                         // TODO probably also inprocess the graph...
@@ -274,12 +278,12 @@ namespace dejavu::search_strategy {
                     // if we are beyond where we need to sift, and we don't want to sample uniformly at random, we
                     // stop picking random elements whatsoever
                     if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
-                       base_pos < static_cast<int>(local_state.compare_base.size())) {
+                       base_pos < static_cast<int>(local_state.compare_base_vertex.size())) {
                         uniform    = false; // sampled leaf not uniform anymore now
                         choose_pos = col;   // just pick first vertex of color
 
                         // or even better: let's choose the base vertex, if it's in the correct color
-                        const int v_base = local_state.compare_base[base_pos];
+                        const int v_base = local_state.compare_base_vertex[base_pos];
                         const int v_base_col = local_state.c->vertex_to_col[v_base];
                         if(col == v_base_col) choose_pos = local_state.c->vertex_to_lab[v_base];
                     }
@@ -370,6 +374,10 @@ namespace dejavu::search_strategy {
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
+
+                if((s_paths & 0x000000FF) == 0)
+                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", fail1=" + std::to_string(s_paths_fail1));
+
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                 local_state.load_reduced_state(*node->get_save());
 

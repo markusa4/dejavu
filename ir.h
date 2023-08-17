@@ -96,6 +96,17 @@ namespace dejavu {
             }
         };
 
+        struct base_info {
+            int color;
+            int color_sz;
+            int cells;
+            int touched_color_list_pt;
+            int singleton_pt;
+
+            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt) : color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
+                    singleton_pt(singletonPt) {}
+        };
+
         /**
          * \brief Controls movement in IR tree
          *
@@ -112,18 +123,14 @@ namespace dejavu {
 
             // TODO: should these be public? or rather accesible through const references or something?
 
-            std::vector<int> singletons;
-            std::vector<int> base_vertex;
-            std::vector<int> base_color;
-            std::vector<int> base_color_sz;
-            std::vector<int> base_touched_color_list_pt;
-            std::vector<int> base_cells;
-            std::vector<int> base_singleton_pt;
+            std::vector<int>       singletons;
+            std::vector<int>       compare_singletons;
 
-            std::vector<int> compare_base_color;
-            std::vector<int> compare_base_cells;
-            std::vector<int> compare_singletons;
-            std::vector<int> compare_base;
+            std::vector<int>       base_vertex; // TODO one vector with base_info
+            std::vector<base_info> base;
+
+            std::vector<int>       compare_base_vertex;
+            std::vector<base_info> compare_base;
 
             coloring leaf_color;
 
@@ -148,7 +155,6 @@ namespace dejavu {
             work_list prev_color_list;
 
             mark_set  diff_tester;
-
             mark_set  diff_vertices;
             mark_set  diff_is_singleton;
             work_list diff_vertices_list;
@@ -170,8 +176,6 @@ namespace dejavu {
             bool h_trace_early_out = false;       /*< use trace early out                */
             bool h_deviation_inc_active  = false; /*< use increased trace deviation      */
             int  s_deviation_inc_current = 0;     /*< number of current trace deviations */
-
-
 
             void touch_initial_colors() {
                 int i = 0;
@@ -224,7 +228,7 @@ namespace dejavu {
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
-                                    && compare_base_cells[s_base_pos - 1] == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
+                                    && compare_base[s_base_pos - 1].cells == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
                 return ndone && (cont || deviation_override);
             }
 
@@ -240,14 +244,15 @@ namespace dejavu {
                     s_cell_active = false;
                 }
 
+                T->op_refine_cell_start(color);
+                if (!s_individualize) T->op_additional_info(color_sz);
+
                 // blueprints
                 if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
+                    s_cell_active = false;
                     T->blueprint_skip_to_next_cell();
                     return false;
                 }
-
-                T->op_refine_cell_start(color);
-                if (!s_individualize) T->op_additional_info(color_sz);
 
                 s_cell_active = true;
                 return true;
@@ -313,6 +318,45 @@ namespace dejavu {
                 mode = IR_MODE_RECORD_TRACE;
                 T->set_compare(false);
                 T->set_record(true);
+            }
+
+            bool there_is_difference_to_base(int domain_size) {
+                for(int i = 0; i < domain_size;) {
+                    const int col    = i;
+                    const int col_sz = c->ptn[col] + 1;
+                    i += col_sz;
+                    if(col_sz == 1) continue;
+
+                    diff_tester.reset();
+                    for(int j = col; j < col + col_sz; ++j) {
+                        const int v = c->lab[j];
+                        diff_tester.set(v);
+                    }
+                    for(int j = col; j < col + col_sz; ++j) {
+                        const int v = leaf_color.lab[j];
+                        if(!diff_tester.get(v)) return true;
+                    }
+                }
+                return false;
+            }
+
+            bool there_is_difference_to_base_including_singles(int domain_size) {
+                for(int i = 0; i < domain_size;) {
+                    const int col    = i;
+                    const int col_sz = c->ptn[col] + 1;
+                    i += col_sz;
+
+                    diff_tester.reset();
+                    for(int j = col; j < col + col_sz; ++j) {
+                        const int v = c->lab[j];
+                        diff_tester.set(v);
+                    }
+                    for(int j = col; j < col + col_sz; ++j) {
+                        const int v = leaf_color.lab[j];
+                        if(!diff_tester.get(v)) return true;
+                    }
+                }
+                return false;
             }
 
             /**
@@ -399,10 +443,22 @@ namespace dejavu {
                 diff_diverge = false;
             }
 
-            void __attribute__((noinline))  singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
+            void singleton_automorphism(controller* state, groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
                 for(int i = singleton_pt_start; i < singletons.size(); ++i) {
                     automorphism->write_single_map(singletons[i], state->singletons[i]);
+                }
+            }
+
+            void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
+                automorphism->reset();
+
+                for(int i = 0; i < c->domain_size;) {
+                    const int col_sz =  c->ptn[i] + 1;
+                    if(col_sz == 1 && c->lab[i] != leaf_color.lab[i]) {
+                        automorphism->write_single_map(c->lab[i], leaf_color.lab[i]);
+                    }
+                    i += col_sz;
                 }
             }
 
@@ -413,8 +469,8 @@ namespace dejavu {
 
 
             // returns whether there is diff cells
-            bool __attribute__((noinline))  update_diff_vertices_last_individualization(controller* other_state) {
-                int i = base_touched_color_list_pt[base_touched_color_list_pt.size()-1];
+            bool update_diff_vertices_last_individualization(controller* other_state) {
+                int i = base.back().touched_color_list_pt;
                 assert(touched_color_list.cur_pos == other_state->touched_color_list.cur_pos);
                 for(;i < touched_color_list.cur_pos; ++i) {
                     const int old_color = prev_color_list[i];
@@ -448,25 +504,20 @@ namespace dejavu {
                 T->set_position(state->T->get_position());
                 T->set_hash(state->T->get_hash());
 
-                compare_base_color = state->compare_base_color;
-                compare_base_cells = state->compare_base_cells;
-                compare_singletons = state->compare_singletons;
-                compare_base       = state->compare_base;
+                base_vertex = state->base_vertex;
+                base        = state->base;
+
+                compare_base_vertex = state->compare_base_vertex;
+                compare_base        = state->compare_base;
 
                 leaf_color.copy_any(&state->leaf_color);
                 mode = state->mode;
 
-                base_color  = state->base_color;
-                base_vertex = state->base_vertex;
-                base_cells  = state->base_cells;
-                base_color_sz = state->base_color_sz;
-                base_touched_color_list_pt = state->base_touched_color_list_pt;
-                base_singleton_pt = state->base_singleton_pt;
                 touched_color.copy(&state->touched_color);
                 prev_color_list.copy(&state->prev_color_list);
                 touched_color_list.copy(&state->touched_color_list);
-                base_touched_color_list_pt = state->base_touched_color_list_pt;
-                singletons = state->singletons;
+                singletons         = state->singletons;
+                compare_singletons = state->singletons;
 
                 diff_tester.copy(&state->diff_tester);
                 s_base_pos = state->s_base_pos;
@@ -488,18 +539,9 @@ namespace dejavu {
                 cT->set_position(T->get_position());
                 flip_trace();
 
-                compare_base_color.clear();
-                compare_base_color.resize(base_color.size());
-                std::copy(base_color.begin(), base_color.end(), compare_base_color.begin());
-                compare_base_cells.clear();
-                compare_base_cells.resize(base_cells.size());
-                std::copy(base_cells.begin(), base_cells.end(), compare_base_cells.begin());
-                compare_singletons.clear();
-                compare_singletons.resize(singletons.size());
-                std::copy(singletons.begin(), singletons.end(), compare_singletons.begin());
-                compare_base.clear();
-                compare_base.resize(base_vertex.size());
-                std::copy(base_vertex.begin(), base_vertex.end(), compare_base.begin());
+                compare_base        = base;
+                compare_base_vertex = base_vertex;
+                compare_singletons  = singletons;
 
                 leaf_color.copy_any(c);
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
@@ -578,11 +620,7 @@ namespace dejavu {
                 base_vertex = state.get_base();
 
                 // these become meaningless, so clear them out
-                base_singleton_pt.clear();
-                base_color.clear();
-                base_color_sz.clear();
-                base_touched_color_list_pt.clear();
-                base_cells.clear();
+                base.clear();
 
                 // if reversible, need to reset touched colors
                 if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
@@ -594,15 +632,17 @@ namespace dejavu {
                 T->set_position(state.get_trace_position());
                 T->reset_trace_equal();
                 T->set_compare(true);
-                s_base_pos = state.get_base_position();
+                s_base_pos  = state.get_base_position();
                 base_vertex = state.get_base();
 
                 // these become meaningless
-                base_singleton_pt.clear();
+                base.clear();
+
+                /*base_singleton_pt.clear();
                 base_color.clear();
                 base_color_sz.clear();
                 base_touched_color_list_pt.clear();
-                base_cells.clear();
+                base_cells.clear();*/
 
                 // deactivate reversability
                 mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
@@ -667,27 +707,30 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void __attribute__((noinline))  move_to_child(sgraph *g, int v) {
+            void move_to_child(sgraph *g, int v) {
+                // always keep track of vertex base
                 ++s_base_pos;
-                base_vertex.push_back(v); // always keep track of base (needed for BFS)
-
-                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
-                    base_singleton_pt.push_back((int) singletons.size());
-                    base_color.push_back(c->vertex_to_col[v]);
-                    base_color_sz.push_back(c->ptn[c->vertex_to_col[v]] + 1);
-                    base_touched_color_list_pt.push_back(touched_color_list.cur_pos);
-                }
+                base_vertex.push_back(v);
 
                 assert(!s_cell_active);
 
+                // some info maybe needed later
+                const int singleton_pt     = (int) singletons.size();
+                const int touched_color_pt = touched_color_list.cur_pos;
+
+                // determine color
+                const int prev_col    = c->vertex_to_col[v];
+                const int prev_col_sz = c->ptn[prev_col] + 1;
+
+                // individualize vertex
                 s_individualize = true;
-                const int prev_col = c->vertex_to_col[v];
-                const int init_color_class = R->individualize_vertex(c, v, my_split_hook);
+                const int init_color_class = refinement::individualize_vertex(c, v, my_split_hook);
                 T->op_individualize(prev_col, c->vertex_to_col[v]);
                 s_individualize = false;
                 s_last_refinement_singleton_only = true;
-                T->op_refine_start();
 
+                // refine coloring
+                T->op_refine_start();
                 if (mode == IR_MODE_RECORD_TRACE) {
                     R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
@@ -696,14 +739,15 @@ namespace dejavu {
                 } else {
                     R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
-                    if (T->trace_equal() && c->cells==compare_base_cells[s_base_pos - 1]) {
+                    if (T->trace_equal() && c->cells==compare_base[s_base_pos - 1].cells) {
                         T->skip_to_individualization();
                     }
                 }
 
                 s_cell_active = false;
 
-                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) base_cells.push_back(c->cells);
+                if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE)
+                    base.emplace_back(prev_col, prev_col_sz, c->cells, touched_color_pt, singleton_pt);
             }
 
             /**
@@ -730,15 +774,16 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void __attribute__((noinline)) move_to_parent() {
+            void move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
-                assert(base_touched_color_list_pt.size() > 0);
+                assert(base.size() > 0);
 
                 // unwind invariant
                 if (T) T->rewind_to_individualization();
 
+                // unwind colors introduced on this level of the tree
                 --s_base_pos;
-                while (prev_color_list.cur_pos > base_touched_color_list_pt[base_touched_color_list_pt.size()-1]) {
+                while (prev_color_list.cur_pos > base.back().touched_color_list_pt) {
                     const int old_color = prev_color_list.pop_back();
                     const int new_color = touched_color_list.pop_back();
 
@@ -762,15 +807,13 @@ namespace dejavu {
                     --c->cells;
                 }
 
-                int const new_singleton_pos = base_singleton_pt.back();
+                // unwind singletons
+                int const new_singleton_pos = base.back().singleton_pt;
                 singletons.resize(new_singleton_pos);
 
+                // remove base information
                 base_vertex.pop_back();
-                base_color.pop_back();
-                base_color_sz.pop_back();
-                base_touched_color_list_pt.pop_back();
-                base_cells.pop_back();
-                base_singleton_pt.pop_back();
+                base.pop_back();
 
                 T->reset_trace_equal();
             }
@@ -802,7 +845,7 @@ namespace dejavu {
              * @param automorphism The automorphism.
              * @return Whether \p automorphism is an automorphism of \p g.
              */
-            bool __attribute__((noinline))  certify(sgraph* g, groups::automorphism_workspace& automorphism) {
+            bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
                 if(automorphism.nsupport() > g->v_size/4) {
                     return R->certify_automorphism(g, automorphism.perm());
                 } else {
@@ -929,12 +972,20 @@ namespace dejavu {
                         break;
                 }
 
-
-                saved_color_sizes = state->base_color_sz;
                 ir_tree_size_estimate.mantissa = 1.0;
                 ir_tree_size_estimate.exponent = 0;
-                for(auto col_sz : state->base_color_sz) {
-                    ir_tree_size_estimate.multiply(col_sz);
+
+                saved_color_base.clear();
+                saved_color_base.reserve(state->base.size());
+                for(auto& bi : state->base) {
+                    saved_color_base.push_back(bi.color);
+                }
+
+                saved_color_sizes.clear();
+                saved_color_sizes.reserve(state->base.size());
+                for(auto& bi : state->base) {
+                    ir_tree_size_estimate.multiply(bi.color_sz);
+                    saved_color_sizes.push_back(bi.color_sz);
                 }
             }
             /**
@@ -950,12 +1001,6 @@ namespace dejavu {
 
                 int prev_color = -1;
                 assert(state->s_base_pos == 0);
-                assert(state->base_vertex.size() == 0);
-                assert(state->base_color.size() == 0);
-                assert(state->base_cells.size() == 0);
-                assert(state->base_touched_color_list_pt.size() == 0);
-                assert(state->base_singleton_pt.size() == 0);
-
                 test_set.initialize(g->v_size);
 
                 int start_test_from = 0;
@@ -1004,8 +1049,6 @@ namespace dejavu {
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-
-                saved_color_base  = state->base_color;
             }
 
             void find_split_driven_base(sgraph *g, controller *state, int perturbe) {
@@ -1013,11 +1056,6 @@ namespace dejavu {
 
                 int prev_color = -1;
                 assert(state->s_base_pos == 0);
-                assert(state->base_vertex.size() == 0);
-                assert(state->base_color.size() == 0);
-                assert(state->base_cells.size() == 0);
-                assert(state->base_touched_color_list_pt.size() == 0);
-                assert(state->base_singleton_pt.size() == 0);
 
                 test_set.initialize(g->v_size);
 
@@ -1088,8 +1126,6 @@ namespace dejavu {
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-
-                saved_color_base  = state->base_color;
             }
 
             void find_first_base(sgraph *g, controller *state) {
@@ -1097,11 +1133,6 @@ namespace dejavu {
 
                 int prev_color = -1;
                 assert(state->s_base_pos == 0);
-                assert(state->base_vertex.size() == 0);
-                assert(state->base_color.size() == 0);
-                assert(state->base_cells.size() == 0);
-                assert(state->base_touched_color_list_pt.size() == 0);
-                assert(state->base_singleton_pt.size() == 0);
 
                 test_set.initialize(g->v_size);
 
@@ -1129,8 +1160,6 @@ namespace dejavu {
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-
-                saved_color_base  = state->base_color;
             }
 
             /**
@@ -1149,11 +1178,6 @@ namespace dejavu {
                 int prev_color_sz = 0;
 
                 assert(state->s_base_pos == 0);
-                assert(state->base_vertex.size() == 0);
-                assert(state->base_color.size() == 0);
-                assert(state->base_cells.size() == 0);
-                assert(state->base_touched_color_list_pt.size() == 0);
-                assert(state->base_singleton_pt.size() == 0);
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
@@ -1206,8 +1230,6 @@ namespace dejavu {
                     state->move_to_child(g, state->get_coloring()->lab[(best_color +
                                                                         (perturbe%state->get_coloring()->ptn[best_color]))]);
                 }
-
-                saved_color_base = state->base_color;
             }
 
             /**
@@ -1246,8 +1268,6 @@ namespace dejavu {
                     state->move_to_child(g, state->get_coloring()->lab[(best_color +
                                                                     (perturbe%state->get_coloring()->ptn[best_color]))]);
                 }
-
-                saved_color_base = state->base_color;
             }
 
             /**
@@ -1282,8 +1302,6 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-
-                saved_color_base = state->base_color;
             }
 
             void find_combinatorial_optimized_base(sgraph *g, controller *state) {
@@ -1326,8 +1344,6 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
-
-                saved_color_base = state->base_color;
             }
 
 
@@ -1384,7 +1400,6 @@ namespace dejavu {
                     state->move_to_child(g, state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))]);
                 }
 
-                saved_color_base = state->base_color;
             }
         };
 
@@ -1415,11 +1430,13 @@ namespace dejavu {
             void record_deviation(long deviation) {
                 deviation_map.insert(deviation);
                 ++computed_for_base;
+                assert(computed_for_base <= expected_for_base);
                 check_finished();
             }
 
             void record_no_deviation() {
                 ++computed_for_base;
+                assert(computed_for_base <= expected_for_base);
                 check_finished();
             }
 
@@ -1555,16 +1572,18 @@ namespace dejavu {
 
         class tree_node {
             std::mutex    lock;
-            limited_save* data;
+            limited_save* data = nullptr;
+            bool          owns_data = true;
             tree_node*    next;
             tree_node*    parent;
             bool          is_base = false;
             bool          is_pruned = false;
             long          hash = 0;
         public:
-            tree_node(limited_save* data, tree_node* next, tree_node* parent) {
+            tree_node(limited_save* data, tree_node* next, tree_node* parent, bool owns_data) {
                 this->data = data;
                 this->next = next;
+                this->owns_data = owns_data;
                 if(next == nullptr) {
                     next = this; // TODO supposed to be this->next?
                 }
@@ -1600,8 +1619,13 @@ namespace dejavu {
             void base() {
                 is_base = true;
             }
+
             [[nodiscard]] bool get_base() const {
                 return is_base;
+            }
+
+            ~tree_node() {
+                if(owns_data) delete data;
             }
         };
 
@@ -1647,7 +1671,14 @@ namespace dejavu {
                             //node->get_parent()->add_hash(node->get_hash() + 1);
                             const int v = node->get_save()->get_base()[0];
                             //node_invariant[v] += 1;//+node->get_hash();
-                            node_invariant[v] += hash(j);
+                            //node_invariant[v] += hash(j);
+                            //node_invariant[node->get_save()->get_base()[j-1]] = (hash(j) + node->get_hash());
+                            unsigned long add_hash = 1;
+                            add_hash = add_to_hash(add_hash, node->get_hash());
+                            add_hash = add_to_hash(add_hash, hash(j));
+
+                            node_invariant[node->get_save()->get_base()[j-1]] += add_hash;
+                            node_invariant[v] += add_hash + 1;
                         }
                     }
                     /*for(int i = 0; i < domain_size; ++i) {
@@ -1689,6 +1720,8 @@ namespace dejavu {
                     return false;
                 }
 
+                for(int i = 0; i < root->get_coloring()->domain_size; ++i) node_invariant[i] = 0;
+
                 const int old_size = (int) current_base.size();
                 const int new_size = (int) new_base.size();
 
@@ -1701,10 +1734,8 @@ namespace dejavu {
                 }
 
                 if(keep_until == 0) {
-                    if(garbage_collector.size() > 1024) {
-                        for(auto & i : garbage_collector) delete i;
-                        garbage_collector.clear();
-                    }
+                    for(auto t : garbage_collector) delete t;
+                    garbage_collector.clear();
                 }
 
 
@@ -1712,6 +1743,7 @@ namespace dejavu {
 
                 finished_up_to = std::min(keep_until, finished_up_to);
 
+                h_bfs_top_level_orbit.reset();
                 tree_data.resize(new_size + 1);
                 tree_level_size.resize(new_size + 1);
                 tree_data_jump_map.resize(new_size + 1);
@@ -1755,6 +1787,8 @@ namespace dejavu {
             void mark_first_level(mark_set& marks) {
                 if(tree_data[1] == nullptr) return;
 
+                marks.reset();
+
                 tree_node * first = tree_data[1];
                 tree_node * next = first;
                 do {
@@ -1772,10 +1806,11 @@ namespace dejavu {
             }
 
             void add_node(int level, limited_save* data, tree_node* parent, bool is_base = false) {
+                assert(data != nullptr);
                 // TODO use locks
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;
-                    tree_data[level] = new tree_node(data, nullptr, parent);
+                    tree_data[level] = new tree_node(data, nullptr, parent, level != 0);
                     tree_data[level]->set_next(tree_data[level]);
 
                     garbage_collector.push_back( tree_data[level]);
@@ -1783,8 +1818,8 @@ namespace dejavu {
                 } else {
                     tree_node* a_node    = tree_data[level];
                     tree_node* next_node = a_node->get_next();
-                    auto       new_node  = new tree_node(data, next_node, parent);
-                    garbage_collector.push_back( new_node);
+                    auto       new_node  = new tree_node(data, next_node, parent, level != 0);
+                    garbage_collector.push_back(new_node);
                     if(is_base) new_node->base();
                     a_node->set_next(new_node);
                     tree_data[level] = new_node;

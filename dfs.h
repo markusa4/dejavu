@@ -111,78 +111,15 @@ namespace dejavu {
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
                 ws_automorphism = automorphism;
             }
-            /**
-             * Recurses to an equal leaf (according to trace compared to within \p state), unless backtracking is
-             * necessary.
-             *
-             * @param g The graph.
-             * @param initial_colors The initial coloring of the graph \p g.
-             * @param state IR controller used for computations. On successful return, \p state will be in a leaf of the
-             * IR tree equal to the stored trace.
-             * @param automorphism If an equal leaf is found, \p automorphism might contain an automorphism mapping the
-             * found leaf to the stored leaf.
-             * @return
-             *
-             * @todo should just always certify the leaf...
-             */
-            std::pair<bool, bool> recurse_to_equal_leaf(sgraph *g, coloring *initial_colors, ir::controller *state) {
-                bool prev_fail = false;
-                int prev_fail_pos = -1;
-                int cert_pos = 0;
 
-                while ((size_t) state->s_base_pos < state->compare_base_color.size()) {
-                    const int col    = state->compare_base_color[state->s_base_pos]; // the base color
-                    const int col_sz = state->c->ptn[col] + 1;
-
-                    if (col_sz < 2) return {false, false}; // color of original base is trivial here, abort
-                    int ind_v = state->c->lab[col];
-                    if(state->c->vertex_to_col[state->base_vertex[state->s_base_pos]] == col)
-                        ind_v = state->base_vertex[state->s_base_pos];
-
-                    // individualize a vertex of base color
-                    state->move_to_child(g, ind_v);
-
-                    const int pos_start = state->base_singleton_pt[state->base_singleton_pt.size() - 1];
-                    const int pos_end   = (int) state->singletons.size();
-
-                    // write sparse automorphism with singletons derived so far
-                    ws_automorphism->write_singleton(&state->compare_singletons, &state->singletons,
-                                                 pos_start, pos_end);
-
-                    singleton_diff += write_singleton_diffs(&singleton_diffs, &state->compare_singletons,
-                                                            &state->singletons, pos_start,
-                                                            pos_end);
-
-                    if(singleton_diff == 0) {
-                        const bool found_auto = state->certify(g, *ws_automorphism);
-                        if(found_auto) return {true, true};
-                        else {
-                            //std::cout << "unnecessary check" << std::endl;
-                        }
-                    }
-                }
-                if (state->c->cells == g->v_size) {
-                    return {true, false}; // we reached a leaf that looks equivalent, but could not certify
-                                                // automorphism
-                } else {
-                    return {false, false}; // failed to reach equivalent leaf
-                }
-            }
-
-            int __attribute__((noinline))  paired_recurse_to_equal_leaf(sgraph *g, ir::controller *state_left, ir::controller *state_right) {
-                //const bool is_diffed_pre = state_left->update_diff_last_individualization(state_right);
+            int paired_recurse_to_equal_leaf(sgraph *g, ir::controller *state_left, ir::controller *state_right) {
                 const bool is_diffed_pre = state_right->update_diff_vertices_last_individualization(state_left);
                 if(!is_diffed_pre) {
-                    std::cout << "diffed pre" << std::endl;
                     return 2;
                 }
                 if(state_left->get_diff_diverge()) {
-                    std::cout << "diff diverge" << std::endl;
                     return 0;
                 }
-
-                //assert_equitable(g, state_right->c);
-                //assert_equitable(g, state_left->c);
 
                 int depth = 0;
                 while ((size_t) state_right->c->cells < g->v_size) {
@@ -190,11 +127,9 @@ namespace dejavu {
 
                     // pick vertices that differ in the color
                     int ind_v_right, ind_v_left;
-                    //std::tie(ind_v_left, ind_v_right) = state_right->color_diff_pair(state_left, col);
                     std::tie(ind_v_left, ind_v_right) = state_right->diff_pair(state_left);
 
                     const int col = state_left->c->vertex_to_col[ind_v_left];
-                    //const int col = state_left->get_diff_color();
                     ++depth;
 
                     assert(col >= 0);
@@ -231,7 +166,6 @@ namespace dejavu {
 
                     // can not perform diff udpates on this (AKA invariant should have differed, but is not
                     // guaranteed to differ always)
-                    //const bool is_diffed = state_left->update_diff_last_individualization(state_right);
                     const bool is_diffed = state_right->update_diff_vertices_last_individualization(state_left);
                     if(state_left->get_diff_diverge()) return 0;
 
@@ -249,28 +183,6 @@ namespace dejavu {
                 // unreachable
                 assert(false);
                 return false;
-            }
-
-            int write_singleton_diffs(mark_set* singleton_diffs, const std::vector<int> *singletons1, const std::vector<int> *singletons2,
-                                 const int pos_start, const int pos_end) {
-                int diff = 0;
-                for (int i = pos_start; i < pos_end; ++i) {
-                    if(!singleton_diffs->get((*singletons1)[i])) {
-                        singleton_diffs->set((*singletons1)[i]);
-                        ++diff;
-                    } else {
-                        singleton_diffs->unset((*singletons1)[i]);
-                        --diff;
-                    }
-                    if(!singleton_diffs->get((*singletons2)[i])) {
-                        singleton_diffs->set((*singletons2)[i]);
-                        ++diff;
-                    } else {
-                        singleton_diffs->unset((*singletons2)[i]);
-                        --diff;
-                    }
-                }
-                return diff;
             }
 
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, coloring *initial_colors, ir::controller &state_left,
@@ -303,17 +215,20 @@ namespace dejavu {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0)
-                        std::cout << "                  " << ">partial-cost " << recent_cost_snapshot << "/" << h_recent_cost_snapshot_limit << std::endl;
+                        progress_current_method("dfs base_pos=" +std::to_string(state_right.s_base_pos)+", cost_snapshot="+std::to_string(recent_cost_snapshot));
+                        //std::cout << "                  " << ">partial-cost " << recent_cost_snapshot << "/" << h_recent_cost_snapshot_limit << std::endl;
 
                     // remember which color we are individualizing
-                    const int col         = state_right.base_color[state_right.s_base_pos];
+                    const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;
                     const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
 
-                    int prune_cost_snapshot = 0;
+                    assert(col_sz >= 2);
+                    assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
+
+                    int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
 
                     // iterate over current color class
-                    //for (int i = col_sz - 1; i >= 0; --i) {
                     for (int i = 0; i < col_sz; ++i) {
                         const int ind_v = state_right.leaf_color.lab[col + i];
                         assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
@@ -351,7 +266,7 @@ namespace dejavu {
 
                         if(!pruned) {
                             // write singleton diff into automorphism...
-                            const int wr_pos_st  = state_right.base_singleton_pt[state_right.base_singleton_pt.size() - 1];
+                            const int wr_pos_st  = state_right.base[state_right.base.size() - 1].singleton_pt;
                             const int wr_pos_end = (int) state_right.singletons.size();
 
                             ws_automorphism->reset();

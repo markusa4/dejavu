@@ -1255,8 +1255,8 @@ namespace dejavu {
                     report_splits->push_back(std::pair<std::pair<int, int>, bool>(
                             std::pair<int, int>(deg0_col, deg1_col), leq));*/
 
-                    report_split_color_class(c, deg0_col, deg1_col, deg1_col_sz, leq);
                     report_split_color_class(c, deg0_col, deg0_col, deg0_col_sz, !leq);
+                    report_split_color_class(c, deg0_col, deg1_col, deg1_col_sz, leq);
 
                     // reset neighbours count to -1
                     neighbours.set(deg0_col, -1);
