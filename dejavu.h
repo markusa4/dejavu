@@ -60,6 +60,8 @@ namespace dejavu {
         // std::function<selector_hook>* h_user_invariant = nullptr; /**< user-provided invariant to be applied during
         //                                                             inprocessing */
 
+        bool h_silent = false; /**< don't print solver progress */
+
         // statistics
         bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
         big_number s_grp_sz; /**< size of the automorphism group computed in last run */

@@ -52,7 +52,7 @@ namespace dejavu {
             int trace_position = 0;       /**< position of trace of this IR node */
             int base_position  = 0;       /**< length of base of this IR node    */
         public:
-            void save(std::vector<int> &s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
+            void save(std::vector<int>& s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
                       int s_base_position) {
                 this->base_vertex = s_base_vertex;
                 this->c.copy_any(&s_c);
@@ -97,6 +97,9 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief Tracks information for a base point
+         */
         struct base_info {
             int color;
             int color_sz;
@@ -104,8 +107,9 @@ namespace dejavu {
             int touched_color_list_pt;
             int singleton_pt;
 
-            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt) : color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
-                    singleton_pt(singletonPt) {}
+            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt) :
+                      color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
+                      singleton_pt(singletonPt) {}
         };
 
         /**
@@ -119,65 +123,68 @@ namespace dejavu {
          */
         struct controller {
         public:
-            coloring      *c  = nullptr;
-            trace         *T  = nullptr;
+            coloring      *c  = nullptr; /**< coloring to be moved around in the tree */
+            trace         *T  = nullptr; /**< trace of current root-to-node path */
 
-            // TODO: should these be public? or rather accesible through const references or something?
+            std::vector<int>       singletons;         /** singletons of the current trace */
+            std::vector<int>       compare_singletons; /** singletons of the comparison trace */
 
-            std::vector<int>       singletons;
-            std::vector<int>       compare_singletons;
+            std::vector<int>       base_vertex; /** current base (i.e., root-to-node path) */
+            std::vector<base_info> base;        /** additional info for the current base   */
 
-            std::vector<int>       base_vertex; // TODO one vector with base_info
-            std::vector<base_info> base;
+            std::vector<int>       compare_base_vertex; /** comparison base */
+            std::vector<base_info> compare_base;        /** additional info of the comparison base */
 
-            std::vector<int>       compare_base_vertex;
-            std::vector<base_info> compare_base;
-
-            coloring leaf_color;
+            coloring leaf_color; /** comparison leaf coloring */
 
             // statistics
-            int   s_base_pos = 0;                          /**< how large the base of the current IR node is*/
-            bool  s_last_refinement_singleton_only = true; /**< whether in the last refinement, only singleton cells
-                                                            * appeared*/
-            int   s_hint_color                     = -1;   /**< a color that was not singleton in last refinement*/
-            bool  s_hint_color_is_singleton_now    = true; /**< whether the \a s_hint_color is singleton now */
+            int   s_base_pos = 0; /**< how large the base of the current IR node is*/
 
             // settings
             int   h_deviation_inc = 48; /**< how many additional splits to wait before terminating whenever
                                          * use_increase_deviation is used  */
         private:
-            refinement* R;
-            trace *cT = nullptr;
-            trace internal_T1;
-            trace internal_T2;
+            refinement* R; /**< refinement workspace to use */
+            trace *cT = nullptr; /**< comparison trace */
+            trace internal_T1; /**< trace 1 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
+            trace internal_T2; /**< trace 2 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
 
-            mark_set  touched_color;
-            work_list touched_color_list;
-            work_list prev_color_list;
+            mark_set  touched_color; /**< were changes in this color already tracked? */
+            work_list touched_color_list; /**< color touched_color_list[i] was changed... */
+            work_list prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
 
-            mark_set  diff_tester;
-            mark_set  diff_vertices;
-            mark_set  diff_is_singleton;
-            work_list diff_vertices_list;
-            work_list diff_vertices_list_pt;
+            // the following workspaces are only used for the paired color dfs (AKA the saucy-style dfs) -- not needed
+            // for normal bfs, dfs, or random search operation
+            mark_set  diff_tester; /**< used for algorithms for 'difference testing' */
+            mark_set  diff_vertices; /**< vertices that differ */
+            mark_set  diff_is_singleton; /**< vertices are singleton */
+            work_list diff_vertices_list; /**< vertices that differ, but in a list */
+            work_list diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
+                                               *  above */
+            bool diff_diverge = false; /**< paths of difference are diverging, can not properly track it anymore, and
+                                         *there is also no point in tracking it anymore since they are not isomorphic */
+            int singleton_pt_start = 0; /**< a pointer were we need to start reading singletons */
 
-            bool diff_diverge = false;
-            int singleton_pt_start = 0;
-
-            std::function<type_split_color_hook>     my_split_hook;
-            std::function<type_worklist_color_hook>  my_worklist_hook;
+            // hooks for color refinement -- this controller hooks into the color refinement algorithm to gather
+            // necessary information
+            std::function<type_split_color_hook>     my_split_hook; /**< split hook for color refinement */
+            std::function<type_worklist_color_hook>  my_worklist_hook; /**< worklist hook for color refinement */
 
             // settings
-            ir_mode mode = IR_MODE_RECORD_TRACE;
+            ir_mode mode = IR_MODE_RECORD_TRACE; /**< which mode are we operating in currently? */
 
             // internal flags for heuristics
-            bool s_cell_active     = false;
-            bool s_individualize   = false;
+            bool s_cell_active     = false; /**< is a cell supposed to be active right now? */
+            bool s_individualize   = false; /**< are we individualizing right now? */
 
-            bool h_trace_early_out = false;       /*< use trace early out                */
-            bool h_deviation_inc_active  = false; /*< use increased trace deviation      */
-            int  s_deviation_inc_current = 0;     /*< number of current trace deviations */
+            bool h_trace_early_out = false;       /**< use trace early out                */
+            bool h_deviation_inc_active  = false; /**< use increased trace deviation      */
+            int  s_deviation_inc_current = 0;     /**< number of current trace deviations */
 
+            /**
+             * Marks all colors of the current coloring as "touched". Used on the initial coloring, since we never want
+             * to "revert" these colors.
+             */
             void touch_initial_colors() {
                 int i = 0;
                 while (i < c->domain_size) {
@@ -186,6 +193,9 @@ namespace dejavu {
                 }
             }
 
+            /**
+             * Resets all information of touched colors (and touches the initial colors again).
+             */
             void reset_touched() {
                 touched_color.reset();
                 touched_color_list.reset();
@@ -193,23 +203,21 @@ namespace dejavu {
                 touch_initial_colors();
             }
 
+            /**
+             * Makes the current trace the comparison trace (and vice versa).
+             */
             void flip_trace() {
                 trace* t_flip = T;
                 T  = cT;
                 cT = t_flip;
             }
 
+            /**
+             * The split hook function used for color refinement. Tracks the trace invariant, touched colors and
+             * singletons. Provides early out functionality using the trace and/or number of cells.
+             */
             bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
-                    // update some heuristic values
-                    if (new_color_sz > 1) {
-                        s_last_refinement_singleton_only = false;
-                        s_hint_color = new_color;
-                        s_hint_color_is_singleton_now = false;
-                    } else if (new_color == s_hint_color && new_color_sz == 1) {
-                        s_hint_color_is_singleton_now = true;
-                    }
-
                     // write singletons to singleton list
                     if (new_color_sz == 1) singletons.push_back(c->lab[new_color]);
 
@@ -239,6 +247,10 @@ namespace dejavu {
                                 std::forward<decltype(PH3)>(PH3)); };
             }
 
+
+            /**
+             * The worklist hook function used for color refinement. Handles blueprints.
+             */
             bool worklist_hook(const int color, const int color_sz) {
                 if (s_cell_active) {
                     T->op_refine_cell_end();
@@ -297,6 +309,7 @@ namespace dejavu {
                 diff_is_singleton.initialize(c->domain_size);
 
                 singleton_pt_start = 0;
+                singletons.reserve(c->domain_size);
             }
 
             work_list* get_touched_colors() {
@@ -732,7 +745,6 @@ namespace dejavu {
                 const int init_color_class = refinement::individualize_vertex(c, v, my_split_hook);
                 T->op_individualize(prev_col, c->vertex_to_col[v]);
                 s_individualize = false;
-                s_last_refinement_singleton_only = true;
 
                 // refine coloring
                 T->op_refine_start();
@@ -797,11 +809,6 @@ namespace dejavu {
                     const int new_color_sz = c->ptn[new_color] + 1;
                     c->ptn[old_color] += new_color_sz;
                     c->ptn[new_color] = 1;
-
-                    if (c->ptn[old_color] > 0) {
-                        s_hint_color = old_color;
-                        s_hint_color_is_singleton_now = false;
-                    }
 
                     for (int j = 0; j < new_color_sz; ++j) {
                         const int v = c->lab[new_color + j];
