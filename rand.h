@@ -234,8 +234,8 @@ namespace dejavu::search_strategy {
                 int could_start_from = group.finished_up_to_level();
 
                 if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0)
-                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", f1=" +
-                                            std::to_string(s_paths_fail1) + ", compress=", group.s_compression_ratio);
+                    progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
+                                             group.s_compression_ratio);
 
                 // can start from below the root if we finished Schreier table at the current root
                 if(local_state.s_base_pos <= could_start_from) {
@@ -249,7 +249,8 @@ namespace dejavu::search_strategy {
                     const int s_cells_now = start_from->get_coloring()->cells;
 
                     if(s_cells_now - s_cell_initial > 10000) {
-                        progress_current_method("random root_cells=" + std::to_string(1.0 * s_cells_now / g->v_size) + ", base_pos=" + std::to_string(could_start_from));
+                        progress_current_method("random", "root_cells", 1.0 * s_cells_now / g->v_size, "base_pos",
+                                                could_start_from);
                         //std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
 
                         // TODO we should at least recompress the Schreier structure here
@@ -377,8 +378,8 @@ namespace dejavu::search_strategy {
                     s_paths_failany < fail_limit) {
 
                 if((s_paths & 0x000000FF) == 0)
-                    progress_current_method("random leaves=" + std::to_string(ir_tree.stat_leaves()) + ", f1=" +
-                                            std::to_string(s_paths_fail1) + ", compress=", group.s_compression_ratio);
+                    progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
+                                            group.s_compression_ratio);
 
                 auto node = ir_tree.pick_node_from_level(pick_from_level, (int) generator());
                 local_state.load_reduced_state(*node->get_save());

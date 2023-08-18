@@ -1720,6 +1720,14 @@ namespace dejavu {
                             add_hash = add_to_hash(add_hash, node->get_hash());
                             add_hash = add_to_hash(add_hash, hash(j));
 
+                            if(j == finished_up_to) {
+                                int cnt = 0;
+                                for (auto v_pre: node->get_save()->get_base()) {
+                                    node_invariant[v_pre] += add_hash * hash(cnt);
+                                    ++cnt;
+                                }
+                            }
+
                             node_invariant[node->get_save()->get_base()[j-1]] += add_hash;
                             node_invariant[v] += add_hash + 1;
                         }

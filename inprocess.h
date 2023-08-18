@@ -116,12 +116,12 @@ namespace dejavu::search_strategy {
                 }*/
                 g->initialize_coloring(local_state.c, hash.get_array());
                 const int cell_after = local_state.c->cells;
-                progress_print("inpr_bfs", std::to_string(cell_prev),
-                               std::to_string(cell_after));
+                /*progress_print("inpr_bfs", std::to_string(cell_prev),
+                               std::to_string(cell_after));*/
                 if (cell_after != cell_prev) {
                     local_state.refine(g);
-                    progress_print("inpr_ref", std::to_string(cell_after),
-                                   std::to_string(local_state.c->cells));
+                    /*progress_print("inpr_ref", std::to_string(cell_after),
+                                   std::to_string(local_state.c->cells));*/
                 } else {
                     //assert(!something_was_pruned);
                 }
@@ -225,8 +225,8 @@ namespace dejavu::search_strategy {
                     }
                 }
                 if(num_inds > 0) {
-                    progress_print("inpr_ind", "_",
-                                   std::to_string(local_state.c->cells));
+                    /*progress_print("inpr_ind", "_",
+                                   std::to_string(local_state.c->cells));*/
                     inproc_can_individualize.clear();
                 }
             }

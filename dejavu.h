@@ -84,6 +84,9 @@ namespace dejavu {
             enum termination_strategy {t_prep, t_inproc, t_dfs, t_bfs, t_det_schreier, t_rand_schreier};
             termination_strategy s_term = t_prep;
 
+            // want to print progress with a timer, initialize module
+            timed_print m_printer;
+
             // no colmap provided? let's substitute the trivial coloring
             if(colmap == nullptr) {
                 colmap_substitute.resize(g->v_size);
@@ -95,7 +98,7 @@ namespace dejavu {
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
 
             // preprocess the graph using sassy
-            PRINT("preprocessing");
+            m_printer.print("preprocessing");
             m_prep.reduce(g, colmap, hook); /*< reduces the graph */
             s_grp_sz.multiply(m_prep.grp_sz); /*< group size needed if the
                                                *  early out below is used */
@@ -142,11 +145,13 @@ namespace dejavu {
                 int h_budget_inc_fact = 5;  /*< factor used when increasing the budget */
 
                 // statistics used to steer heuristics
-                int s_restarts = -1;       /*< number of restarts performed */
-                int s_inproc_success = 0;  /*< how many times inprocessing succeeded  */
-                int s_cost = 0;            /*< cost induced so far by current restart iteration */
-                bool s_long_base  = false; /*< flag for bases that are considered very long  */
-                bool s_short_base = false; /*< flag for bases that are considered very short */
+                int  s_restarts = -1;       /*< number of restarts performed */
+                int  s_inproc_success = 0;  /*< how many times inprocessing succeeded  */
+                int  s_cost = 0;            /*< cost induced so far by current restart iteration */
+                bool s_long_base  = false;  /*< flag for bases that are considered very long  */
+                bool s_short_base = false;  /*< flag for bases that are considered very short */
+                double s_random_score_bias = 1.0; /*< a bias for random search, whether we've gathered that the
+                                                   *  technique does not seem to work on this graph */
                 bool s_few_cells  = false;
                 [[maybe_unused]] bool s_many_cells = false;
                 bool s_inprocessed = false; /*< flag which says that we've inprocessed the graph since last restart */
@@ -228,7 +233,7 @@ namespace dejavu {
                     // find a selector, moves local_state to a leaf of the IR tree
                     m_selectors.find_base(g, &local_state, s_restarts);
                     auto selector = m_selectors.get_selector_hook();
-                    progress_print("sel", local_state.s_base_pos, local_state.T->get_position());
+                    m_printer.timer_print("sel", local_state.s_base_pos, local_state.T->get_position());
                     int base_size = local_state.s_base_pos;
 
                     // determine whether base_vertex is "large", or "short"
@@ -246,12 +251,12 @@ namespace dejavu {
                     big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
                     const bool s_too_big  = (s_short_base && s_same_length &&
                                             (s_last_tree_sz < s_tree_estimate));
-                    const bool s_too_big2  = false && ((s_restarts > 2) && s_last_tree_sz < s_tree_estimate);
+                    //const bool s_too_big2  = false && ((s_restarts > 2) && s_last_tree_sz < s_tree_estimate);
 
                     // immediately discard this base_vertex if deemed too large or unfavourable, unless we are discarding too
                     // often
-                    if ((s_too_big || s_too_big2 || s_too_long) && s_inproc_success < 1 && s_consecutive_discard < 3) {
-                        progress_print("skip", local_state.s_base_pos, s_last_base_size);
+                    if ((s_too_big || s_too_long) && s_inproc_success < 1 && s_consecutive_discard < 3) {
+                        m_printer.timer_print("skip", local_state.s_base_pos, s_last_base_size);
                         ++s_consecutive_discard;
                         continue;
                     }
@@ -274,7 +279,7 @@ namespace dejavu {
                     m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
                     dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
                                                                               m_inprocess.inproc_maybe_individualize);
-                    progress_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
+                    m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
                     if (dfs_level == 0) {
@@ -370,7 +375,7 @@ namespace dejavu {
                             double s_rand_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now;
 
                             // we do so by negatively scoring each method: higher score, worse technique
-                            double score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success);
+                            double score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success) * s_random_score_bias;
                             double score_bfs  = s_bfs_estimate * (0.1 + 1 - s_path_fail1_avg);
 
                             // we make some adjustments to try to model effect of techniques better
@@ -419,9 +424,9 @@ namespace dejavu {
 
                         // some printing...
                         if(h_last_routine == random_ir && h_next_routine != random_ir) {
-                            progress_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
+                            m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
                             if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
+                                m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
                                                            std::to_string(sh_schreier->s_densegen()), "_");
                             }
                         }
@@ -451,9 +456,9 @@ namespace dejavu {
 
                                 // TODO this code is duplicated, let's think about this again...
                                 if(finished_symmetries) {
-                                    progress_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
+                                    m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
                                     if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                        progress_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
+                                        m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
                                                                    std::to_string(sh_schreier->s_densegen()), "_");
                                     }
                                 }
@@ -463,7 +468,7 @@ namespace dejavu {
                                 m_bfs.h_use_deviation_pruning = !((s_inproc_success >= 2) && s_path_fail1_avg > 0.1);
                                 //m_bfs.h_use_deviation_pruning = false;
                                 m_bfs.do_a_level(g, hook, *sh_tree, sh_schreier, local_state, selector);
-                                progress_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
+                                m_printer.timer_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
                                                std::to_string(s_bfs_next_level_nodes) + ")",
                                                std::to_string(sh_tree->get_level_size(sh_tree->get_finished_up_to())));
 
@@ -510,6 +515,8 @@ namespace dejavu {
                     // we are restarting -- so we try to inprocess using the gathered data
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget);
                     s_inproc_success += s_inprocessed;
+
+                    if(s_inprocessed) m_printer.timer_print("inprocess", local_state.c->cells, s_inproc_success);
 
                     // edge case where inprocessing might finish the graph
                     if (root_save.get_coloring()->cells == g->v_size) {

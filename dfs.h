@@ -215,9 +215,8 @@ namespace dejavu {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0)
-                        progress_current_method("dfs base_pos=" +
-                                                 std::to_string(state_right.compare_base.size() -state_right.s_base_pos)
-                                                 + ", cost_snapshot=", recent_cost_snapshot);
+                        progress_current_method("dfs", "base_pos", static_cast<double>(state_right.compare_base.size())
+                                                -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
                     // remember which color we are individualizing
                     const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;

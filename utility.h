@@ -154,15 +154,27 @@ namespace dejavu {
         return out << number.mantissa << "*10^" << number.exponent;
     }
 
-    static std::chrono::high_resolution_clock::time_point first;
-    static std::chrono::high_resolution_clock::time_point previous;
-    static bool set_first = false;
-
     static void progress_current_method(const std::string print) {
         PRINT_NO_NEWLINE("\r>" << print);
     }
-    static void progress_current_method(const std::string print, double info) {
-        PRINT_NO_NEWLINE("\r>" << print << info);
+    static void progress_current_method(const std::string method_name, std::string var1, double var1_val) {
+        PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val);
+    }
+    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
+                                                                       std::string var2, double var2_val) {
+        PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val);
+    }
+    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
+                                                                       std::string var2, double var2_val,
+                                                                       std::string var3, double var3_val) {
+        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
+                                              << ", " << var3 << "=" << var3_val);
+    }
+    static void progress_current_method(const std::string method_name, std::string var1, int var1_val,
+                                        std::string var2, int var2_val,
+                                        std::string var3, double var3_val) {
+        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
+                               << ", " << var3 << "=" << var3_val);
     }
 
     static void progress_print_split() {
@@ -178,37 +190,60 @@ namespace dejavu {
               << "_" << std::setw(16) << "_" );
     }
 
-    static void progress_print(const std::string
-                               proc, const std::string p1, const std::string p2) {
-        if(!set_first) {
+
+    class timed_print {
+        std::chrono::high_resolution_clock::time_point first;
+        std::chrono::high_resolution_clock::time_point previous;
+    public:
+        timed_print() {
             first     = std::chrono::high_resolution_clock::now();
             previous  = first;
-            set_first = true;
-        }
-        auto now = std::chrono::high_resolution_clock::now();
-        PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
-                   << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
-                   << std::setw(11)
-                   << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
-                   << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
-        previous = now;
-    }
-
-    static void progress_print(const std::string
-                               proc, const double p1, const double p2) {
-        if(!set_first) {
-            first     = std::chrono::high_resolution_clock::now();
-            previous  = first;
-            set_first = true;
         }
 
-        auto now = std::chrono::high_resolution_clock::now();
-        PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
-        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0 << std::setw(11)
-        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
-        << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
-        previous = now;
-    }
+        void print(const std::string str) {
+            PRINT("\r" << str);
+        }
+
+        void timer_print(const std::string proc) {
+            auto now = std::chrono::high_resolution_clock::now();
+            PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
+                       << std::setw(11)
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
+                       << std::setw(12) << proc);
+            previous = now;
+        }
+
+        void timer_print(const std::string proc, const std::string p1, const std::string p2) {
+            auto now = std::chrono::high_resolution_clock::now();
+            PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
+                       << std::setw(11)
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
+                       << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+            previous = now;
+        }
+
+        void timer_print(const std::string proc, const int p1, const int p2) {
+            auto now = std::chrono::high_resolution_clock::now();
+            PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
+                       << std::setw(11)
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
+                       << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+            previous = now;
+        }
+
+        void timer_print(const std::string proc, const int p1, const double p2) {
+            auto now = std::chrono::high_resolution_clock::now();
+            PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
+                       << std::setw(11)
+                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
+                       << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
+            previous = now;
+        }
+    };
 }
 
 #endif //DEJAVU_UTILITY_H
