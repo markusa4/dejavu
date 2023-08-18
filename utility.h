@@ -178,7 +178,7 @@ namespace dejavu {
     }
 
     static void progress_print_split() {
-        PRINT("______________________________________________________________");
+        PRINT("\r______________________________________________________________");
     }
 
     static void progress_print_header() {
@@ -186,8 +186,6 @@ namespace dejavu {
         PRINT(std::setw(11) << std::left <<"T (ms)" << std::setw(11) << "δ (ms)" << std::setw(14) << "proc"
               << std::setw(16) << "p1"        << std::setw(16)        << "p2");
         progress_print_split();
-        PRINT(std::setw(11) << std::left << 0 << std::setw(11) << 0 << std::setw(12) << "start" << std::setw(16)
-              << "_" << std::setw(16) << "_" );
     }
 
 
@@ -195,16 +193,26 @@ namespace dejavu {
         std::chrono::high_resolution_clock::time_point first;
         std::chrono::high_resolution_clock::time_point previous;
     public:
+
+        bool h_silent = false;
+
         timed_print() {
             first     = std::chrono::high_resolution_clock::now();
             previous  = first;
         }
 
+        void print_header() {
+            if(h_silent) return;
+            progress_print_header();
+        }
+
         void print(const std::string str) {
+            if(h_silent) return;
             PRINT("\r" << str);
         }
 
         void timer_print(const std::string proc) {
+            if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
                        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
@@ -215,6 +223,7 @@ namespace dejavu {
         }
 
         void timer_print(const std::string proc, const std::string p1, const std::string p2) {
+            if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
                        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
@@ -224,7 +233,12 @@ namespace dejavu {
             previous = now;
         }
 
+        void timer_split() {
+            previous = std::chrono::high_resolution_clock::now();
+        }
+
         void timer_print(const std::string proc, const int p1, const int p2) {
+            if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
                        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
@@ -235,6 +249,7 @@ namespace dejavu {
         }
 
         void timer_print(const std::string proc, const int p1, const double p2) {
+            if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
                        << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0

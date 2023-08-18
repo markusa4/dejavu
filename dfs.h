@@ -152,8 +152,8 @@ namespace dejavu {
 
                     state_right.use_trace_early_out(false);
                     state_left.use_trace_early_out(false);
-                    state_right.T->set_hash(0);
-                    state_left.T->set_hash(0);
+                    //state_right.T->set_hash(0);
+                    //state_left.T->set_hash(0);
                     state_right.T->reset_trace_unequal();
                     state_left.T->reset_trace_unequal();
 
@@ -211,7 +211,7 @@ namespace dejavu {
                 int    trace_pos_reset = 0;
 
                 // loop that serves to optimize Tinhofer graphs
-                while (recent_cost_snapshot < h_recent_cost_snapshot_limit && state_right.s_base_pos > 0 && !fail) {
+                while ((recent_cost_snapshot < h_recent_cost_snapshot_limit) && state_right.s_base_pos > 0 && !fail) {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0)
@@ -255,7 +255,7 @@ namespace dejavu {
                         const int prev_base_pos = state_right.s_base_pos;
                         trace_pos_reset = state_right.T->get_position(); // TODO is there an elegant solution to this?
                         state_right.T->reset_trace_equal();
-                        state_right.T->set_hash(0);
+                        //state_right.T->set_hash(0);
                         state_right.use_trace_early_out(true);
                         state_right.move_to_child(g, ind_v);
                         bool pruned     = !state_right.T->trace_equal(); // TODO keep track of cost here as well!
@@ -282,7 +282,7 @@ namespace dejavu {
 
                                 //TODO make a mode for this in the IR controller module
                                 state_left.T->reset_trace_equal();
-                                state_left.T->set_hash(0);
+                                //state_left.T->set_hash(0);
                                 state_left.T->set_position(trace_pos_reset);
                                 state_left.use_trace_early_out(true);
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex

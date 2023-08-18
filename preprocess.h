@@ -3297,7 +3297,6 @@ namespace sassy {
             //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_setup" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             const int test_d = g->d[0];
-            std::cout << test_d << std::endl;
             int k;
             for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k) {};
 
@@ -3387,6 +3386,7 @@ namespace sassy {
             bool has_deg_2 = false;
             bool has_discrete = false;
             bool graph_changed = false;
+            int count_deg2 = 0;
 
             for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
@@ -3398,7 +3398,8 @@ namespace sassy {
                         has_deg_1 = true;
                         break;
                     case 2:
-                        has_deg_2 = true;
+                        ++count_deg2;
+                        //has_deg_2 = true;
                         break;
                     default:
                         break;
@@ -3411,6 +3412,7 @@ namespace sassy {
             PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             //if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
+            has_deg_2 = (count_deg2 > 16); /*< if there's only very few, there's really no point... */
 
             if (schedule != nullptr) {
                 del_e = dejavu::mark_set();

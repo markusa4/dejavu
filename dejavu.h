@@ -97,6 +97,7 @@ namespace dejavu {
             // first, we try to preprocess
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
 
+
             // preprocess the graph using sassy
             m_printer.print("preprocessing");
             m_prep.reduce(g, colmap, hook); /*< reduces the graph */
@@ -124,7 +125,6 @@ namespace dejavu {
 
             // run the solver for each of the components separately (tends to be just one component, though)
             for(int i = 0; i < s_num_components; ++i) {
-
                 // if we have multiple components, we need to lift the symmetry back to the original graph
                 // we do so using the lifting routine of the preprocessor
                 if(s_num_components > 1) {
@@ -134,8 +134,11 @@ namespace dejavu {
                 }
 
                 // print that we are solving now...
-                PRINT("\nsolving_component " << i << "/" << s_num_components-1 << " (n=" << g->v_size << ")");
-                progress_print_header();
+                m_printer.h_silent = h_silent || (g->v_size <= 128 && i != 0);
+                if(!m_printer.h_silent)
+                    PRINT("\r\nsolving_component " << i << "/" << s_num_components-1 << " (n=" << g->v_size << ")");
+                m_printer.print_header();
+                m_printer.timer_split();
 
                 // flag to denote which color refinement version is used
                 g->dense = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
@@ -403,8 +406,8 @@ namespace dejavu {
                         if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                             s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
                             h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
-                        // silly case in which the base_vertex is so large, that an unnecessary restart has fairly high cost
-                        // attached -- so if BFS can be successful, let's do that first...
+                        // silly case in which the base is so long, that an unnecessary restart has fairly high
+                        // cost attached -- so if BFS can be successful, let's do that first...
                         if (h_next_routine == restart && 2*base_size > s_bfs_next_level_nodes
                             && s_trace_cost1_avg < base_size && s_path_fail1_avg > 0.01) h_next_routine = bfs_ir;
 
@@ -458,8 +461,9 @@ namespace dejavu {
                                 if(finished_symmetries) {
                                     m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
                                     if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                        m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
-                                                                   std::to_string(sh_schreier->s_densegen()), "_");
+                                        m_printer.timer_print("schreier",
+                                                              "s"  + std::to_string(sh_schreier->s_sparsegen()) +
+                                                              "/d" + std::to_string(sh_schreier->s_densegen()), "_");
                                     }
                                 }
                             }
@@ -468,8 +472,9 @@ namespace dejavu {
                                 m_bfs.h_use_deviation_pruning = !((s_inproc_success >= 2) && s_path_fail1_avg > 0.1);
                                 //m_bfs.h_use_deviation_pruning = false;
                                 m_bfs.do_a_level(g, hook, *sh_tree, sh_schreier, local_state, selector);
-                                m_printer.timer_print("bfs", "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
-                                               std::to_string(s_bfs_next_level_nodes) + ")",
+                                m_printer.timer_print("bfs",
+                                                      "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
+                                                      std::to_string(s_bfs_next_level_nodes) + ")",
                                                std::to_string(sh_tree->get_level_size(sh_tree->get_finished_up_to())));
 
                                 // A bit of a mess here! Manage correct group size whenever BFS finishes the graph. Bit
@@ -526,9 +531,8 @@ namespace dejavu {
                     }
                 }
 
-                s_deterministic_termination = s_term != t_rand_schreier;
+                s_deterministic_termination = (s_term != t_rand_schreier) && s_deterministic_termination;
                 big_number sh_grp_sz = sh_schreier->get_group_size();
-                //std::cout << s_grp_sz << ";" << m_inprocess.s_grp_sz << ";" << m_dfs.s_grp_sz << ";" << sh_grp_sz << std::endl;
 
                 // We are done! Let's add up the total group size from all the different modules.
                 s_grp_sz.multiply(m_inprocess.s_grp_sz);
@@ -540,6 +544,8 @@ namespace dejavu {
                 delete sh_schreier; /*< clean up allocated schreier structure */
                 delete sh_tree;     /*< ... and also the shared IR tree       */
             }
+            m_printer.h_silent = h_silent;
+            m_printer.timer_print("done", s_deterministic_termination, s_term);
         }
     };
 }

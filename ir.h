@@ -107,9 +107,13 @@ namespace dejavu {
             int touched_color_list_pt;
             int singleton_pt;
 
-            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt) :
+            int           trace_pos;
+            long trace_hash;
+
+            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt, int tracePos,
+                      long traceHash) :
                       color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
-                      singleton_pt(singletonPt) {}
+                      singleton_pt(singletonPt), trace_pos(tracePos), trace_hash(traceHash) {}
         };
 
         /**
@@ -598,8 +602,43 @@ namespace dejavu {
                 touched_color_list.copy(&state->touched_color_list);
                 singletons         = state->singletons;
                 compare_singletons = state->singletons;
+                
+                s_base_pos = state->s_base_pos;
 
-                diff_tester.copy(&state->diff_tester);
+                this->R = state->R;
+            }
+
+            /**
+             * Copy the state of another controller. Does not copy the trace, but instead links the trace of this
+             * controller to the comparison state of the other (such that both states compare to the same single
+             * trace).
+             *
+             * @param state the other state which is copied
+             */
+            void copy_link(controller* state) {
+                this->c->copy_any(state->c);
+
+                T->set_compare(true);
+                T->set_record(false);
+                T->set_compare_trace(state->T);
+                T->set_position(state->T->get_position());
+                T->set_hash(state->T->get_hash());
+
+                base_vertex = state->base_vertex;
+                base        = state->base;
+
+                compare_base_vertex = state->compare_base_vertex;
+                compare_base        = state->compare_base;
+
+                leaf_color.copy_any(&state->leaf_color);
+                mode = state->mode;
+
+                touched_color.copy(&state->touched_color);
+                prev_color_list.copy(&state->prev_color_list);
+                touched_color_list.copy(&state->touched_color_list);
+                singletons         = state->singletons;
+                compare_singletons = state->singletons;
+
                 s_base_pos = state->s_base_pos;
 
                 this->R = state->R;
@@ -777,6 +816,8 @@ namespace dejavu {
                 // some info maybe needed later
                 const int singleton_pt     = (int) singletons.size();
                 const int touched_color_pt = touched_color_list.cur_pos;
+                const int trace_pos        = T->get_position();
+                const long trace_hash      = T->get_hash();
 
                 // determine color
                 const int prev_col    = c->vertex_to_col[v];
@@ -806,7 +847,8 @@ namespace dejavu {
                 s_cell_active = false;
 
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE)
-                    base.emplace_back(prev_col, prev_col_sz, c->cells, touched_color_pt, singleton_pt);
+                    base.emplace_back(prev_col, prev_col_sz, c->cells, touched_color_pt, singleton_pt, trace_pos,
+                                      trace_hash);
             }
 
             /**
@@ -839,6 +881,8 @@ namespace dejavu {
 
                 // unwind invariant
                 if (T) T->rewind_to_individualization();
+                assert(T->get_position() == base.back().trace_pos);
+                T->set_hash(base.back().trace_hash);
 
                 // unwind colors introduced on this level of the tree
                 --s_base_pos;
@@ -1012,6 +1056,7 @@ namespace dejavu {
                     case 3:
                         find_combinatorial_optimized_base(g, state);
                         break;
+                        //TODO: "probed selector" -- pick cell that has largest ratio of trace deviations
                 }
 
                 ir_tree_size_estimate.mantissa = 1.0;
