@@ -70,6 +70,7 @@ namespace dejavu {
 
             void write_skip_compare(int d) {
                 d = std::min(INT32_MAX-10,d);
+                assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 if (record) data.push_back(d);
                 ++position;
             }
@@ -299,6 +300,7 @@ namespace dejavu {
                 assert_cell_act   = false;
                 assert_refine_act = false;
                 this->position = new_position;
+                if(record) data.resize(position);
             }
 
             [[nodiscard]] int get_position() const {

@@ -31,8 +31,6 @@ namespace dejavu {
          * Due to the search not back-tracking, this module can not deal with difficult parts of combinatorial graphs.
          */
         class dfs_ir {
-            mark_set singleton_diffs;
-            int      singleton_diff = 0;
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
             groups::automorphism_workspace* ws_automorphism = nullptr;
 
@@ -46,12 +44,12 @@ namespace dejavu {
                                                           * fraction of the cost of an entire root-to-leaf walk. */
             big_number s_grp_sz; /**< group size */
 
-            work_list check_color_deg1;
-            work_list revert1;
-            work_list check_color_deg2;
-            work_list revert2;
-
             bool assert_equitable(sgraph *g, coloring* c) {
+                work_list check_color_deg1;
+                work_list revert1;
+                work_list check_color_deg2;
+                work_list revert2;
+
                 check_color_deg1.resize(g->v_size);
                 check_color_deg2.resize(g->v_size);
                 revert1.resize(g->v_size);
@@ -112,13 +110,13 @@ namespace dejavu {
                 ws_automorphism = automorphism;
             }
 
-            int paired_recurse_to_equal_leaf(sgraph *g, ir::controller& state_left, ir::controller& state_right) {
+            int __attribute__((noinline)) paired_recurse_to_equal_leaf(sgraph *g, ir::controller& state_left, ir::controller& state_right) {
                 const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
                 if(!is_diffed_pre) {
                     return 2;
                 }
-                if(state_left.get_diff_diverge()) {
-                    return 0;
+                if(state_right.get_diff_diverge()) {
+                    return 2;
                 }
 
                 int depth = 0;
@@ -145,9 +143,9 @@ namespace dejavu {
                     assert(ind_v_left >= -1);
                     assert(ind_v_right >= -1);
 
-                    assert(state_left->c->vertex_to_col[ind_v_left] == col);
-                    assert(state_right->c->vertex_to_col[ind_v_right] == col);
-                    assert(state_left->c->vertex_to_col[ind_v_right] != col);
+                    assert(state_left.c->vertex_to_col[ind_v_left] == col);
+                    assert(state_right.c->vertex_to_col[ind_v_right] == col);
+                    assert(state_left.c->vertex_to_col[ind_v_right] != col);
                     //assert(state_right->c->vertex_to_col[ind_v_left] != col);
 
                     state_right.use_trace_early_out(false);
@@ -177,7 +175,7 @@ namespace dejavu {
                         return found_auto;
                     }
 
-                    assert(state_right->c->cells < g->v_size); // there can not be diff on a leaf
+                    assert(state_right.c->cells < g->v_size); // there can not be diff on a leaf
                 }
 
                 // unreachable
@@ -187,17 +185,19 @@ namespace dejavu {
 
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
                               std::vector<std::pair<int, int>>& computed_orbits) {
+                if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
 
                 // orbit algorithm structure
                 groups::orbit orbs(g->v_size);
+                mark_set orbit_handled(g->v_size);
 
                 // automorphism workspace
                 ws_automorphism->reset();
 
                 // saucy strategy of paired states
-                state_left.copy_link_compare(&state_right);
+                state_left.link_compare(&state_right);
 
                 // we want to terminate if things become to costly, we save the current trace position to track cost
                 cost_snapshot = state_right.T->get_position();
@@ -214,7 +214,7 @@ namespace dejavu {
                 while ((recent_cost_snapshot < h_recent_cost_snapshot_limit) && state_right.s_base_pos > 0 && !fail) {
                     // backtrack one level
                     state_right.move_to_parent();
-                    if((state_right.s_base_pos & 0x00000FFF) == 0)
+                    if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
                         progress_current_method("dfs", "base_pos", static_cast<double>(state_right.compare_base.size())
                                                 -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
                     // remember which color we are individualizing
@@ -226,15 +226,19 @@ namespace dejavu {
                     assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
 
                     int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
+                    orbit_handled.reset();
 
                     // iterate over current color class
                     for (int i = 0; i < col_sz; ++i) {
-                        const int ind_v = state_right.leaf_color.lab[col + i];
+                        int ind_v = state_right.leaf_color.lab[col + i];
                         assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
 
                         // only consider every orbit once
-                        if (ind_v == base_vertex || !orbs.represents_orbit(ind_v)) continue;
-                        if (orbs.are_in_same_orbit(ind_v, base_vertex))            continue;
+                        if(orbs.are_in_same_orbit(ind_v, base_vertex)) continue;
+                        if(!orbs.represents_orbit(ind_v)) ind_v = orbs.find_orbit(ind_v);
+                        if(orbit_handled.get(ind_v)) continue;
+                        orbit_handled.set(ind_v);
+
 
                         // track cost of this refinement for whatever is to come
                         const int cost_start = state_right.T->get_position();
@@ -287,6 +291,7 @@ namespace dejavu {
                                 state_left.use_trace_early_out(true);
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
                                 assert(state_left.T->trace_equal());
+                                assert(state_left.T->get_position() == state_right.T->get_position());
                                 //assert_equitable(g, state_left.c);
                                 auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
                                 found_auto = (return_code == 1);

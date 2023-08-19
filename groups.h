@@ -290,8 +290,6 @@ namespace dejavu {
          */
         class orbit {
             int        sz = 0;
-            mark_set   touched;
-            work_list  reset_arr;
             work_list  map_arr;
             work_list  orb_sz;
         public:
@@ -333,7 +331,7 @@ namespace dejavu {
              * @param v Vertex of the specified domain.
              * @return Whether \p v is the representative of the orbit of \p v.
              */
-            bool represents_orbit(const int v) {
+            [[nodiscard]] bool represents_orbit(const int v) const {
                 return v == map_arr[v];
             }
 
@@ -348,21 +346,16 @@ namespace dejavu {
                 assert(v2 >= 0);
                 assert(v1 < sz);
                 assert(v2 < sz);
-                if(v1 != v2) {
-                    if(!touched.get(v1)) reset_arr.push_back(v1);
-                    if(!touched.get(v2)) reset_arr.push_back(v2);
-                    touched.set(v1);
-                    touched.set(v2);
-                    int orbit1 = find_orbit(v1);
-                    int orbit2 = find_orbit(v2);
-                    if(orbit1 == orbit2) return;
-                    if(orbit1 < orbit2) {
-                        map_arr[orbit2] = orbit1;
-                        orb_sz[orbit1] += orb_sz[orbit2];
-                    } else {
-                        map_arr[orbit1] = orbit2;
-                        orb_sz[orbit2] += orb_sz[orbit1];
-                    }
+                if(v1 == v2) return;
+                const int orbit1 = find_orbit(v1);
+                const int orbit2 = find_orbit(v2);
+                if(orbit1 == orbit2) return;
+                if(orbit1 < orbit2) {
+                    map_arr[orbit2] = orbit1;
+                    orb_sz[orbit1] += orb_sz[orbit2];
+                } else {
+                    map_arr[orbit1] = orbit2;
+                    orb_sz[orbit2] += orb_sz[orbit1];
                 }
             }
 
@@ -374,7 +367,7 @@ namespace dejavu {
              * @param v2  The second vertex.
              * @return Whether \p v1 and \p v2 are in the same orbit.
              */
-            bool are_in_same_orbit(const int v1, const int v2) {
+            bool __attribute__((noinline)) are_in_same_orbit(const int v1, const int v2) {
                 assert(v1 >= 0);
                 assert(v2 >= 0);
                 assert(v1 < sz);
@@ -386,12 +379,10 @@ namespace dejavu {
             }
 
             void reset() {
-                while(!reset_arr.empty()) {
-                    const int v = reset_arr.pop_back();
+                for(int v = 0; v < sz; ++v) {
                     map_arr[v] = v;
                     orb_sz[v]  = 1;
                 }
-                touched.reset();
             }
 
             /**
@@ -415,8 +406,6 @@ namespace dejavu {
              */
             void initialize(int domain_size) {
                 sz = domain_size;
-                touched.initialize(domain_size);
-                reset_arr.allocate(domain_size);
                 map_arr.allocate(domain_size);
                 orb_sz.allocate(domain_size);
                 for(int i = 0; i < domain_size; ++i) {

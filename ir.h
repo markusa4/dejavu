@@ -241,6 +241,7 @@ namespace dejavu {
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
+                                    && s_base_pos - 1 < compare_base.size()
                                     && compare_base[s_base_pos - 1].cells == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
                 return ndone && (cont || deviation_override);
             }
@@ -398,6 +399,9 @@ namespace dejavu {
                 mode = IR_MODE_RECORD_TRACE;
                 T->set_compare(false);
                 T->set_record(true);
+
+                compare_base.clear();
+                compare_base_vertex.clear();
             }
 
             /**
@@ -546,9 +550,12 @@ namespace dejavu {
              * @param other_state the other state
              * @return whether there is a difference
              */
-            bool update_diff_vertices_last_individualization(const controller& other_state) {
+            bool __attribute__((noinline)) update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
-                assert(touched_color_list.cur_pos == other_state.touched_color_list.cur_pos);
+                if(touched_color_list.cur_pos != other_state.touched_color_list.cur_pos) {
+                    diff_diverge = true;
+                    return true;
+                }
                 for(;i < touched_color_list.cur_pos; ++i) {
                     const int old_color = prev_color_list[i];
                     const int new_color = touched_color_list[i];
@@ -579,7 +586,7 @@ namespace dejavu {
              *
              * @param state the other state which is copied
              */
-            void copy_link_compare(controller* state) {
+            void __attribute__((noinline)) link_compare(controller* state) {
                 this->c->copy_any(state->c);
 
                 T->set_compare(true);
@@ -591,7 +598,7 @@ namespace dejavu {
                 base_vertex = state->base_vertex;
                 base        = state->base;
 
-                compare_base_vertex = state->compare_base_vertex;
+                //compare_base_vertex = state->compare_base_vertex;
                 compare_base        = state->compare_base;
 
                 leaf_color.copy_any(&state->leaf_color);
@@ -600,9 +607,10 @@ namespace dejavu {
                 touched_color.copy(&state->touched_color);
                 prev_color_list.copy(&state->prev_color_list);
                 touched_color_list.copy(&state->touched_color_list);
-                singletons         = state->singletons;
-                compare_singletons = state->singletons;
-                
+
+                //singletons         = state->singletons;
+                //compare_singletons = state->compare_singletons;
+
                 s_base_pos = state->s_base_pos;
 
                 this->R = state->R;
@@ -615,7 +623,7 @@ namespace dejavu {
              *
              * @param state the other state which is copied
              */
-            void copy_link(controller* state) {
+            void __attribute__((noinline)) link(controller* state) {
                 this->c->copy_any(state->c);
 
                 T->set_compare(true);
@@ -637,7 +645,7 @@ namespace dejavu {
                 prev_color_list.copy(&state->prev_color_list);
                 touched_color_list.copy(&state->touched_color_list);
                 singletons         = state->singletons;
-                compare_singletons = state->singletons;
+                compare_singletons = state->compare_singletons;
 
                 s_base_pos = state->s_base_pos;
 
@@ -806,7 +814,7 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void move_to_child(sgraph *g, int v) {
+            void __attribute__((noinline)) move_to_child(sgraph *g, int v) {
                 // always keep track of vertex base
                 ++s_base_pos;
                 base_vertex.push_back(v);
@@ -875,13 +883,12 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void move_to_parent() {
+            void __attribute__((noinline)) move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
                 assert(base.size() > 0);
 
                 // unwind invariant
-                if (T) T->rewind_to_individualization();
-                assert(T->get_position() == base.back().trace_pos);
+                T->set_position(base.back().trace_pos);
                 T->set_hash(base.back().trace_hash);
 
                 // unwind colors introduced on this level of the tree
@@ -1037,7 +1044,7 @@ namespace dejavu {
                 return ir_tree_size_estimate;
             }
 
-            void find_base(sgraph *g, controller *state, const int h_choose) {
+            void __attribute__((noinline)) find_base(sgraph *g, controller *state, controller *state_probe, const int h_choose) {
                 int perturbe = 0;
                 if(h_choose > 6) {
                     perturbe = (int) (hash(h_choose) % 256);
@@ -1054,9 +1061,11 @@ namespace dejavu {
                         find_small_optimized_base(g, state, perturbe);
                         break;
                     case 3:
+                        //find_early_trace_deviation_base(g, state, state_probe, perturbe);
+                        // (seems to be very good, but needs work to be less expensive -- maybe this should only be
+                        // applied for a fixed number of levels and then switch to find_combinatorial_optimized_base)
                         find_combinatorial_optimized_base(g, state);
                         break;
-                        //TODO: "probed selector" -- pick cell that has largest ratio of trace deviations
                 }
 
                 ir_tree_size_estimate.mantissa = 1.0;
@@ -1091,24 +1100,33 @@ namespace dejavu {
                 test_set.initialize(g->v_size);
 
                 int start_test_from = 0;
+                int start_test_from_inside = 0;
+                int base_lim = 1000;
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
-                    int test_lim   = 512;
+                    int test_lim   = state->s_base_pos <= base_lim?512:16;
 
                     // pick previous color if possible
                     if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
                         best_color = prev_color;
                     } else if (prev_color >= 0) { // pick neighbour of previous color if possible
                         const int test_vertex = state->get_coloring()->lab[prev_color];
-                        for (int i = 0; i < g->d[test_vertex]; ++i) {
-                            const int other_vertex = g->e[g->v[test_vertex] + i];
+                        int i =  g->v[test_vertex] + start_test_from_inside;
+                        const int end_pt = g->v[test_vertex] + g->d[test_vertex];
+                        for (; i < end_pt; ++i) {
+                            const int other_vertex = g->e[i];
                             const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
                             if (state->get_coloring()->ptn[other_color] > 0) {
                                 best_color = other_color;
+                                break;
+                            } else {
+                                ++start_test_from_inside;
                             }
                         }
                     }
+
+                    start_test_from_inside = 0;
 
                     // heuristic, try to pick "good" color
                     if (best_color == -1) {
@@ -1488,6 +1506,122 @@ namespace dejavu {
                     state->move_to_child(g, state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))]);
                 }
 
+            }
+
+            /**
+             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for
+             * combinatorial graphs solved by bfs/random walks (i.e., by choosing large colors).
+             *
+             * @param R A refinement workspace.
+             * @param g The graph.
+             * @param state The IR state from which a base is created.
+             */
+            void find_early_trace_deviation_base(sgraph *g, controller* state, controller* state_probe, int perturbe) {
+                state->mode_write_base();
+
+                int prev_color    = -1;
+                int prev_color_sz = 0;
+
+                constexpr int probe_limit = 5;
+
+                state_probe->link(state);
+                state_probe->mode_compare_base();
+                candidates.clear();
+
+                int probe_limit_candidates = 8;
+
+                while (state->get_coloring()->cells != g->v_size) {
+                    int best_color = -1;
+                    int best_score_deviate = -1;
+                    int best_score_cells   = -1;
+
+                    probe_limit_candidates = std::max(probe_limit_candidates, 2);
+
+                    candidates.clear();
+                    for (int i = 0; i < state->c->domain_size;) {
+                        const int col_sz = state->c->ptn[i] + 1;
+                        if (col_sz >= 2) {
+                            candidates.push_back(i);
+                        }
+                        if(candidates.size() >= probe_limit_candidates) break;
+                        i += col_sz;
+                    }
+
+                    // now, probe and score the candidates... we are trying to find the color with most trace deviations
+                    for(int i = 0; i < candidates.size(); ++i) {
+                        const int col    = candidates[i];
+                        const int col_sz = state->c->ptn[col] + 1;
+                        assert(col_sz >= 2);
+                        const int probe_lim_col = std::min(probe_limit, col_sz);
+
+                        const int v_base = state->get_coloring()->lab[(col + (perturbe%col_sz))];
+                        assert(state->s_base_pos        == state_probe->s_base_pos);
+                        assert(state->T->get_position() == state_probe->T->get_position());
+                        assert(state->c->cells == state_probe->c->cells);
+
+                        int cells_pre    = state->c->cells;
+                        int previous_pos = state->T->get_position();
+
+                        state->move_to_child(g, v_base);
+
+                        const int cells = state->c->cells;
+
+                        int deviated = 0;
+                        for(int j = 0; j < probe_lim_col; ++j) {
+                            // pick random vertex
+                            const int v = state_probe->c->lab[col + ((j + perturbe) % col_sz)];
+                            // individualize in state_probe
+                            state_probe->reset_trace_equal();
+                            state_probe->use_trace_early_out(true);
+                            assert(state_probe->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v_base]);
+                            state_probe->move_to_child(g, v);
+                            deviated += !state_probe->T->trace_equal();
+                            assert(v==v_base?state_probe->T->trace_equal():true);
+                            state_probe->move_to_parent();
+                            assert(state_probe->c->cells == cells_pre);
+                            assert(state_probe->T->get_position() == previous_pos);
+                        }
+
+                        state->move_to_parent();
+                        assert(state->T->get_position() == previous_pos);
+
+                        assert(cells_pre == state->c->cells);
+                        assert(state->s_base_pos        == state_probe->s_base_pos);
+                        assert(state->T->get_position() == state_probe->T->get_position());
+                        assert(state->c->cells == state_probe->c->cells);
+
+                        if(deviated > best_score_deviate || ((deviated == best_score_deviate) &&
+                           (cells >= best_score_cells))) {
+                            best_color = col;
+                            best_score_deviate = deviated;
+                            best_score_cells   = cells;
+                            if(deviated > 0) break;
+                        }
+                    }
+
+                    if(best_score_deviate > 0) --probe_limit_candidates;
+
+                    assert(best_color >= 0);
+                    assert(best_color < g->v_size);
+                    assert(state->s_base_pos == state_probe->s_base_pos);
+                    assert(state->T->get_position() == state_probe->T->get_position());
+                    //assert(state->T->get_hash() == state_probe->T->get_hash());
+                    assert(state->c->cells == state_probe->c->cells);
+                    prev_color    = best_color;
+                    prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
+                    const int v = state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))];
+
+                    assert(state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
+
+                    state_probe->reset_trace_equal();
+                    state->move_to_child(g, v);
+                    state_probe->move_to_child(g, v);
+
+                    assert(state->s_base_pos        == state_probe->s_base_pos);
+                    assert(state->T->get_position() == state_probe->T->get_position());
+                    assert(state_probe->T->trace_equal());
+                    assert(state->c->cells == state_probe->c->cells);
+                }
             }
         };
 

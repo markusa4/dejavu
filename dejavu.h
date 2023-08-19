@@ -234,7 +234,7 @@ namespace dejavu {
                     m_inprocess.inproc_maybe_individualize.clear();
 
                     // find a selector, moves local_state to a leaf of the IR tree
-                    m_selectors.find_base(g, &local_state, s_restarts);
+                    m_selectors.find_base(g, &local_state, &local_state_left, s_restarts);
                     auto selector = m_selectors.get_selector_hook();
                     m_printer.timer_print("sel", local_state.s_base_pos, local_state.T->get_position());
                     int base_size = local_state.s_base_pos;
@@ -245,7 +245,8 @@ namespace dejavu {
                     s_few_cells  = root_save.get_coloring()->cells <= 2;               /*< "few"  cells in initial */
                     s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial */
 
-                    // heuristics to determine whether we want to skip this base_vertex
+                    // heuristics to determine whether we want to skip this base, i.e., is this obviously worse than
+                    // what we've seen before, and is there no reason to look at it?
                     const bool s_same_length     = base_size == s_last_base_size;
                     const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                     const bool s_too_long_long = s_long_base && (base_size > 1.25 * s_last_base_size);
@@ -254,7 +255,8 @@ namespace dejavu {
                     big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
                     const bool s_too_big  = (s_short_base && s_same_length &&
                                             (s_last_tree_sz < s_tree_estimate));
-                    //const bool s_too_big2  = false && ((s_restarts > 2) && s_last_tree_sz < s_tree_estimate);
+                    // || (s_inproc_success == 0 && (s_restarts > 3) && s_last_tree_sz < s_tree_estimate);
+                    // (bad on usr, good on had -- not clear)
 
                     // immediately discard this base_vertex if deemed too large or unfavourable, unless we are discarding too
                     // often
@@ -279,9 +281,9 @@ namespace dejavu {
                     const int s_trace_full_cost = local_state.T->get_position(); /*< total trace cost of this base_vertex */
 
                     // we first perform a depth-first search, starting from the computed leaf in local_state
-                    m_dfs.h_recent_cost_snapshot_limit = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
+                    m_dfs.h_recent_cost_snapshot_limit  = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
                     dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
-                                                                              m_inprocess.inproc_maybe_individualize);
+                                                                          m_inprocess.inproc_maybe_individualize);
                     m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
