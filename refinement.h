@@ -184,7 +184,7 @@ namespace dejavu {
                     // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
                     const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
-                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
+                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) { // !(g->dense && very_dense)
                         // singleton
                         refine_color_class_singleton(g, c, next_color_class);
                     } else if (g->dense) {

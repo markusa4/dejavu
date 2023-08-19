@@ -233,7 +233,7 @@ namespace dejavu::search_strategy {
 
                 int could_start_from = group.finished_up_to_level();
 
-                if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0)
+                if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0x000000FE)
                     progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
                                              group.s_compression_ratio);
 
@@ -377,7 +377,7 @@ namespace dejavu::search_strategy {
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
 
-                if((s_paths & 0x000000FF) == 0)
+                if((s_paths & 0x000000FF) == 0x000000FE)
                     progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
                                             group.s_compression_ratio);
 

@@ -155,6 +155,7 @@ namespace dejavu {
                 bool s_short_base = false;  /*< flag for bases that are considered very short */
                 double s_random_score_bias = 1.0; /*< a bias for random search, whether we've gathered that the
                                                    *  technique does not seem to work on this graph */
+
                 bool s_few_cells  = false;
                 [[maybe_unused]] bool s_many_cells = false;
                 bool s_inprocessed = false; /*< flag which says that we've inprocessed the graph since last restart */
@@ -163,6 +164,7 @@ namespace dejavu {
                                                 * changes */
                 bool s_last_bfs_pruned = false;/*< keep track of whether last BFS calculation pruned some nodes */
                 big_number s_last_tree_sz;
+
 
                 // some data we want to keep track of
                 std::vector<int> base_vertex;       /*< current base_vertex of vertices       */
@@ -180,6 +182,8 @@ namespace dejavu {
                 sh_schreier = new groups::compressed_schreier(); /*< Schreier structure to sift automorphisms */
                 //sh_schreier->h_error_bound = h_error_bound; /*< pass the error bound parameter */
                 sh_schreier->set_error_bound(h_error_bound);
+
+                ir::scored_base best_base;
 
                 // initialize modules for high-level search strategies
                 search_strategy::dfs_ir      m_dfs;       /*< depth-first search */
@@ -234,7 +238,7 @@ namespace dejavu {
                     m_inprocess.inproc_maybe_individualize.clear();
 
                     // find a selector, moves local_state to a leaf of the IR tree
-                    m_selectors.find_base(g, &local_state, &local_state_left, s_restarts);
+                    m_selectors.find_base(g, &local_state, &local_state_left, s_restarts, h_budget);
                     auto selector = m_selectors.get_selector_hook();
                     m_printer.timer_print("sel", local_state.s_base_pos, local_state.T->get_position());
                     int base_size = local_state.s_base_pos;
@@ -254,9 +258,9 @@ namespace dejavu {
                     const bool s_too_long = s_too_long_anyway || s_too_long_long; // s_too_long_hard yes or no?
                     big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
                     const bool s_too_big  = (s_short_base && s_same_length &&
-                                            (s_last_tree_sz < s_tree_estimate));
-                    // || (s_inproc_success == 0 && (s_restarts > 3) && s_last_tree_sz < s_tree_estimate);
-                    // (bad on usr, good on had -- not clear)
+                                            (s_last_tree_sz < s_tree_estimate))
+                                             || (s_inproc_success == 0 && (s_restarts > 3) &&
+                                             (base_size > s_last_base_size) && s_last_tree_sz < s_tree_estimate);
 
                     // immediately discard this base_vertex if deemed too large or unfavourable, unless we are discarding too
                     // often
@@ -368,6 +372,7 @@ namespace dejavu {
 
                         // using this data, we now make a decision
                         h_next_routine = restart; /*< undecided? do a restart */
+                        double score_rand, score_bfs;
 
                         if (!s_have_rand_estimate) { /*< don't have an estimate, so let's poke a bit with random! */
                             h_next_routine = random_ir; /*< need to gather more information */
@@ -380,8 +385,8 @@ namespace dejavu {
                             double s_rand_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now;
 
                             // we do so by negatively scoring each method: higher score, worse technique
-                            double score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success) * s_random_score_bias;
-                            double score_bfs  = s_bfs_estimate * (0.1 + 1 - s_path_fail1_avg);
+                            score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success) * s_random_score_bias;
+                            score_bfs  = s_bfs_estimate * (0.1 + 1 - s_path_fail1_avg);
 
                             // we make some adjustments to try to model effect of techniques better
                             // increase BFS score if BFS does not prune nodes on the next level -- we want to be
@@ -401,9 +406,11 @@ namespace dejavu {
                         }
 
                         // we override the above decisions in specific cases...
-                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2 * h_budget)
+                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2 * h_budget) {
                             h_next_routine = restart; /* best decision would be BFS, but it would exceed the budget a
                                                        * lot! */
+                        }
+
                         if (s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
                         if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                             s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
@@ -507,6 +514,9 @@ namespace dejavu {
                                 break;
                             case restart: // do a restart
                                 do_a_restart = true;
+                                if(s_have_rand_estimate) {
+
+                                }
                                 break;
                         }
 
@@ -523,7 +533,9 @@ namespace dejavu {
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget);
                     s_inproc_success += s_inprocessed;
 
-                    if(s_inprocessed) m_printer.timer_print("inprocess", local_state.c->cells, s_inproc_success);
+                    if(s_inprocessed) {
+                        m_printer.timer_print("inprocess", local_state.c->cells, s_inproc_success);
+                    }
 
                     // edge case where inprocessing might finish the graph
                     if (root_save.get_coloring()->cells == g->v_size) {

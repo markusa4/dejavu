@@ -1044,7 +1044,8 @@ namespace dejavu {
                 return ir_tree_size_estimate;
             }
 
-            void __attribute__((noinline)) find_base(sgraph *g, controller *state, controller *state_probe, const int h_choose) {
+            void __attribute__((noinline)) find_base(sgraph *g, controller *state, controller *state_probe,
+                                                     const int h_choose, const int h_budget) {
                 int perturbe = 0;
                 if(h_choose > 6) {
                     perturbe = (int) (hash(h_choose) % 256);
@@ -1061,10 +1062,14 @@ namespace dejavu {
                         find_small_optimized_base(g, state, perturbe);
                         break;
                     case 3:
-                        //find_early_trace_deviation_base(g, state, state_probe, perturbe);
-                        // (seems to be very good, but needs work to be less expensive -- maybe this should only be
-                        // applied for a fixed number of levels and then switch to find_combinatorial_optimized_base)
-                        find_combinatorial_optimized_base(g, state);
+                        if(h_budget > 32) {
+                            // hail mary selector... seems to be very good for some classes, but is very expensive and
+                            // its use must be limited somehow... probing is only used for a fixed number of levels and
+                            // then switches to find_combinatorial_optimized_base
+                            // idea is to create trace deviations "higher up" in the tree, such that bfs may succeed
+                            // earlier
+                            find_early_trace_deviation_base(g, state, state_probe, perturbe);
+                        } else find_combinatorial_optimized_base(g, state);
                         break;
                 }
 
@@ -1468,6 +1473,8 @@ namespace dejavu {
                 int prev_color    = -1;
                 int prev_color_sz = 0;
 
+                const bool perturbe_flip = perturbe % 2;
+
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
                     int best_score = -1;
@@ -1477,7 +1484,7 @@ namespace dejavu {
                         for (int i = 0; i < prev_color + prev_color_sz;) {
                             const int col_sz = state->get_coloring()->ptn[i];
                             int test_score = color_score_size(state, i);
-                            if (test_score >= best_score && col_sz > 0) {
+                            if (((test_score > best_score) || (perturbe_flip && (test_score >= best_score))) && col_sz > 0) {
                                 best_color = i;
                                 best_score = test_score;
                             }
@@ -1530,76 +1537,106 @@ namespace dejavu {
 
                 int probe_limit_candidates = 8;
 
+                bool use_probing = true;
+
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
                     int best_score_deviate = -1;
                     int best_score_cells   = -1;
+                    int best_score_size    = -1;
 
                     probe_limit_candidates = std::max(probe_limit_candidates, 2);
 
-                    candidates.clear();
-                    for (int i = 0; i < state->c->domain_size;) {
-                        const int col_sz = state->c->ptn[i] + 1;
-                        if (col_sz >= 2) {
-                            candidates.push_back(i);
+                    if(use_probing) {
+                        candidates.clear();
+                        for (int i = 0; i < state->c->domain_size;) {
+                            const int col_sz = state->c->ptn[i] + 1;
+                            if (col_sz >= 2) {
+                                candidates.push_back(i);
+                            }
+                            if (candidates.size() >= probe_limit_candidates) break;
+                            i += col_sz;
                         }
-                        if(candidates.size() >= probe_limit_candidates) break;
-                        i += col_sz;
+
+                        // now, probe and score the candidates... we are trying to find the color with most trace deviations
+                        for (int i = 0; i < candidates.size(); ++i) {
+                            const int col = candidates[i];
+                            const int col_sz = state->c->ptn[col] + 1;
+                            assert(col_sz >= 2);
+                            const int probe_lim_col = std::min(probe_limit, col_sz);
+
+                            const int v_base = state->get_coloring()->lab[(col + (perturbe % col_sz))];
+                            assert(state->s_base_pos == state_probe->s_base_pos);
+                            assert(state->T->get_position() == state_probe->T->get_position());
+                            assert(state->c->cells == state_probe->c->cells);
+
+                            int cells_pre = state->c->cells;
+                            int previous_pos = state->T->get_position();
+
+                            state->move_to_child(g, v_base);
+
+                            const int cells = state->c->cells;
+
+                            int deviated = 0;
+                            for (int j = 0; j < probe_lim_col; ++j) {
+                                // pick random vertex
+                                const int v = state_probe->c->lab[col + ((j + perturbe) % col_sz)];
+                                // individualize in state_probe
+                                state_probe->reset_trace_equal();
+                                state_probe->use_trace_early_out(true);
+                                assert(state_probe->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v_base]);
+                                state_probe->move_to_child(g, v);
+                                deviated += !state_probe->T->trace_equal();
+                                assert(v == v_base ? state_probe->T->trace_equal() : true);
+                                state_probe->move_to_parent();
+                                assert(state_probe->c->cells == cells_pre);
+                                assert(state_probe->T->get_position() == previous_pos);
+                            }
+
+                            state->move_to_parent();
+                            assert(state->T->get_position() == previous_pos);
+
+                            assert(cells_pre == state->c->cells);
+                            assert(state->s_base_pos == state_probe->s_base_pos);
+                            assert(state->T->get_position() == state_probe->T->get_position());
+                            assert(state->c->cells == state_probe->c->cells);
+
+                            if (deviated > best_score_deviate ||
+                               ((deviated == best_score_deviate) && (cells > best_score_cells)) ||
+                               ((deviated == best_score_deviate) && (cells == best_score_cells) &&
+                                (col_sz > best_score_size))) {
+                                best_color = col;
+                                best_score_deviate = deviated;
+                                best_score_cells   = cells;
+                                best_score_size    = col_sz;
+                                if (deviated > 0) break;
+                            }
+                        }
+
+                        if (best_score_deviate > 0) --probe_limit_candidates;
+                    } else {
+                        // heuristic, try to pick "good" color
+                        candidates.clear();
+                        int best_score = -1;
+                        for (int i = 0; i < state->get_coloring()->domain_size;) {
+                            if (state->get_coloring()->ptn[i] > 0) {
+                                candidates.push_back(i);
+                            }
+                            i += state->get_coloring()->ptn[i] + 1;
+                        }
+                        while (!candidates.empty()) {
+                            const int test_color = candidates.back();
+                            candidates.pop_back();
+
+                            int test_score = color_score_size(state, test_color);
+                            if (test_score >= best_score) {
+                                best_color = test_color;
+                                best_score = test_score;
+                            }
+                        }
                     }
 
-                    // now, probe and score the candidates... we are trying to find the color with most trace deviations
-                    for(int i = 0; i < candidates.size(); ++i) {
-                        const int col    = candidates[i];
-                        const int col_sz = state->c->ptn[col] + 1;
-                        assert(col_sz >= 2);
-                        const int probe_lim_col = std::min(probe_limit, col_sz);
-
-                        const int v_base = state->get_coloring()->lab[(col + (perturbe%col_sz))];
-                        assert(state->s_base_pos        == state_probe->s_base_pos);
-                        assert(state->T->get_position() == state_probe->T->get_position());
-                        assert(state->c->cells == state_probe->c->cells);
-
-                        int cells_pre    = state->c->cells;
-                        int previous_pos = state->T->get_position();
-
-                        state->move_to_child(g, v_base);
-
-                        const int cells = state->c->cells;
-
-                        int deviated = 0;
-                        for(int j = 0; j < probe_lim_col; ++j) {
-                            // pick random vertex
-                            const int v = state_probe->c->lab[col + ((j + perturbe) % col_sz)];
-                            // individualize in state_probe
-                            state_probe->reset_trace_equal();
-                            state_probe->use_trace_early_out(true);
-                            assert(state_probe->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v_base]);
-                            state_probe->move_to_child(g, v);
-                            deviated += !state_probe->T->trace_equal();
-                            assert(v==v_base?state_probe->T->trace_equal():true);
-                            state_probe->move_to_parent();
-                            assert(state_probe->c->cells == cells_pre);
-                            assert(state_probe->T->get_position() == previous_pos);
-                        }
-
-                        state->move_to_parent();
-                        assert(state->T->get_position() == previous_pos);
-
-                        assert(cells_pre == state->c->cells);
-                        assert(state->s_base_pos        == state_probe->s_base_pos);
-                        assert(state->T->get_position() == state_probe->T->get_position());
-                        assert(state->c->cells == state_probe->c->cells);
-
-                        if(deviated > best_score_deviate || ((deviated == best_score_deviate) &&
-                           (cells >= best_score_cells))) {
-                            best_color = col;
-                            best_score_deviate = deviated;
-                            best_score_cells   = cells;
-                            if(deviated > 0) break;
-                        }
-                    }
-
-                    if(best_score_deviate > 0) --probe_limit_candidates;
+                    if(probe_limit_candidates < 2 || state->s_base_pos > 5) use_probing = false;
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
@@ -1615,13 +1652,37 @@ namespace dejavu {
 
                     state_probe->reset_trace_equal();
                     state->move_to_child(g, v);
-                    state_probe->move_to_child(g, v);
+                    if(use_probing) state_probe->move_to_child(g, v);
 
                     assert(state->s_base_pos        == state_probe->s_base_pos);
                     assert(state->T->get_position() == state_probe->T->get_position());
                     assert(state_probe->T->trace_equal());
                     assert(state->c->cells == state_probe->c->cells);
                 }
+            }
+        };
+
+        struct scored_base {
+            double bfs_score  = INT32_MAX;
+            double rand_score = INT32_MAX;
+            std::vector<int> base_vertex;
+
+            bool assured_bfs_pruning = false;
+            int  level               = 0;
+
+            void replace_if_better(std::vector<int>& base, double bfs, double rand, int bfs_level, bool assured_prune) {
+                if(stored_is_better(base, bfs, rand, bfs_level, assured_prune)) return;
+                base_vertex         = base;
+                bfs_score           = bfs;
+                rand_score          = rand;
+                level               = bfs_level;
+                assured_bfs_pruning = assured_prune;
+            }
+
+            bool stored_is_better(std::vector<int>& base, double bfs, double rand, int bfs_level, bool assured_prune) {
+                if(assured_prune && !assured_bfs_pruning)  return true;
+                if(level >= bfs_level && bfs_score < bfs)  return true;
+                return false;
             }
         };
 
