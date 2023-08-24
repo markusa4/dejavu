@@ -114,9 +114,12 @@ namespace dejavu {
 
                 // special code for automorphism pruning on base size 2
                 const int parent_node_base_pos  = node->get_save()->get_base_position()-1;
-                const int parent_node_base_vert = parent_node_base_pos>=0? node->get_save()->get_base()[parent_node_base_pos]:-1;
-                const int vert_on_base          = parent_node_base_pos>=0 ? local_state.compare_base_vertex[parent_node_base_pos] : -1;
-                const int vert_on_base_sl       = parent_node_base_pos==-1 ? local_state.compare_base_vertex[0] : -1;
+                const int parent_node_base_vert = parent_node_base_pos>=0?
+                        node->get_save()->get_base()[parent_node_base_pos]:-1;
+                const int vert_on_base          = parent_node_base_pos>=0 ?
+                        (*local_state.compare_base_vertex)[parent_node_base_pos] : -1;
+                const int vert_on_base_sl       = parent_node_base_pos==-1 ?
+                        (*local_state.compare_base_vertex)[0] : -1;
                 if(parent_node_base_pos == 0 && !ir_tree->h_bfs_top_level_orbit.represents_orbit(parent_node_base_vert)) {
                     ++s_total_automorphism_prune;
                     return;
@@ -151,7 +154,7 @@ namespace dejavu {
 
                 // we want to keep track of whether we are on the base or not
                 const bool parent_is_base = node->get_base();
-                const bool is_base = parent_is_base && (v == local_state.compare_base_vertex[local_state.s_base_pos - 1]);
+                const bool is_base = parent_is_base && (v == (*local_state.compare_base_vertex)[local_state.s_base_pos - 1]);
 
                 assert(is_base?!local_state.there_is_difference_to_base_including_singles(g->v_size):true);
 

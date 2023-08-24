@@ -280,12 +280,12 @@ namespace dejavu::search_strategy {
                     // if we are beyond where we need to sift, and we don't want to sample uniformly at random, we
                     // stop picking random elements whatsoever
                     if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
-                       base_pos < static_cast<int>(local_state.compare_base_vertex.size())) {
+                       base_pos < static_cast<int>(local_state.compare_base_vertex->size())) {
                         uniform    = false; // sampled leaf not uniform anymore now
                         choose_pos = col;   // just pick first vertex of color
 
                         // or even better: let's choose the base vertex, if it's in the correct color
-                        const int v_base = local_state.compare_base_vertex[base_pos];
+                        const int v_base = (*local_state.compare_base_vertex)[base_pos];
                         const int v_base_col = local_state.c->vertex_to_col[v_base];
                         if(col == v_base_col) choose_pos = local_state.c->vertex_to_lab[v_base];
                     }

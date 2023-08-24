@@ -131,13 +131,13 @@ namespace dejavu {
             trace         *T  = nullptr; /**< trace of current root-to-node path */
 
             std::vector<int>       singletons;         /** singletons of the current trace */
-            std::vector<int>       compare_singletons; /** singletons of the comparison trace */
+            std::vector<int>*      compare_singletons; /** singletons of the comparison trace */
 
             std::vector<int>       base_vertex; /** current base (i.e., root-to-node path) */
             std::vector<base_info> base;        /** additional info for the current base   */
 
-            std::vector<int>       compare_base_vertex; /** comparison base */
-            std::vector<base_info> compare_base;        /** additional info of the comparison base */
+            std::vector<int>*      compare_base_vertex; /** comparison base */
+            std::vector<base_info>*compare_base;        /** additional info of the comparison base */
 
             coloring leaf_color; /** comparison leaf coloring */
 
@@ -152,6 +152,12 @@ namespace dejavu {
             trace *cT = nullptr; /**< comparison trace */
             trace internal_T1; /**< trace 1 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
             trace internal_T2; /**< trace 2 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
+
+
+
+            std::vector<int>       internal_compare_singletons;  /** singletons of the comparison trace */
+            std::vector<int>       internal_compare_base_vertex; /** comparison base */
+            std::vector<base_info> internal_compare_base;        /** additional info of the comparison base */
 
             mark_set  touched_color; /**< were changes in this color already tracked? */
             work_list touched_color_list; /**< color touched_color_list[i] was changed... */
@@ -220,7 +226,7 @@ namespace dejavu {
              * The split hook function used for color refinement. Tracks the trace invariant, touched colors and
              * singletons. Provides early out functionality using the trace and/or number of cells.
              */
-            bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
+            bool __attribute__((noinline)) split_hook(const int old_color, const int new_color, const int new_color_sz) {
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
                     // write singletons to singleton list
                     if (new_color_sz == 1) singletons.push_back(c->lab[new_color]);
@@ -241,8 +247,8 @@ namespace dejavu {
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
-                                    && s_base_pos - 1 < compare_base.size()
-                                    && compare_base[s_base_pos - 1].cells == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
+                                    && s_base_pos - 1 < compare_base->size()
+                                    && (*compare_base)[s_base_pos - 1].cells == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
                 return ndone && (cont || deviation_override);
             }
 
@@ -400,8 +406,9 @@ namespace dejavu {
                 T->set_compare(false);
                 T->set_record(true);
 
-                compare_base.clear();
-                compare_base_vertex.clear();
+                internal_compare_base.clear();
+                internal_compare_base_vertex.clear();
+                internal_compare_singletons.clear();
             }
 
             /**
@@ -598,7 +605,7 @@ namespace dejavu {
                 base_vertex = state->base_vertex;
                 base        = state->base;
 
-                //compare_base_vertex = state->compare_base_vertex;
+                compare_base_vertex = state->compare_base_vertex;
                 compare_base        = state->compare_base;
 
                 leaf_color.copy_any(&state->leaf_color);
@@ -609,7 +616,7 @@ namespace dejavu {
                 touched_color_list.copy(&state->touched_color_list);
 
                 //singletons         = state->singletons;
-                //compare_singletons = state->compare_singletons;
+                compare_singletons = state->compare_singletons;
 
                 s_base_pos = state->s_base_pos;
 
@@ -666,9 +673,14 @@ namespace dejavu {
                 cT->set_position(T->get_position());
                 flip_trace();
 
-                compare_base        = base;
-                compare_base_vertex = base_vertex;
-                compare_singletons  = singletons;
+                internal_compare_base        = base;
+                internal_compare_base_vertex = base_vertex;
+                internal_compare_singletons  = singletons;
+
+                compare_base        = &internal_compare_base;
+                compare_base_vertex = &internal_compare_base_vertex;
+                compare_singletons  = &internal_compare_singletons;
+
 
                 leaf_color.copy_any(c);
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
@@ -847,7 +859,7 @@ namespace dejavu {
                 } else {
                     R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
-                    if (T->trace_equal() && c->cells==compare_base[s_base_pos - 1].cells) {
+                    if (T->trace_equal() && c->cells==(*compare_base)[s_base_pos - 1].cells) {
                         T->skip_to_individualization();
                     }
                 }
@@ -1160,84 +1172,6 @@ namespace dejavu {
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
             }
-
-            /*
-            void find_split_driven_base(sgraph *g, controller *state, int perturbe) {
-                state->mode_write_base();
-
-                int prev_color = -1;
-                assert(state->s_base_pos == 0);
-
-                test_set.initialize(g->v_size);
-
-                int start_test_from    = state->get_touched_colors()->cur_pos;
-                int start_test_from_cl = 0;
-
-                while (state->get_coloring()->cells != g->v_size) {
-                    int best_color = -1;
-                    int best_score = INT32_MIN;
-                    int test_lim   = 64;
-
-                    // pick previous color if possible
-                    if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
-                        best_color = prev_color;
-                    } else if (prev_color >= 0) { // pick neighbour of previous color if possible
-                        const int test_vertex = state->get_coloring()->lab[prev_color];
-                        for (int i = 0; i < g->d[test_vertex]; ++i) {
-                            const int other_vertex = g->e[g->v[test_vertex] + i];
-                            const int other_color = state->get_coloring()->vertex_to_col[other_vertex];
-                            if (state->get_coloring()->ptn[other_color] > 0 &&
-                                state->get_touched_colors_test()->get(other_color)) {
-                                best_color = other_color;
-                            }
-                        }
-                    }
-
-                    if(best_color == -1) {
-                        for(int i = start_test_from; i < state->get_touched_colors()->cur_pos && test_lim >= 0;) {
-                            const int col    = (*state->get_touched_colors())[i];
-                            const int col_sz = state->get_coloring()->ptn[col];
-
-                            if (col_sz > 0) {
-                                --test_lim;
-                                const int test_score = color_score_size(state, col);
-                                if(test_score > best_score) {
-                                    best_color = col;
-                                    best_score = test_score;
-                                }
-                                break;
-                            }
-
-                            if(col_sz == 0 && start_test_from == i) start_test_from += 1;
-                            i += 1;
-                        }
-                    }
-
-                    // heuristic, try to pick "good" color
-                    if (best_color == -1) {
-                        for (int i = start_test_from_cl; i < state->get_coloring()->domain_size && test_lim >= 0;) {
-                            const int col_sz = state->get_coloring()->ptn[i];
-
-                            if (col_sz > 0) {
-                                --test_lim;
-                                const int test_score = color_score_size(state, i);
-                                if (test_score > best_score) {
-                                    best_color = i;
-                                    best_score = test_score;
-                                }
-                            }
-
-                            if(col_sz == 0 && start_test_from_cl == i) start_test_from_cl += col_sz + 1;
-                            i += col_sz + 1;
-                        }
-                    }
-
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
-                    prev_color = best_color;
-                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
-                }
-            }*/
 
             void find_first_base(sgraph *g, controller *state) {
                 state->mode_write_base();

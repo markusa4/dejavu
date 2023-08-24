@@ -215,7 +215,7 @@ namespace dejavu {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
-                        progress_current_method("dfs", "base_pos", static_cast<double>(state_right.compare_base.size())
+                        progress_current_method("dfs", "base_pos", static_cast<double>(state_right.compare_base->size())
                                                 -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
                     // remember which color we are individualizing
                     const int col         = state_right.base[state_right.s_base_pos].color;
@@ -274,7 +274,7 @@ namespace dejavu {
 
                             ws_automorphism->reset();
                             // ... and then check whether this implies a (sparse) automorphism
-                            ws_automorphism->write_singleton(&state_right.compare_singletons,
+                            ws_automorphism->write_singleton(state_right.compare_singletons,
                                                              &state_right.singletons, wr_pos_st,
                                                              wr_pos_end);
                             found_auto = state_right.certify(g, *ws_automorphism);

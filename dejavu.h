@@ -153,6 +153,7 @@ namespace dejavu {
                 int  s_cost = 0;            /*< cost induced so far by current restart iteration */
                 bool s_long_base  = false;  /*< flag for bases that are considered very long  */
                 bool s_short_base = false;  /*< flag for bases that are considered very short */
+                bool s_prunable   = false;  /*< does this graph seem to exhibit exploitable structure? */
                 double s_random_score_bias = 1.0; /*< a bias for random search, whether we've gathered that the
                                                    *  technique does not seem to work on this graph */
 
@@ -255,15 +256,16 @@ namespace dejavu {
                     const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                     const bool s_too_long_long = s_long_base && (base_size > 1.25 * s_last_base_size);
                     const bool s_too_long_hard = s_hard && !s_inprocessed && (base_size > s_last_base_size);
-                    const bool s_too_long = s_too_long_anyway || s_too_long_long; // s_too_long_hard yes or no?
+                    const bool s_too_long      = s_too_long_anyway || s_too_long_long; // s_too_long_hard yes or no?
                     big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
                     const bool s_too_big  = (s_short_base && s_same_length &&
                                             (s_last_tree_sz < s_tree_estimate))
-                                             || (s_inproc_success == 0 && (s_restarts > 3) &&
-                                             (base_size > s_last_base_size) && s_last_tree_sz < s_tree_estimate);
+                                             || (s_inproc_success == 0 && (s_restarts > 3) && // TODO add "prunable" heuristic -- if it does not seem prunable, we should restart if tree is larger!
+                                              (s_last_tree_sz < s_tree_estimate) && !s_prunable);
+                    // && (base_size > s_last_base_size)
 
-                    // immediately discard this base_vertex if deemed too large or unfavourable, unless we are discarding too
-                    // often
+                    // the cell selector crystal ball: immediately discard this base if deemed too unfavourable by the
+                    // heuristics, unless we are discarding too often
                     if ((s_too_big || s_too_long) && s_inproc_success < 1 && s_consecutive_discard < 3) {
                         m_printer.timer_print("skip", local_state.s_base_pos, s_last_base_size);
                         ++s_consecutive_discard;
@@ -282,15 +284,18 @@ namespace dejavu {
                     base_sizes.reserve(local_state.base.size());
                     for(auto& bi : local_state.base) base_sizes.push_back(bi.color_sz); // TODO clean up
 
-                    const int s_trace_full_cost = local_state.T->get_position(); /*< total trace cost of this base_vertex */
+                    const int s_trace_full_cost = local_state.T->get_position(); /*< total trace cost of this base */
+
 
                     // we first perform a depth-first search, starting from the computed leaf in local_state
                     m_dfs.h_recent_cost_snapshot_limit  = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
+                    //m_dfs.h_recent_cost_snapshot_limit = 1.0;
                     dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
                                                                           m_inprocess.inproc_maybe_individualize);
                     m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
+                    s_prunable = s_prunable || (dfs_level < base_size - 5);
                     if (dfs_level == 0) {
                         // dfs finished the graph -- we are done!
                         s_term = t_dfs;
@@ -406,7 +411,7 @@ namespace dejavu {
                         }
 
                         // we override the above decisions in specific cases...
-                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2 * h_budget) {
+                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2*h_budget) {
                             h_next_routine = restart; /* best decision would be BFS, but it would exceed the budget a
                                                        * lot! */
                         }
@@ -438,8 +443,8 @@ namespace dejavu {
                         if(h_last_routine == random_ir && h_next_routine != random_ir) {
                             m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
                             if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) + "/d" +
-                                                           std::to_string(sh_schreier->s_densegen()), "_");
+                                m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) +
+                                                                 "/d" + std::to_string(sh_schreier->s_densegen()), "_");
                             }
                         }
 
@@ -514,9 +519,6 @@ namespace dejavu {
                                 break;
                             case restart: // do a restart
                                 do_a_restart = true;
-                                if(s_have_rand_estimate) {
-
-                                }
                                 break;
                         }
 
