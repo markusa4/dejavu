@@ -105,21 +105,14 @@ namespace dejavu {
                 return true;
             }
 
-
             void link_to_workspace(groups::automorphism_workspace* automorphism) {
                 ws_automorphism = automorphism;
             }
 
-            int __attribute__((noinline)) paired_recurse_to_equal_leaf(sgraph *g, ir::controller& state_left, ir::controller& state_right) {
+            int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right) {
                 const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
-                if(!is_diffed_pre) {
-                    return 2;
-                }
-                if(state_right.get_diff_diverge()) {
-                    return 2;
-                }
+                if(!is_diffed_pre || state_right.get_diff_diverge()) return 2;
 
-                int depth = 0;
                 while ((size_t) state_right.c->cells < g->v_size) {
                     // pick a color that prevents the "matching OPP"
 
@@ -128,7 +121,6 @@ namespace dejavu {
                     std::tie(ind_v_left, ind_v_right) = state_right.diff_pair(state_left);
 
                     const int col = state_left.c->vertex_to_col[ind_v_left];
-                    ++depth;
 
                     assert(col >= 0);
                     assert(col < g->v_size);
@@ -146,12 +138,10 @@ namespace dejavu {
                     assert(state_left.c->vertex_to_col[ind_v_left] == col);
                     assert(state_right.c->vertex_to_col[ind_v_right] == col);
                     assert(state_left.c->vertex_to_col[ind_v_right] != col);
-                    //assert(state_right->c->vertex_to_col[ind_v_left] != col);
+                    // TODO maybe make sure both vertices are in diff, test this for f-lex-srg?
 
                     state_right.use_trace_early_out(false);
                     state_left.use_trace_early_out(false);
-                    //state_right.T->set_hash(0);
-                    //state_left.T->set_hash(0);
                     state_right.T->reset_trace_unequal();
                     state_left.T->reset_trace_unequal();
 
@@ -184,7 +174,7 @@ namespace dejavu {
             }
 
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
-                              std::vector<std::pair<int, int>>& computed_orbits) {
+                              std::vector<std::pair<int, int>>& computed_orbits, int max_depth = 0) {
                 if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
@@ -235,6 +225,7 @@ namespace dejavu {
 
                         // only consider every orbit once
                         if(orbs.are_in_same_orbit(ind_v, base_vertex)) continue;
+                        //if(!orbs.represents_orbit(ind_v)) continue;
                         if(!orbs.represents_orbit(ind_v)) ind_v = orbs.find_orbit(ind_v);
                         if(orbit_handled.get(ind_v)) continue;
                         orbit_handled.set(ind_v);
@@ -259,13 +250,14 @@ namespace dejavu {
                         const int prev_base_pos = state_right.s_base_pos;
                         trace_pos_reset = state_right.T->get_position(); // TODO is there an elegant solution to this?
                         state_right.T->reset_trace_equal();
-                        //state_right.T->set_hash(0);
                         state_right.use_trace_early_out(true);
                         state_right.move_to_child(g, ind_v);
-                        bool pruned     = !state_right.T->trace_equal(); // TODO keep track of cost here as well!
 
+                        bool pruned = !state_right.T->trace_equal();
                         bool found_auto = false;
-                        assert(state_right.c->vertex_to_col[ind_v] == state_right.leaf_color.vertex_to_col[base_vertex]);
+
+                        assert(state_right.c->vertex_to_col[ind_v] ==
+                               state_right.leaf_color.vertex_to_col[base_vertex]);
 
                         if(!pruned) {
                             // write singleton diff into automorphism...
@@ -284,15 +276,14 @@ namespace dejavu {
                             if (!found_auto) {
                                 ws_automorphism->reset();
 
-                                //TODO make a mode for this in the IR controller module
                                 state_left.T->reset_trace_equal();
-                                //state_left.T->set_hash(0);
                                 state_left.T->set_position(trace_pos_reset);
                                 state_left.use_trace_early_out(true);
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
+
                                 assert(state_left.T->trace_equal());
                                 assert(state_left.T->get_position() == state_right.T->get_position());
-                                //assert_equitable(g, state_left.c);
+
                                 auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
                                 found_auto = (return_code == 1);
                                 pruned     = (return_code == 2);
@@ -308,7 +299,8 @@ namespace dejavu {
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
                             assert(ws_automorphism->nsupport() > 0);
-                            assert(ws_automorphism->perm()[ind_v] == base_vertex || ws_automorphism->perm()[base_vertex] == ind_v);
+                            assert(ws_automorphism->perm()[ind_v] == base_vertex ||
+                                   ws_automorphism->perm()[base_vertex] == ind_v);
                             orbs.add_automorphism_to_orbit(*ws_automorphism);
                             if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
                                              ws_automorphism->support());

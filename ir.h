@@ -642,8 +642,8 @@ namespace dejavu {
                 base_vertex = state->base_vertex;
                 base        = state->base;
 
-                compare_base_vertex = state->compare_base_vertex;
-                compare_base        = state->compare_base;
+                compare_base_vertex = &state->base_vertex;
+                compare_base        = &state->base;
 
                 leaf_color.copy_any(&state->leaf_color);
                 mode = state->mode;
@@ -652,7 +652,7 @@ namespace dejavu {
                 prev_color_list.copy(&state->prev_color_list);
                 touched_color_list.copy(&state->touched_color_list);
                 singletons         = state->singletons;
-                compare_singletons = state->compare_singletons;
+                compare_singletons = &state->singletons;
 
                 s_base_pos = state->s_base_pos;
 
@@ -748,7 +748,7 @@ namespace dejavu {
              *
              * @param state A reference to the limited_save from which the state will be loaded.
              */
-            void load_reduced_state(limited_save &state) {
+            void __attribute__((noinline)) load_reduced_state(limited_save &state) {
                 c->copy_any(state.get_coloring());
 
                 T->set_hash(state.get_invariant_hash());
@@ -1467,6 +1467,7 @@ namespace dejavu {
 
                 state_probe->link(state);
                 state_probe->mode_compare_base();
+                state_probe->use_reversible(true);
                 candidates.clear();
 
                 int probe_limit_candidates = 8;
@@ -1574,24 +1575,24 @@ namespace dejavu {
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
-                    assert(state->s_base_pos == state_probe->s_base_pos);
-                    assert(state->T->get_position() == state_probe->T->get_position());
+                    assert(!use_probing || state->s_base_pos == state_probe->s_base_pos);
+                    assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
                     //assert(state->T->get_hash() == state_probe->T->get_hash());
-                    assert(state->c->cells == state_probe->c->cells);
+                    assert(!use_probing || state->c->cells == state_probe->c->cells);
                     prev_color    = best_color;
                     prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
                     const int v = state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))];
 
-                    assert(state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
+                    assert(!use_probing || state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
 
                     state_probe->reset_trace_equal();
                     state->move_to_child(g, v);
                     if(use_probing) state_probe->move_to_child(g, v);
 
-                    assert(state->s_base_pos        == state_probe->s_base_pos);
-                    assert(state->T->get_position() == state_probe->T->get_position());
-                    assert(state_probe->T->trace_equal());
-                    assert(state->c->cells == state_probe->c->cells);
+                    assert(!use_probing || state->s_base_pos        == state_probe->s_base_pos);
+                    assert(!use_probing || state_probe->T->trace_equal());
+                    assert(!use_probing || state->c->cells == state_probe->c->cells);
+                    assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
                 }
             }
         };

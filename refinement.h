@@ -482,114 +482,6 @@ namespace dejavu {
                 return true;
             }
 
-            // certify an automorphism on a graph, sparse, report on which vertex failed
-            std::pair<bool, int>
-            certify_automorphism_sparse_report_fail(const dejavu::sgraph *g, const int *colmap,
-                                                    const int *p, int supp, const int *supp_arr) {
-                int i, found;
-
-                assure_initialized(g);
-
-                //for(i = 0; i < g->v_size; ++i) {
-                for (int f = 0; f < supp; ++f) {
-                    i = supp_arr[f];
-                    const int image_i = p[i];
-                    if (colmap[i] != colmap[image_i]) // colors must be equal
-                        return {false, -1};
-
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    found = 0;
-                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        if (colmap[vertex_j] != colmap[image_j])
-                            return {false, i};
-                        scratch_set.set(image_j);
-                        found += 1;
-                    }
-                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        if (!scratch_set.get(vertex_j)) {
-                            return {false, i};
-                        }
-                        scratch_set.unset(vertex_j);
-                        found -= 1;
-                    }
-                    if (found != 0) {
-                        return {false, i};
-                    }
-                }
-
-                return {true, -1};
-            }
-
-            // certify an automorphism on a graph, sparse, report on which vertex failed
-            std::tuple<bool, int, int>
-            certify_automorphism_sparse_report_fail_resume(const sgraph *g, const int*, const int *p, int supp,
-                                                           const int *supp_arr, int pos_start) {
-                assure_initialized(g);
-
-                //for(i = 0; i < g->v_size; ++i) {
-                for (int f = pos_start; f < supp; ++f) {
-                    const int i = supp_arr[f];
-                    const int image_i = p[i];
-                    assert(image_i != i);
-
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    const int i_deg = g->d[i];
-                    for (int j = g->v[i]; j < g->v[i] + i_deg; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        scratch_set.set(image_j);
-                    }
-                    const int image_i_deg = g->d[image_i];
-                    int fail = 0;
-                    for (int j = g->v[image_i]; j < g->v[image_i] + image_i_deg; ++j) {
-                        const int vertex_j = g->e[j];
-                        fail += !scratch_set.get(vertex_j);
-                        scratch_set.unset(vertex_j);
-                    }
-
-                    if (fail != 0 || i_deg != image_i_deg) {
-                        return {false, i, f};
-                    }
-                }
-
-                return {true, -1, supp};
-            }
-
-            // certify an automorphism, for a single vertex
-            bool check_single_failure(const sgraph *g, const int *, const int *p, int failure) {
-                assure_initialized(g);
-
-                const int i = failure;
-                const int image_i = p[i];
-
-                scratch_set.reset();
-                // automorphism must preserve neighbours
-                const int i_deg = g->d[i];
-                for (int j = g->v[i]; j < g->v[i] + i_deg; ++j) {
-                    const int vertex_j = g->e[j];
-                    const int image_j = p[vertex_j];
-                    scratch_set.set(image_j);
-                }
-                const int image_i_deg = g->d[image_i];
-                int fail = 0;
-                for (int j = g->v[image_i]; j < g->v[image_i] + image_i_deg; ++j) {
-                    const int vertex_j = g->e[j];
-                    fail += !scratch_set.get(vertex_j);
-                    scratch_set.unset(vertex_j);
-                }
-
-                if (fail != 0 || i_deg != image_i_deg) {
-                    return false;
-                }
-
-                return true;
-            }
-
             ~refinement() {
             }
 
@@ -604,7 +496,7 @@ namespace dejavu {
             // helper data structures for color refinement
             mark_set         scratch_set;
             worklist_t<int>  vertex_worklist;
-            work_set_t<int>  color_vertices_considered; // todo this should use a different datastructure, with n space and not 2n
+            work_set_t<int>  color_vertices_considered; // todo should use different datastructure, with n space not 2n
             work_set_t<int>  neighbours;
             work_set_t<int>  neighbour_sizes;
             worklist_t<int>  old_color_classes;

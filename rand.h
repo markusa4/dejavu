@@ -51,11 +51,15 @@ namespace dejavu::search_strategy {
         /**
          * Co-routine which adds a leaf to leaf_storage, and sifts resulting automorphism into a given group.
          *
+         * @returns whether the hash already existed
          */
         bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::compressed_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
-                                           ir::limited_save &root_save, bool uniform) {
+                                           ir::controller &other_state, ir::limited_save &root_save, bool uniform) {
             bool used_load = false;
+            bool hash_col  = false;
+
+            bool copied = false;
 
             assert(g->v_size == local_state.c->cells);
 
@@ -63,6 +67,7 @@ namespace dejavu::search_strategy {
             for(int hash_offset = 0; hash_offset < h_hash_col_limit; ++hash_offset) {
                 // After first hash collision, we write a stronger invariant
                 if(hash_offset == 1) local_state.write_strong_invariant(g);
+
                 // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do
                 //  this before the loop if that flag is set
 
@@ -76,7 +81,6 @@ namespace dejavu::search_strategy {
                     ++s_paths_failany;
                     s_rolling_success = (9.0 * s_rolling_success + 0.0) / 10.0;
                     leaf_storage.add_leaf(hash_c, *local_state.c, local_state.base_vertex);
-                    //return false;
                     break;
                 }
 
@@ -88,11 +92,8 @@ namespace dejavu::search_strategy {
                     const int* lab = other_leaf->get_lab_or_base();
                     gws_automorphism->write_color_diff(local_state.c->vertex_to_col, lab);
                 } else {
-                    // If not, we need to use a more involved loading procedure which changes the local_state
-                    memcpy(gws_schreierw->scratch_apply1.get_array(), local_state.c->vertex_to_col, g->v_size * sizeof(int));
-                    load_state_from_leaf(g, local_state, root_save, other_leaf);
-                    gws_automorphism->write_color_diff(gws_schreierw->scratch_apply1.get_array(), local_state.c->lab);
-                    used_load = true;
+                    load_state_from_leaf(g, other_state, root_save, other_leaf);
+                    gws_automorphism->write_color_diff(local_state.c->vertex_to_col, other_state.c->lab);
                 }
 
 
@@ -122,18 +123,10 @@ namespace dejavu::search_strategy {
 
                     gws_automorphism->reset();
                     return sift;
-                } else {
-                    //if(hash_offset > 0) std::cout << "cert fail " << other_leaf->get_store_type() << "/" << ir::stored_leaf::STORE_LAB << std::endl;
-                    // If we used the more involved loading procedure, break for now
-                    if(used_load) {
-                        ++s_paths_failany;
-                        break; // TODO maybe there is better fix here...
-                    }
-                    continue;
                 }
             }
             gws_automorphism->reset();
-            return false;
+            return hash_col;
         }
 
     public:
@@ -217,13 +210,17 @@ namespace dejavu::search_strategy {
          */
         void random_walks(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                           ir::shared_tree &ir_tree, groups::compressed_schreier &group, ir::controller &local_state,
-                          int fail_limit) {
+                          ir::controller& other_state, int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
-            ir::limited_save my_own_save;
+            other_state.use_reversible(false);
+            other_state.use_trace_early_out(false);
 
+            ir::limited_save my_own_save;
             ir::limited_save* root_save  = ir_tree.pick_node_from_level(0, 0)->get_save();
             ir::limited_save* start_from = root_save;
+
+            other_state.link_compare(&local_state);
 
             int s_cell_initial = start_from->get_coloring()->cells;
 
@@ -345,7 +342,7 @@ namespace dejavu::search_strategy {
 
                 // we arrived at a leaf... let's check whether we already have an equivalent leaf to form an
                 // automorphism -- or add this leaf to the storage
-                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state,
+                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state, other_state,
                                               *root_save, uniform);
             }
         }
@@ -368,11 +365,15 @@ namespace dejavu::search_strategy {
          */
         void random_walks_from_tree(sgraph *g, dejavu_hook *hook, std::function<ir::type_selector_hook> *selector,
                                     ir::shared_tree &ir_tree, groups::compressed_schreier &group,
-                                    ir::controller &local_state, int fail_limit) {
+                                    ir::controller &local_state, ir::controller& other_state, int fail_limit) {
             local_state.use_reversible(false);
             local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
+            int last_v = -1;
+            bool use_leaf_doubling = true;
+
+            other_state.link_compare(&local_state);
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
@@ -392,6 +393,7 @@ namespace dejavu::search_strategy {
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
+                    last_v = v;
                     const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                     local_state.move_to_child(g, v);
@@ -412,7 +414,7 @@ namespace dejavu::search_strategy {
                     continue;
                 }
 
-                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state,
+                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state, other_state,
                                               *ir_tree.pick_node_from_level(0, 0)->get_save(), true);
             }
         }

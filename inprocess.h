@@ -68,14 +68,14 @@ namespace dejavu::search_strategy {
          * @return whether any preprocessing was performed
          */
         bool inprocess(sgraph *g, ir::shared_tree *tree, groups::compressed_schreier *group, ir::controller &local_state,
-                       ir::limited_save &root_save, [[maybe_unused]] int budget) {
+                       ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/
             bool touched_coloring = false; /*< whether we change the root_save or not, i.e., whether we change
                                             *  anything */
 
-            if (tree->get_finished_up_to() >= 1) { // did we do BFS?
+            if (tree->get_finished_up_to() >= 1 && use_bfs_inprocess) { // did we do BFS?
                 // TODO: hashing actually makes this worse!
                 worklist hash(g->v_size);
                 mark_set is_pruned(g->v_size);
@@ -236,6 +236,7 @@ namespace dejavu::search_strategy {
 
 
             if(cell_prev != local_state.c->cells) {
+                std::cout << cell_prev << "->" << local_state.c->cells << std::endl;
                 local_state.save_reduced_state(root_save);
                 touched_coloring = true;
             }

@@ -99,6 +99,11 @@ namespace dejavu {
             return (l.exponent < r.exponent) || (l.exponent == r.exponent && l.mantissa < r.mantissa);
         }
 
+        friend bool operator==(const big_number& l, const big_number& r)
+        {
+            return (l.exponent == r.exponent) && (l.mantissa > r.mantissa-0.01) && (l.mantissa < r.mantissa+0.01);
+        }
+
         /**
          * Multiply a \p number to this big_number.
          *

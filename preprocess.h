@@ -63,7 +63,7 @@ namespace sassy {
         dejavu::worklist worklist_deg0;
         dejavu::worklist worklist_deg1;
         dejavu::mark_set add_edge_buff_act;
-        dejavu::ir::refinement* R1;
+        dejavu::ir::refinement* R1 = nullptr;
 
         dejavu::mark_set touched_color_cache;
 
@@ -94,6 +94,13 @@ namespace sassy {
         bool h_deact_deg1 = false;  /**< no degree 0,1 processing */
         bool h_deact_deg2 = false;  /**< no degree 2   processing */
         bool h_translate_only = false;
+
+        preprocessor() {};
+
+        preprocessor(dejavu::ir::refinement* R) {
+            R1 = R;
+        }
+
         // for a vertex v of reduced graph, return corresponding vertex of the original graph
         int translate_back(int v) {
             const int layers = static_cast<int>(translation_layers.size());
@@ -3327,7 +3334,8 @@ namespace sassy {
             const int pre_cells  = c.cells;
 
             dejavu::ir::refinement R_stack = dejavu::ir::refinement();
-            R1 = &R_stack;
+            if(R1 == nullptr) R1 = &R_stack;
+
             R1->refine_coloring_first(g, &c, -1);
 
             const bool color_refinement_effective = pre_cells != c.cells;

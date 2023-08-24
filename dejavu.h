@@ -61,6 +61,7 @@ namespace dejavu {
         //                                                             inprocessing */
 
         bool h_silent = false; /**< don't print solver progress */
+        int h_bfs_memory_limit = 0x20000000;
 
         // statistics
         bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
@@ -95,6 +96,7 @@ namespace dejavu {
             }
 
             // first, we try to preprocess
+            //ir::refinement      m_refinement;          /*< workspace for color refinement and other utilities */
             sassy::preprocessor m_prep; /*< initializes the preprocessor */
 
 
@@ -136,7 +138,7 @@ namespace dejavu {
                 // print that we are solving now...
                 m_printer.h_silent = h_silent || (g->v_size <= 128 && i != 0);
                 if(!m_printer.h_silent)
-                    PRINT("\r\nsolving_component " << i << "/" << s_num_components-1 << " (n=" << g->v_size << ")");
+                    PRINT("\r\nsolving_component " << i << "/" << s_num_components-1 << " (n=" << g->v_size << ")")
                 m_printer.print_header();
                 m_printer.timer_split();
 
@@ -164,6 +166,7 @@ namespace dejavu {
                                                 * case where all searchable bases became much larger due to BFS or other
                                                 * changes */
                 bool s_last_bfs_pruned = false;/*< keep track of whether last BFS calculation pruned some nodes */
+                bool s_any_bfs_pruned  = false;
                 big_number s_last_tree_sz;
 
 
@@ -172,8 +175,8 @@ namespace dejavu {
                 std::vector<int> base_sizes; /*< current size of colors on base_vertex */
 
                 // local modules and workspace, to be used by other modules
-                ir::refinement        m_refinement; /*< workspace for color refinement and other utilities */
                 ir::base_selector     m_selectors;  /*< cell selector creation */
+                ir::refinement        m_refinement;          /*< workspace for color refinement and other utilities */
                 ds::domain_compressor m_compress;   /*< can compress a workspace of vertices to a subset of vertices */
                 groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
                 groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims */
@@ -250,19 +253,21 @@ namespace dejavu {
                     s_few_cells  = root_save.get_coloring()->cells <= 2;               /*< "few"  cells in initial */
                     s_many_cells = root_save.get_coloring()->cells >  sqrt(g->v_size); /*< "many" cells in initial */
 
+                    big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
+
                     // heuristics to determine whether we want to skip this base, i.e., is this obviously worse than
                     // what we've seen before, and is there no reason to look at it?
                     const bool s_same_length     = base_size == s_last_base_size;
                     const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
                     const bool s_too_long_long = s_long_base && (base_size > 1.25 * s_last_base_size);
-                    const bool s_too_long_hard = s_hard && !s_inprocessed && (base_size > s_last_base_size);
+                    //const bool s_too_long_hard = s_hard && !s_inprocessed && (base_size > s_last_base_size);
                     const bool s_too_long      = s_too_long_anyway || s_too_long_long; // s_too_long_hard yes or no?
-                    big_number s_tree_estimate = m_selectors.get_ir_size_estimate();
                     const bool s_too_big  = (s_short_base && s_same_length &&
                                             (s_last_tree_sz < s_tree_estimate))
                                              || (s_inproc_success == 0 && (s_restarts > 3) && // TODO add "prunable" heuristic -- if it does not seem prunable, we should restart if tree is larger!
                                               (s_last_tree_sz < s_tree_estimate) && !s_prunable);
                     // && (base_size > s_last_base_size)
+                    std::cout << s_tree_estimate << std::endl;
 
                     // the cell selector crystal ball: immediately discard this base if deemed too unfavourable by the
                     // heuristics, unless we are discarding too often
@@ -338,6 +343,7 @@ namespace dejavu {
                     search_strategy::random_ir::specific_walk(g, *sh_tree, local_state, base_vertex);
 
                     s_last_bfs_pruned = false;
+                    s_any_bfs_pruned  = false;
                     int s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
                     int h_rand_fail_lim_total  = 0;
                     int h_rand_fail_lim_now    = 0;
@@ -374,6 +380,7 @@ namespace dejavu {
                         }
 
                         const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
+                        //const bool h_look_close = false;
 
                         // using this data, we now make a decision
                         h_next_routine = restart; /*< undecided? do a restart */
@@ -391,7 +398,7 @@ namespace dejavu {
 
                             // we do so by negatively scoring each method: higher score, worse technique
                             score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success) * s_random_score_bias;
-                            score_bfs  = s_bfs_estimate * (0.1 + 1 - s_path_fail1_avg);
+                            score_bfs  = s_bfs_estimate  * (0.1 + 1 - s_path_fail1_avg);
 
                             // we make some adjustments to try to model effect of techniques better
                             // increase BFS score if BFS does not prune nodes on the next level -- we want to be
@@ -411,9 +418,14 @@ namespace dejavu {
                         }
 
                         // we override the above decisions in specific cases...
-                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2*h_budget) {
+                        if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2*h_budget)
                             h_next_routine = restart; /* best decision would be BFS, but it would exceed the budget a
                                                        * lot! */
+
+                        // let's obey the memory limits...
+                        long s_bfs_est_mem_usage = round(s_bfs_next_level_nodes * (1 - s_path_fail1_avg) * g->v_size);
+                        if (h_next_routine == bfs_ir && (s_bfs_est_mem_usage >h_bfs_memory_limit)) {
+                            h_next_routine = random_ir;
                         }
 
                         if (s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
@@ -428,8 +440,8 @@ namespace dejavu {
                         // ... but if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done"
                         //if (search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
-                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4 &&
-                            h_next_routine == restart)   h_next_routine = random_ir;
+                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
+                            h_next_routine = random_ir;// todo add back && h_next_routine == restart, but BFS should not reset rolling success...
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
                             h_next_routine == restart)
                             h_next_routine = random_ir;
@@ -459,11 +471,11 @@ namespace dejavu {
                                 if (sh_tree->get_finished_up_to() == 0) {
                                     // random automorphisms, single origin
                                     m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
-                                                        h_rand_fail_lim_total);
+                                                        local_state_left, h_rand_fail_lim_total);
                                 } else {
                                     // random automorphisms, sampled from shared_tree
                                     m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
-                                                                  local_state,
+                                                                  local_state, local_state_left,
                                                                   h_rand_fail_lim_total);
                                 }
                                 finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
@@ -513,6 +525,7 @@ namespace dejavu {
 
                                 // if there are less remaining nodes than we expected, we pruned some nodes
                                 s_last_bfs_pruned = sh_tree->get_current_level_size() < s_bfs_next_level_nodes;
+                                s_any_bfs_pruned  = s_any_bfs_pruned || s_last_bfs_pruned;
                                 m_rand.reset_statistics();
                                 s_cost += sh_tree->get_current_level_size();
                             }
@@ -532,7 +545,8 @@ namespace dejavu {
                     }
 
                     // we are restarting -- so we try to inprocess using the gathered data
-                    s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget);
+                    s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget,
+                                                          s_any_bfs_pruned);
                     s_inproc_success += s_inprocessed;
 
                     if(s_inprocessed) {
