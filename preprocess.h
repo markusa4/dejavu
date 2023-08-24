@@ -40,11 +40,11 @@ namespace sassy {
         dejavu_hook* saved_hook;
 
         coloring c;
-        dejavu::work_list automorphism;
-        dejavu::work_list automorphism_supp;
+        dejavu::worklist automorphism;
+        dejavu::worklist automorphism_supp;
 
-        dejavu::work_list aux_automorphism;
-        dejavu::work_list aux_automorphism_supp;
+        dejavu::worklist aux_automorphism;
+        dejavu::worklist aux_automorphism_supp;
 
         bool layers_melded = false;
 
@@ -60,8 +60,8 @@ namespace sassy {
         std::vector<std::vector<int>> recovery_strings;
 
         std::vector<std::vector<int>> add_edge_buff;
-        dejavu::work_list worklist_deg0;
-        dejavu::work_list worklist_deg1;
+        dejavu::worklist worklist_deg0;
+        dejavu::worklist worklist_deg1;
         dejavu::mark_set add_edge_buff_act;
         dejavu::ir::refinement* R1;
 
@@ -69,7 +69,7 @@ namespace sassy {
 
         std::vector<int> g_old_v;
         std::vector<int> g_old_e;
-        dejavu::work_list edge_scratch;
+        dejavu::worklist edge_scratch;
 
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
@@ -77,11 +77,11 @@ namespace sassy {
         std::vector<int>                                  recovery_edge_attached;
         std::vector<std::vector<std::tuple<int,int,int>>> recovery_edge_adjacent;
 
-        dejavu::work_list _automorphism;
-        dejavu::work_list _automorphism_supp;
+        dejavu::worklist _automorphism;
+        dejavu::worklist _automorphism_supp;
         std::vector<int> save_colmap;
 
-        dejavu::work_list before_move;
+        dejavu::worklist before_move;
 
         dejavu::ir::graph_decomposer* decomposer = nullptr;
         int current_component = 0;
@@ -149,10 +149,10 @@ namespace sassy {
 
             dejavu::ds::mark_set  test_twin(g->v_size);
             std::vector<int> add_to_string;
-            dejavu::ds::work_list twin_counter(g->v_size);
+            dejavu::ds::worklist twin_counter(g->v_size);
 
             dejavu::ds::mark_set  potential_twin(g->v_size);
-            dejavu::ds::work_list potential_twin_counter(g->v_size);
+            dejavu::ds::worklist potential_twin_counter(g->v_size);
 
             dejavu::ds::mark_set  touched(g->v_size);
 
@@ -486,7 +486,7 @@ namespace sassy {
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
         static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::mark_set* path_done,
-                              dejavu::work_list* path) {
+                              dejavu::worklist* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -562,7 +562,7 @@ namespace sassy {
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
         static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block,
-                                                 dejavu::work_list* path) {
+                                                 dejavu::worklist* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -604,18 +604,18 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            dejavu::work_list endpoint_cnt(g->v_size);
+            dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
             dejavu::mark_set  path_done(g->v_size);
-            dejavu::work_list color_pos(g->v_size);
-            dejavu::work_list filter(g->v_size);
-            dejavu::work_list path_list(g->v_size);
-            dejavu::work_list path(g->v_size);
-            dejavu::work_list connected_paths(g->e_size);
-            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::worklist color_pos(g->v_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
 
             // collect and count endpoints
             [[maybe_unused]] int total_paths = 0;
@@ -879,9 +879,9 @@ namespace sassy {
          * @param automorphism_supp support worklist of \p automorphism
          * @param help_array an array of `domain_size` required for auxiliary data
          */
-        void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::work_list* automorphism_supp,
-                                                     dejavu::ds::work_list* help_array1,
-                                                     dejavu::ds::work_list* help_array2) {
+        void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::worklist* automorphism_supp,
+                                                     dejavu::ds::worklist* help_array1,
+                                                     dejavu::ds::worklist* help_array2) {
             if(recovery_edge_adjacent[v].empty()) return;
             const int v_map     = automorphism[v];
 
@@ -950,19 +950,19 @@ namespace sassy {
             del.reset();
             worklist_deg1.reset();
 
-            dejavu::work_list endpoint_cnt(g->v_size);
+            dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
             dejavu::mark_set  path_done(g->v_size);
-            dejavu::work_list color_pos(g->v_size);
-            dejavu::work_list color_deg(g->v_size);
-            dejavu::work_list hub_vertex_position(g->v_size);
-            dejavu::work_list color_canonical_v(g->v_size);
-            dejavu::work_list filter(g->v_size);
-            dejavu::work_list path_list(g->v_size);
-            dejavu::work_list path(g->v_size);
-            dejavu::work_list connected_paths(g->e_size);
-            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::worklist color_pos(g->v_size);
+            dejavu::worklist color_deg(g->v_size);
+            dejavu::worklist hub_vertex_position(g->v_size);
+            dejavu::worklist color_canonical_v(g->v_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
             dejavu::mark_set  duplicate_endpoints(g->v_size);
 
             // collect and count endpoints
@@ -1221,15 +1221,15 @@ namespace sassy {
             del.reset();
             worklist_deg1.reset();
 
-            dejavu::work_list endpoint_cnt(g->v_size);
+            dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
             dejavu::mark_set  path_done(g->v_size);
-            dejavu::work_list filter(g->v_size);
-            dejavu::work_list path_list(g->v_size);
-            dejavu::work_list path(g->v_size);
-            dejavu::work_list connected_paths(g->e_size);
-            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
             dejavu::mark_set  duplicate_endpoints(g->v_size);
 
             // collect and count endpoints
@@ -1451,7 +1451,7 @@ namespace sassy {
             int cycles_recolored = 0;
 
             dejavu::mark_set  path_done(g->v_size);
-            dejavu::work_list path(g->v_size);
+            dejavu::worklist path(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1512,21 +1512,21 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            dejavu::ds::work_list endpoint_cnt(g->v_size);
+            dejavu::ds::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
             dejavu::ds::mark_set path_done(g->v_size);
-            dejavu::ds::work_list color_pos(g->v_size);
-            dejavu::ds::work_list not_unique(2*g->v_size);
-            dejavu::ds::work_list not_unique_analysis(g->v_size);
-            dejavu::ds::work_list path_list(g->v_size);
-            dejavu::ds::work_list path(g->v_size);
-            dejavu::ds::work_list connected_paths(g->e_size);
-            dejavu::ds::work_list connected_endpoints(g->e_size);
-            dejavu::ds::work_list neighbour_list(g->v_size);
-            dejavu::ds::work_list neighbour_to_endpoint(g->v_size);
+            dejavu::ds::worklist color_pos(g->v_size);
+            dejavu::ds::worklist not_unique(2*g->v_size);
+            dejavu::ds::worklist not_unique_analysis(g->v_size);
+            dejavu::ds::worklist path_list(g->v_size);
+            dejavu::ds::worklist path(g->v_size);
+            dejavu::ds::worklist connected_paths(g->e_size);
+            dejavu::ds::worklist connected_endpoints(g->e_size);
+            dejavu::ds::worklist neighbour_list(g->v_size);
+            dejavu::ds::worklist neighbour_to_endpoint(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1781,18 +1781,18 @@ namespace sassy {
             worklist_deg1.reset();
 
             dejavu::mark_set  is_parent(g->v_size);
-            dejavu::work_list pair_match(g->v_size);
-            dejavu::work_list parentlist(g->v_size);
-            dejavu::work_list childcount(g->v_size);
+            dejavu::worklist pair_match(g->v_size);
+            dejavu::worklist parentlist(g->v_size);
+            dejavu::worklist childcount(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount.push_back(0);
 
-            dejavu::work_list childcount_prev(g->v_size);
+            dejavu::worklist childcount_prev(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount_prev.push_back(0);
 
             dejavu::worklist_t<std::pair<int, int>> stack1(g->v_size);
-            dejavu::work_list map(g->v_size);
+            dejavu::worklist map(g->v_size);
 
             assert(_automorphism_supp.cur_pos == 0);
 
@@ -3172,7 +3172,7 @@ namespace sassy {
 
             g->initialize_coloring(&c, colmap);
 
-            dejavu::work_list old_arr(g->v_size);
+            dejavu::worklist old_arr(g->v_size);
 
             std::memcpy(old_arr.get_array(), g->v, g->v_size*sizeof(int));
             for(int j = 0; j < g->v_size; ++j) {

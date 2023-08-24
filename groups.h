@@ -24,7 +24,7 @@ namespace dejavu {
          * @param automorphism Dense notation of the given automorphism, i.e., vertex `i` is mapped to `automorphism[i]`.
          * @param support Support of the automorphism, contains all vertices where `i != automorphism[i]`.
          */
-        static void reset_automorphism(int *automorphism, work_list *support) {
+        static void reset_automorphism(int *automorphism, worklist *support) {
             for (int i = 0; i < support->cur_pos; ++i) {
                 automorphism[(*support)[i]] = (*support)[i];
             }
@@ -44,7 +44,7 @@ namespace dejavu {
          * @param support Support for the automorphism \p automorphism.
          */
         static void color_diff_automorphism(int domain_size, const int *vertex_to_col, const int *col_to_vertex,
-                                            int *automorphism, work_list *support) {
+                                            int *automorphism, worklist *support) {
             for (int v1 = 0; v1 < domain_size; ++v1) {
                 const int col = vertex_to_col[v1];
                 const int v2  = col_to_vertex[col];
@@ -61,8 +61,8 @@ namespace dejavu {
          * Enables O(1) lookup on a sparse automorphism by using an O(n) workspace.
          */
         class automorphism_workspace {
-            work_list automorphism;
-            work_list automorphism_supp;
+            worklist automorphism;
+            worklist automorphism_supp;
             int domain_size = 0;
 
             bool support01 = false;
@@ -137,7 +137,7 @@ namespace dejavu {
              * @param other Automorphism in sparse notation that is applied to this automorphism in.
              * @param pwr Power with which \p other is applied to this automorphism.
              */
-            [[maybe_unused]] void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
+            [[maybe_unused]] void apply(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
                        automorphism_workspace *other, int pwr = 1) {
                 apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
             }
@@ -154,7 +154,7 @@ namespace dejavu {
              * @param other Automorphism in dense notation that is applied to this automorphism.
              * @param pwr Power with which \p other is applied to this automorphism.
              */
-            void apply(work_list &scratch_apply1, work_list &scratch_apply2, mark_set &scratch_apply3,
+            void apply(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
                   const int *p, int pwr = 1) {
                 if (pwr == 0) return;
                 if (pwr <= 5) {
@@ -290,8 +290,8 @@ namespace dejavu {
          */
         class orbit {
             int        sz = 0;
-            work_list  map_arr;
-            work_list  orb_sz;
+            worklist  map_arr;
+            worklist  orb_sz;
         public:
 
             /**
@@ -453,7 +453,7 @@ namespace dejavu {
                                           };
 
         private:
-            work_list data;
+            worklist data;
             int domain_size = 0;
             stored_automorphism_type store_type = STORE_SPARSE;
 
@@ -600,9 +600,9 @@ namespace dejavu {
 
             mark_set scratch1;        /**< auxiliary space */
             mark_set scratch2;        /**< auxiliary space */
-            work_list scratch_apply1; /**< auxiliary space used for `apply` operations */
-            work_list scratch_apply2; /**< auxiliary space used for `apply` operations */
-            mark_set  scratch_apply3; /**< auxiliary space used for `apply` operations */
+            worklist scratch_apply1; /**< auxiliary space used for `apply` operations */
+            worklist scratch_apply2; /**< auxiliary space used for `apply` operations */
+            mark_set scratch_apply3; /**< auxiliary space used for `apply` operations */
             automorphism_workspace scratch_auto; /**< used to store a sparse automorphism*/
         };
 

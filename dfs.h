@@ -45,10 +45,10 @@ namespace dejavu {
             big_number s_grp_sz; /**< group size */
 
             bool assert_equitable(sgraph *g, coloring* c) {
-                work_list check_color_deg1;
-                work_list revert1;
-                work_list check_color_deg2;
-                work_list revert2;
+                worklist check_color_deg1;
+                worklist revert1;
+                worklist check_color_deg2;
+                worklist revert2;
 
                 check_color_deg1.resize(g->v_size);
                 check_color_deg2.resize(g->v_size);

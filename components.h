@@ -20,13 +20,13 @@ namespace dejavu::ir {
      * components - 1
      * @returns number of components
      */
-    static int quotient_components(sgraph *g, int* colmap, ds::work_list *vertex_to_component) {
+    static int quotient_components(sgraph *g, int* colmap, ds::worklist *vertex_to_component) {
         coloring c;
         g->initialize_coloring(&c, colmap);
 
         ds::mark_set  handled(g->v_size);
         ds::mark_set  col_handled(g->v_size);
-        ds::work_list wl(g->v_size);
+        ds::worklist  wl(g->v_size);
         int current_component      = 0;
         int total_size             = 0;
         int non_trivial_components = 0;
@@ -121,7 +121,7 @@ namespace dejavu::ir {
          * @param vertex_to_component maps vertices of \p g to their components
          * @param new_num_components how many components
          */
-        void decompose(sgraph *g, int* colmap, ds::work_list& vertex_to_component, int new_num_components) {
+        void decompose(sgraph *g, int* colmap, ds::worklist& vertex_to_component, int new_num_components) {
             // set up forward / backward maps
             num_components = new_num_components; // new_num_components
             if(num_components <= 1) return;

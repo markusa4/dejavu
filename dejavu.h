@@ -43,7 +43,7 @@ namespace dejavu {
         ir::shared_tree*             sh_tree     = nullptr;  /**< IR tree                 */
 
         // auxiliary
-        work_list  colmap_substitute;
+        worklist  colmap_substitute;
 
     public:
         // settings
@@ -116,7 +116,7 @@ namespace dejavu {
             int s_num_components = 1;
             if(h_decompose) {
                 // place to store the result of component computation
-                work_list vertex_to_component(g->v_size);
+                worklist vertex_to_component(g->v_size);
                 // compute the quotient components
                 s_num_components = ir::quotient_components(g, colmap, &vertex_to_component);
                 // make the decomposition according to the quotient components

@@ -77,7 +77,7 @@ namespace dejavu::search_strategy {
 
             if (tree->get_finished_up_to() >= 1) { // did we do BFS?
                 // TODO: hashing actually makes this worse!
-                work_list hash(g->v_size);
+                worklist hash(g->v_size);
                 mark_set is_pruned(g->v_size);
                 tree->mark_first_level(is_pruned);
 
@@ -130,7 +130,7 @@ namespace dejavu::search_strategy {
             // A stronger invariant from the BFS tree
             /*if (tree->get_finished_up_to() >= 2 || cell_prev != local_state.c->cells) {
                 const int cell_prev_inv = local_state.get_coloring()->cells;
-                work_list hash(g->v_size);
+                worklist hash(g->v_size);
                 std::vector<unsigned long> new_invariant;
                 new_invariant.reserve(g->v_size);
                 for(int i = 0; i < g->v_size; ++i) {

@@ -160,16 +160,16 @@ namespace dejavu {
             std::vector<base_info> internal_compare_base;        /** additional info of the comparison base */
 
             mark_set  touched_color; /**< were changes in this color already tracked? */
-            work_list touched_color_list; /**< color touched_color_list[i] was changed... */
-            work_list prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
+            worklist  touched_color_list; /**< color touched_color_list[i] was changed... */
+            worklist  prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
 
             // the following workspaces are only used for the paired color dfs (AKA the saucy-style dfs) -- not needed
             // for normal bfs, dfs, or random search operation
             mark_set  diff_tester; /**< used for algorithms for 'difference testing' */
             mark_set  diff_vertices; /**< vertices that differ */
             mark_set  diff_is_singleton; /**< vertices are singleton */
-            work_list diff_vertices_list; /**< vertices that differ, but in a list */
-            work_list diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
+            worklist  diff_vertices_list; /**< vertices that differ, but in a list */
+            worklist  diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
                                                *  above */
             bool diff_diverge = false; /**< paths of difference are diverging, can not properly track it anymore, and
                                          *there is also no point in tracking it anymore since they are not isomorphic */
@@ -1699,7 +1699,7 @@ namespace dejavu {
             }
 
         private:
-            work_list lab_or_base;
+            worklist lab_or_base;
             stored_leaf_type store_type;
         };
 

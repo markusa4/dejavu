@@ -285,6 +285,8 @@ namespace dejavu {
             T *arr     = nullptr; /**< internal array */
         };
 
+        typedef worklist_t<int> worklist;
+
         /**
          * \brief Fixed-size array, 0-initialized
          *
@@ -377,7 +379,7 @@ namespace dejavu {
             /**
              * @return A pointer to the internal memory.
              */
-            inline int* get_array() const {
+            [[nodiscard]] inline int* get_array() const {
                 return arr;
             }
 
@@ -659,7 +661,7 @@ namespace dejavu {
                 if(domain_size > 0) s_compression_ratio = 1.0 * s_vertices_active / domain_size;
             }
 
-            double determine_compression_ratio(coloring& c, std::vector<int>& base, int stop) {
+            double determine_compression_ratio(coloring& c, std::vector<int>& base, int stop) const {
                 mark_set color_was_added(c.domain_size);
 
                 color_was_added.reset();
@@ -679,11 +681,11 @@ namespace dejavu {
                 return compression_ratio;
             }
 
-            int compressed_domain_size() {
+            [[nodiscard]] int compressed_domain_size() const {
                 return s_vertices_active;
             }
 
-            int decompressed_domain_size() {
+            [[nodiscard]] int decompressed_domain_size() const {
                 return domain_size;
             }
 
