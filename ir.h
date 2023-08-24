@@ -272,11 +272,11 @@ namespace dejavu {
                 if (!s_individualize) T->op_additional_info(color_sz);
 
                 // blueprints
-                if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
+                /*if (T->trace_equal() && !T->blueprint_is_next_cell_active()) {
                     s_cell_active = false;
                     T->blueprint_skip_to_next_cell();
                     return false;
-                }
+                }*/
 
                 s_cell_active = true;
                 return true;

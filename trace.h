@@ -91,7 +91,7 @@ namespace dejavu {
                 assert(old_color >= 0);
                 assert(ind_color != old_color);
                 write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
-                write_compare(old_color);
+                //write_compare(old_color);
                 write_compare(ind_color);
             }
 
@@ -112,8 +112,8 @@ namespace dejavu {
                 assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
                 cell_old_color = color;
-                cell_act_spot = (int) data.size();
-                write_skip_compare(false);
+                //cell_act_spot = (int) data.size();
+                //write_skip_compare(false);
                 assert_cell_act = true;
             }
 
@@ -124,8 +124,7 @@ namespace dejavu {
             void op_refine_cell_record(int new_color) {
                 assert(!comp || assert_cell_act);
                 write_compare(new_color);
-                if (new_color != cell_old_color && record)
-                    data[cell_act_spot] = true;
+                //if (new_color != cell_old_color && record) data[cell_act_spot] = true;
             }
 
             void op_additional_info(int d) {
@@ -138,7 +137,8 @@ namespace dejavu {
             void op_refine_cell_end() {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
-                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
+                //
+                // write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
             /**
