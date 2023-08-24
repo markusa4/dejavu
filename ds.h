@@ -88,14 +88,14 @@ namespace dejavu {
         };
 
         /**
-         * \brief Fixed-size array
+         * \brief Fixed-size array, uninitialized
          *
          * An array of fixed size, with some further convenience functions.
          *
          * @tparam T The type of array elements.
          */
         template<class T>
-        class work_list_t {
+        class worklist_t {
         private:
             /**
              * Allocate an array of size \p size.
@@ -118,7 +118,7 @@ namespace dejavu {
             /**
              * Default constructor, does not allocate any memory.
              */
-            work_list_t() = default;
+            worklist_t() = default;
 
             /**
              * Constructor that allocates the internal array with size \p size. The allocated memory is not
@@ -126,11 +126,11 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            explicit work_list_t(unsigned int size) {
+            explicit worklist_t(unsigned int size) {
                 allocate(size);
             }
 
-            void copy(work_list_t<T>* other) {
+            void copy(worklist_t<T>* other) {
                 alloc(other->arr_sz);
                 for(int i = 0; i < other->arr_sz; ++i) {
                     arr[i] = other->arr[i];
@@ -233,7 +233,7 @@ namespace dejavu {
             /**
              * Deallocates the internal array.
              */
-            ~work_list_t() {
+            ~worklist_t() {
                 dealloc();
             }
 
@@ -285,9 +285,119 @@ namespace dejavu {
             T *arr     = nullptr; /**< internal array */
         };
 
-        // frequently used types
-        typedef work_list_t<int> work_list;
-        typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
+        /**
+         * \brief Fixed-size array, 0-initialized
+         *
+         * An array of fixed size, with some further convenience functions.
+         *
+         */
+        class workspace {
+        private:
+            /**
+             * Allocate an array of size \p size.
+             * @param size Space to allocate.
+             */
+            void alloc(const unsigned int size) {
+                dealloc();
+                arr = (int*) calloc(size, sizeof(int));
+                arr_sz = size;
+            }
+
+            void dealloc() {
+                if(arr) free(arr);
+                arr = nullptr;
+            }
+
+        public:
+            /**
+             * Default constructor, does not allocate any memory.
+             */
+            workspace() = default;
+
+            /**
+             * Constructor that allocates the internal array with size \p size. The allocated memory is not
+             * initialized.
+             *
+             * @param size Size to allocate.
+             */
+            explicit workspace(unsigned int size) {
+                allocate(size);
+            }
+
+            void copy(workspace* other) {
+                alloc(other->arr_sz);
+                for(int i = 0; i < other->arr_sz; ++i) {
+                    arr[i] = other->arr[i];
+                }
+                arr_sz  = other->arr_sz;
+            }
+
+            /**
+             * Allocates the internal array with size \p size. The allocated memory is not
+             * initialized. Initializes the internal position \a cur_pos of the array at 0.
+             *
+             * @param size Size to allocate.
+             */
+            void allocate(unsigned int size) {
+                alloc(size);
+            }
+
+            /**
+             * Sets the entire array to 0.
+             */
+            inline void reset() {
+                memset(arr, 0, arr_sz * sizeof(int));
+            }
+
+            /**
+             * Resizes the internal array to `size`. Copies the contents of the old array into the new one. If the new
+             * size is larger than the old one, the new space is only allocated and not initialized.
+             *
+             * @param size New size to allocate the array to.
+             */
+            void resize(const unsigned int size) {
+                if (arr && size <= arr_sz) return;
+                int *old_arr = arr;
+                unsigned int old_arr_sz = arr_sz;
+                alloc(size);
+                if (old_arr) {
+                    int cp_pt = std::min(old_arr_sz, arr_sz);
+                    memcpy(arr, old_arr, cp_pt * sizeof(int));
+                    free(old_arr);
+                }
+            }
+
+            /**
+             * Deallocates the internal array.
+             */
+            ~workspace() {
+                dealloc();
+            }
+
+            /**
+             * @return A pointer to the internal memory.
+             */
+            inline int* get_array() const {
+                return arr;
+            }
+
+            /**
+             * Access element \p index in the internal array \p arr.
+             *
+             * @param index Index of the internal array.
+             * @return The element `arr[index]`.
+             */
+            inline int &operator[](int index) const {
+                assert(index >= 0);
+                assert(index < arr_sz);
+                return arr[index];
+            }
+
+            int cur_pos = 0; /**< current position */
+        private:
+            unsigned int arr_sz = 0; /**< size to which \a arr is currently allocated*/
+            int *arr = nullptr; /**< internal array */
+        };
 
         // queue with fixed size limitation
         class work_queue {
@@ -360,8 +470,7 @@ namespace dejavu {
             }
 
             void reset() {
-                while (!reset_queue.empty())
-                    s[reset_queue.pop()] = -1;
+                while (!reset_queue.empty()) s[reset_queue.pop()] = -1;
             }
 
             void reset_hard() {

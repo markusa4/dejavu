@@ -1791,7 +1791,7 @@ namespace sassy {
             for (int i = 0; i < g->v_size; ++i)
                 childcount_prev.push_back(0);
 
-            dejavu::work_list_t<std::pair<int, int>> stack1(g->v_size);
+            dejavu::worklist_t<std::pair<int, int>> stack1(g->v_size);
             dejavu::work_list map(g->v_size);
 
             assert(_automorphism_supp.cur_pos == 0);
