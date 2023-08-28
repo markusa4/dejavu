@@ -111,6 +111,7 @@ namespace dejavu {
             void op_refine_cell_start(int color) {
                 assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
+                //write_compare(color);
                 cell_old_color = color;
                 //cell_act_spot = (int) data.size();
                 //write_skip_compare(false);
@@ -138,7 +139,7 @@ namespace dejavu {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
                 //
-                // write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
+                write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
             /**
@@ -295,6 +296,10 @@ namespace dejavu {
             // record to trace
             void set_record(bool new_record) {
                 this->record = new_record;
+            }
+
+            void reserve(const int n) {
+                data.reserve(n);
             }
 
             // position the trace

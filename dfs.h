@@ -201,7 +201,8 @@ namespace dejavu {
                 int    trace_pos_reset = 0;
 
                 // loop that serves to optimize Tinhofer graphs
-                while ((recent_cost_snapshot < h_recent_cost_snapshot_limit) && state_right.s_base_pos > 0 && !fail) {
+                while ((recent_cost_snapshot < h_recent_cost_snapshot_limit || state_right.s_base_pos == 1) &&
+                        state_right.s_base_pos > 0 && !fail) {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
@@ -331,6 +332,8 @@ namespace dejavu {
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }
                 }
+
+                // std::cout << fail << std::endl;
 
                 // set reason for termination
                 s_termination = fail? r_fail : r_cost;

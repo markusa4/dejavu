@@ -227,7 +227,7 @@ namespace dejavu {
              * @param pos_start start reading the vectors at this position
              * @param pos_end stop reading the vecvtors at this position.
              */
-            void __attribute__((noinline))  write_singleton(const std::vector<int> *singletons1, const std::vector<int> *singletons2,
+            void write_singleton(const std::vector<int> *singletons1, const std::vector<int> *singletons2,
                                  const int pos_start, const int pos_end) {
                 for (int i = pos_start; i < pos_end; ++i) {
                     const int from = (*singletons1)[i];
@@ -367,7 +367,7 @@ namespace dejavu {
              * @param v2  The second vertex.
              * @return Whether \p v1 and \p v2 are in the same orbit.
              */
-            bool __attribute__((noinline)) are_in_same_orbit(const int v1, const int v2) {
+            bool are_in_same_orbit(const int v1, const int v2) {
                 assert(v1 >= 0);
                 assert(v2 >= 0);
                 assert(v1 < sz);
@@ -390,7 +390,7 @@ namespace dejavu {
              *
              * @param aut Automorphism workspace which is applied.
              */
-            void __attribute__((noinline))  add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
+            void add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
                 const int  nsupp = aut.nsupport();
                 const int* supp  = aut.support();
                 const int* p     = aut.perm();

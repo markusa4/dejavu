@@ -22,14 +22,15 @@ namespace dejavu::ir {
      */
     static int quotient_components(sgraph *g, int* colmap, ds::worklist *vertex_to_component) {
         coloring c;
-        g->initialize_coloring(&c, colmap);
+        g->initialize_coloring(&c, colmap); // TODO certainly possible without a coloring, just keep a
+                                            // TODO color_to_component array
 
         ds::mark_set  handled(g->v_size);
         ds::mark_set  col_handled(g->v_size);
         ds::worklist  wl(g->v_size);
+
         int current_component      = 0;
         int total_size             = 0;
-        int non_trivial_components = 0;
 
         for(int i = 0; i < g->v_size; ++i) {
             if(handled.get(i)) continue;
@@ -78,7 +79,6 @@ namespace dejavu::ir {
             if(current_component_size > 0) {
                 ++current_component;
             }
-            if(current_component_size > 1) ++non_trivial_components;
 
             if(total_size == g->v_size) break;
         }

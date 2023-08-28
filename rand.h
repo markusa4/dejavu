@@ -39,7 +39,7 @@ namespace dejavu::search_strategy {
          * @param local_state Local state in which the leaf will be stored.
          * @param start_from State from which the walk to the leaf is performed.
          */
-        static void load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::limited_save &start_from,
+        static void __attribute__((noinline)) load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::limited_save &start_from,
                                   ir::stored_leaf *leaf) {
             assert(leaf->get_store_type() == ir::stored_leaf::STORE_BASE);
             std::vector<int> base;
@@ -53,7 +53,8 @@ namespace dejavu::search_strategy {
          *
          * @returns whether the hash already existed
          */
-        bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::compressed_schreier &group,
+        bool __attribute__((noinline)) add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook,
+                                                                     groups::compressed_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
                                            ir::controller &other_state, ir::limited_save &root_save, bool uniform) {
             bool used_load = false;
@@ -66,7 +67,9 @@ namespace dejavu::search_strategy {
             // Outer loop to handle hash collisions -- at most h_hash_col_limit will be checked and stored
             for(int hash_offset = 0; hash_offset < h_hash_col_limit; ++hash_offset) {
                 // After first hash collision, we write a stronger invariant
-                if(hash_offset == 1) local_state.write_strong_invariant(g);
+                if(hash_offset == 1) {
+                    local_state.write_strong_invariant(g);
+                }
 
                 // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do
                 //  this before the loop if that flag is set
@@ -112,7 +115,10 @@ namespace dejavu::search_strategy {
                     bool sift = group.sift(*gws_schreierw, *gws_automorphism, uniform);
                     gws_automorphism->reset();
 
-                    if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.1) { // 025
+                    //if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.1) { // 025
+                    // good: hypercubes(!), lattice, triang, maybe tran? -- bad: latin, pg, maybe crafted?
+                    //if(true) {
+                    if(sift && group.s_densegen() + group.s_sparsegen() > 1) {
                         int fail = 3; // 3
                         while(fail >= 0) {
                             const bool sift_changed = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
@@ -226,7 +232,7 @@ namespace dejavu::search_strategy {
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
-                local_state.load_reduced_state(*start_from); // TODO can load more efficiently, this uses copy_force
+                local_state.load_reduced_state(*start_from); // TODO can load more efficiently
 
                 int could_start_from = group.finished_up_to_level();
 

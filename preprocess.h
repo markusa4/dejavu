@@ -3529,6 +3529,8 @@ namespace sassy {
                     graph_changed = graph_changed || pre_v != g->v_size || pre_e != g->e_size;
                 }
             }
+
+            skipped_preprocessing = g->v_size == domain_size;
         }
 
         void save_my_hook(dejavu_hook *hook) {
@@ -3584,7 +3586,7 @@ namespace sassy {
         // dejavu usage specific: (TODO!)
         [[maybe_unused]] static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
-            if(p->skipped_preprocessing) {
+            if(p->skipped_preprocessing && !p->decomposer) {
                 if(p->saved_hook != nullptr) {
                     (*p->saved_hook)(n, aut, nsupp, supp);
                 }

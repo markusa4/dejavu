@@ -183,13 +183,17 @@ namespace dejavu {
 
                     // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
-                    const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
-                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) { // !(g->dense && very_dense)
+                    const int  test_deg   = g->d[c->lab[next_color_class]];
+                    const bool very_dense = test_deg >  (g->v_size / (next_color_class_sz + 1));
+                    const bool cell_dense = test_deg >  (c->cells);
+                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) { //
                         // singleton
                         refine_color_class_singleton(g, c, next_color_class);
                     } else if (g->dense) {
                         if (very_dense) { // dense-dense
                             refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz);
+                        } else if(cell_dense) { // dense-cell
+                            refine_color_class_dense_shallow(g, c, next_color_class, next_color_class_sz);
                         } else { // dense-sparse
                             refine_color_class_dense(g, c, next_color_class, next_color_class_sz);
                         }
@@ -351,13 +355,17 @@ namespace dejavu {
                     scratch_set.reset();
                     // automorphism must preserve neighbours
                     int found = 0;
-                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                    const int start_pt = g->v[i];
+                    const int end_pt   = g->v[i] + g->d[i];
+                    for (int j = start_pt; j < end_pt; ++j) {
                         const int vertex_j = g->e[j];
                         const int image_j = p[vertex_j];
                         scratch_set.set(image_j);
                         found += 1;
                     }
-                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                    const int image_start_pt = g->v[image_i];
+                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
+                    for (int j = image_start_pt; j < image_end_pt; ++j) {
                         const int vertex_j = g->e[j];
                         if (!scratch_set.get(vertex_j)) return false;
                         scratch_set.unset(vertex_j);
@@ -419,13 +427,17 @@ namespace dejavu {
                     scratch_set.reset();
                     // automorphism must preserve neighbours
                     found = 0;
-                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
+                    const int start_pt = g->v[i];
+                    const int end_pt   = g->v[i] + g->d[i];
+                    for (int j = start_pt; j < end_pt; ++j) {
                         const int vertex_j = g->e[j];
                         const int image_j = p[vertex_j];
                         scratch_set.set(image_j);
                         found += 1;
                     }
-                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
+                    const int image_start_pt = g->v[image_i];
+                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
+                    for (int j = image_start_pt; j < image_end_pt; ++j) {
                         const int vertex_j = g->e[j];
                         if (!scratch_set.get(vertex_j)) {
                             scratch_set.reset();
@@ -566,16 +578,28 @@ namespace dejavu {
 
                 // split color classes according to neighbour count
                 while (!old_color_classes.empty()) {
-                    const int _col = old_color_classes.pop_back();
+                    const int _col    = old_color_classes.pop_back();
                     const int _col_sz = ptn[_col] + 1;
+                    const int vcount  = color_vertices_considered.get(_col) + 1;
                     neighbour_sizes.reset();
                     vertex_worklist.reset();
 
-                    for (i = 0; i < color_vertices_considered.get(_col) + 1; ++i) {
-                        const int v = scratch[_col + i];
+                    for (i = 0; i < vcount; ++i) {
+                        const int v     = scratch[_col + i];
                         const int index = neighbours.get(v) + 1;
-                        if (neighbour_sizes.inc(index) == 0)
-                            vertex_worklist.push_back(index);
+                        if (neighbour_sizes.inc(index) == 0) vertex_worklist.push_back(index);
+                    }
+
+                    if(vcount == _col_sz && vertex_worklist.cur_pos == 1) {
+                        vertex_worklist.reset();
+                        j = 0;
+                        while (j < vcount) {
+                            const int v = scratch[_col + j];
+                            neighbours.set(v, -1);
+                            ++j;
+                        }
+                        color_vertices_considered.set(_col, -1);
+                        continue;
                     }
 
                     vertex_worklist.sort();
@@ -594,14 +618,13 @@ namespace dejavu {
                         }
                     }
 
-                    const int vcount = color_vertices_considered.get(_col);
 
                     vertex_worklist.reset();
                     j = 0;
                     color_vertices_considered.set(_col, -1);
 
                     // determine colors and rearrange vertices
-                    while (j < vcount + 1) {
+                    while (j < vcount) {
                         const int v = scratch[_col + j];
                         ++j;
                         if ((neighbours.get(v) == -1))
@@ -660,7 +683,7 @@ namespace dejavu {
                 cc = color_class; // iterate over color class
                 comp = true;
 
-                neighbours.reset_hard();
+                neighbours.reset();
                 scratch_set.reset();
                 old_color_classes.reset();
                 vertex_worklist.reset();
@@ -692,9 +715,9 @@ namespace dejavu {
                 while (!old_color_classes.empty()) {
                     const int col = old_color_classes.pop_back();
                     const int col_sz = c->ptn[col] + 1;
-
-                    if (col_sz == 1)
-                        continue;
+                //for(int col = 0; col < g->v_size; col += c->ptn[col] + 1) {
+                    //const int col_sz = c->ptn[col] + 1;
+                    if (col_sz == 1) continue; //  || !scratch_set.get(col)
 
                     neighbour_sizes.reset();
                     vertex_worklist.reset();
@@ -705,8 +728,7 @@ namespace dejavu {
                     for (i = col; i < col + col_sz; ++i) {
                         const int v = c->lab[i];
                         int index = neighbours.get(v) + 1;
-                        if (index == first_index)
-                            continue;
+                        if (index == first_index) continue;
                         total += 1;
                         if (neighbour_sizes.inc(index) == 0)
                             vertex_worklist.push_back(index);
@@ -717,12 +739,7 @@ namespace dejavu {
 
                     //comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
 
-                    if (vertex_worklist.cur_pos == 1) {
-                        // no split
-                        //const int v_degree = neighbours.get(c->lab[col]);
-                        //comp = I->write_top_and_compare(col + g->v_size * v_degree) && comp;
-                        continue;
-                    }
+                    if (vertex_worklist.cur_pos == 1) continue;
 
                     vertex_worklist.sort();
                     // enrich neighbour_sizes to accumulative counting array
@@ -780,22 +797,142 @@ namespace dejavu {
                         i += i_sz;
                     }
                 }
+
+                neighbours.reset();
+            }
+
+            void refine_color_class_dense_shallow(sgraph *g, coloring *c, int color_class, int class_size) {
+                bool comp;
+                int i, cc, acc, largest_color_class_size, pos;
+                cc = color_class; // iterate over color class
+                comp = true;
+
+                //neighbours.reset_hard();
+                neighbours.reset();
+                scratch_set.reset();
+                old_color_classes.reset();
+                vertex_worklist.reset();
+
+                const int end_cc = color_class + class_size;
+
+                // for all vertices of the color class...
+                while (cc < end_cc) { // increment value of neighbours of vc by 1
+                    const int vc = c->lab[cc];
+                    const int pe = g->v[vc];
+                    const int end_i = pe + g->d[vc];
+                    for (i = pe; i < end_i; i++) {
+                        const int v = g->e[i];
+                        const int col = c->vertex_to_col[v];
+                        neighbours.inc(v);
+                        scratch_set.set(col);
+                    }
+                    cc += 1;
+                }
+
+                // for every cell to be split...
+                for(int _col = 0; _col < g->v_size;) {
+                    const int col_sz = c->ptn[_col] + 1;
+                    const int col = _col;
+                    _col += col_sz;
+                    if (col_sz == 1 || !scratch_set.get(col)) continue;
+
+                    neighbour_sizes.reset();
+                    vertex_worklist.reset();
+
+                    const int first_index = neighbours.get(c->lab[col]) + 1;
+                    vertex_worklist.push_back(first_index);
+                    int total = 0;
+                    for (i = col; i < col + col_sz; ++i) {
+                        const int v = c->lab[i];
+                        int index = neighbours.get(v) + 1;
+                        if (index == first_index) continue;
+                        total += 1;
+                        if (neighbour_sizes.inc(index) == 0)
+                            vertex_worklist.push_back(index);
+                    }
+
+                    neighbour_sizes.inc(first_index);
+                    neighbour_sizes.set(first_index, col_sz - total - 1);
+
+                    //comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
+
+                    if (vertex_worklist.cur_pos == 1) continue;
+
+                    vertex_worklist.sort();
+                    // enrich neighbour_sizes to accumulative counting array
+                    acc = 0;
+                    while (!vertex_worklist.empty()) {
+                        const int j = vertex_worklist.pop_back();
+                        const int val = neighbour_sizes.get(j) + 1;
+                        if (val >= 1) {
+                            neighbour_sizes.set(j, val + acc);
+                            acc += val;
+                            const int _col = col + col_sz - (neighbour_sizes.get(j));
+                            c->ptn[_col] = -1; // this is val - 1, actually...
+                        }
+                    }
+
+                    // copy cell for rearranging
+                    memcpy(scratch.get_array(), c->lab + col, col_sz * sizeof(int));
+                    //vertex_worklist.cur_pos = col_sz;
+                    pos = col_sz;
+
+                    // determine colors and rearrange
+                    // split color classes according to count in counting array
+                    while (pos > 0) {
+                        const int v = scratch[--pos];
+                        const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
+                        // i could immediately determine size of v_new_color here and write invariant before rearrange?
+                        assert(v_new_color >= col);
+                        assert(v_new_color < col + col_sz);
+
+                        c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
+                        c->vertex_to_col[v] = v_new_color;
+                        c->vertex_to_lab[v] = v_new_color + c->ptn[v_new_color] + 1;
+                        c->ptn[v_new_color] += 1;
+                    }
+
+                    largest_color_class_size = -1;
+                    int largest_color_class  = 0;
+                    // determine largest class to throw away
+                    for (i = col; i < col + col_sz;) {
+                        assert(i >= 0 && i < c->domain_size);
+                        assert(c->ptn[i] + 1 > 0);
+                        const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
+                        largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
+                        largest_color_class = new_largest? i : largest_color_class;
+                        if (i != 0) c->ptn[i - 1] = 0;
+                        i += c->ptn[i] + 1;
+                    }
+                    assert(largest_color_class >= col);
+                    assert(largest_color_class < col + col_sz);
+
+                    // report splits
+                    for (i = col; i < col + col_sz;) {
+                        const int i_sz = c->ptn[i] + 1;
+                        report_split_color_class(c, col, i, i_sz, i == largest_color_class);
+                        i += i_sz;
+                    }
+                }
+
+                neighbours.reset();
             }
 
             void refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size) {
                 bool comp;
-                int i, j, acc, cc, largest_color_class_size;
+                int i, j, acc, cc, largest_color_class_size, deg;
                 cc = color_class; // iterate over color class
                 comp = true;
 
                 neighbours.reset();
-                old_color_classes.reset();
 
                 const int end_cc = color_class + class_size;
                 while (cc < end_cc) { // increment value of neighbours of vc by 1
                     const int vc = c->lab[cc];
                     const int pe = g->v[vc];
-                    const int end_i = pe + g->d[vc];
+                    deg= g->d[vc];
+                    const int end_i = pe + deg - (deg==g->v_size-1?deg:0); // special code for universal vertices
+
                     for (i = pe; i < end_i; i++) {
                         const int v = g->e[i];
                         neighbours.inc_nr(v);
@@ -803,20 +940,15 @@ namespace dejavu {
                     cc += 1;
                 }
 
+                if(class_size == 1 && deg == g->v_size-1) return; // special code for universal singletons
+
                 // in dense-dense we dont sort, instead we just iterate over all cells (which are already sorted)
-                old_color_classes.sort();
                 // for every cell...
                 for (j = 0; j < g->v_size;) {
                     const int col = j;
                     j += c->ptn[j] + 1;
                     const int col_sz = c->ptn[col] + 1;
-                    if (col_sz == 1) {
-                        const int v_degree = neighbours.get(c->lab[col]) + 1;
-                        if (v_degree == -1) // not connected! skip...
-                            continue;
-                        //comp = I->write_top_and_compare(col + v_degree * g->v_size) && comp;
-                        continue;
-                    }
+                    if (col_sz == 1) continue;
 
                     neighbour_sizes.reset();
                     vertex_worklist.reset();
@@ -904,7 +1036,7 @@ namespace dejavu {
                 neighbours.reset_hard();
             }
 
-            void refine_color_class_singleton(sgraph *g, coloring *c, int color_class) {
+            void __attribute__((noinline)) refine_color_class_singleton(sgraph *g, coloring *c, int color_class) {
                 int i, cc, deg1_write_pos, deg1_read_pos;
                 cc = color_class; // iterate over color class
 
@@ -914,7 +1046,8 @@ namespace dejavu {
 
                 const int vc = c->lab[cc];
                 const int pe = g->v[vc];
-                const int end_i = pe + g->d[vc];
+                const int deg= g->d[vc];
+                const int end_i = pe + deg;
 
                 for (i = pe; i < end_i; i++) {
                     const int v = g->e[i];

@@ -226,7 +226,7 @@ namespace dejavu {
              * The split hook function used for color refinement. Tracks the trace invariant, touched colors and
              * singletons. Provides early out functionality using the trace and/or number of cells.
              */
-            bool __attribute__((noinline)) split_hook(const int old_color, const int new_color, const int new_color_sz) {
+            bool split_hook(const int old_color, const int new_color, const int new_color_sz) {
                 if (mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE) {
                     // write singletons to singleton list
                     if (new_color_sz == 1) singletons.push_back(c->lab[new_color]);
@@ -340,9 +340,10 @@ namespace dejavu {
 
                 if(col_sz == 1) {
                     add_diff_vertex(state.c->lab[col]);
-                    remove_diff_vertex(c->lab[col]);
-                    if(!diff_is_singleton.get(c->lab[col])) {
-                        diff_is_singleton.set(c->lab[col]);
+                    const int v = c->lab[col];
+                    remove_diff_vertex(v);
+                    if(!diff_is_singleton.get(v)) {
+                        diff_is_singleton.set(v);
                     }
                     return;
                 }
@@ -350,7 +351,7 @@ namespace dejavu {
                 diff_tester.reset();
                 for(int i = 0; i < col_sz; ++i) diff_tester.set(state.c->lab[col + i]);
                 for(int i = 0; i < col_sz; ++i)
-                    if(!diff_tester.get(c->lab[col + i]))       add_diff_vertex(c->lab[col + i]);
+                    if(!diff_tester.get(c->lab[col + i])) add_diff_vertex(c->lab[col + i]);
 
                 diff_tester.reset();
                 for(int i = 0; i < col_sz; ++i) diff_tester.set(c->lab[col + i]);
@@ -500,11 +501,23 @@ namespace dejavu {
                 assert(diff_vertices_list.cur_pos > 0);
 
                 // pick a vertex from the difference list
-                const int right     = diff_vertices_list[0];
+                const int right = diff_vertices_list[0];
                 const int right_col = c->vertex_to_col[right];
+
+                const int right_col_sz = c->ptn[right_col];
 
                 // find a corresponding counterpart in the other coloring
                 const int left      = state.c->lab[right_col];
+                /*int left = -1;
+                for (int i = 0; i < right_col_sz; ++i) {
+                    const int candidate = state.c->lab[right_col + i];
+                    if(diff_vertices.get(candidate)) {
+                        left = candidate;
+                        break;
+                    }
+                }
+                if(left == -1) left = state.c->lab[right_col];*/
+
 
                 return {left, right};
             }
@@ -557,7 +570,7 @@ namespace dejavu {
              * @param other_state the other state
              * @return whether there is a difference
              */
-            bool __attribute__((noinline)) update_diff_vertices_last_individualization(const controller& other_state) {
+            bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
                 if(touched_color_list.cur_pos != other_state.touched_color_list.cur_pos) {
                     diff_diverge = true;
@@ -578,8 +591,8 @@ namespace dejavu {
                     diff_diverge = diff_diverge || (old_color_sz != old_color_sz_other)
                                    || (new_color_sz != new_color_sz_other);
 
-                    color_fix_difference(other_state, new_color);
-                    //color_fix_difference(other_state, old_color);
+                    if(new_color_sz <= old_color_sz) color_fix_difference(other_state, new_color);
+                    else                             color_fix_difference(other_state, old_color);
                     if(old_color_sz == 1) color_fix_difference(other_state, old_color);
                 }
 
@@ -686,6 +699,14 @@ namespace dejavu {
                 mode = ir::IR_MODE_COMPARE_TRACE_REVERSIBLE;
             }
 
+            void reserve() {
+                const int domain_size = sqrt(c->domain_size);
+                int sqrt_domain = sqrt(domain_size);
+                base.reserve(sqrt_domain);
+                base_vertex.reserve(sqrt_domain);
+                T->reserve(2*domain_size);
+            }
+
             /**
              * Enables or disables whether following \a move_to_child calls will be reversible using \a move_to_parent,
              * or not. Using non-reversible calls to \a move_to_child is faster.
@@ -765,6 +786,28 @@ namespace dejavu {
                 if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
             }
 
+            /**
+             * Load a partial state into this controller.
+             *
+             * @param state A reference to the limited_save from which the state will be loaded.
+             */
+            void __attribute__((noinline)) load_reduced_state_ancestor(limited_save &state) {
+                c->copy_from_ir_ancestor(state.get_coloring());
+
+                T->set_hash(state.get_invariant_hash());
+                T->set_position(state.get_trace_position());
+                T->reset_trace_equal();
+                T->set_compare(true);
+                s_base_pos  = state.get_base_position();
+                base_vertex = state.get_base();
+
+                // these become meaningless, so clear them out
+                base.clear();
+
+                // if reversible, need to reset touched colors
+                if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
+            }
+
             // TODO: hopefully can be deprecated
             // TODO: problem this fixes: trace state is not reverted properly when moving to parent!
             void load_reduced_state_without_coloring(limited_save &state) {
@@ -805,7 +848,7 @@ namespace dejavu {
              *
              * @param g The graph.
              */
-            void write_strong_invariant(const sgraph* g) const {
+            void __attribute__((noinline)) write_strong_invariant(const sgraph* g) const {
                 for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
                     const int v = c->lab[l];
                     unsigned int inv1 = 0;
@@ -962,7 +1005,7 @@ namespace dejavu {
              * @param automorphism The automorphism.
              * @return Whether \p automorphism is an automorphism of \p g.
              */
-            bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
+            bool __attribute__((noinline))  certify(sgraph* g, groups::automorphism_workspace& automorphism) {
                 if(automorphism.nsupport() > g->v_size/4) {
                     return R->certify_automorphism(g, automorphism.perm());
                 } else {
@@ -1064,6 +1107,7 @@ namespace dejavu {
                 }
                 switch(h_choose % 4) {
                     case 0:
+                        //find_combinatorial_optimized_base_recurse(g, state, perturbe);
                         find_sparse_optimized_base(g, state, 0);
                         //find_first_base(g, state);
                         break;

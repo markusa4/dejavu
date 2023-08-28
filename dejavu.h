@@ -211,6 +211,7 @@ namespace dejavu {
                 ir::controller local_state_left(&m_refinement, &local_coloring_left);
                 // set deviation counter relative to graph size
                 local_state.h_deviation_inc = std::min(static_cast<int>(floor(3 * sqrt(g->v_size))), 128);
+                local_state.reserve(); // reserve some space
 
                 // save root state for random and BFS search, as well as restarts
                 ir::limited_save root_save;
@@ -439,7 +440,7 @@ namespace dejavu {
 
                         // ... but if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done"
-                        //if (search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
+                        if (search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
                         if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
                             h_next_routine = random_ir;// todo add back && h_next_routine == restart, but BFS should not reset rolling success...
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
