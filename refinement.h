@@ -20,6 +20,10 @@ namespace dejavu {
         // bool split_color_hook(int color_initial, int new_color, int new_color_sz);
         typedef bool type_split_color_hook(const int, const int, const int);
 
+        // return whether to continue color refinement
+        // bool split_color_hook(int invariant);
+        typedef void type_invariant_hook(const int);
+
         // return whether to continue splitting the respective cell, or skip it
         // bool worklist_color_hook(int color, int color_sz);
         typedef bool type_worklist_color_hook(const int, const int);
@@ -154,7 +158,8 @@ namespace dejavu {
          */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                                  const std::function<type_split_color_hook>* split_hook = nullptr,
-                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
+                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr,
+                                 const std::function<type_invariant_hook>* invariant_hook = nullptr) {
                 assure_initialized(g);
                 cell_todo.reset(&queue_pointer);
 
@@ -696,7 +701,7 @@ namespace dejavu {
                     const int pe = g->v[vc];
                     const int end_i = pe + g->d[vc];
                     for (i = pe; i < end_i; i++) {
-                        const int v = g->e[i];
+                        const int v   = g->e[i];
                         const int col = c->vertex_to_col[v];
                         if (c->ptn[col] > 0) {
                             neighbours.inc(v); // want to use reset variant?
@@ -715,9 +720,7 @@ namespace dejavu {
                 while (!old_color_classes.empty()) {
                     const int col = old_color_classes.pop_back();
                     const int col_sz = c->ptn[col] + 1;
-                //for(int col = 0; col < g->v_size; col += c->ptn[col] + 1) {
-                    //const int col_sz = c->ptn[col] + 1;
-                    if (col_sz == 1) continue; //  || !scratch_set.get(col)
+                    if (col_sz == 1) continue;
 
                     neighbour_sizes.reset();
                     vertex_worklist.reset();
@@ -755,9 +758,10 @@ namespace dejavu {
                         }
                     }
 
+                    vertex_worklist.reset();
+
                     // copy cell for rearranging
                     memcpy(scratch.get_array(), c->lab + col, col_sz * sizeof(int));
-                    //vertex_worklist.cur_pos = col_sz;
                     pos = col_sz;
 
                     // determine colors and rearrange
@@ -919,10 +923,8 @@ namespace dejavu {
             }
 
             void refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size) {
-                bool comp;
                 int i, j, acc, cc, largest_color_class_size, deg;
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 neighbours.reset();
 
@@ -945,9 +947,9 @@ namespace dejavu {
                 // in dense-dense we dont sort, instead we just iterate over all cells (which are already sorted)
                 // for every cell...
                 for (j = 0; j < g->v_size;) {
-                    const int col = j;
-                    j += c->ptn[j] + 1;
+                    const int col    = j;
                     const int col_sz = c->ptn[col] + 1;
+                    j += col_sz;
                     if (col_sz == 1) continue;
 
                     neighbour_sizes.reset();
@@ -959,8 +961,7 @@ namespace dejavu {
                     for (i = col; i < col + col_sz; ++i) {
                         const int v = c->lab[i];
                         const int index = neighbours.get(v) + 1;
-                        if (index == first_index)
-                            continue;
+                        if (index == first_index) continue;
                         total += 1;
                         if (neighbour_sizes.inc(index) == 0)
                             vertex_worklist.push_back(index);
@@ -969,10 +970,7 @@ namespace dejavu {
                     neighbour_sizes.inc(first_index);
                     neighbour_sizes.set(first_index, col_sz - total - 1);
 
-                    if (vertex_worklist.cur_pos == 1) {
-                        // no split
-                        continue;
-                    }
+                    if (vertex_worklist.cur_pos == 1) continue; // no split
 
                     vertex_worklist.sort();
                     // enrich neighbour_sizes to accumulative counting array
@@ -998,6 +996,8 @@ namespace dejavu {
                     // split color classes according to count in counting array
                     while (!vertex_worklist.empty()) {
                         const int v = vertex_worklist.pop_back();
+                    //for(i = 0; i < col_sz; ++i) {
+                        //const int v = vertex_worklist[i];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
                         // i could immediately determine size of v_new_color here and write invariant before rearrange?
                         assert(v_new_color >= col);
@@ -1065,7 +1065,7 @@ namespace dejavu {
                     }
                     // write vertex to scratchpad for later use
                     scratch[neighbours.get(col)] = v;
-                    neighbours.inc_nr(col); // we reset neighbours later, since old_color_classes for reset
+                    neighbours.inc_nr(col); // we reset neighbours later, use old_color_classes for reset
                 }
 
                 old_color_classes.sort();

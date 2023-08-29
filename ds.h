@@ -488,7 +488,7 @@ namespace dejavu {
                 return s[index];
             }
 
-            void inc_nr(int index) {
+            void inline inc_nr(int index) {
                 assert(index >= 0 && index < sz);
                 ++s[index];
             }

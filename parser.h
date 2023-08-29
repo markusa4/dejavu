@@ -3,13 +3,15 @@
 #include "sgraph.h"
 #include <string>
 
-static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap) {
+static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap, int seed_permute=0) {
     //const size_t bufsize = 4*1024;
     //char buf[bufsize];
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
     //infile.rdbuf()->pubsetbuf(buf, bufsize);
+
+    std::vector<int> reshuffle;
 
     std::vector<std::vector<int>> incidence_list;
     std::set<int> degrees;
@@ -38,6 +40,14 @@ static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* 
                 ne = std::stoi(ne_str);
                 average_d = (ne / nv) + 3;
                 g->initialize(nv, ne * 2);
+
+                reshuffle.reserve(nv);
+                for(int j = 0; j < nv; ++j) reshuffle.push_back(j + 1);
+                if(seed_permute != 0) {
+                    std::mt19937 eng(seed_permute);
+                    std::shuffle(std::begin(reshuffle), std::end(reshuffle), eng);
+                }
+
                 incidence_list.reserve(nv);
                 for(int j = 0; j < nv; ++j) {
                     incidence_list.emplace_back();
@@ -55,8 +65,8 @@ static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* 
                     nv2_string += line[i];
                 }
 
-                nv1 = std::stoi(nv1_string);
-                nv2 = std::stoi(nv2_string);
+                nv1 = reshuffle[std::stoi(nv1_string)-1];
+                nv2 = reshuffle[std::stoi(nv2_string)-1];
 
                 incidence_list[nv1 - 1].push_back(nv2 - 1);
                 incidence_list[nv2 - 1].push_back(nv1 - 1);
@@ -74,7 +84,7 @@ static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* 
                     nv2_string += line[i];
                 }
 
-                nv1 = std::stoi(nv1_string);
+                nv1 = reshuffle[std::stoi(nv1_string)-1];
                 nv2 = std::stoi(nv2_string);
                 (*colmap)[nv1 - 1] = nv2;
                 break;

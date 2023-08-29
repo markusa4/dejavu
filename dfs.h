@@ -333,8 +333,6 @@ namespace dejavu {
                     }
                 }
 
-                // std::cout << fail << std::endl;
-
                 // set reason for termination
                 s_termination = fail? r_fail : r_cost;
 

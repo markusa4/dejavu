@@ -34,6 +34,14 @@ void empty_hook(int, const int*, int, const int *) {}
 
 void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     // touch the graph (mitigate cache variance)
+    volatile int acc = 0;
+    for(int i = 0; i < g->v_size; ++i) {
+        acc += g->v[i] + g->d[i];
+    }
+    for(int i = 0; i < g->e_size; ++i) {
+        acc += g->e[i];
+    }
+
     Clock::time_point timer = Clock::now();
     auto empty_hook_func = dejavu_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
@@ -66,6 +74,8 @@ int commandline_mode(int argc, char **argv) {
     bool entered_file = false;
     int  timeout = -1;
     bool permute_graph = false;
+    bool permute_graph_have_seed  = false;
+    int  permute_graph_given_seed = 0;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
@@ -119,33 +129,16 @@ int commandline_mode(int argc, char **argv) {
             }
         } else if (arg == "__PERMUTE") {
             permute_graph = true;
-        } else if (arg == "__KDEVIATION") {
+        }  else if (arg == "__PERMUTE_SEED") {
             if (i + 1 < argc) {
                 i++;
-                //config.CONFIG_IR_EXPAND_DEVIATION = atoi(argv[i]);
+                permute_graph_have_seed  = true;
+                permute_graph_given_seed = atoi(argv[i]);
             } else {
-                std::cerr << "--kdeviation option requires one argument." << std::endl;
+                std::cerr << "--permute_seed option requires one argument." << std::endl;
                 return 1;
             }
-        } else if (arg == "__NO_IDLESKIP") {
-            //config.CONFIG_IR_IDLE_SKIP = false;
-        }  else if (arg == "__EARLY_IR") {
-            //config.CONFIG_IR_INDIVIDUALIZE_EARLY = true;
-        } else if (arg == "__COMPRESS") {
-            //config.CONFIG_PREPROCESS_COMPRESS      = true;
-           // config.CONFIG_PREPROCESS_EDGELIST_SORT = true;
-        }  else if (arg == "__ONLY_COLOR_REF_INVARIANT") {
-                //config.CONFIG_ONLY_COLOR_REF_INVARIANT = true;
-        }  else if (arg == "__FORCE_SELECTOR") {
-            if (i + 1 < argc) {
-                i++;
-                //config.CONFIG_IR_CELL_SELECTOR  = atoi(argv[i]);
-                //config.CONFIG_IR_FORCE_SELECTOR = true;
-            } else {
-                std::cerr << "--force_selector option requires one argument." << std::endl;
-                return 1;
-            }
-        }   else if (argv[i][0] != '-'){
+        } else if (argv[i][0] != '-') {
             if(!entered_file) {
                 filename = argv[i];
                 entered_file = true;
@@ -172,14 +165,18 @@ int commandline_mode(int argc, char **argv) {
     dejavu::sgraph *g = new dejavu::sgraph();
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    parse_dimacs_file_fast(filename, g, &colmap);
-    dejavu::sgraph *_g = new dejavu::sgraph();
+
+    int permute_seed = 0;
     if(permute_graph) {
-        std::cout << "Permuting graph (not implemented)" << std::endl;
-        _g = g;
-    } else {
-        _g = g;
+        permute_seed = permute_graph_given_seed;
+        if(!permute_graph_have_seed) {
+            std::random_device r;
+            permute_seed = static_cast<int>(r());
+        }
+        std::cout << "permutation(" << permute_seed << ")" << std::endl;
     }
+
+    parse_dimacs_file_fast(filename, g, &colmap, permute_seed);
 
     std::cout << "------------------------------------------------------------------" << std::endl;
     std::cout << "dejavu 2.0beta" << std::endl;
@@ -190,7 +187,7 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     //if(timeout > 0)
     //    killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bench_dejavu(_g, colmap, &dejavu_solve_time);
+    bench_dejavu(g, colmap, &dejavu_solve_time);
     if(timeout > 0)
         killer.join();
 

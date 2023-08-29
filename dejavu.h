@@ -380,9 +380,6 @@ namespace dejavu {
                             s_trace_cost1_avg = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
                         }
 
-                        const bool h_look_close = (m_rand.s_rolling_first_level_success > 0.5) && !s_short_base;
-                        //const bool h_look_close = false;
-
                         // using this data, we now make a decision
                         h_next_routine = restart; /*< undecided? do a restart */
                         double score_rand, score_bfs;
@@ -464,6 +461,9 @@ namespace dejavu {
                         // now that we've decided what the next routine is going to be, let's perform it...
                         switch (h_next_routine) {
                             case random_ir: { // random leaf search
+                                const bool h_look_close = ((m_rand.s_rolling_first_level_success > 0.5) &&
+                                                          !s_short_base) || (s_have_rand_estimate &&
+                                                                  sh_tree->get_finished_up_to() == base_size - 1);
                                 h_rand_fail_lim_total += h_rand_fail_lim_now;
                                 m_rand.setup(h_look_close); // TODO: look_close does not seem worth it h_look_close
                                 m_rand.h_sift_random     = !s_easy;

@@ -1164,9 +1164,12 @@ namespace dejavu {
                 int start_test_from_inside = 0;
                 int base_lim = 1000;
 
+                int buffered_col       = -1;
+                int buffered_col_score = -1;
+
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
-                    int test_lim   = state->s_base_pos <= base_lim?512:16;
+                    int test_lim   = state->s_base_pos <= base_lim?512:1;
 
                     // pick previous color if possible
                     if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
@@ -1189,6 +1192,14 @@ namespace dejavu {
 
                     start_test_from_inside = 0;
 
+
+                    if(best_color == -1 && buffered_col >= 0 && state->get_coloring()->ptn[buffered_col] > 0 &&
+                       color_score(g, state, buffered_col) >= buffered_col_score) {
+                        best_color = buffered_col;
+                        buffered_col = -1;
+                        buffered_col_score = -1;
+                    }
+
                     // heuristic, try to pick "good" color
                     if (best_color == -1) {
                         int best_score = -1;
@@ -1202,6 +1213,11 @@ namespace dejavu {
                                 if (test_score > best_score) {
                                     best_color = i;
                                     best_score = test_score;
+                                    buffered_col       = -1;
+                                    buffered_col_score = -1;
+                                } else if (test_score == best_score) {
+                                    buffered_col       = i;
+                                    buffered_col_score = test_score;
                                 }
                             }
 
@@ -1523,6 +1539,7 @@ namespace dejavu {
                     int best_score_deviate = -1;
                     int best_score_cells   = -1;
                     int best_score_size    = -1;
+                    int best_test_v        = -1;
 
                     probe_limit_candidates = std::max(probe_limit_candidates, 2);
 
@@ -1588,6 +1605,7 @@ namespace dejavu {
                                 best_score_deviate = deviated;
                                 best_score_cells   = cells;
                                 best_score_size    = col_sz;
+                                best_test_v        = v_base;
                                 if (deviated > 0) break;
                             }
                         }
@@ -1625,7 +1643,8 @@ namespace dejavu {
                     assert(!use_probing || state->c->cells == state_probe->c->cells);
                     prev_color    = best_color;
                     prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
-                    const int v = state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))];
+                    int v = best_test_v;
+                    if(v == -1) v = state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))];
 
                     assert(!use_probing || state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
 
