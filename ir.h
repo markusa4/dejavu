@@ -46,13 +46,13 @@ namespace dejavu {
             // TODO enable a "compressed state" only consisting of base (but code outside should be oblivious to it)
             // TODO this is only supposed to be an "incomplete" state -- should there be complete states?
 
-            std::vector<int> base_vertex; /**< base of vertices of this IR node (optional) */
+            std::vector<int> base_vertex; /**< base of vertices of this IR node  */
             coloring c;                   /**< vertex coloring of this IR node   */
-            long invariant     = 0;       /**< hash of invariant of this IR node */
+            unsigned long invariant = 0;  /**< hash of invariant of this IR node */
             int trace_position = 0;       /**< position of trace of this IR node */
             int base_position  = 0;       /**< length of base of this IR node    */
         public:
-            void save(std::vector<int>& s_base_vertex, coloring &s_c, long s_invariant, int s_trace_position,
+            void save(std::vector<int>& s_base_vertex, coloring &s_c, unsigned long s_invariant, int s_trace_position,
                       int s_base_position) {
                 this->base_vertex = s_base_vertex;
                 this->c.copy_any(&s_c);
@@ -71,7 +71,7 @@ namespace dejavu {
             /**
              * @return hash of invariant of this IR node
              */
-            [[nodiscard]] long get_invariant_hash() const {
+            [[nodiscard]] unsigned long get_invariant_hash() const {
                 return invariant;
             }
 
@@ -107,11 +107,11 @@ namespace dejavu {
             int touched_color_list_pt;
             int singleton_pt;
 
-            int           trace_pos;
-            long trace_hash;
+            int  trace_pos;
+            unsigned long trace_hash;
 
             base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt, int tracePos,
-                      long traceHash) :
+                      unsigned long traceHash) :
                       color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
                       singleton_pt(singletonPt), trace_pos(tracePos), trace_hash(traceHash) {}
         };
@@ -143,17 +143,11 @@ namespace dejavu {
 
             // statistics
             int   s_base_pos = 0; /**< how large the base of the current IR node is*/
-
-            // settings
-            int   h_deviation_inc = 48; /**< how many additional splits to wait before terminating whenever
-                                         * use_increase_deviation is used  */
         private:
             refinement* R; /**< refinement workspace to use */
             trace *cT = nullptr; /**< comparison trace */
             trace internal_T1; /**< trace 1 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
             trace internal_T2; /**< trace 2 -- trace 1 and trace 2 can be flipped to switch from reading to writing */
-
-
 
             std::vector<int>       internal_compare_singletons;  /** singletons of the comparison trace */
             std::vector<int>       internal_compare_base_vertex; /** comparison base */
@@ -165,9 +159,9 @@ namespace dejavu {
 
             // the following workspaces are only used for the paired color dfs (AKA the saucy-style dfs) -- not needed
             // for normal bfs, dfs, or random search operation
-            mark_set  diff_tester; /**< used for algorithms for 'difference testing' */
-            mark_set  diff_vertices; /**< vertices that differ */
-            mark_set  diff_is_singleton; /**< vertices are singleton */
+            mark_set  diff_tester;        /**< used for algorithms for 'difference testing' */
+            mark_set  diff_vertices;      /**< vertices that differ */
+            mark_set  diff_is_singleton;  /**< vertices are singleton */
             worklist  diff_vertices_list; /**< vertices that differ, but in a list */
             worklist  diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
                                                *  above */
@@ -190,6 +184,13 @@ namespace dejavu {
             bool h_trace_early_out = false;       /**< use trace early out                */
             bool h_deviation_inc_active  = false; /**< use increased trace deviation      */
             int  s_deviation_inc_current = 0;     /**< number of current trace deviations */
+            int  h_deviation_inc = 48; /**< how many additional splits to wait before terminating whenever
+                                         * use_increase_deviation is used  */
+
+            bool h_use_split_limit = false;
+            int  h_split_limit     = 0;
+
+            int  s_splits = 0;
 
             /**
              * Marks all colors of the current coloring as "touched". Used on the initial coloring, since we never want
@@ -246,10 +247,12 @@ namespace dejavu {
                 s_deviation_inc_current += (!cont);
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
-                const bool ndone = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
-                                    && s_base_pos - 1 < compare_base->size()
-                                    && (*compare_base)[s_base_pos - 1].cells == c->cells); // compare_base_cells[s_base_pos - 1] == c->cells
-                return ndone && (cont || deviation_override);
+                const bool continue_cell_limit = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
+                                                   && s_base_pos - 1 < compare_base->size()
+                                                   && (*compare_base)[s_base_pos - 1].cells == c->cells);
+                ++s_splits;
+                const bool continue_split_limit = !h_use_split_limit || (s_splits < h_split_limit);
+                return continue_split_limit && continue_cell_limit && (cont || deviation_override);
             }
 
             std::function<type_split_color_hook> self_split_hook() {
@@ -457,10 +460,26 @@ namespace dejavu {
 
                 for(int i = 0; i < c->domain_size;) {
                     const int col_sz =  c->ptn[i] + 1;
+
                     if(col_sz == 1 && c->lab[i] != leaf_color.lab[i]) {
                         automorphism->write_single_map(c->lab[i], leaf_color.lab[i]);
                     }
                     i += col_sz;
+                }
+            }
+
+            void color_diff_automorphism_base(groups::automorphism_workspace*  automorphism) {
+                automorphism->reset();
+
+                for(int i = 0; i < c->domain_size; ++i) {
+
+                    const int v1 = i;
+                    const int col = c->vertex_to_lab[i];
+                    const int v2  = leaf_color.lab[col];
+
+                    if(v1 != v2) {
+                        automorphism->write_single_map(v1, v2);
+                    }
                 }
             }
 
@@ -674,7 +693,7 @@ namespace dejavu {
 
             /**
              * Compare all following computations to this IR node. The \a mode must be set to `IR_MODE_RECORD_TRACE`
-             * (using \a mode_write_base) to call this function. Changes the \a mode to `IR_MODE_COMPARE_TRACE_REVERSIBLE`
+             * (using \a mode_write_base) to call this function. Changes \a mode to `IR_MODE_COMPARE_TRACE_REVERSIBLE`
              * (i.e., such as calling \a mode_compare_base).
              */
             void compare_to_this() {
@@ -747,6 +766,29 @@ namespace dejavu {
             }
 
             /**
+             * Whether to record additional deviation information once a deviation from the comparison trace is found.
+             * Only applicable when \a use_trace_early_out is set. Essentially delays the termination of color refinement
+             * to record more information into the trace invariant.
+             *
+             * @param deviation_inc how many deviations to add before terminating (default = 48)
+             */
+            void set_increase_deviation(int deviation_inc = 48) {
+                h_deviation_inc = deviation_inc;
+            }
+
+            /**
+             * Whether to record additional deviation information once a deviation from the comparison trace is found.
+             * Only applicable when \a use_trace_early_out is set. Essentially delays the termination of color
+             * refinement to record more information into the trace invariant.
+             *
+             * @param deviation_inc_active Whether increased deviation is recorded or not.
+             */
+            void use_split_limit(bool use_split_limit, int limit = 0) {
+                h_use_split_limit = use_split_limit;
+                h_split_limit = limit;
+            }
+
+            /**
              * Resets whether the trace is deemed equal to its comparison trace.
              */
             void reset_trace_equal() {
@@ -777,28 +819,6 @@ namespace dejavu {
                 T->reset_trace_equal();
                 T->set_compare(true);
                 s_base_pos = state.get_base_position();
-                base_vertex = state.get_base();
-
-                // these become meaningless, so clear them out
-                base.clear();
-
-                // if reversible, need to reset touched colors
-                if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
-            }
-
-            /**
-             * Load a partial state into this controller.
-             *
-             * @param state A reference to the limited_save from which the state will be loaded.
-             */
-            void __attribute__((noinline)) load_reduced_state_ancestor(limited_save &state) {
-                c->copy_from_ir_ancestor(state.get_coloring());
-
-                T->set_hash(state.get_invariant_hash());
-                T->set_position(state.get_trace_position());
-                T->reset_trace_equal();
-                T->set_compare(true);
-                s_base_pos  = state.get_base_position();
                 base_vertex = state.get_base();
 
                 // these become meaningless, so clear them out
@@ -848,8 +868,28 @@ namespace dejavu {
              *
              * @param g The graph.
              */
-            void __attribute__((noinline)) write_strong_invariant(const sgraph* g) const {
-                for(int l = 0; l < g->v_size; ++l) { // "half of them should be enough"...
+            void write_strong_invariant(const sgraph* g) const {
+                for(int l = 0; l < g->v_size; ++l) {
+                    const int v = c->lab[l];
+                    unsigned int inv1 = 0;
+                    const int start_pt = g->v[v];
+                    const int end_pt   = start_pt + g->d[v];
+                    for(int pt = start_pt; pt < end_pt; ++pt) {
+                        const int other_v = g->e[pt];
+                        inv1 += hash((unsigned int) c->vertex_to_col[other_v]);
+                    }
+                    T->op_additional_info((int) inv1);
+                }
+            }
+
+            /**
+             * Writes a stronger invariant using the internal coloring and graph to the trace, but less strong than the
+             * one written by \a write_strong_invariant.
+             *
+             * @param g The graph.
+             */
+            void write_strong_invariant_quarter(const sgraph* g) const {
+                for(int l = 0; l < g->v_size; l += 4) {
                     const int v = c->lab[l];
                     unsigned int inv1 = 0;
                     const int start_pt = g->v[v];
@@ -869,9 +909,10 @@ namespace dejavu {
              * @param g the graph
              * @param v the vertex to be individualized
              */
-            void __attribute__((noinline)) move_to_child(sgraph *g, int v) {
+            void move_to_child(sgraph *g, int v) {
                 // always keep track of vertex base
                 ++s_base_pos;
+                s_splits = 0;
                 base_vertex.push_back(v);
 
                 assert(!s_cell_active);
@@ -880,7 +921,7 @@ namespace dejavu {
                 const int singleton_pt     = (int) singletons.size();
                 const int touched_color_pt = touched_color_list.cur_pos;
                 const int trace_pos        = T->get_position();
-                const long trace_hash      = T->get_hash();
+                const unsigned long trace_hash      = T->get_hash();
 
                 // determine color
                 const int prev_col    = c->vertex_to_col[v];
@@ -938,7 +979,7 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void __attribute__((noinline)) move_to_parent() {
+            void move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
                 assert(base.size() > 0);
 
@@ -1005,7 +1046,7 @@ namespace dejavu {
              * @param automorphism The automorphism.
              * @return Whether \p automorphism is an automorphism of \p g.
              */
-            bool __attribute__((noinline))  certify(sgraph* g, groups::automorphism_workspace& automorphism) {
+            bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
                 if(automorphism.nsupport() > g->v_size/4) {
                     return R->certify_automorphism(g, automorphism.perm());
                 } else {
@@ -1021,7 +1062,7 @@ namespace dejavu {
          * Heuristics which enable the creation of different cell selectors, as well as moving an \ref controller to a
          * leaf of the IR tree.
          */
-        class base_selector {
+        class cell_selector_factory {
             const int locked_lim = 512;
 
             std::vector<int> saved_color_base;
@@ -1058,13 +1099,13 @@ namespace dejavu {
         public:
 
             /**
-             * Dynamic cell selector, chooses first non-trivial color class, unless color class from stored base is
+             * Cell selector, chooses first non-trivial color class, unless color class from stored base is
              * applicable.
              *
              * @param c Coloring from which a color class shall be selected.
              * @param base_pos Current position in base.
              */
-            int dynamic_selector_first(const coloring *c, const int base_pos) {
+            int cell_selector(const coloring *c, const int base_pos) {
                 if (base_pos >= 0 && base_pos < (int) saved_color_base.size() && c->ptn[saved_color_base[base_pos]] > 0 &&
                     c->vertex_to_col[c->lab[saved_color_base[base_pos]]] == saved_color_base[base_pos] &&
                         c->ptn[saved_color_base[base_pos]] + 1 == saved_color_sizes[base_pos]) {
@@ -1087,7 +1128,7 @@ namespace dejavu {
              * @return A selector hook based on the saved base and configured dynamic selector.
              */
             std::function<type_selector_hook> *get_selector_hook() {
-                dynamic_seletor = std::bind(&base_selector::dynamic_selector_first, this, std::placeholders::_1,
+                dynamic_seletor = std::bind(&cell_selector_factory::cell_selector, this, std::placeholders::_1,
                                             std::placeholders::_2);
                 return &dynamic_seletor;
             }
@@ -1099,8 +1140,17 @@ namespace dejavu {
                 return ir_tree_size_estimate;
             }
 
-            void __attribute__((noinline)) find_base(sgraph *g, controller *state, controller *state_probe,
-                                                     const int h_choose, const int h_budget) {
+            /**
+             * Creates and stores a new cell selector.
+             *
+             * @param g the graph
+             * @param state ir controller that is navigated to the new target leaf
+             * @param state_probe ir controller used for auxiliary probing
+             * @param h_choose chooses strategy of the new cell selector
+             * @param h_budget available budget
+             */
+            void make_cell_selector(sgraph *g, controller *state, controller *state_probe, const int h_choose,
+                                    const int h_budget) {
                 int perturbe = 0;
                 if(h_choose > 6) {
                     perturbe = (int) (hash(h_choose) % 256);
@@ -1129,6 +1179,7 @@ namespace dejavu {
                         break;
                 }
 
+                // now save the selector and make some estimates
                 ir_tree_size_estimate.mantissa = 1.0;
                 ir_tree_size_estimate.exponent = 0;
 
@@ -1660,36 +1711,12 @@ namespace dejavu {
             }
         };
 
-        struct scored_base {
-            double bfs_score  = INT32_MAX;
-            double rand_score = INT32_MAX;
-            std::vector<int> base_vertex;
-
-            bool assured_bfs_pruning = false;
-            int  level               = 0;
-
-            void replace_if_better(std::vector<int>& base, double bfs, double rand, int bfs_level, bool assured_prune) {
-                if(stored_is_better(base, bfs, rand, bfs_level, assured_prune)) return;
-                base_vertex         = base;
-                bfs_score           = bfs;
-                rand_score          = rand;
-                level               = bfs_level;
-                assured_bfs_pruning = assured_prune;
-            }
-
-            bool stored_is_better(std::vector<int>& base, double bfs, double rand, int bfs_level, bool assured_prune) {
-                if(assured_prune && !assured_bfs_pruning)  return true;
-                if(level >= bfs_level && bfs_score < bfs)  return true;
-                return false;
-            }
-        };
-
         /**
          *  \brief Store deviations for a BFS level
          */
         class deviation_map {
         private:
-            std::unordered_set<long> deviation_map;
+            std::unordered_set<unsigned long> deviation_map;
             int computed_for_base = 0;
             int expected_for_base = 0;
             bool deviation_done = false;
@@ -1708,7 +1735,7 @@ namespace dejavu {
                 deviation_done = false;
             }
 
-            void record_deviation(long deviation) {
+            void record_deviation(unsigned long deviation) {
                 deviation_map.insert(deviation);
                 ++computed_for_base;
                 assert(computed_for_base <= expected_for_base);
@@ -1721,13 +1748,13 @@ namespace dejavu {
                 check_finished();
             }
 
-            bool check_deviation(long deviation) {
+            bool check_deviation(unsigned long deviation) {
                 return !deviation_done || deviation_map.contains(deviation);
             }
         };
 
         /**
-         * \brief An IR leaf
+         * \brief IR leaf
          *
          * A stored leaf of an IR tree. The leaf can be stored in a dense manner (coloring of the leaf), or a sparse
          * manner (base of the walk that leads to this leaf).
@@ -1775,12 +1802,12 @@ namespace dejavu {
          */
         class shared_leaves {
             std::mutex lock;
-            std::unordered_multimap<long, stored_leaf*> leaf_store;
+            std::unordered_multimap<unsigned long, stored_leaf*> leaf_store;
             std::vector<stored_leaf*> garbage_collector;
 
         public:
             int s_leaves          = 0;   /**< number of leaves stored */
-            int h_full_save_limit = 100; /**< number of leaves which will be stored fully */
+            int h_full_save_limit = 256; /**< number of leaves which will be stored fully */
 
             shared_leaves() {
                 leaf_store.reserve(20);
@@ -1801,7 +1828,7 @@ namespace dejavu {
              * @param hash
              * @return
              */
-            stored_leaf* lookup_leaf(long hash) {
+            stored_leaf* lookup_leaf(unsigned long hash) {
                 lock.lock();
                 auto find = leaf_store.find(hash);
                 if(find != leaf_store.end()) {
@@ -1820,7 +1847,7 @@ namespace dejavu {
              * @param hash
              * @param ptr
              */
-            void add_leaf(long hash, coloring& c, std::vector<int>& base) {
+            void add_leaf(unsigned long hash, coloring& c, std::vector<int>& base) {
                 lock.lock();
 
                 // check whether hash already exists
@@ -1835,7 +1862,7 @@ namespace dejavu {
                        = full_save?stored_leaf::stored_leaf_type::STORE_LAB:stored_leaf::stored_leaf_type::STORE_BASE;
                 auto new_leaf
                        = full_save?new stored_leaf(c.lab,c.domain_size, type):new stored_leaf(base, type);
-                leaf_store.insert(std::pair<long, stored_leaf*>(hash, new_leaf));
+                leaf_store.insert(std::pair<unsigned long, stored_leaf*>(hash, new_leaf));
                 garbage_collector.push_back(new_leaf);
                 ++s_leaves;
                 lock.unlock();
@@ -1851,6 +1878,9 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief A node of an IR tree
+         */
         class tree_node {
             std::mutex    lock;
             limited_save* data = nullptr;
@@ -1859,7 +1889,7 @@ namespace dejavu {
             tree_node*    parent;
             bool          is_base = false;
             bool          is_pruned = false;
-            long          hash = 0;
+            unsigned long hash = 0;
         public:
             tree_node(limited_save* data, tree_node* next, tree_node* parent, bool owns_data) {
                 this->data = data;
@@ -1889,11 +1919,11 @@ namespace dejavu {
             [[nodiscard]] bool get_prune() const {
                 return is_pruned;
             }
-            void add_hash(long add) {
+            void add_hash(unsigned long add) {
                 this->hash += add;
             }
 
-            [[nodiscard]] long get_hash() const {
+            [[nodiscard]] unsigned long get_hash() const {
                 return hash;
             }
 
@@ -1930,7 +1960,7 @@ namespace dejavu {
 
             std::vector<int> current_base;
 
-            std::vector<unsigned long> node_invariant; // TODO: move this to inprocessor
+            std::vector<unsigned long> node_invariant; // TODO: move this to inprocessor?
 
             bool init = false;
         public:
@@ -1943,17 +1973,13 @@ namespace dejavu {
                 h_bfs_top_level_orbit.initialize(domain_size);
             };
 
-            // TODO: move this to inprocessor
+            // TODO: move this to inprocessor?
             void make_node_invariant(int domain_size) {
                 if(finished_up_to > 1) {
                     for(int j = finished_up_to; j >= 1; --j) {
                         finish_level(j);
                         for(auto node : tree_data_jump_map[j]) {
-                            //node->get_parent()->add_hash(node->get_hash() + 1);
                             const int v = node->get_save()->get_base()[0];
-                            //node_invariant[v] += 1;//+node->get_hash();
-                            //node_invariant[v] += hash(j);
-                            //node_invariant[node->get_save()->get_base()[j-1]] = (hash(j) + node->get_hash());
                             unsigned long add_hash = 1;
                             add_hash = add_to_hash(add_hash, node->get_hash());
                             add_hash = add_to_hash(add_hash, hash(j));
@@ -1970,11 +1996,6 @@ namespace dejavu {
                             node_invariant[v] += add_hash + 1;
                         }
                     }
-                    /*for(int i = 0; i < domain_size; ++i) {
-                        auto node = tree_data_jump_map[1][i];
-                        const int v = node->get_save()->get_base()[0];
-                        node_invariant[v] += node->get_hash();
-                    }*/
                 }
             }
 
@@ -2086,11 +2107,11 @@ namespace dejavu {
                 } while (next != first);
             }
 
-            void record_invariant(int v, long inv) {
+            void record_invariant(int v, unsigned long inv) {
                 node_invariant[v] = inv;
             }
 
-            void record_add_invariant(int v, long inv) {
+            void record_add_invariant(int v, unsigned long inv) {
                 node_invariant[v] += inv;
             }
 

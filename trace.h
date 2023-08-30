@@ -252,7 +252,7 @@ namespace dejavu {
             /**
              * @return A hash value summarizing the operations recorded in this trace.
              */
-            [[nodiscard]] long get_hash() const {
+            [[nodiscard]] unsigned long get_hash() const {
                 return hash;
             }
 
@@ -260,7 +260,7 @@ namespace dejavu {
              * Sets the hash value to a pre-determined value.
              * @param hash The hash value.
              */
-            void set_hash(long new_hash) {
+            void set_hash(unsigned long new_hash) {
                 this->hash = new_hash;
             }
 

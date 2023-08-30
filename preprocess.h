@@ -3394,33 +3394,40 @@ namespace sassy {
             bool has_deg_2 = false;
             bool has_discrete = false;
             bool graph_changed = false;
+            int count_deg0 = 0;
+            int count_deg1 = 0;
             int count_deg2 = 0;
+            int count_discrete = 0;
 
             for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
+                const int col_sz = c.ptn[i] + 1;
                 switch (g->d[v]) {
                     case 0:
-                        has_deg_0 = true;
+                        count_deg0 += col_sz;
                         break;
                     case 1:
-                        has_deg_1 = true;
+                        count_deg1 += col_sz;
                         break;
                     case 2:
-                        ++count_deg2;
-                        //has_deg_2 = true;
+                        count_deg2 += col_sz;
                         break;
                     default:
                         break;
                 }
-                const int col_sz = c.ptn[i] + 1;
-                has_discrete = has_discrete || col_sz == 1;
+                count_discrete += (col_sz == 1);
                 i += col_sz;
             }
             copy_coloring_to_colmap(&c, colmap);
             PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
 
             //if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
+            has_deg_0 = (count_deg0 > 4);
+            has_deg_1 = (count_deg1 > 8);
             has_deg_2 = (count_deg2 > 16); /*< if there's only very few, there's really no point... */
+            has_discrete = (count_discrete > 4);
+
+            if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
 
             if (schedule != nullptr) {
                 del_e = dejavu::mark_set();

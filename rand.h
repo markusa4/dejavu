@@ -39,7 +39,7 @@ namespace dejavu::search_strategy {
          * @param local_state Local state in which the leaf will be stored.
          * @param start_from State from which the walk to the leaf is performed.
          */
-        static void __attribute__((noinline)) load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::limited_save &start_from,
+        static void load_state_from_leaf(sgraph *g, ir::controller &local_state, ir::limited_save &start_from,
                                   ir::stored_leaf *leaf) {
             assert(leaf->get_store_type() == ir::stored_leaf::STORE_BASE);
             std::vector<int> base;
@@ -51,31 +51,25 @@ namespace dejavu::search_strategy {
         /**
          * Co-routine which adds a leaf to leaf_storage, and sifts resulting automorphism into a given group.
          *
-         * @returns whether the hash already existed
+         * @returns whether an automorphism was found and it sifted successfully
          */
         bool __attribute__((noinline)) add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook,
                                                                      groups::compressed_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
                                            ir::controller &other_state, ir::limited_save &root_save, bool uniform) {
-            bool used_load = false;
-            bool hash_col  = false;
-
-            bool copied = false;
-
             assert(g->v_size == local_state.c->cells);
 
             // Outer loop to handle hash collisions -- at most h_hash_col_limit will be checked and stored
             for(int hash_offset = 0; hash_offset < h_hash_col_limit; ++hash_offset) {
-                // After first hash collision, we write a stronger invariant
-                if(hash_offset == 1) {
-                    local_state.write_strong_invariant(g);
-                }
+                // after first hash collision, we write a stronger invariant
+                if(hash_offset == 1) local_state.write_strong_invariant_quarter(g);
 
-                // TODO might lead to discarding leaves... should actually save whether cert failed, and then just do
-                //  this before the loop if that flag is set
+                // after second hash collision, an even stronger one
+                if(hash_offset == 2) local_state.write_strong_invariant(g);
 
                 // First, test whether leaf with same hash has already been stored
-                const long hash_c = local_state.T->get_hash() + hash_offset; // '+hash_offset' is for hash collisions
+                const unsigned long hash_c = local_state.T->get_hash() + hash_offset; // '+hash_offset' is for hash
+                                                                                      // collisions
                 auto other_leaf = leaf_storage.lookup_leaf(hash_c);
 
                 // If not, add leaf to leaf_storage
@@ -115,16 +109,17 @@ namespace dejavu::search_strategy {
                     bool sift = group.sift(*gws_schreierw, *gws_automorphism, uniform);
                     gws_automorphism->reset();
 
-                    //if((sift && h_sift_random && s_paths > h_sift_random_lim) || group.s_compression_ratio <= 0.1) { // 025
-                    // good: hypercubes(!), lattice, triang, maybe tran? -- bad: latin, pg, maybe crafted?
-                    //if(true) {
-                    if(sift && group.s_densegen() + group.s_sparsegen() > 1) {
+                    if(sift && group.s_densegen() + group.s_sparsegen() > 1 && s_random_sift_success > -5) {
                         int fail = 3; // 3
+                        bool any_changed = false;
                         while(fail >= 0) {
                             const bool sift_changed = group.sift_random(*gws_schreierw, *gws_automorphism, generator);
-                            //std::cout << "r_sift_changed: " << sift_changed << std::endl;
+                            any_changed = sift_changed || any_changed;
                             fail -= !sift_changed;
                         }
+
+                        s_random_sift_success += any_changed?1:-1;
+                        s_random_sift_success  = std::max(std::min(s_random_sift_success, 5), -5);
                     }
 
                     gws_automorphism->reset();
@@ -132,7 +127,7 @@ namespace dejavu::search_strategy {
                 }
             }
             gws_automorphism->reset();
-            return hash_col;
+            return false;
         }
 
     public:
@@ -148,6 +143,8 @@ namespace dejavu::search_strategy {
         int       s_succeed       = 0;                    /**< how many total paths have succeeded        */
         int       s_leaves        = 0;                    /**< how many leaves were added                 */
 
+        int s_random_sift_success = 0;
+
         // settings for heuristics
         bool      h_look_close      = false;              /**< whether to use trace early out on first level   */
         const int h_hash_col_limit  = 32;                 /**< limit for how many hash collisions are allowed  */
@@ -155,7 +152,7 @@ namespace dejavu::search_strategy {
         int       h_sift_random_lim = 8;                  /**< after how many paths random elements are sifted */
         int       h_randomize_up_to = INT32_MAX;          /**< randomize vertex selection up to this level */
 
-        void setup(bool look_close = false) {
+        void use_look_close(bool look_close = false) {
             h_look_close = look_close;
         }
 
@@ -228,11 +225,16 @@ namespace dejavu::search_strategy {
 
             other_state.link_compare(&local_state);
 
-            int s_cell_initial = start_from->get_coloring()->cells;
+            int    s_cell_initial   = start_from->get_coloring()->cells;
+            double progress_initial = 1.0 * s_cell_initial / g->v_size;
+
+            const int target_level = ir_tree.get_finished_up_to();
+
+            int s_sifting_success = 0;
 
             while(!group.probabilistic_abort_criterion() && !group.deterministic_abort_criterion() &&
                     s_paths_failany < fail_limit) {
-                local_state.load_reduced_state(*start_from); // TODO can load more efficiently
+                local_state.load_reduced_state(*start_from);
 
                 int could_start_from = group.finished_up_to_level();
 
@@ -249,20 +251,14 @@ namespace dejavu::search_strategy {
                     local_state.save_reduced_state(my_own_save); // from now on, we start from this save!
                     start_from = &my_own_save;
 
-                    const int s_cells_now = start_from->get_coloring()->cells;
+                    const int s_cells_now     = start_from->get_coloring()->cells;
+                    const double progress_now = 1.0 * s_cells_now / g->v_size;
 
-                    if(s_cells_now - s_cell_initial > 10000) {
+                    if(progress_now - progress_initial > 0.1) {
                         progress_current_method("random", "root_cells", 1.0 * s_cells_now / g->v_size, "base_pos",
-                                                could_start_from);
-                        //std::cout << "                  " << ">root-cells " << 1.0 * s_cells_now / g->v_size << std::endl;
-
-                        // TODO we should at least recompress the Schreier structure here
-                        // TODO probably also inprocess the graph...
-                        // TODO ... maybe for the sake of the code not supposed to become shit just stop, go to inprocess,
-                        // TODO and restart? should be way easier to implement, although not as efficient because we throw
-                        // TODO away DFS unnecessarily
-
-                        s_cell_initial = s_cells_now;
+                                                could_start_from, "sift", s_sifting_success, "rsift", s_random_sift_success);
+                        s_cell_initial   = s_cells_now;
+                        progress_initial = progress_now;
                     }
                 }
 
@@ -282,7 +278,7 @@ namespace dejavu::search_strategy {
 
                     // if we are beyond where we need to sift, and we don't want to sample uniformly at random, we
                     // stop picking random elements whatsoever
-                    if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
+                    /*if(base_pos >= h_randomize_up_to && !h_sift_random && ir_tree.stored_leaves.s_leaves <= 1 &&
                        base_pos < static_cast<int>(local_state.compare_base_vertex->size())) {
                         uniform    = false; // sampled leaf not uniform anymore now
                         choose_pos = col;   // just pick first vertex of color
@@ -291,7 +287,23 @@ namespace dejavu::search_strategy {
                         const int v_base = (*local_state.compare_base_vertex)[base_pos];
                         const int v_base_col = local_state.c->vertex_to_col[v_base];
                         if(col == v_base_col) choose_pos = local_state.c->vertex_to_lab[v_base];
+                    }*/
+
+                    // in the case where we are not succeeding in sifting randomly generated elements in the group
+                    // itself, let's try to create sparse generators by trying to stick to the base after a few
+                    // individualizations
+                    if(base_pos > start_from_base_pos + 1 && g->v_size > 5000 && s_sifting_success >= 0 &&
+                       s_random_sift_success < 0 &&  base_pos < local_state.compare_base_vertex->size()) {
+                        // or even better: let's choose the base vertex, if it's in the correct color
+                        const int v_base     = (*local_state.compare_base_vertex)[base_pos];
+                        const int v_base_col = local_state.c->vertex_to_col[v_base];
+
+                        if(col == v_base_col) {
+                            uniform = false;
+                            choose_pos = local_state.c->vertex_to_lab[v_base];
+                        }
                     }
+
                     int v = local_state.c->lab[choose_pos];
 
                     // base-aware search: if we are still walking along the base, and the vertex we picked is in the
@@ -309,26 +321,22 @@ namespace dejavu::search_strategy {
                         }
                     }
 
-                    if(group.is_in_base_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
+                    /*if(group.is_in_base_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
                         v = group.base_point(local_state.s_base_pos);
                         assert(local_state.c->vertex_to_col[v] == col);
                         uniform = false; // not uniform anymore!
                     } else {
                         base_aligned = false; // we stopped walking along the base
-                    }  //base_aligned = false;
-
-                    //std::cout << "-----" << base_pos << ", " << col_sz  << ", " << v << std::endl;
-
-                    //if(local_state.s_base_pos == 14) std::cout << "picked " << v << std::endl;
+                    }*/
 
                     assert(local_state.c->vertex_to_col[v] == col);
                     const int trace_pos_pre = local_state.T->get_position();
-                    local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
+                    local_state.use_trace_early_out((base_pos == target_level) && !h_look_close);
                     local_state.move_to_child(g, v);
 
                     // keep track of some statistics for the first individualization (these statistics are used for
                     // decisions concerning breadth-first search)
-                    if(base_pos == start_from_base_pos) {
+                    if(base_pos == target_level) {
                         s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
                         s_paths_fail1 += !local_state.T->trace_equal();
                         s_rolling_first_level_success =
@@ -341,15 +349,18 @@ namespace dejavu::search_strategy {
                 }
 
                 ++s_paths;
-                if(base_pos == start_from_base_pos) { // did not arrive in a leaf
+                if(base_pos == target_level) { // did not arrive in a leaf
                     ++s_paths_failany;
                     continue;
                 }
 
                 // we arrived at a leaf... let's check whether we already have an equivalent leaf to form an
                 // automorphism -- or add this leaf to the storage
-                add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state, other_state,
-                                              *root_save, uniform);
+                const bool sift = add_leaf_to_storage_and_group(g, hook, group, ir_tree.stored_leaves, local_state,
+                                                                other_state, *root_save, uniform);
+                s_sifting_success += sift?1:-1;
+                s_sifting_success += sift && !uniform?1:0;
+                s_sifting_success = std::max(std::min(s_sifting_success, 10), -10);
             }
         }
 
@@ -376,8 +387,6 @@ namespace dejavu::search_strategy {
             local_state.use_trace_early_out(false);
             s_rolling_first_level_success = 1;
             const int pick_from_level = ir_tree.get_finished_up_to();
-            int last_v = -1;
-            bool use_leaf_doubling = true;
 
             other_state.link_compare(&local_state);
 
@@ -399,7 +408,6 @@ namespace dejavu::search_strategy {
                     const int col_sz = local_state.c->ptn[col] + 1;
                     const int rand = ((int) generator()) % col_sz;
                     int v = local_state.c->lab[col + rand];
-                    last_v = v;
                     const int trace_pos_pre = local_state.T->get_position();
                     local_state.use_trace_early_out((base_pos == start_from_base_pos) && !h_look_close);
                     local_state.move_to_child(g, v);

@@ -96,7 +96,7 @@ namespace dejavu {
 
         friend bool operator<(const big_number& l, const big_number& r)
         {
-            return (l.exponent < r.exponent) || (l.exponent == r.exponent && l.mantissa < r.mantissa);
+            return (l.exponent < r.exponent) || (l.exponent == r.exponent && l.mantissa+0.01 < r.mantissa);
         }
 
         friend bool operator==(const big_number& l, const big_number& r)
@@ -180,6 +180,14 @@ namespace dejavu {
                                         std::string var3, double var3_val) {
         PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
                                << ", " << var3 << "=" << var3_val);
+    }
+
+    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
+                                        std::string var2, int var2_val,
+                                        std::string var3, int var3_val,
+                                        std::string var4, int var4_val) {
+        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
+                               << ", " << var3 << "=" << var3_val << ", " << var4 << "=" << var4_val);
     }
 
     static void progress_print_split() {

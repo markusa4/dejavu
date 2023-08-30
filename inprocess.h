@@ -43,13 +43,31 @@ namespace dejavu::search_strategy {
                 std::vector<unsigned long> *map;
                 int* colmap;
 
-                explicit comparator_map(std::vector<unsigned  long> *map, int* colmap) {
+                explicit comparator_map(std::vector<unsigned long> *map, int* colmap) {
                     this->map = map;
                     this->colmap = colmap;
                 }
 
                 bool operator()(const int &a, const int &b) {
                     return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && ((*map)[a] < (*map)[b]));
+                }
+            };
+            auto c = comparator_map(map, colmap);
+            std::sort(nodes.begin(), nodes.end(), c);
+        }
+
+        void sort_nodes_map(unsigned long* map, int* colmap) {
+            struct comparator_map {
+                unsigned long *map;
+                int* colmap;
+
+                explicit comparator_map(unsigned long *map, int* colmap) {
+                    this->map = map;
+                    this->colmap = colmap;
+                }
+
+                bool operator()(const int &a, const int &b) {
+                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && (map[a] < map[b]));
                 }
             };
             auto c = comparator_map(map, colmap);
@@ -68,12 +86,72 @@ namespace dejavu::search_strategy {
          * @return whether any preprocessing was performed
          */
         bool inprocess(sgraph *g, ir::shared_tree *tree, groups::compressed_schreier *group, ir::controller &local_state,
-                       ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess) {
+                       ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess,
+                       bool use_shallow_inprocess) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/
             bool touched_coloring = false; /*< whether we change the root_save or not, i.e., whether we change
                                             *  anything */
+
+            if (use_shallow_inprocess && !(tree->get_finished_up_to() >= 1 && use_bfs_inprocess)) { // did we do BFS?
+                worklist hash(g->v_size);
+                worklist_t<unsigned long> inv(g->v_size);
+
+                nodes.reserve(g->v_size);
+                nodes.clear();
+
+                local_state.use_reversible(true);
+                local_state.use_trace_early_out(true);
+                local_state.use_increase_deviation(true);
+                local_state.use_split_limit(true, 8);
+
+                for(int i = 0; i < g->v_size; ++i) {
+                    local_state.T->set_hash(0);
+                    local_state.reset_trace_equal();
+                    const int col = local_state.c->vertex_to_col[i];
+                    const int col_sz = local_state.c->ptn[col] + 1;
+                    if(col_sz >= 2) {
+                        local_state.move_to_child(g, i);
+                        inv[i] = local_state.T->get_hash();
+                        local_state.move_to_parent();
+                    } else {
+                        inv[i] = 0;
+                    }
+                }
+
+                local_state.use_trace_early_out(false);
+                local_state.use_increase_deviation(false);
+                local_state.use_split_limit(false);
+
+                int num_of_hashs = 0;
+
+                for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
+                sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
+                unsigned long last_inv = -1;
+                int last_col  = local_state.c->vertex_to_col[0];
+                for(int i = 0; i < g->v_size; ++i) {
+                    const int v      = nodes[i];
+                    const unsigned long v_inv = inv[v];
+                    const int  v_col = local_state.c->vertex_to_col[v];
+                    if(last_col != v_col) {
+                        last_col = v_col;
+                        last_inv = v_inv;
+                        ++num_of_hashs;
+                    }
+                    if(v_inv != last_inv) {
+                        last_inv = v_inv;
+                        ++num_of_hashs;
+                    }
+                    hash[v] = num_of_hashs;
+                }
+
+                g->initialize_coloring(local_state.c, hash.get_array());
+                const int cell_after = local_state.c->cells;
+                if (cell_after != cell_prev) {
+                    local_state.refine(g);
+                }
+            }
 
             if (tree->get_finished_up_to() >= 1 && use_bfs_inprocess) { // did we do BFS?
                 // TODO: hashing actually makes this worse!
@@ -107,13 +185,7 @@ namespace dejavu::search_strategy {
                     }
                     hash[v] = num_of_hashs;
                 }
-                /*for (int i = 0; i < g->v_size; ++i) {
-                    hash[i]  = is_pruned.get(i);
-                    hash[i] += (int) (*tree->get_node_invariant())[i] % 512;
-                }
-                for (int i = 0; i < g->v_size; ++i) {
-                    hash[i] = 513 * local_state.c->vertex_to_col[i] + hash[i];
-                }*/
+
                 g->initialize_coloring(local_state.c, hash.get_array());
                 const int cell_after = local_state.c->cells;
                 /*progress_print("inpr_bfs", std::to_string(cell_prev),
@@ -234,9 +306,7 @@ namespace dejavu::search_strategy {
             inproc_can_individualize.clear();
             inproc_maybe_individualize.clear();
 
-
             if(cell_prev != local_state.c->cells) {
-                std::cout << cell_prev << "->" << local_state.c->cells << std::endl;
                 local_state.save_reduced_state(root_save);
                 touched_coloring = true;
             }

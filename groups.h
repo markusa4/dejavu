@@ -64,8 +64,10 @@ namespace dejavu {
             worklist automorphism;
             worklist automorphism_supp;
             int domain_size = 0;
-
             bool support01 = false;
+
+            workspace inverse_automorphism;
+            bool have_inverse_automorphism = false;
         public:
             /**
              * Initializes the stored automorphism to the identity.
@@ -74,9 +76,12 @@ namespace dejavu {
              */
             explicit automorphism_workspace(int domain_size) {
                 automorphism.allocate(domain_size);
-                for (int i = 0; i < domain_size; ++i)
+                for (int i = 0; i < domain_size; ++i) {
                     automorphism[i] = i;
+                }
                 automorphism_supp.allocate(domain_size);
+                inverse_automorphism.allocate(domain_size);
+                invalidate_inverse_automorphism();
                 this->domain_size = domain_size;
             }
 
@@ -102,6 +107,7 @@ namespace dejavu {
             void write_color_diff(const int *vertex_to_col, const int *col_to_vertex) {
                 color_diff_automorphism(domain_size, vertex_to_col, col_to_vertex, automorphism.get_array(),
                                         &automorphism_supp);
+                invalidate_inverse_automorphism();
             }
 
             /**
@@ -215,6 +221,74 @@ namespace dejavu {
 
                 // rewrite support
                 update_support();
+                invalidate_inverse_automorphism();
+            }
+
+            void update_inverse_automorphism() {
+                if(!have_inverse_automorphism) {
+                    for (int i = 0; i < domain_size; ++i) {
+                        const int j = automorphism[i];
+                        inverse_automorphism[j] = i;
+                    }
+                    have_inverse_automorphism = true;
+                }
+            }
+
+            void invalidate_inverse_automorphism() {
+                have_inverse_automorphism = false;
+            }
+
+            void apply_sparse(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
+                       const int *p, const int* support, const int nsupport, int pwr = 1) {
+                if (pwr == 0) return;
+                if(pwr == 1) {
+                    update_inverse_automorphism();
+
+                    scratch_apply1.reset();
+                    scratch_apply2.reset();
+                    for (int k = 0; k < nsupport; ++k) {
+                        const int i = support[k];
+                        assert(automorphism[inverse_automorphism[i]] == i);
+                        const int inv_i = inverse_automorphism[i];
+                        const int p_i   = p[i];
+                        automorphism[inv_i] = p_i;
+                        scratch_apply1.push_back(inv_i);
+                        scratch_apply2.push_back(p_i);
+                    }
+
+                    for(int k = 0; k < scratch_apply1.size(); ++k) {
+                        inverse_automorphism[scratch_apply2[k]] = scratch_apply1[k];
+                    }
+
+                    scratch_apply1.reset();
+                    scratch_apply2.reset();
+                } else if(pwr == 2) {
+                    update_inverse_automorphism();
+
+                    scratch_apply1.reset();
+                    scratch_apply2.reset();
+                    for (int k = 0; k < nsupport; ++k) {
+                        const int i = support[k];
+                        assert(automorphism[inverse_automorphism[i]] == i);
+                        const int inv_i = inverse_automorphism[i];
+                        const int p_i   = p[p[i]];
+                        automorphism[inv_i] = p_i;
+                        scratch_apply1.push_back(inv_i);
+                        scratch_apply2.push_back(p_i);
+                    }
+
+                    for(int k = 0; k < scratch_apply1.size(); ++k) {
+                        inverse_automorphism[scratch_apply2[k]] = scratch_apply1[k];
+                    }
+
+                    scratch_apply1.reset();
+                    scratch_apply2.reset();
+                } else {
+                    apply(scratch_apply1, scratch_apply2, scratch_apply3, p, pwr);
+                }
+
+                // rewrite support
+                update_support();
             }
 
 
@@ -238,6 +312,7 @@ namespace dejavu {
                         automorphism[from] = to;
                     }
                 }
+                invalidate_inverse_automorphism();
             }
 
             void write_single_map(const int from, const int to) {
@@ -246,12 +321,14 @@ namespace dejavu {
                     automorphism_supp.push_back(from);
                     automorphism[from] = to;
                 }
+                invalidate_inverse_automorphism();
             }
 
             /**
              * Reset the contained automorphism back to the identity.
              */
             void reset() {
+                invalidate_inverse_automorphism();
                 reset_automorphism(automorphism.get_array(), &automorphism_supp);
             }
 
@@ -796,7 +873,12 @@ namespace dejavu {
                 } else if (pwr > 0) { // use generator
                     generator->load(w.loader, w.scratch_auto);
                     // multiply
-                    automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
+                    if(generator->get_store_type() == stored_automorphism::STORE_DENSE) {
+                        automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
+                    } else {
+                        automorphism.apply_sparse(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(),
+                                           w.scratch_auto.support(), w.scratch_auto.nsupport(), pwr);
+                    }
                     w.scratch_auto.reset();
                 }
             }
@@ -1246,7 +1328,8 @@ namespace dejavu {
                 automorphism.reset();
                 automorphism.set_support01(true);
                 generate_random(w, automorphism, rn_generator);
-                return sift(w, automorphism, false);
+                const bool added_generator = sift(w, automorphism, false);
+                return added_generator;
             }
 
             /**

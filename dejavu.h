@@ -88,7 +88,7 @@ namespace dejavu {
             // want to print progress with a timer, initialize module
             timed_print m_printer;
 
-            // no colmap provided? let's substitute the trivial coloring
+            // no colmap provided? let's substitute a trivial vertex coloring
             if(colmap == nullptr) {
                 colmap_substitute.resize(g->v_size);
                 colmap = colmap_substitute.get_array();
@@ -159,8 +159,10 @@ namespace dejavu {
                 double s_random_score_bias = 1.0; /*< a bias for random search, whether we've gathered that the
                                                    *  technique does not seem to work on this graph */
 
+
                 bool s_few_cells  = false;
                 [[maybe_unused]] bool s_many_cells = false;
+                bool h_used_shallow_inprocess = false;
                 bool s_inprocessed = false; /*< flag which says that we've inprocessed the graph since last restart */
                 int s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                                 * case where all searchable bases became much larger due to BFS or other
@@ -175,7 +177,7 @@ namespace dejavu {
                 std::vector<int> base_sizes; /*< current size of colors on base_vertex */
 
                 // local modules and workspace, to be used by other modules
-                ir::base_selector     m_selectors;  /*< cell selector creation */
+                ir::cell_selector_factory     m_selectors;  /*< cell selector creation */
                 ir::refinement        m_refinement;          /*< workspace for color refinement and other utilities */
                 ds::domain_compressor m_compress;   /*< can compress a workspace of vertices to a subset of vertices */
                 groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
@@ -184,10 +186,7 @@ namespace dejavu {
                 // shared, global modules
                 sh_tree     = new ir::shared_tree(g->v_size);    /*< BFS levels, shared leaves, ...           */
                 sh_schreier = new groups::compressed_schreier(); /*< Schreier structure to sift automorphisms */
-                //sh_schreier->h_error_bound = h_error_bound; /*< pass the error bound parameter */
                 sh_schreier->set_error_bound(h_error_bound);
-
-                ir::scored_base best_base;
 
                 // initialize modules for high-level search strategies
                 search_strategy::dfs_ir      m_dfs;       /*< depth-first search */
@@ -204,20 +203,21 @@ namespace dejavu {
                 coloring local_coloring;
                 coloring local_coloring_left;
                 g->initialize_coloring(&local_coloring, colmap);
-                const bool s_regular = local_coloring.cells == 1; // Is the graph regular?
+                const bool s_regular = local_coloring.cells == 1; /*< is this graph regular? */
 
                 // set up a local state for IR computations
                 ir::controller local_state(&m_refinement,      &local_coloring); /*< controls movement in IR tree*/
                 ir::controller local_state_left(&m_refinement, &local_coloring_left);
+
                 // set deviation counter relative to graph size
-                local_state.h_deviation_inc = std::min(static_cast<int>(floor(3 * sqrt(g->v_size))), 128);
+                local_state.set_increase_deviation(std::min(static_cast<int>(floor(3 * sqrt(g->v_size))), 128));
                 local_state.reserve(); // reserve some space
 
                 // save root state for random and BFS search, as well as restarts
                 ir::limited_save root_save;
                 local_state.save_reduced_state(root_save); /*< root of the IR tree */
                 int s_last_base_size = g->v_size + 1;      /*< v_size + 1 is larger than any actual base_vertex*/
-                int dfs_level = -1;
+                int dfs_level = -1; /*< level up to which depth-first search was performed */
 
                 // now that we are set up, let's start solving the graph
                 // loop for restarts
@@ -235,7 +235,7 @@ namespace dejavu {
                         if (s_inproc_success >= 3) h_budget_inc_fact = 2;
                         if (s_inprocessed) h_budget = 1; /*< if we inprocessed, we hope that the graph is easy again */
                         h_budget *= s_inc_fac; /*< increase the budget */
-                        s_cost    = 0;            /* reset the cost */
+                        s_cost    = 0;         /*< reset the cost */
                     }
 
                     // keep vertices which are save to individualize for in-processing
@@ -243,7 +243,7 @@ namespace dejavu {
                     m_inprocess.inproc_maybe_individualize.clear();
 
                     // find a selector, moves local_state to a leaf of the IR tree
-                    m_selectors.find_base(g, &local_state, &local_state_left, s_restarts, h_budget);
+                    m_selectors.make_cell_selector(g, &local_state, &local_state_left, s_restarts, h_budget);
                     auto selector = m_selectors.get_selector_hook();
                     m_printer.timer_print("sel", local_state.s_base_pos, local_state.T->get_position());
                     int base_size = local_state.s_base_pos;
@@ -258,29 +258,24 @@ namespace dejavu {
 
                     // heuristics to determine whether we want to skip this base, i.e., is this obviously worse than
                     // what we've seen before, and is there no reason to look at it?
-                    const bool s_same_length     = base_size == s_last_base_size;
-                    const bool s_too_long_anyway = base_size > h_base_max_diff * s_last_base_size;
-                    const bool s_too_long_long = s_long_base && (base_size > 1.25 * s_last_base_size);
-                    //const bool s_too_long_hard = s_hard && !s_inprocessed && (base_size > s_last_base_size);
-                    const bool s_too_long      = s_too_long_anyway || s_too_long_long; // s_too_long_hard yes or no?
-                    const bool s_too_big  = (s_short_base && s_same_length &&
-                                            (s_last_tree_sz < s_tree_estimate))
-                                             || (s_inproc_success == 0 && (s_restarts > 3) && // TODO add "prunable" heuristic -- if it does not seem prunable, we should restart if tree is larger!
-                                              (s_last_tree_sz < s_tree_estimate) && !s_prunable);
-                    // && (base_size > s_last_base_size)
-                    std::cout << s_tree_estimate << std::endl;
+                    const bool s_too_long = base_size > h_base_max_diff * s_last_base_size && s_inproc_success <= 1;
+                    const bool s_too_big  = (s_inproc_success <= (s_regular + !s_prunable)) &&
+                                            (s_last_tree_sz < s_tree_estimate) &&
+                                            (s_restarts >= 2); // TODO was 3 at some point
 
-                    // the cell selector crystal ball: immediately discard this base if deemed too unfavourable by the
-                    // heuristics, unless we are discarding too often
-                    if ((s_too_big || s_too_long) && s_inproc_success < 1 && s_consecutive_discard < 3) {
+                    // immediately discard this base if deemed too unfavourable by the heuristics above, unless we are
+                    // discarding too often
+                    if ((s_too_big || s_too_long) && s_consecutive_discard < 3) {
+                        // TODO was s_inproc_success < 1
                         m_printer.timer_print("skip", local_state.s_base_pos, s_last_base_size);
                         ++s_consecutive_discard;
                         continue;
                     }
                     s_consecutive_discard = 0;    /*< reset counter since we are not discarding this one   */
                     s_last_base_size = base_size; /*< also reset `s_last_base_size` to current `base_size` */
-                    s_last_tree_sz = m_selectors.get_ir_size_estimate();
-                    const bool s_last_base_eq = (base_vertex == local_state.base_vertex);
+                    s_last_tree_sz   = m_selectors.get_ir_size_estimate(); /*< ...same with the IR tree size estimate */
+                    const bool s_last_base_eq = (base_vertex == local_state.base_vertex); /*< is this just the same
+                                                                                           *  base again? */
 
                     // make snapshot of trace and leaf, used by following search strategies
                     local_state.compare_to_this();
@@ -348,6 +343,7 @@ namespace dejavu {
                     int s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
                     int h_rand_fail_lim_total  = 0;
                     int h_rand_fail_lim_now    = 0;
+                    double s_path_fail1_avg  = 0;
 
                     // in the following, we will always decide between 3 different strategies: random paths, BFS, or
                     // inprocessing followed by a restart
@@ -371,7 +367,6 @@ namespace dejavu {
 
                         const bool s_have_rand_estimate = (m_rand.s_paths >= 4);  /*< for some estimations, we need a
                                                                                    *  few random paths */
-                        double s_path_fail1_avg  = 0;
                         double s_trace_cost1_avg = s_trace_full_cost;
 
                         int s_random_path_trace_cost = s_trace_full_cost - sh_tree->get_current_level_tracepos();
@@ -416,17 +411,21 @@ namespace dejavu {
                         }
 
                         // we override the above decisions in specific cases...
+                        // first, we consider our limits: budget, memory limits, ...
                         if (h_next_routine == bfs_ir && s_bfs_next_level_nodes * (1 - s_path_fail1_avg) > 2*h_budget)
                             h_next_routine = restart; /* best decision would be BFS, but it would exceed the budget a
                                                        * lot! */
 
-                        // let's obey the memory limits...
+                        // let's stick to the memory limits...
                         long s_bfs_est_mem_usage = round(s_bfs_next_level_nodes * (1 - s_path_fail1_avg) * g->v_size);
                         if (h_next_routine == bfs_ir && (s_bfs_est_mem_usage >h_bfs_memory_limit)) {
                             h_next_routine = random_ir;
                         }
 
+                        // let's stick to the budget...
                         if (s_cost > h_budget) h_next_routine = restart; /*< we exceeded our budget, restart */
+
+                        // ...unless...
                         if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
                             s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
                             h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
@@ -435,19 +434,25 @@ namespace dejavu {
                         if (h_next_routine == restart && 2*base_size > s_bfs_next_level_nodes
                             && s_trace_cost1_avg < base_size && s_path_fail1_avg > 0.01) h_next_routine = bfs_ir;
 
-                        // ... but if we are "almost done" with random search, we stretch the budget a bit
-                        // here are some definitions for "almost done"
+                        // ... and if we are "almost done" with random search, we stretch the budget a bit
+                        // here are some definitions for "almost done", because I can not come up with a single one
                         if (search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
                         if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
-                            h_next_routine = random_ir;// todo add back && h_next_routine == restart, but BFS should not reset rolling success...
+                            h_next_routine = random_ir;
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
                             h_next_routine == restart)
                             h_next_routine = random_ir;
+                        if (dfs_level == sh_tree->get_finished_up_to() && s_any_bfs_pruned && s_cost <= h_budget * 20)
+                            h_next_routine = random_ir;
 
-                        // immediately inprocess if BFS was successful in pruning the first level
-                        if (sh_tree->get_finished_up_to() == 1 && s_last_bfs_pruned) h_next_routine = restart;
+                        // immediately inprocess if bfs was successful in pruning the first level -- we somewhat don't
+                        // want to do too much bfs, since we have only very limited automorphism pruning capability
+                        if (sh_tree->get_finished_up_to() == 1 && dfs_level > 1 && s_last_bfs_pruned)
+                            h_next_routine = restart;
                         if (sh_tree->get_finished_up_to() > 1 && sh_tree->get_current_level_size() < base_sizes[0])
                             h_next_routine = restart;
+
+                        // now we've finally made up our mind of what to do next
 
                         // some printing...
                         if(h_last_routine == random_ir && h_next_routine != random_ir) {
@@ -458,23 +463,24 @@ namespace dejavu {
                             }
                         }
 
-                        // now that we've decided what the next routine is going to be, let's perform it...
+                        // let's perform the next routine...
                         switch (h_next_routine) {
                             case random_ir: { // random leaf search
+                                // look close means we do not abort random walks that deviate from trace on the first
+                                // level
                                 const bool h_look_close = ((m_rand.s_rolling_first_level_success > 0.5) &&
                                                           !s_short_base) || (s_have_rand_estimate &&
-                                                                  sh_tree->get_finished_up_to() == base_size - 1);
+                                                           sh_tree->get_finished_up_to() == base_size - 1);
                                 h_rand_fail_lim_total += h_rand_fail_lim_now;
-                                m_rand.setup(h_look_close); // TODO: look_close does not seem worth it h_look_close
+                                m_rand.use_look_close(h_look_close);
                                 m_rand.h_sift_random     = !s_easy;
                                 m_rand.h_randomize_up_to = dfs_level;
-
-                                if (sh_tree->get_finished_up_to() == 0) {
-                                    // random automorphisms, single origin
+                                if (sh_tree->get_finished_up_to() == 0 || (s_long_base && !s_any_bfs_pruned)) {
+                                    // random automorphisms, sampled from root of IR tree
                                     m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
                                                         local_state_left, h_rand_fail_lim_total);
                                 } else {
-                                    // random automorphisms, sampled from shared_tree
+                                    // random automorphisms, sampled from current bfs level of ir tree
                                     m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
                                                                   local_state, local_state_left,
                                                                   h_rand_fail_lim_total);
@@ -546,8 +552,11 @@ namespace dejavu {
                     }
 
                     // we are restarting -- so we try to inprocess using the gathered data
+                    const bool h_use_shallow_inprocess = !h_used_shallow_inprocess && s_inproc_success == 0 &&
+                                                          s_path_fail1_avg > 0.1;
+                    h_used_shallow_inprocess = h_used_shallow_inprocess || h_use_shallow_inprocess;
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget,
-                                                          s_any_bfs_pruned);
+                                                          s_any_bfs_pruned, h_use_shallow_inprocess);
                     s_inproc_success += s_inprocessed;
 
                     if(s_inprocessed) {

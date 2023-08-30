@@ -20,10 +20,6 @@ namespace dejavu {
         // bool split_color_hook(int color_initial, int new_color, int new_color_sz);
         typedef bool type_split_color_hook(const int, const int, const int);
 
-        // return whether to continue color refinement
-        // bool split_color_hook(int invariant);
-        typedef void type_invariant_hook(const int);
-
         // return whether to continue splitting the respective cell, or skip it
         // bool worklist_color_hook(int color, int color_sz);
         typedef bool type_worklist_color_hook(const int, const int);
@@ -144,22 +140,21 @@ namespace dejavu {
 
         public:
             /**
-         * The color refinement algorithm. Refines a given coloring with respect to a given graph.
-         * @param g The graph.
-         * @param c The coloring to be refined.
-         * @param init_color Initialize the worklist with a single color class (e.g., after individualization). The
-         * default value -1 denotes that the worklist is initialized with all color classes of the coloring.
-         * @param color_limit Integer which is used to stop refinement whenever the refined coloring reaches this number
-         * of color classes. The default value -1 denotes that refinement is performed exhaustively.
-         * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used
-             * to stop refinement early.
-         * @param worklist_hook Function pointer that is called whenever a color class is considered for refinement. Return value
-         * can be used to skip refinement of that color class.
-         */
+             * The color refinement algorithm. Refines a given coloring with respect to a given graph.
+             * @param g The graph.
+             * @param c The coloring to be refined.
+             * @param init_color Initialize the worklist with a single color class (e.g., after individualization). The
+             * default value -1 denotes that the worklist is initialized with all color classes of the coloring.
+             * @param color_limit Integer which is used to stop refinement whenever the refined coloring reaches this number
+             * of color classes. The default value -1 denotes that refinement is performed exhaustively.
+             * @param split_hook Function pointer that is called whenever a color class is split. Return value can be used
+                 * to stop refinement early.
+             * @param worklist_hook Function pointer that is called whenever a color class is considered for refinement. Return value
+             * can be used to skip refinement of that color class.
+             */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                                  const std::function<type_split_color_hook>* split_hook = nullptr,
-                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr,
-                                 const std::function<type_invariant_hook>* invariant_hook = nullptr) {
+                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
                 assure_initialized(g);
                 cell_todo.reset(&queue_pointer);
 
