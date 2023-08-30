@@ -85,7 +85,7 @@ namespace dejavu::search_strategy {
          * @param budget
          * @return whether any preprocessing was performed
          */
-        bool inprocess(sgraph *g, ir::shared_tree *tree, groups::compressed_schreier *group, ir::controller &local_state,
+        bool inprocess(sgraph *g, ir::shared_tree &tree, groups::compressed_schreier &group, ir::controller &local_state,
                        ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess,
                        bool use_shallow_inprocess) {
             local_state.load_reduced_state(root_save);
@@ -94,7 +94,7 @@ namespace dejavu::search_strategy {
             bool touched_coloring = false; /*< whether we change the root_save or not, i.e., whether we change
                                             *  anything */
 
-            if (use_shallow_inprocess && !(tree->get_finished_up_to() >= 1 && use_bfs_inprocess)) { // did we do BFS?
+            if (use_shallow_inprocess && !(tree.get_finished_up_to() >= 1 && use_bfs_inprocess)) { // did we do BFS?
                 worklist hash(g->v_size);
                 worklist_t<unsigned long> inv(g->v_size);
 
@@ -153,13 +153,13 @@ namespace dejavu::search_strategy {
                 }
             }
 
-            if (tree->get_finished_up_to() >= 1 && use_bfs_inprocess) { // did we do BFS?
+            if (tree.get_finished_up_to() >= 1 && use_bfs_inprocess) { // did we do BFS?
                 // TODO: hashing actually makes this worse!
                 worklist hash(g->v_size);
                 mark_set is_pruned(g->v_size);
-                tree->mark_first_level(is_pruned);
+                tree.mark_first_level(is_pruned);
 
-                tree->make_node_invariant(g->v_size); // "compresses" node invariant from all levels into first level
+                tree.make_node_invariant(g->v_size); // "compresses" node invariant from all levels into first level
 
                 nodes.reserve(g->v_size);
                 nodes.clear();
@@ -167,12 +167,12 @@ namespace dejavu::search_strategy {
                 int num_of_hashs = 0;
 
                 for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
-                sort_nodes_map(tree->get_node_invariant(), local_state.c->vertex_to_col);
-                unsigned long last_inv = (*tree->get_node_invariant())[0];
+                sort_nodes_map(tree.get_node_invariant(), local_state.c->vertex_to_col);
+                unsigned long last_inv = (*tree.get_node_invariant())[0];
                 int last_col           = local_state.c->vertex_to_col[0];
                 for(int i = 0; i < g->v_size; ++i) {
                     const int v               = nodes[i];
-                    const unsigned long v_inv = (*tree->get_node_invariant())[v];
+                    const unsigned long v_inv = (*tree.get_node_invariant())[v];
                     const int  v_col = local_state.c->vertex_to_col[v];
                     if(last_col != v_col) {
                         last_col = v_col;
@@ -271,8 +271,7 @@ namespace dejavu::search_strategy {
                 }
             }*/
 
-            group->determine_potential_individualization(&inproc_can_individualize,
-                                                         local_state.get_coloring());
+            group.determine_potential_individualization(&inproc_can_individualize, local_state.get_coloring());
             if (!inproc_can_individualize.empty() || !inproc_maybe_individualize.empty()) {
                 int num_inds = 0;
                 for (auto &i: inproc_can_individualize) {

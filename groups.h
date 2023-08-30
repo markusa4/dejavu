@@ -1665,8 +1665,15 @@ namespace dejavu {
              * @return Whether the deterministic abort criterion allows termination or not.
              */
             [[nodiscard]] bool deterministic_abort_criterion() const {
-                //std::cout << internal_schreier.base_point(14) << "->" << compressor->decompress(internal_schreier.base_point(14)) << std::endl;
                 return internal_schreier.deterministic_abort_criterion();
+            }
+
+            /**
+             * @return Whether any abort criterion allows termination or not.
+             */
+            [[nodiscard]] bool any_abort_criterion() const {
+                return internal_schreier.probabilistic_abort_criterion() ||
+                       internal_schreier.deterministic_abort_criterion();
             }
 
             void set_error_bound(int error_bound) {

@@ -37,11 +37,6 @@ namespace dejavu {
      */
     class dejavu2 {
     private:
-        // TODO why not move these into automorphism procedure?
-        // shared modules
-        groups::compressed_schreier* sh_schreier = nullptr;  /**< Schreier-Sims structure */
-        ir::shared_tree*             sh_tree     = nullptr;  /**< IR tree                 */
-
         // auxiliary
         worklist  colmap_substitute;
 
@@ -184,9 +179,9 @@ namespace dejavu {
                 groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims */
 
                 // shared, global modules
-                sh_tree     = new ir::shared_tree(g->v_size);    /*< BFS levels, shared leaves, ...           */
-                sh_schreier = new groups::compressed_schreier(); /*< Schreier structure to sift automorphisms */
-                sh_schreier->set_error_bound(h_error_bound);
+                ir::shared_tree sh_tree(g->v_size);    /*< BFS levels, shared leaves, ...           */
+                groups::compressed_schreier sh_schreier; /*< Schreier structure to sift automorphisms */
+                sh_schreier.set_error_bound(h_error_bound);
 
                 // initialize modules for high-level search strategies
                 search_strategy::dfs_ir      m_dfs;       /*< depth-first search */
@@ -313,15 +308,15 @@ namespace dejavu {
                     const bool can_keep_previous = (s_restarts >= 3) && !s_inprocessed; /*< do we want to try to keep
                                                                                      *  previous automorphisms? */
                     // maybe we want to compress the Schreier structure
-                    sh_schreier->h_min_compression_ratio = g->v_size > 1000000 ? 0.7 : 0.4; /*<if graph is large,
+                    sh_schreier.h_min_compression_ratio = g->v_size > 1000000 ? 0.7 : 0.4; /*<if graph is large,
                                                                                              * compress aggressively */
                     m_compress.determine_compression_map(*root_save.get_coloring(), base_vertex, dfs_level);
 
                     // set up Schreier structure
-                    const bool reset_prob = sh_schreier->reset(&m_compress, g->v_size, schreierw, base_vertex, base_sizes,
+                    const bool reset_prob = sh_schreier.reset(&m_compress, g->v_size, schreierw, base_vertex, base_sizes,
                                                                dfs_level,
                                                                can_keep_previous, m_inprocess.inproc_fixed_points);
-                    if (reset_prob) sh_schreier->reset_probabilistic_criterion(); /*< need to reset probabilistic abort
+                    if (reset_prob) sh_schreier.reset_probabilistic_criterion(); /*< need to reset probabilistic abort
                                                                                    *  criterion after inprocessing */
 
                     // reset metrics of random search
@@ -329,18 +324,18 @@ namespace dejavu {
 
                     // here, we set up the shared IR tree, which contains computed BFS levels, stored leaves, as well as
                     // further gathered data for heuristics
-                    sh_tree->reset(base_vertex, &root_save, can_keep_previous);
-                    if (s_inprocessed) sh_tree->clear_leaves();
+                    sh_tree.reset(base_vertex, &root_save, can_keep_previous);
+                    if (s_inprocessed) sh_tree.clear_leaves();
 
                     s_inprocessed = false; /*< tracks whether we changed the root of IR tree since we've initialized BFS
                                             *  and Schreier last time */
 
                     // we add the leaf of the base_vertex to the IR tree
-                    search_strategy::random_ir::specific_walk(g, *sh_tree, local_state, base_vertex);
+                    search_strategy::random_ir::specific_walk(g, sh_tree, local_state, base_vertex);
 
                     s_last_bfs_pruned = false;
                     s_any_bfs_pruned  = false;
-                    int s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
+                    int s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(sh_tree, selector);
                     int h_rand_fail_lim_total  = 0;
                     int h_rand_fail_lim_now    = 0;
                     double s_path_fail1_avg  = 0;
@@ -363,13 +358,13 @@ namespace dejavu {
                         // here are our decision heuristics (AKA dark magic)
 
                         // first, we update our estimations / statistics
-                        s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(*sh_tree, selector);
+                        s_bfs_next_level_nodes = search_strategy::bfs_ir::next_level_estimate(sh_tree, selector);
 
                         const bool s_have_rand_estimate = (m_rand.s_paths >= 4);  /*< for some estimations, we need a
                                                                                    *  few random paths */
                         double s_trace_cost1_avg = s_trace_full_cost;
 
-                        int s_random_path_trace_cost = s_trace_full_cost - sh_tree->get_current_level_tracepos();
+                        int s_random_path_trace_cost = s_trace_full_cost - sh_tree.get_current_level_tracepos();
                         if (s_have_rand_estimate) {
                             s_path_fail1_avg  = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
                             s_trace_cost1_avg = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
@@ -400,7 +395,7 @@ namespace dejavu {
 
                             // we decrease the BFS score if we are beyond the first level, in the hope that this models
                             // the effect of trace deviation maps
-                            if (sh_tree->get_finished_up_to() >= 1) score_bfs *= (1 - s_path_fail1_avg);
+                            if (sh_tree.get_finished_up_to() >= 1) score_bfs *= (1 - s_path_fail1_avg);
 
                             // we make a decision...
                             h_next_routine = (score_rand < score_bfs) ? random_ir : bfs_ir;
@@ -427,7 +422,7 @@ namespace dejavu {
 
                         // ...unless...
                         if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 &&
-                            s_path_fail1_avg > 0.01 && sh_tree->get_finished_up_to() == 0)
+                            s_path_fail1_avg > 0.01 && sh_tree.get_finished_up_to() == 0)
                             h_next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
                         // silly case in which the base is so long, that an unnecessary restart has fairly high
                         // cost attached -- so if BFS can be successful, let's do that first...
@@ -436,30 +431,30 @@ namespace dejavu {
 
                         // ... and if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done", because I can not come up with a single one
-                        if (search_strategy::random_ir::h_almost_done(*sh_schreier)) h_next_routine = random_ir;
+                        if (search_strategy::random_ir::h_almost_done(sh_schreier)) h_next_routine = random_ir;
                         if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
                             h_next_routine = random_ir;
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
                             h_next_routine == restart)
                             h_next_routine = random_ir;
-                        if (dfs_level == sh_tree->get_finished_up_to() && s_any_bfs_pruned && s_cost <= h_budget * 20)
+                        if (dfs_level == sh_tree.get_finished_up_to() && s_any_bfs_pruned && s_cost <= h_budget * 20)
                             h_next_routine = random_ir;
 
                         // immediately inprocess if bfs was successful in pruning the first level -- we somewhat don't
                         // want to do too much bfs, since we have only very limited automorphism pruning capability
-                        if (sh_tree->get_finished_up_to() == 1 && dfs_level > 1 && s_last_bfs_pruned)
+                        if (sh_tree.get_finished_up_to() == 1 && dfs_level > 1 && s_last_bfs_pruned)
                             h_next_routine = restart;
-                        if (sh_tree->get_finished_up_to() > 1 && sh_tree->get_current_level_size() < base_sizes[0])
+                        if (sh_tree.get_finished_up_to() > 1 && sh_tree.get_current_level_size() < base_sizes[0])
                             h_next_routine = restart;
 
                         // now we've finally made up our mind of what to do next
 
                         // some printing...
                         if(h_last_routine == random_ir && h_next_routine != random_ir) {
-                            m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
-                            if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
-                                m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier->s_sparsegen()) +
-                                                                 "/d" + std::to_string(sh_schreier->s_densegen()), "_");
+                            m_printer.timer_print("random", sh_tree.stat_leaves(), m_rand.s_rolling_success);
+                            if (sh_schreier.s_densegen() + sh_schreier.s_sparsegen() > 0) {
+                                m_printer.timer_print("schreier", "s" + std::to_string(sh_schreier.s_sparsegen()) +
+                                                                 "/d" + std::to_string(sh_schreier.s_densegen()), "_");
                             }
                         }
 
@@ -470,33 +465,32 @@ namespace dejavu {
                                 // level
                                 const bool h_look_close = ((m_rand.s_rolling_first_level_success > 0.5) &&
                                                           !s_short_base) || (s_have_rand_estimate &&
-                                                           sh_tree->get_finished_up_to() == base_size - 1);
+                                                           sh_tree.get_finished_up_to() == base_size - 1);
                                 h_rand_fail_lim_total += h_rand_fail_lim_now;
                                 m_rand.use_look_close(h_look_close);
                                 m_rand.h_sift_random     = !s_easy;
                                 m_rand.h_randomize_up_to = dfs_level;
-                                if (sh_tree->get_finished_up_to() == 0 || (s_long_base && !s_any_bfs_pruned)) {
+                                if (sh_tree.get_finished_up_to() == 0 || (s_long_base && !s_any_bfs_pruned)) {
                                     // random automorphisms, sampled from root of IR tree
-                                    m_rand.random_walks(g, hook, selector, *sh_tree, *sh_schreier, local_state,
+                                    m_rand.random_walks(g, hook, selector, sh_tree, sh_schreier, local_state,
                                                         local_state_left, h_rand_fail_lim_total);
                                 } else {
                                     // random automorphisms, sampled from current bfs level of ir tree
-                                    m_rand.random_walks_from_tree(g, hook, selector, *sh_tree, *sh_schreier,
+                                    m_rand.random_walks_from_tree(g, hook, selector, sh_tree, sh_schreier,
                                                                   local_state, local_state_left,
                                                                   h_rand_fail_lim_total);
                                 }
-                                finished_symmetries = sh_schreier->deterministic_abort_criterion() ||
-                                                      sh_schreier->probabilistic_abort_criterion();
-                                s_term = sh_schreier->deterministic_abort_criterion()? t_det_schreier : t_rand_schreier;
+                                finished_symmetries = sh_schreier.any_abort_criterion();
+                                s_term = sh_schreier.deterministic_abort_criterion()? t_det_schreier : t_rand_schreier;
                                 s_cost += h_rand_fail_lim_now;
 
                                 // TODO this code is duplicated, let's think about this again...
                                 if(finished_symmetries) {
-                                    m_printer.timer_print("random", sh_tree->stat_leaves(), m_rand.s_rolling_success);
-                                    if (sh_schreier->s_densegen() + sh_schreier->s_sparsegen() > 0) {
+                                    m_printer.timer_print("random", sh_tree.stat_leaves(), m_rand.s_rolling_success);
+                                    if (sh_schreier.s_densegen() + sh_schreier.s_sparsegen() > 0) {
                                         m_printer.timer_print("schreier",
-                                                              "s"  + std::to_string(sh_schreier->s_sparsegen()) +
-                                                              "/d" + std::to_string(sh_schreier->s_densegen()), "_");
+                                                              "s"  + std::to_string(sh_schreier.s_sparsegen()) +
+                                                              "/d" + std::to_string(sh_schreier.s_densegen()), "_");
                                     }
                                 }
                             }
@@ -504,37 +498,37 @@ namespace dejavu {
                             case bfs_ir: { // one level of breadth-first search
                                 m_bfs.h_use_deviation_pruning = !((s_inproc_success >= 2) && s_path_fail1_avg > 0.1);
                                 //m_bfs.h_use_deviation_pruning = false;
-                                m_bfs.do_a_level(g, hook, *sh_tree, sh_schreier, local_state, selector);
+                                m_bfs.do_a_level(g, hook, sh_tree, &sh_schreier, local_state, selector);
                                 m_printer.timer_print("bfs",
-                                                      "0-" + std::to_string(sh_tree->get_finished_up_to()) + "(" +
+                                                      "0-" + std::to_string(sh_tree.get_finished_up_to()) + "(" +
                                                       std::to_string(s_bfs_next_level_nodes) + ")",
-                                               std::to_string(sh_tree->get_level_size(sh_tree->get_finished_up_to())));
+                                               std::to_string(sh_tree.get_level_size(sh_tree.get_finished_up_to())));
 
                                 // A bit of a mess here! Manage correct group size whenever BFS finishes the graph. Bit
                                 // complicated because of the special code for `base_size == 2`, which can perform
                                 // automorphism pruning. (The removed automorphisms must be accounted for when
                                 // calculating the group size.)
-                                if (sh_tree->get_finished_up_to() == base_size) {
+                                if (sh_tree.get_finished_up_to() == base_size) {
                                     finished_symmetries = true;
                                     s_term = t_bfs;
                                     if (base_size == 2) { /*< case for the special code */
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base_vertex[0]) *
-                                                sh_tree->h_bfs_automorphism_pw, 0);
+                                                (double) sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0]) *
+                                                sh_tree.h_bfs_automorphism_pw, 0);
                                     } else if (base_size == 1) {
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree->h_bfs_top_level_orbit.orbit_size(base_vertex[0]), 0);
+                                                (double) sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0]), 0);
                                     } else { /*< base_vertex case which just multiplies the remaining elements of the level */
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree->get_level_size(sh_tree->get_finished_up_to()), 0);
+                                                (double) sh_tree.get_level_size(sh_tree.get_finished_up_to()), 0);
                                     }
                                 }
 
                                 // if there are less remaining nodes than we expected, we pruned some nodes
-                                s_last_bfs_pruned = sh_tree->get_current_level_size() < s_bfs_next_level_nodes;
+                                s_last_bfs_pruned = sh_tree.get_current_level_size() < s_bfs_next_level_nodes;
                                 s_any_bfs_pruned  = s_any_bfs_pruned || s_last_bfs_pruned;
                                 m_rand.reset_statistics();
-                                s_cost += sh_tree->get_current_level_size();
+                                s_cost += sh_tree.get_current_level_size();
                             }
                                 break;
                             case restart: // do a restart
@@ -547,7 +541,7 @@ namespace dejavu {
 
                     // Are we done or just restarting?
                     if (finished_symmetries) {
-                        sh_schreier->compute_group_size(); // need to compute the group size now
+                        sh_schreier.compute_group_size(); // need to compute the group size now
                         break; // we are done
                     }
 
@@ -572,17 +566,14 @@ namespace dejavu {
                 }
 
                 s_deterministic_termination = (s_term != t_rand_schreier) && s_deterministic_termination;
-                big_number sh_grp_sz = sh_schreier->get_group_size();
+                big_number sh_grp_sz = sh_schreier.get_group_size();
 
                 // We are done! Let's add up the total group size from all the different modules.
                 s_grp_sz.multiply(m_inprocess.s_grp_sz);
                 s_grp_sz.multiply(m_dfs.s_grp_sz);
 
                 // if we finished with BFS, group size in Schreier is redundant since we also found them with BFS
-                if(s_term != t_bfs) s_grp_sz.multiply(sh_schreier->get_group_size());
-
-                delete sh_schreier; /*< clean up allocated schreier structure */
-                delete sh_tree;     /*< ... and also the shared IR tree       */
+                if(s_term != t_bfs) s_grp_sz.multiply(sh_schreier.get_group_size());
             }
             m_printer.h_silent = h_silent;
             m_printer.timer_print("done", s_deterministic_termination, s_term);
