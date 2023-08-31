@@ -46,9 +46,142 @@ namespace dejavu {
 
             explicit dfs_ir(groups::automorphism_workspace& automorphism) : ws_automorphism(automorphism) {}
 
-            int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right) {
-                const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
-                if(!is_diffed_pre || state_right.get_diff_diverge()) return 2;
+            int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right,
+                                             int max_depth, bool recurse=false) {
+                if(max_depth == 0) return paired_recurse_to_equal_leaf(g, state_left, state_right, recurse);
+
+                if(!recurse) {
+                    const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
+                    if (!is_diffed_pre || state_right.get_diff_diverge()) return 2;
+                }
+
+                // pick vertices that differ in the color
+                int ind_v_right, ind_v_left;
+                std::tie(ind_v_left, ind_v_right) = state_right.diff_pair(state_left);
+
+                // pick a color that prevents the "matching OPP"
+                const int col          = state_left.c->vertex_to_col[ind_v_left];
+                const int col_sz_right = state_right.c->ptn[col] + 1;
+                const int col_sz_left  = state_left.c->ptn[col]  + 1;
+
+                assert(ind_v_left >= -1);
+                assert(ind_v_right >= -1);
+
+                assert(state_left.c->vertex_to_col[ind_v_left] == col);
+                assert(state_right.c->vertex_to_col[ind_v_right] == col);
+                assert(state_left.c->vertex_to_col[ind_v_right] != col);
+
+                if (col_sz_right < 2 || col_sz_left != col_sz_right) return 2;
+
+                const int base_pos = state_left.s_base_pos;
+
+                std::vector<int> color;
+                bool first_ind = true;
+
+                int diff_verts_initial = state_right.diff_num();
+                int cells_initial = state_right.c->cells;
+                //std::cout << "initial:" << diff_verts_initial << std::endl;
+
+                state_left.use_trace_early_out(false);
+                state_left.T->reset_trace_unequal();
+                state_left.T->set_hash(0);
+                state_left.move_to_child(g,  ind_v_left);
+                unsigned long saved_hash = state_left.T->get_hash();
+
+                for(int i = 0; i < col_sz_left; ++i) {
+                    while(state_right.s_base_pos > base_pos) {
+                        state_right.revert_diff_last_individualization();
+                        state_right.move_to_parent();
+                    }
+                    if(diff_verts_initial != state_right.diff_num()){
+                        std::cout << diff_verts_initial << "/" << state_right.diff_num() << std::endl;
+                    }
+                    assert(diff_verts_initial == state_right.diff_num());
+                    assert(cells_initial == state_right.c->cells);
+                    while(state_left.s_base_pos > base_pos + 1) {
+                        state_left.move_to_parent();
+                    }
+
+                    state_right.use_trace_early_out(false);
+                    state_right.T->set_hash(0);
+                    state_right.T->reset_trace_unequal();
+
+                    int ind_v_right_now;
+                    if(first_ind) {
+                        ind_v_right_now = ind_v_right;
+                        first_ind = false;
+                    } else if(color.size() == 0) {
+                        color.reserve(col_sz_left);
+                        color.push_back(ind_v_right);
+                        for(int j = 0; j < col_sz_left; ++j) {
+                            const int v = state_right.c->lab[col + j];
+                            if(v != ind_v_right) color.push_back(v);
+                        }
+                        ind_v_right_now = color[i];
+                    } else {
+                        ind_v_right_now = color[i];
+                    }
+
+                    // individualize a vertex
+                    state_right.move_to_child(g, ind_v_right_now);
+                    assert(state_left.s_base_pos == state_right.s_base_pos);
+
+                    // can not perform diff udpates on this (AKA invariant should have differed, but is not
+                    // guaranteed to differ always)
+
+                    // invariant differs
+                    if(state_right.T->get_hash() != saved_hash) {
+                        state_right.move_to_parent();
+                        continue;
+                    }
+
+                    const bool is_diffed = state_right.update_diff_vertices_last_individualization(state_left);
+                    //std::cout << "->" << state_right.diff_num() << std::endl;
+
+                    if(state_right.get_diff_diverge()) {
+                        //std::cout << "diff diverge" << std::endl;
+                        continue;
+                    }
+
+                    // no difference? check for automorphism now -- if it doesn't succeed there is no hope on this path
+                    if(!is_diffed) {
+                        //std::cout << state_right.s_base_pos << std::endl;
+                        ws_automorphism.reset();
+                        state_right.singleton_automorphism(state_left, ws_automorphism);
+                        const bool found_auto = state_right.certify(g, ws_automorphism);
+                        if(found_auto) {
+                            return true;
+                        } else {
+                            continue;
+                        }
+                    }
+
+                    if(state_right.diff_num() <= 0) std::cout << state_right.diff_num() << std::endl;
+                    assert(state_right.diff_num() > 0);
+                    //std::cout << "recursive call" << max_depth - 1 << std::endl;
+                    int res = paired_recurse_to_equal_leaf(g, state_left, state_right, max_depth - 1, true);
+                    //std::cout << "comeback from recursion" << max_depth - 1 << std::endl;
+                    if(res == 0) {
+                        //std::cout << "failed at " << max_depth << std::endl;
+                        return 0;
+                    } else if (res == 1) {
+                        //std::cout << "fail" << std::endl;
+                        return 1;
+                    }
+                }
+
+                //std::cout << "end loop"<< std::endl;
+
+                // TODO something here
+                return 2;
+            }
+
+            int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right,
+                                             bool recurse=false) {
+                if(!recurse) {
+                    const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
+                    if (!is_diffed_pre || state_right.get_diff_diverge()) return 2;
+                }
 
                 while (state_right.c->cells < g->v_size) {
                     // pick a color that prevents the "matching OPP"
@@ -151,8 +284,7 @@ namespace dejavu {
                     const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;
                     const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
-
-                    assert(col_sz >= 2);
+                              assert(col_sz >= 2);
                     assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
 
                     int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
@@ -211,7 +343,7 @@ namespace dejavu {
                                                              wr_pos_end);
                             found_auto = state_right.certify(g, ws_automorphism);
 
-                            assert(ws_automorphism->perm()[base_vertex] == ind_v);
+                            assert(ws_automorphism.perm()[base_vertex] == ind_v);
                             // if no luck with sparse automorphism, try more proper walk to leaf node
                             if (!found_auto) {
                                 ws_automorphism.reset();
@@ -238,9 +370,9 @@ namespace dejavu {
 
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
-                            assert(ws_automorphism->nsupport() > 0);
-                            assert(ws_automorphism->perm()[ind_v] == base_vertex ||
-                                   ws_automorphism->perm()[base_vertex] == ind_v);
+                            assert(ws_automorphism.nsupport() > 0);
+                            assert(ws_automorphism.perm()[ind_v] == base_vertex ||
+                                   ws_automorphism.perm()[base_vertex] == ind_v);
                             orbs.add_automorphism_to_orbit(ws_automorphism);
                             if(hook) (*hook)(g->v_size, ws_automorphism.perm(), ws_automorphism.nsupport(),
                                              ws_automorphism.support());
@@ -255,8 +387,11 @@ namespace dejavu {
 
                         // if no automorphism could be determined we would have to backtrack -- so stop!
 
-                        if ((!found_auto && !pruned) || ((4*prune_cost_snapshot > cost_snapshot) &&
-                                                         (prev_base_pos > 0))) {
+                        // ((4*prune_cost_snapshot > cost_snapshot) &&
+                        //                                                         (prev_base_pos > 0))
+                        if ((!found_auto && !pruned) ) {
+                            //if(((4*prune_cost_snapshot > cost_snapshot) &&
+                            //    (prev_base_pos > 0))) std::cout << "cost fail" << std::endl;
                             fail = true;
                             if(failed_first_level == -1)
                                 failed_first_level = state_right.s_base_pos;

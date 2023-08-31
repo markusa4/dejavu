@@ -57,6 +57,68 @@ namespace dejavu::search_strategy {
             std::sort(nodes.begin(), nodes.end(), c);
         }
 
+
+        void shallow_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+            local_state.use_reversible(true);
+            local_state.use_trace_early_out(true);
+            local_state.use_increase_deviation(true);
+            local_state.use_split_limit(true, 20); // 20
+
+            for(int i = 0; i < g->v_size; ++i) {
+                local_state.T->set_hash(0);
+                local_state.reset_trace_equal();
+                const int col = local_state.c->vertex_to_col[i];
+                const int col_sz = local_state.c->ptn[col] + 1;
+                if(col_sz >= 2) {
+                    local_state.move_to_child(g, i);
+                    inv[i] += local_state.T->get_hash();
+                    local_state.move_to_parent();
+                }
+            }
+
+            local_state.use_trace_early_out(false);
+            local_state.use_increase_deviation(false);
+            local_state.use_split_limit(false);
+        }
+
+        unsigned long shallow_invariant_comb(sgraph* g, ir::controller &local_state) {
+            local_state.use_reversible(true);
+            local_state.use_trace_early_out(true);
+            local_state.use_increase_deviation(true);
+            local_state.use_split_limit(true, 64); // 20
+
+            unsigned long acc = 0;
+            int pick_col = -1;
+
+            for(int i = 0; i < g->v_size;) {
+                const int col = i;
+                const int col_sz = local_state.c->ptn[col] + 1;
+                if (col_sz >= 2) {
+                    pick_col = col;
+                    break;
+                }
+                i += col_sz;
+            }
+            if(pick_col != -1) {
+                const int pick_col_sz = local_state.c->ptn[pick_col] + 1;
+                std::vector<int> verts;
+                for (int i = 0; i < pick_col_sz; ++i) verts.push_back(local_state.c->lab[pick_col + i]);
+                for (int i = 0; i < verts.size(); ++i) {
+                    local_state.T->set_hash(0);
+                    local_state.reset_trace_equal();
+                    local_state.move_to_child(g, verts[i]);
+                    acc += local_state.T->get_hash();
+                    local_state.move_to_parent();
+                }
+            }
+
+            local_state.use_trace_early_out(false);
+            local_state.use_increase_deviation(false);
+            local_state.use_split_limit(false);
+
+            return acc;
+        }
+
         /**
          * Inprocess the (colored) graph using all the available solver data.
          *
@@ -85,31 +147,9 @@ namespace dejavu::search_strategy {
                 nodes.reserve(g->v_size);
                 nodes.clear();
 
-                local_state.use_reversible(true);
-                local_state.use_trace_early_out(true);
-                local_state.use_increase_deviation(true);
-                local_state.use_split_limit(true, 8);
-
-                for(int i = 0; i < g->v_size; ++i) {
-                    local_state.T->set_hash(0);
-                    local_state.reset_trace_equal();
-                    const int col = local_state.c->vertex_to_col[i];
-                    const int col_sz = local_state.c->ptn[col] + 1;
-                    if(col_sz >= 2) {
-                        local_state.move_to_child(g, i);
-                        inv[i] = local_state.T->get_hash();
-                        local_state.move_to_parent();
-                    } else {
-                        inv[i] = 0;
-                    }
-                }
-
-                local_state.use_trace_early_out(false);
-                local_state.use_increase_deviation(false);
-                local_state.use_split_limit(false);
+                shallow_invariant(g, local_state, inv);
 
                 int num_of_hashs = 0;
-
                 for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
                 sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
                 unsigned long last_inv = -1;
@@ -137,8 +177,9 @@ namespace dejavu::search_strategy {
                 }
             }
 
-            // use breadth-first search tree as an invariant
-            if (tree.get_finished_up_to() >= 1 && use_bfs_inprocess) { // did we do BFS?
+            tree.introspection();
+
+            if (tree.get_finished_up_to() >= 1 && use_bfs_inprocess) {
                 worklist hash(g->v_size);
                 mark_set is_pruned(g->v_size);
                 tree.mark_first_level(is_pruned);

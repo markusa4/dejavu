@@ -205,7 +205,7 @@ namespace dejavu {
                 bool s_long_base  = false;  /*< flag for bases that are considered very long  */
                 bool s_short_base = false;  /*< flag for bases that are considered very short */
                 bool s_prunable   = false;  /*< does this graph seem to exhibit exploitable structure? */
-                double s_random_score_bias = 1.0; /*< a bias for random search, whether we've gathered that the
+                double s_random_budget_bias = 1.0; /*< a bias for random search, whether we've gathered that the
                                                    *  technique does not seem to work on this graph */
 
                 bool s_few_cells  = false;
@@ -276,7 +276,10 @@ namespace dejavu {
                         local_state.load_reduced_state(root_save); /*< start over from root */
                         progress_print_split();
                         const int s_inc_fac = (s_restarts >= 3)? h_budget_inc_fact : 2;/*< factor of budget increase */
-                        if (s_inproc_success >= 3) h_budget_inc_fact = 2;
+                        if (s_inproc_success >= 3) {
+                            s_random_budget_bias = 0.1;
+                            h_budget_inc_fact    = 2;
+                        }
                         if (s_inprocessed) h_budget = 1; /*< if we inprocessed, we hope that the graph is easy again */
                         h_budget *= s_inc_fac; /*< increase the budget */
                         s_cost    = 0;         /*< reset the cost */
@@ -287,7 +290,8 @@ namespace dejavu {
                     m_inprocess.inproc_maybe_individualize.clear();
 
                     // find a selector, moves local_state to a leaf of the IR tree
-                    m_selectors.make_cell_selector(g, &local_state, &local_state_left, s_restarts, h_budget);
+                    auto style = static_cast<ir::cell_selector_factory::selector_style>(s_restarts % 4);
+                    m_selectors.make_cell_selector(g, &local_state, &local_state_left, style, s_restarts, h_budget);
                     auto selector = m_selectors.get_selector_hook();
                     m_printer.timer_print("sel", local_state.s_base_pos, local_state.T->get_position());
 
@@ -333,8 +337,11 @@ namespace dejavu {
                     // we first perform a depth-first search, starting from the computed leaf in local_state
                     m_dfs.h_recent_cost_snapshot_limit  = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
                     //m_dfs.h_recent_cost_snapshot_limit = 1.0;
-                    dfs_level = s_last_base_eq?dfs_level: m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
-                                                                          m_inprocess.inproc_maybe_individualize);
+                    dfs_level = s_last_base_eq ? dfs_level : m_dfs.do_paired_dfs(hook, g, local_state_left,
+                                                                                 local_state,
+                                                                                 m_inprocess.inproc_maybe_individualize);
+
+
                     m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
@@ -432,7 +439,7 @@ namespace dejavu {
                             double s_rand_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now;
 
                             // we do so by negatively scoring each method: higher score, worse technique
-                            score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success) * s_random_score_bias;
+                            score_rand = s_rand_estimate * (1 - m_rand.s_rolling_success);
                             score_bfs  = s_bfs_estimate  * (0.1 + 1 - s_path_fail1_avg);
 
                             // we make some adjustments to try to model effect of techniques better
@@ -476,7 +483,9 @@ namespace dejavu {
 
                         // ... and if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done", because I can not come up with a single one
-                        if (search_strategy::random_ir::h_almost_done(sh_schreier)) next_routine = random_ir;
+                        if (search_strategy::random_ir::h_almost_done(sh_schreier) &&
+                            next_routine == restart)
+                            next_routine = random_ir;
                         if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
                             next_routine = random_ir;
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
@@ -511,7 +520,7 @@ namespace dejavu {
                                 const bool h_look_close = ((m_rand.s_rolling_first_level_success > 0.5) &&
                                                           !s_short_base) || (s_have_rand_estimate &&
                                                            sh_tree.get_finished_up_to() == base_size - 1);
-                                h_rand_fail_lim_total += h_rand_fail_lim_now;
+                                h_rand_fail_lim_total += std::max(5.0, h_rand_fail_lim_now * s_random_budget_bias);
                                 m_rand.use_look_close(h_look_close);
                                 m_rand.h_sift_random     = !s_easy;
                                 m_rand.h_randomize_up_to = dfs_level;

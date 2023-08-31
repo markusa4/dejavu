@@ -1579,18 +1579,19 @@ namespace dejavu {
              */
             void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection, int base_pos) {
                 if(compressor != nullptr) {
-                    for(int &i : selection) {
+                    for(int i = 0; i < static_cast<int>(selection.size()); ++i) {
                         assert(compressor->compress(selection[i]) >= 0);
-                        i = compressor->compress(i);
+                        selection[i] = compressor->compress(selection[i]);
                     }
                 }
                 internal_schreier.reduce_to_unfinished(w, selection, base_pos-s_compressed_until);
                 if(compressor != nullptr) {
-                    for(int &i : selection) {
-                        i = compressor->decompress(i);
+                    for(int i = 0; i < static_cast<int>(selection.size()); ++i) {
+                        selection[i] = compressor->decompress(selection[i]);
                         assert(selection[i] >= 0);
                     }
                 }
+
             }
 
             void compress_automorphism(automorphism_workspace &automorphism, automorphism_workspace &automorphism_compress) {

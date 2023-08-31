@@ -165,6 +165,7 @@ namespace dejavu {
             worklist  diff_vertices_list; /**< vertices that differ, but in a list */
             worklist  diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
                                                *  above */
+            std::vector<int> diff_trace;
             bool diff_diverge = false; /**< paths of difference are diverging, can not properly track it anymore, and
                                          *there is also no point in tracking it anymore since they are not isomorphic */
             int singleton_pt_start = 0; /**< a pointer were we need to start reading singletons */
@@ -296,8 +297,10 @@ namespace dejavu {
              * Vertex v is now differing.
              * @param v the vertex
              */
-            void add_diff_vertex(int v) {
+            void add_diff_vertex(int v, bool trace = true) {
+                //assert(trace || (!diff_vertices.get(v) && !diff_is_singleton.get(v)));
                 if(!diff_vertices.get(v) && !diff_is_singleton.get(v)) {
+                    if(trace) diff_trace.push_back((v+1));
                     diff_vertices.set(v);
                     diff_vertices_list.push_back(v);
                     diff_vertices_list_pt[v] = diff_vertices_list.cur_pos - 1;
@@ -308,8 +311,10 @@ namespace dejavu {
              * Vertex v is now not differing anymore
              * @param v the vertex
              */
-            void remove_diff_vertex(int v) {
+            void remove_diff_vertex(int v, bool trace = true) {
+                //assert(trace || (diff_vertices.get(v)));
                 if(diff_vertices.get(v)) {
+                    if(trace) diff_trace.push_back(-(v+1));
                     const int pt      = diff_vertices_list_pt[v];
                     assert(diff_vertices_list[pt] == v);
 
@@ -336,10 +341,6 @@ namespace dejavu {
              */
             void color_fix_difference(const controller& state, int col) {
                 const int col_sz = c->ptn[col] + 1;
-                if(col_sz != state.c->ptn[col] + 1) {
-                    assert(false);
-                    return;
-                }
 
                 if(col_sz == 1) {
                     add_diff_vertex(state.c->lab[col]);
@@ -524,8 +525,8 @@ namespace dejavu {
                 const int right_col = c->vertex_to_col[right];
 
                 // find a corresponding counterpart in the other coloring
-                const int left      = state.c->lab[right_col];
-                /*const int right_col_sz = c->ptn[right_col];
+                //const int left      = state.c->lab[right_col];
+                const int right_col_sz = c->ptn[right_col];
                 int left = -1;
                 for (int i = 0; i < right_col_sz; ++i) {
                     const int candidate = state.c->lab[right_col + i];
@@ -534,7 +535,7 @@ namespace dejavu {
                         break;
                     }
                 }
-                if(left == -1) left = state.c->lab[right_col];*/
+                if(left == -1) left = state.c->lab[right_col];
 
 
                 return {left, right};
@@ -547,6 +548,8 @@ namespace dejavu {
                 diff_vertices.reset();
                 diff_vertices_list.reset();
                 diff_is_singleton.reset();
+
+                diff_trace.clear();
 
                 diff_tester.reset();
                 singleton_pt_start = singletons.size();
@@ -590,7 +593,9 @@ namespace dejavu {
              */
             bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
+                diff_trace.push_back(INT32_MAX);
                 if(touched_color_list.cur_pos != other_state.touched_color_list.cur_pos) {
+                    std::cout << "diff diverge" << touched_color_list.cur_pos  << "vs. " << other_state.touched_color_list.cur_pos  << std::endl;
                     diff_diverge = true;
                     return true;
                 }
@@ -609,13 +614,15 @@ namespace dejavu {
                     diff_diverge = diff_diverge || (old_color_sz != old_color_sz_other)
                                    || (new_color_sz != new_color_sz_other);
 
+                    //color_fix_difference(other_state, new_color);
+
                     if(new_color_sz <= old_color_sz) color_fix_difference(other_state, new_color);
                     else                             color_fix_difference(other_state, old_color);
                     if(old_color_sz == 1) color_fix_difference(other_state, old_color);
                 }
-
                 return (diff_vertices_list.cur_pos != 0) || diff_diverge; // there is a diff!
             }
+
 
             /**
              * Copy the state of another controller. Does not copy the trace, but instead links the trace of this
@@ -689,6 +696,10 @@ namespace dejavu {
 
                 this->R = state->R;
             }
+
+            int diff_num() {
+                return diff_vertices_list.cur_pos;
+            };
 
             /**
              * Compare all following computations to this IR node. The \a mode must be set to `IR_MODE_RECORD_TRACE`
@@ -1006,7 +1017,6 @@ namespace dejavu {
 
                     --c->cells;
                 }
-
                 // unwind singletons
                 int const new_singleton_pos = base.back().singleton_pt;
                 singletons.resize(new_singleton_pos);
@@ -1016,6 +1026,41 @@ namespace dejavu {
                 base.pop_back();
 
                 T->reset_trace_equal();
+            }
+
+
+            /**
+             * Difference-checking. Records differences between this state and the given \p other_state. Before using
+             * this, this state and \p other_state should start from the same node of the IR tree, and the difference
+             * should be reset at that point. Then, after each individualization this update function should be called.
+             * The function keeps track of all colors that are non-matching.
+             *
+             * @param other_state the other state
+             * @return whether there is a difference
+             */
+            void revert_diff_last_individualization() {
+                int i;
+
+                int const new_singleton_pos = base.back().singleton_pt;
+                for(i = singletons.size()-1; i >= new_singleton_pos; --i) {
+                    diff_is_singleton.unset(singletons[i]);
+                }
+
+                for(i = diff_trace.size()-1; i >= 0;) {
+                    const int read_diff_trace = diff_trace[i];
+                    if(read_diff_trace == INT32_MAX) break;
+                    const int vert = abs(read_diff_trace)-1;
+                    if(read_diff_trace<0) {
+                        diff_is_singleton.unset(vert);
+                        add_diff_vertex(vert, false);
+                    } else {
+                        //diff_is_singleton.unset(vert);
+                        remove_diff_vertex(vert, false);
+                    }
+                    --i;
+                }
+
+                diff_trace.resize(std::max(i,0));
             }
 
             /**
@@ -1096,6 +1141,7 @@ namespace dejavu {
             }
 
         public:
+            enum selector_style {SELECT_SPARSE, SELECT_COMB, SELECT_SMALL, SELECT_DRY_LAND};
 
             /**
              * Cell selector, chooses first non-trivial color class, unless color class from stored base is
@@ -1145,16 +1191,16 @@ namespace dejavu {
              * @param g the graph
              * @param state ir controller that is navigated to the new target leaf
              * @param state_probe ir controller used for auxiliary probing
-             * @param h_choose chooses strategy of the new cell selector
+             * @param h_seed chooses strategy of the new cell selector
              * @param h_budget available budget
              */
-            void make_cell_selector(sgraph *g, controller *state, controller *state_probe, const int h_choose,
-                                    const int h_budget) {
+            void make_cell_selector(sgraph *g, controller *state, controller *state_probe, const selector_style style,
+                                    const int h_seed, const int h_budget) {
                 int perturbe = 0;
-                if(h_choose > 6) {
-                    perturbe = (int) (hash(h_choose) % 256);
+                if(h_seed > 6) {
+                    perturbe = (int) (hash(h_seed) % 256);
                 }
-                switch(h_choose % 4) {
+                switch(style) {
                     case 0:
                         //find_combinatorial_optimized_base_recurse(g, state, perturbe);
                         find_sparse_optimized_base(g, state);
@@ -1848,6 +1894,10 @@ namespace dejavu {
             bool          is_pruned = false;
             unsigned long hash = 0;
         public:
+
+            int           nodes_below  = 0;
+            int           pruned_below = 0;
+
             tree_node(limited_save* data, tree_node* next, tree_node* parent, bool owns_data) {
                 this->data = data;
                 this->next = next;
@@ -1857,6 +1907,7 @@ namespace dejavu {
                 }
                 this->parent = parent;
             }
+
             tree_node* get_next() {
                 return next;
             }
@@ -1954,6 +2005,38 @@ namespace dejavu {
                         }
                     }
                 }
+            }
+
+            void introspection() {
+                /*for(int j = finished_up_to; j >= 1; --j) {
+                    finish_level(j);
+                    for(auto node : tree_data_jump_map[j]) {
+                        node->nodes_below = 0;
+                    }
+                }
+
+                for(int j = finished_up_to; j >= 1; --j) {
+                    for(auto node : tree_data_jump_map[j]) {
+                        node->get_parent()->nodes_below += node->nodes_below + 1;
+                    }
+                }
+
+                for(int j = 1; j <= finished_up_to; ++j) {
+                    int nodes_below_compare = 0;
+                    for(auto node : tree_data_jump_map[j]) {
+                        if(node->get_base()) {
+                            nodes_below_compare = node->nodes_below;
+                            break;
+                        }
+                    }
+                    int could_prune = 0;
+                    for(auto node : tree_data_jump_map[j]) {
+                        if(nodes_below_compare != node->nodes_below) {
+                            ++could_prune;
+                        }
+                    }
+                    std::cout << could_prune << "@" << j << std::endl;
+                }*/
             }
 
             std::vector<unsigned long>* get_node_invariant() {
@@ -2100,9 +2183,12 @@ namespace dejavu {
                     tree_data_jump_map[level].reserve(tree_level_size[level]);
                     tree_node * next = first;
                     do {
-                        tree_data_jump_map[level].push_back(next);
+                        if(next->get_parent() == nullptr || !next->get_parent()->get_prune()) {
+                            tree_data_jump_map[level].push_back(next);
+                        }
                         next = next->get_next();
                     } while (next != first);
+                    tree_level_size[level] = tree_data_jump_map[level].size();
                     assert(tree_data_jump_map[level].size() == tree_level_size[level]);
                 }
             }
