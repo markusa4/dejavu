@@ -101,7 +101,7 @@ namespace dejavu {
              * Allocate an array of size \p size.
              * @param size Space to allocate.
              */
-            void alloc(const unsigned int size) {
+            void alloc(const int size) {
                 dealloc();
                 //arr = (T *) malloc(sizeof(T) * size);
                 arr = new T[size];
@@ -126,7 +126,8 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            explicit worklist_t(unsigned int size) {
+            explicit worklist_t(int size) {
+                assert(size >= 0);
                 allocate(size);
             }
 
@@ -145,7 +146,8 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            void allocate(unsigned int size) {
+            void allocate(int size) {
+                assert(size >= 0);
                 alloc(size);
                 cur_pos = 0;
             }
@@ -217,10 +219,11 @@ namespace dejavu {
              *
              * @param size New size to allocate the array to.
              */
-            void resize(const unsigned int size) {
+            void resize(const int size) {
+                assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 T *old_arr = nullptr;
-                unsigned int old_arr_sz = arr_sz;
+                int old_arr_sz = arr_sz;
                 if (arr) old_arr = arr;
                 alloc(size);
                 if (old_arr != nullptr) {
@@ -281,7 +284,7 @@ namespace dejavu {
 
             int cur_pos = 0; /**< current position */
         private:
-            unsigned int arr_sz = 0;      /**< size to which \a arr is currently allocated*/
+            int arr_sz = 0;       /**< size to which \a arr is currently allocated*/
             T *arr     = nullptr; /**< internal array */
         };
 
@@ -299,7 +302,8 @@ namespace dejavu {
              * Allocate an array of size \p size.
              * @param size Space to allocate.
              */
-            void alloc(const unsigned int size) {
+            void alloc(const int size) {
+                assert(size >= 0);
                 dealloc();
                 arr = (int*) calloc(size, sizeof(int));
                 arr_sz = size;
@@ -322,14 +326,14 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            explicit workspace(unsigned int size) {
+            explicit workspace(int size) {
                 allocate(size);
             }
 
             void copy(workspace* other) {
                 alloc(other->arr_sz);
                 for(int i = 0; i < other->arr_sz; ++i) {
-                    arr[i] = other->arr[i];
+                    arr[i] = other->arr[i]; // TODO use memcpy
                 }
                 arr_sz  = other->arr_sz;
             }
@@ -340,7 +344,7 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            void allocate(unsigned int size) {
+            void allocate(int size) {
                 alloc(size);
             }
 
@@ -357,10 +361,11 @@ namespace dejavu {
              *
              * @param size New size to allocate the array to.
              */
-            void resize(const unsigned int size) {
+            void resize(const int size) {
+                assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 int *old_arr = arr;
-                unsigned int old_arr_sz = arr_sz;
+                int old_arr_sz = arr_sz;
                 alloc(size);
                 if (old_arr) {
                     int cp_pt = std::min(old_arr_sz, arr_sz);
@@ -395,9 +400,8 @@ namespace dejavu {
                 return arr[index];
             }
 
-            int cur_pos = 0; /**< current position */
         private:
-            unsigned int arr_sz = 0; /**< size to which \a arr is currently allocated*/
+            int arr_sz = 0;     /**< size to which \a arr is currently allocated*/
             int *arr = nullptr; /**< internal array */
         };
 
@@ -659,26 +663,6 @@ namespace dejavu {
                 }
                 s_compression_ratio = 1.0;
                 if(domain_size > 0) s_compression_ratio = 1.0 * s_vertices_active / domain_size;
-            }
-
-            double determine_compression_ratio(coloring& c, std::vector<int>& base, int stop) const {
-                mark_set color_was_added(c.domain_size);
-
-                color_was_added.reset();
-
-                int vertices_active = 0;
-                for(int i = 0; i < stop; ++i) {
-                    const int base_vertex = base[i];
-                    const int col = c.vertex_to_col[base_vertex];
-                    if(!color_was_added.get(col)) {
-                        color_was_added.set(col);
-                        const int col_sz = c.ptn[col] + 1;
-                        vertices_active += col_sz;
-                    }
-                }
-                double compression_ratio = 1.0;
-                if(domain_size > 0) compression_ratio = 1.0 * vertices_active / c.domain_size;
-                return compression_ratio;
             }
 
             [[nodiscard]] int compressed_domain_size() const {

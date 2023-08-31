@@ -37,7 +37,7 @@ namespace sassy {
         enum preop { deg01, deg2ue, deg2ma, qcedgeflip, densify2, twins };
 
         //inline static preprocessor* save_preprocessor;
-        dejavu_hook* saved_hook;
+        dejavu_hook* saved_hook = nullptr;
 
         coloring c;
         dejavu::worklist automorphism;
@@ -95,9 +95,8 @@ namespace sassy {
         bool h_deact_deg2 = false;  /**< no degree 2   processing */
         bool h_translate_only = false;
 
-        preprocessor() {};
-
-        preprocessor(dejavu::ir::refinement* R) {
+        preprocessor() = default;
+        explicit preprocessor(dejavu::ir::refinement* R) {
             R1 = R;
         }
 
@@ -214,10 +213,9 @@ namespace sassy {
                     if(limit_breached) break;
 
                     //for(int jj = j+1; jj < color_size; ++jj) {
-                    for(int jj = 0; jj < potential_twin_list.size(); ++jj) {
+                    for(int other_vertex : potential_twin_list) {
                         bool is_twin = true;
                         //const int other_vertex = col.lab[color + jj];
-                        const int other_vertex = potential_twin_list[jj];
                         if(potential_twin_counter[other_vertex] < g->d[vertex] - 1) continue;
                         if(vertex == other_vertex || del.get(other_vertex) ||
                                 c.vertex_to_col[other_vertex] != c.vertex_to_col[vertex]) continue;
@@ -258,24 +256,22 @@ namespace sassy {
                     assert(twin_class_sz -1 == add_to_string.size());
                     assert(twin_counter[vertex] == add_to_string.size());
                     const int orig_vertex = translate_back(vertex);
-                    int debug_sz = recovery_strings[orig_vertex].size();
+                    [[maybe_unused]] int debug_sz = (int) recovery_strings[orig_vertex].size();
                     for(auto& other_vertex : add_to_string) {
                         assert(del.get(other_vertex));
                         const int orig_other  = translate_back(other_vertex);
                         assert(debug_sz == recovery_strings[orig_other].size());
                         recovery_strings[orig_vertex].push_back(orig_other);
-                        for(int k = 0; k < recovery_strings[orig_other].size(); ++k) {
+                        for(int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
                             recovery_strings[orig_vertex].push_back(recovery_strings[orig_other][k]);
                         }
                     }
                 }
 
                 add_to_string.clear();
-                int cnt_last = -1;
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = c.lab[color + j];
                     if(!del.get(vertex)) {
-                        cnt_last = twin_counter[vertex];
                         assert(colmap[vertex] + twin_counter[vertex] < color + color_size);
                         colmap[vertex] = color + twin_counter[vertex];
                         add_to_string.push_back(vertex);
@@ -316,7 +312,6 @@ namespace sassy {
                 return;
 
             del.reset();
-            int found_match = 0;
 
             //coloring test_col;
             g->initialize_coloring(&c, colmap);
@@ -388,7 +383,6 @@ namespace sassy {
                             }
 
                             if (check_if_match) {
-                                found_match += c.ptn[i] + 1;
                                 for (int f = 0; f < c.ptn[i] + 1; ++f) {
                                     const int _test_v = c.lab[i + f];
                                     del.set(_test_v);
@@ -446,8 +440,6 @@ namespace sassy {
                         touched_color_cache.set(col_n1);
                         touched_color_cache.set(col_n2);
 
-                        found_match += c.ptn[i] + 1;
-
                         //const size_t debug_str_sz = recovery_strings[translate_back(test_v)].size();
 
                         for (int f = 0; f < c.ptn[i] + 1; ++f) {
@@ -486,7 +478,6 @@ namespace sassy {
             worklist_deg0.reset();
             worklist_deg1.reset();
             touched_color_cache.reset();
-            //PRINT("(prep-red) deg2_matching, vertices deleted: " << found_match << "/" << g->v_size);
         }
 
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
@@ -869,7 +860,7 @@ namespace sassy {
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
             const int pos = static_cast<int>(recovery_edge_attached.size());
             assert(recovery.size() != 0);
-            for(int i = 0; i < recovery.size(); ++i) {
+            for(int i = 0; i < static_cast<int>(recovery.size()); ++i) {
                 recovery_edge_attached.push_back(recovery[i]);
             }
             const int len = static_cast<int>(recovery.size());
@@ -892,9 +883,9 @@ namespace sassy {
             if(recovery_edge_adjacent[v].empty()) return;
             const int v_map     = automorphism[v];
 
-            for(int j = 0; j < recovery_edge_adjacent[v].size(); ++j) {
-                const int other = std::get<0>(recovery_edge_adjacent[v][j]);
-                const int id    = std::get<1>(recovery_edge_adjacent[v][j]);
+            for(auto & j : recovery_edge_adjacent[v]) {
+                const int other = std::get<0>(j);
+                const int id    = std::get<1>(j);
 
                 assert(other != v);
                 const int other_map = automorphism[other];
@@ -905,7 +896,7 @@ namespace sassy {
 
             assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
 
-            for(int j = 0; j < recovery_edge_adjacent[v_map].size(); ++j) {
+            for(int j = 0; j < static_cast<int>(recovery_edge_adjacent[v_map].size()); ++j) {
                 const int other_map = std::get<0>(recovery_edge_adjacent[v_map][j]);
                 const int id        = std::get<1>(recovery_edge_adjacent[v_map][j]);
                 const int len       = std::get<2>(recovery_edge_adjacent[v_map][j]);
@@ -974,8 +965,6 @@ namespace sassy {
 
             // collect and count endpoints
             int total_paths = 0;
-            int total_deleted_vertices = 0;
-            int total_paths_excluded_not_unique = 0;
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1051,7 +1040,6 @@ namespace sassy {
                 // check which neighbouring paths have non-unique color
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
-                    const int endpoint      = connected_endpoints[g->v[test_vertex] + j];
 
                     assert(g->d[neighbour] == 2);
                     const int neighbour_col = c.vertex_to_col[neighbour];
@@ -1073,8 +1061,6 @@ namespace sassy {
                     duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
                     assert(endpoint_cnt[endpt_test_vertex] == endpoints);
                     for (int k = 0; k < endpoints; ++k) {
-                        const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
-                        assert(g->d[neighbour] == 2);
                         const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
                         if(duplicate_endpoints.get(endpoint)) {
                             duplicate_endpoint_flag = true;
@@ -1176,7 +1162,6 @@ namespace sassy {
                             del.set(del_v);
                             assert(!path_done.get(del_v));
                             path_done.set(del_v);
-                            ++total_deleted_vertices;
                         }
                         del.unset(hub_vertex); // don't delete canonical vertex
                         assert(!del.get(hub_vertex));
@@ -1241,8 +1226,6 @@ namespace sassy {
 
             // collect and count endpoints
             int total_paths = 0;
-            int total_deleted_vertices = 0;
-            int total_paths_excluded_not_unique = 0;
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1364,8 +1347,6 @@ namespace sassy {
                 }
 
                 path.reset();
-
-                int use_pos = 0;
                 const int num_paths = filter.cur_pos;
 
                 // do next steps for all vertices in color classes...
@@ -1414,7 +1395,6 @@ namespace sassy {
                             del.set(del_v);
                             assert(!path_done.get(del_v));
                             path_done.set(del_v);
-                            ++total_deleted_vertices;
                         }
 
                         // connect endpoints of path to hub vertex (the canonical vertex)
@@ -1435,7 +1415,7 @@ namespace sassy {
                             assert(path_v_orig >= 0);
                             assert(path_v_orig < domain_size);
                             recovery.push_back(path_v_orig);
-                            for(int f = 0; f < recovery_strings[path_v_orig].size(); ++f) {
+                            for(int f = 0; f < static_cast<int>(recovery_strings[path_v_orig].size()); ++f) {
                                 recovery.push_back(recovery_strings[path_v_orig][f]);
                             }
                         }
@@ -1584,14 +1564,6 @@ namespace sassy {
                 const int test_vertex = c.lab[color];
                 const int endpoints = endpoint_cnt[test_vertex];
 
-                //if(endpoints != 1)
-                //    continue;
-
-                for (int j = 0; j < color_size; ++j) {
-                    const int other_from_color = c.lab[color + j];
-                    assert(endpoint_cnt[other_from_color] == endpoints);
-                }
-
                 if (endpoints == 0) {
                     continue;
                 }
@@ -1647,7 +1619,7 @@ namespace sassy {
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     const int endpoint  = not_unique[kk + 1];
                     const int endpoint_col    = c.vertex_to_col[endpoint];
-                    const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
+                    [[maybe_unused]] const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
                     path.reset();
                     if (!color_test.get(endpoint_col)) {
                         color_test.set(endpoint_col);
@@ -1671,8 +1643,8 @@ namespace sassy {
                             // test_vertex connects to all vertices of endpoint_col!
                             if (all_unique && color < endpoint_col) {
                                 const int path_col = c.vertex_to_col[neighbour];
-                                const int path_col_sz = c.ptn[path_col] + 1;
-                                const int connects_to = not_unique_analysis[endpoint_col];
+                                [[maybe_unused]] const int path_col_sz = c.ptn[path_col] + 1;
+                                [[maybe_unused]] const int connects_to = not_unique_analysis[endpoint_col];
                                 assert(path_col_sz == (connects_to * color_size));
                                 assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
 
@@ -3260,9 +3232,9 @@ namespace sassy {
 
             if(h_translate_only) {
                 translate_layer_fwd.reserve(g->v_size);
-                backward_translation_layers.emplace_back(std::vector<int>());
+                backward_translation_layers.emplace_back();
                 const size_t back_ind = backward_translation_layers.size() - 1;
-                translation_layers.emplace_back(std::vector<int>());
+                translation_layers.emplace_back();
                 // const int fwd_ind = translation_layers.size() - 1;
                 backward_translation_layers[back_ind].reserve(g->v_size);
                 for (int i = 0; i < g->v_size; ++i)
@@ -3286,9 +3258,8 @@ namespace sassy {
                 domain_size = g->v_size;
 
                 recovery_strings.reserve(g->v_size);
-                for (int i = 0; i < domain_size; ++i) {
-                    recovery_strings.emplace_back(std::vector<int>());
-                }
+                for (int i = 0; i < domain_size; ++i) recovery_strings.emplace_back();
+
                 saved_hook = hook;
                 save_preprocessor = this;
                 return;
@@ -3314,9 +3285,9 @@ namespace sassy {
                 return;
             }
 
-            backward_translation_layers.emplace_back(std::vector<int>());
+            backward_translation_layers.emplace_back();
             const size_t back_ind = backward_translation_layers.size() - 1;
-            translation_layers.emplace_back(std::vector<int>());
+            translation_layers.emplace_back();
             // const int fwd_ind = translation_layers.size() - 1;
             backward_translation_layers[back_ind].reserve(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
@@ -3347,8 +3318,6 @@ namespace sassy {
                 return;
             }
 
-            int deg0, deg1, deg2;
-            //add_edge_buff.allocate(domain_size);
             add_edge_buff.clear();
             add_edge_buff.reserve(domain_size);
             for (int i = 0; i < domain_size; ++i)

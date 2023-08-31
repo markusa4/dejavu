@@ -248,7 +248,7 @@ namespace dejavu {
                 const bool deviation_override = h_deviation_inc_active && (s_deviation_inc_current <= h_deviation_inc);
 
                 const bool continue_cell_limit = !((mode != IR_MODE_RECORD_TRACE) && T->trace_equal()
-                                                   && s_base_pos - 1 < compare_base->size()
+                                                   && s_base_pos - 1 < static_cast<int>(compare_base->size())
                                                    && (*compare_base)[s_base_pos - 1].cells == c->cells);
                 ++s_splits;
                 const bool continue_split_limit = !h_use_split_limit || (s_splits < h_split_limit);
@@ -455,7 +455,7 @@ namespace dejavu {
              *
              * @param automorphism workspace to write the automorphism to
              */
-            void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
+            [[maybe_unused]] void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
 
                 for(int i = 0; i < c->domain_size;) {
@@ -468,7 +468,7 @@ namespace dejavu {
                 }
             }
 
-            void color_diff_automorphism_base(groups::automorphism_workspace*  automorphism) {
+            [[maybe_unused]] void color_diff_automorphism_base(groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
 
                 for(int i = 0; i < c->domain_size; ++i) {
@@ -523,11 +523,10 @@ namespace dejavu {
                 const int right = diff_vertices_list[0];
                 const int right_col = c->vertex_to_col[right];
 
-                const int right_col_sz = c->ptn[right_col];
-
                 // find a corresponding counterpart in the other coloring
                 const int left      = state.c->lab[right_col];
-                /*int left = -1;
+                /*const int right_col_sz = c->ptn[right_col];
+                int left = -1;
                 for (int i = 0; i < right_col_sz; ++i) {
                     const int candidate = state.c->lab[right_col + i];
                     if(diff_vertices.get(candidate)) {
@@ -564,7 +563,7 @@ namespace dejavu {
              */
             void singleton_automorphism(controller& state, groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
-                for(int i = singleton_pt_start; i < singletons.size(); ++i) {
+                for(int i = singleton_pt_start; i < static_cast<int>(singletons.size()); ++i) {
                     automorphism->write_single_map(singletons[i], state.singletons[i]);
                 }
             }
@@ -1158,7 +1157,7 @@ namespace dejavu {
                 switch(h_choose % 4) {
                     case 0:
                         //find_combinatorial_optimized_base_recurse(g, state, perturbe);
-                        find_sparse_optimized_base(g, state, 0);
+                        find_sparse_optimized_base(g, state);
                         //find_first_base(g, state);
                         break;
                     case 1:
@@ -1204,7 +1203,7 @@ namespace dejavu {
              * @param g The graph.
              * @param state The IR state from which a base is created.
              */
-            void find_sparse_optimized_base(sgraph *g, controller *state, int perturbe) {
+            void find_sparse_optimized_base(sgraph *g, controller *state) {
                 state->mode_write_base();
 
                 int prev_color = -1;
@@ -1286,8 +1285,6 @@ namespace dejavu {
 
             void find_first_base(sgraph *g, controller *state) {
                 state->mode_write_base();
-
-                int prev_color = -1;
                 assert(state->s_base_pos == 0);
 
                 test_set.initialize(g->v_size);
@@ -1313,7 +1310,6 @@ namespace dejavu {
 
                     assert(best_color >= 0);
                     assert(best_color < g->v_size);
-                    prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
             }
@@ -1423,40 +1419,6 @@ namespace dejavu {
                     assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[(best_color +
                                                                     (perturbe%state->get_coloring()->ptn[best_color]))]);
-                }
-            }
-
-            /**
-             * Find a base/selector for a given graph \p g from state \p state. Attemtps to find a good base for
-             * combinatorial graphs solved by bfs/random walks (i.e., by choosing large colors).
-             *
-             * @param R A refinement workspace.
-             * @param g The graph.
-             * @param state The IR state from which a base is created.
-             */
-            void find_combinatorial_optimized_base(sgraph *g, controller *state, int perturbe) {
-                state->mode_write_base();
-
-                while (state->get_coloring()->cells != g->v_size) {
-                    int best_color = -1;
-
-                    // heuristic, try to pick "good" color
-                    int best_score = -1;
-                    int skip = perturbe % 3;
-                    for (int i = 0; i < state->get_coloring()->domain_size;) {
-                        if (state->get_coloring()->ptn[i] > 0) {
-                            int test_score = color_score_size(state, i);
-                            if (test_score > best_score) {
-                                best_color = i;
-                                best_score = test_score;
-                            }
-                        }
-                        i += state->get_coloring()->ptn[i] + 1;
-                    }
-
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
-                    state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
             }
 
@@ -1570,10 +1532,6 @@ namespace dejavu {
              */
             void find_early_trace_deviation_base(sgraph *g, controller* state, controller* state_probe, int perturbe) {
                 state->mode_write_base();
-
-                int prev_color    = -1;
-                int prev_color_sz = 0;
-
                 constexpr int probe_limit = 5;
 
                 state_probe->link(state);
@@ -1601,12 +1559,12 @@ namespace dejavu {
                             if (col_sz >= 2) {
                                 candidates.push_back(i);
                             }
-                            if (candidates.size() >= probe_limit_candidates) break;
+                            if (static_cast<int>(candidates.size()) >= probe_limit_candidates) break;
                             i += col_sz;
                         }
 
                         // now, probe and score the candidates... we are trying to find the color with most trace deviations
-                        for (int i = 0; i < candidates.size(); ++i) {
+                        for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
                             const int col = candidates[i];
                             const int col_sz = state->c->ptn[col] + 1;
                             assert(col_sz >= 2);
@@ -1617,8 +1575,8 @@ namespace dejavu {
                             assert(state->T->get_position() == state_probe->T->get_position());
                             assert(state->c->cells == state_probe->c->cells);
 
-                            int cells_pre = state->c->cells;
-                            int previous_pos = state->T->get_position();
+                            [[maybe_unused]] int cells_pre = state->c->cells;
+                            [[maybe_unused]] int previous_pos = state->T->get_position();
 
                             state->move_to_child(g, v_base);
 
@@ -1692,10 +1650,9 @@ namespace dejavu {
                     assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
                     //assert(state->T->get_hash() == state_probe->T->get_hash());
                     assert(!use_probing || state->c->cells == state_probe->c->cells);
-                    prev_color    = best_color;
-                    prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
+                    const int col_sz = state->get_coloring()->ptn[best_color] + 1;
                     int v = best_test_v;
-                    if(v == -1) v = state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))];
+                    if(v == -1) v = state->get_coloring()->lab[(best_color + (perturbe% col_sz))];
 
                     assert(!use_probing || state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
 
@@ -1974,7 +1931,7 @@ namespace dejavu {
             };
 
             // TODO: move this to inprocessor?
-            void make_node_invariant(int domain_size) {
+            void make_node_invariant() {
                 if(finished_up_to > 1) {
                     for(int j = finished_up_to; j >= 1; --j) {
                         finish_level(j);

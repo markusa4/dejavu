@@ -53,8 +53,7 @@ namespace dejavu::search_strategy {
          *
          * @returns whether an automorphism was found and it sifted successfully
          */
-        bool __attribute__((noinline)) add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook,
-                                                                     groups::compressed_schreier &group,
+        bool add_leaf_to_storage_and_group(sgraph *g, dejavu_hook *hook, groups::compressed_schreier &group,
                                            ir::shared_leaves &leaf_storage, ir::controller &local_state,
                                            ir::controller &other_state, ir::limited_save &root_save, bool uniform) {
             assert(g->v_size == local_state.c->cells);
@@ -177,7 +176,7 @@ namespace dejavu::search_strategy {
             s_paths_failany    = 0;
             s_leaves           = 0;
             s_succeed          = 0;
-            s_rolling_success = 0;
+            s_rolling_success  = 0;
             s_rolling_first_level_success  = 1.0;
         }
 
@@ -225,8 +224,8 @@ namespace dejavu::search_strategy {
 
             other_state.link_compare(&local_state);
 
-            int    s_cell_initial   = start_from->get_coloring()->cells;
-            double progress_initial = 1.0 * s_cell_initial / g->v_size;
+            const int s_cell_initial   = start_from->get_coloring()->cells;
+            double    progress_initial = 1.0 * s_cell_initial / g->v_size;
 
             const int target_level = ir_tree.get_finished_up_to();
 
@@ -251,13 +250,12 @@ namespace dejavu::search_strategy {
                     local_state.save_reduced_state(my_own_save); // from now on, we start from this save!
                     start_from = &my_own_save;
 
-                    const int s_cells_now     = start_from->get_coloring()->cells;
+                    const int    s_cells_now  = start_from->get_coloring()->cells;
                     const double progress_now = 1.0 * s_cells_now / g->v_size;
 
                     if(progress_now - progress_initial > 0.1) {
                         progress_current_method("random", "root_cells", 1.0 * s_cells_now / g->v_size, "base_pos",
                                                 could_start_from, "sift", s_sifting_success, "rsift", s_random_sift_success);
-                        s_cell_initial   = s_cells_now;
                         progress_initial = progress_now;
                     }
                 }
@@ -266,7 +264,7 @@ namespace dejavu::search_strategy {
                 int base_pos                  = local_state.s_base_pos;
 
                 // track whether current walk is base-aware and/or uniform
-                bool base_aligned = true;
+                // bool base_aligned = true;
                 bool uniform      = true;
 
                 //walk down the tree as long as we are not in a leaf
@@ -293,7 +291,8 @@ namespace dejavu::search_strategy {
                     // itself, let's try to create sparse generators by trying to stick to the base after a few
                     // individualizations
                     if(base_pos > start_from_base_pos + 1 && g->v_size > 5000 && s_sifting_success >= 0 &&
-                       s_random_sift_success < 0 &&  base_pos < local_state.compare_base_vertex->size()) {
+                       s_random_sift_success < 0 &&
+                       base_pos < static_cast<int>(local_state.compare_base_vertex->size())) {
                         // or even better: let's choose the base vertex, if it's in the correct color
                         const int v_base     = (*local_state.compare_base_vertex)[base_pos];
                         const int v_base_col = local_state.c->vertex_to_col[v_base];
@@ -316,7 +315,8 @@ namespace dejavu::search_strategy {
                         }
                         group.reduce_to_unfinished(*gws_schreierw, heuristic_reroll, base_pos);
                         if(!heuristic_reroll.empty()) {
-                            const int rand_reroll = ((int) generator()) % heuristic_reroll.size();
+                            const int rand_reroll = static_cast<int>(generator()) %
+                                                    static_cast<int>(heuristic_reroll.size());
                             v = heuristic_reroll[rand_reroll];
                         }
                     }

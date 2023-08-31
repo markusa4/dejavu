@@ -52,7 +52,7 @@ namespace dejavu {
                 const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
                 if(!is_diffed_pre || state_right.get_diff_diverge()) return 2;
 
-                while ((size_t) state_right.c->cells < g->v_size) {
+                while (state_right.c->cells < g->v_size) {
                     // pick a color that prevents the "matching OPP"
 
                     // pick vertices that differ in the color

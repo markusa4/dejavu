@@ -104,6 +104,11 @@ namespace dejavu {
             return (l.exponent == r.exponent) && (l.mantissa > r.mantissa-0.01) && (l.mantissa < r.mantissa+0.01);
         }
 
+        void set(long double set_mantissa, int set_exponent) {
+            mantissa = set_mantissa;
+            exponent = set_exponent;
+        }
+
         /**
          * Multiply a \p number to this big_number.
          *
@@ -155,37 +160,28 @@ namespace dejavu {
         }
     };
 
-    inline std::ostream& operator<<(std::ostream& out, big_number& number) {
+    inline std::ostream& operator<<(std::ostream& out, big_number number) {
         return out << number.mantissa << "*10^" << number.exponent;
     }
 
-    static void progress_current_method(const std::string print) {
+    static void progress_current_method(const std::string& print) {
         PRINT_NO_NEWLINE("\r>" << print);
     }
-    static void progress_current_method(const std::string method_name, std::string var1, double var1_val) {
-        PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val);
-    }
-    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
-                                                                       std::string var2, double var2_val) {
+    static void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
+                                                                       const std::string& var2, double var2_val) {
         PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val);
     }
-    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
-                                                                       std::string var2, double var2_val,
-                                                                       std::string var3, double var3_val) {
-        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
-                                              << ", " << var3 << "=" << var3_val);
-    }
-    static void progress_current_method(const std::string method_name, std::string var1, int var1_val,
-                                        std::string var2, int var2_val,
-                                        std::string var3, double var3_val) {
+    static void progress_current_method(const std::string& method_name, const std::string& var1, int var1_val,
+                                        const std::string& var2, int var2_val,
+                                        const std::string& var3, double var3_val) {
         PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
                                << ", " << var3 << "=" << var3_val);
     }
 
-    static void progress_current_method(const std::string method_name, std::string var1, double var1_val,
-                                        std::string var2, int var2_val,
-                                        std::string var3, int var3_val,
-                                        std::string var4, int var4_val) {
+    static void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
+                                        const std::string& var2, int var2_val,
+                                        const std::string& var3, int var3_val,
+                                        const std::string& var4, int var4_val) {
         PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
                                << ", " << var3 << "=" << var3_val << ", " << var4 << "=" << var4_val);
     }
@@ -214,28 +210,17 @@ namespace dejavu {
             previous  = first;
         }
 
-        void print_header() {
+        void print_header() const {
             if(h_silent) return;
             progress_print_header();
         }
 
-        void print(const std::string str) {
+        void print(const std::string& str) const {
             if(h_silent) return;
             PRINT("\r" << str);
         }
 
-        void timer_print(const std::string proc) {
-            if(h_silent) return;
-            auto now = std::chrono::high_resolution_clock::now();
-            PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
-                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - first).count()) / 1000000.0
-                       << std::setw(11)
-                       << (std::chrono::duration_cast<std::chrono::nanoseconds>(now - previous).count()) / 1000000.0
-                       << std::setw(12) << proc);
-            previous = now;
-        }
-
-        void timer_print(const std::string proc, const std::string p1, const std::string p2) {
+        void timer_print(const std::string& proc, const std::string& p1, const std::string& p2) {
             if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
@@ -250,7 +235,7 @@ namespace dejavu {
             previous = std::chrono::high_resolution_clock::now();
         }
 
-        void timer_print(const std::string proc, const int p1, const int p2) {
+        void timer_print(const std::string& proc, const int p1, const int p2) {
             if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left
@@ -261,7 +246,7 @@ namespace dejavu {
             previous = now;
         }
 
-        void timer_print(const std::string proc, const int p1, const double p2) {
+        void timer_print(const std::string& proc, const int p1, const double p2) {
             if(h_silent) return;
             auto now = std::chrono::high_resolution_clock::now();
             PRINT("\r" << std::fixed << std::setprecision(2) << std::setw(11) << std::left

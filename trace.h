@@ -38,8 +38,8 @@ namespace dejavu {
             bool record  = false; /**< whether to record a trace */
 
             // housekeeping
-            int cell_act_spot      = -1;
-            int cell_old_color     = -1;
+            // int cell_act_spot      = -1;
+            // int cell_old_color     = -1;
             bool assert_cell_act   = false;
             bool assert_refine_act = false;
 
@@ -69,12 +69,12 @@ namespace dejavu {
                 ++position;
             }
 
-            void write_skip_compare(int d) {
+            /*void write_skip_compare(int d) {
                 d = std::min(INT32_MAX-10,d);
                 assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 if (record) data.push_back(d);
                 ++position;
-            }
+            }*/
 
         public:
 
@@ -108,11 +108,11 @@ namespace dejavu {
              * Records the start of a refinement with respect to a color.
              * @param color The color in respect to which the coloring is refined.
              */
-            void op_refine_cell_start(int color) {
+            void op_refine_cell_start([[maybe_unused]] int color) {
                 assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
                 //write_compare(color);
-                cell_old_color = color;
+                // cell_old_color = color;
                 //cell_act_spot = (int) data.size();
                 //write_skip_compare(false);
                 assert_cell_act = true;
@@ -158,8 +158,8 @@ namespace dejavu {
              * @return Determines whether in the stored trace, the next color in respect to which was refined created new colors
              * (i.e., whether the next color is splitting).
              */
-            bool blueprint_is_next_cell_active() {
-                if (!compare || !comp || position > compare_trace->data.size()) return true;
+            [[maybe_unused]] bool blueprint_is_next_cell_active() {
+                if (!compare || !comp || position > static_cast<int>(compare_trace->data.size())) return true;
 
                 assert(compare_trace);
                 size_t read_pt = position;
@@ -179,8 +179,8 @@ namespace dejavu {
              * Skips the \a position to the start of the next refinement with respect to a color. To be used after
              * \a blueprint_is_next_cell_active() determined the current color to be non-splitting.
              */
-            void blueprint_skip_to_next_cell() {
-                while (position < compare_trace->data.size() &&
+            [[maybe_unused]] void blueprint_skip_to_next_cell() {
+                while (position < static_cast<int>(compare_trace->data.size()) &&
                        compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
                     assert(compare_trace->data.size() > (size_t) position);
                     ++position;
@@ -192,7 +192,7 @@ namespace dejavu {
             /**
              * Rewinds the \a position to the previous individualization.
              */
-            void rewind_to_individualization() {
+            [[maybe_unused]] void rewind_to_individualization() {
                 assert_cell_act = false;
                 assert_refine_act = false;
                 if (record) {

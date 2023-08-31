@@ -68,6 +68,26 @@ namespace dejavu {
 
             workspace inverse_automorphism;
             bool have_inverse_automorphism = false;
+
+            /**
+             * Reconstruct inverse automorphism
+             */
+            void update_inverse_automorphism() {
+                if(!have_inverse_automorphism) {
+                    for (int i = 0; i < domain_size; ++i) {
+                        const int j = automorphism[i];
+                        inverse_automorphism[j] = i;
+                    }
+                    have_inverse_automorphism = true;
+                }
+            }
+
+            /**
+             * Invalidate inverse automorphism
+             */
+            void invalidate_inverse_automorphism() {
+                have_inverse_automorphism = false;
+            }
         public:
             /**
              * Initializes the stored automorphism to the identity.
@@ -145,7 +165,13 @@ namespace dejavu {
              */
             [[maybe_unused]] void apply(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
                        automorphism_workspace *other, int pwr = 1) {
-                apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
+                if(!other->support01 && other->nsupport() <= domain_size / 4) {
+                    apply_sparse(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), other->support(),
+                                 other->nsupport(), pwr);
+                } else {
+                    apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
+
+                }
             }
 
             /**
@@ -224,66 +250,95 @@ namespace dejavu {
                 invalidate_inverse_automorphism();
             }
 
-            void update_inverse_automorphism() {
-                if(!have_inverse_automorphism) {
-                    for (int i = 0; i < domain_size; ++i) {
-                        const int j = automorphism[i];
-                        inverse_automorphism[j] = i;
-                    }
-                    have_inverse_automorphism = true;
-                }
-            }
-
-            void invalidate_inverse_automorphism() {
-                have_inverse_automorphism = false;
-            }
-
             void apply_sparse(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
                        const int *p, const int* support, const int nsupport, int pwr = 1) {
                 if (pwr == 0) return;
-                if(pwr == 1) {
+                // sparse version only implemented for pwr <= 6 right now
+                if(pwr <= 6) {
+                    // we need the inverse automorphism for the algorithm
                     update_inverse_automorphism();
-
                     scratch_apply1.reset();
                     scratch_apply2.reset();
-                    for (int k = 0; k < nsupport; ++k) {
-                        const int i = support[k];
-                        assert(automorphism[inverse_automorphism[i]] == i);
-                        const int inv_i = inverse_automorphism[i];
-                        const int p_i   = p[i];
-                        automorphism[inv_i] = p_i;
-                        scratch_apply1.push_back(inv_i);
-                        scratch_apply2.push_back(p_i);
+
+                    switch(pwr) {
+                        case 1:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[i];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                        break;
+                        case 2:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[p[i]];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                            break;
+                        case 3:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[p[p[i]]];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                            break;
+                        case 4:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[p[p[p[i]]]];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                            break;
+                        case 5:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[p[p[p[p[i]]]]];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                            break;
+                        case 6:
+                            for (int k = 0; k < nsupport; ++k) {
+                                const int i = support[k];
+                                assert(automorphism[inverse_automorphism[i]] == i);
+                                const int inv_i = inverse_automorphism[i];
+                                const int p_i = p[p[p[p[p[p[i]]]]]];
+                                automorphism[inv_i] = p_i;
+                                scratch_apply1.push_back(inv_i);
+                                scratch_apply2.push_back(p_i);
+                            }
+                            break;
+                        default:
+                            assert(false); // unreachable
+                            break;
                     }
 
-                    for(int k = 0; k < scratch_apply1.size(); ++k) {
+                    // fix inverse automorphism
+                    for (int k = 0; k < scratch_apply1.size(); ++k)
                         inverse_automorphism[scratch_apply2[k]] = scratch_apply1[k];
-                    }
-
-                    scratch_apply1.reset();
-                    scratch_apply2.reset();
-                } else if(pwr == 2) {
-                    update_inverse_automorphism();
-
-                    scratch_apply1.reset();
-                    scratch_apply2.reset();
-                    for (int k = 0; k < nsupport; ++k) {
-                        const int i = support[k];
-                        assert(automorphism[inverse_automorphism[i]] == i);
-                        const int inv_i = inverse_automorphism[i];
-                        const int p_i   = p[p[i]];
-                        automorphism[inv_i] = p_i;
-                        scratch_apply1.push_back(inv_i);
-                        scratch_apply2.push_back(p_i);
-                    }
-
-                    for(int k = 0; k < scratch_apply1.size(); ++k) {
-                        inverse_automorphism[scratch_apply2[k]] = scratch_apply1[k];
-                    }
-
                     scratch_apply1.reset();
                     scratch_apply2.reset();
                 } else {
+                    // otherwise just use dense version...
                     apply(scratch_apply1, scratch_apply2, scratch_apply3, p, pwr);
                 }
 
@@ -351,12 +406,6 @@ namespace dejavu {
              */
             [[nodiscard]] int nsupport() const {
                 return automorphism_supp.cur_pos;
-            }
-
-            /** Set support (unsafe).
-             */
-            void set_nsupport(int nsupp) {
-                automorphism_supp.set_size(nsupp);
             }
         };
 
@@ -805,9 +854,6 @@ namespace dejavu {
             /*enum stored_transversal_type {
                 STORE_DENSE, STORE_SPARSE
             };*/
-
-            std::mutex lock_transversal;          /**< locks this transversal */
-
             int fixed = -1;                       /**< vertex fixed by this transversal */
             int sz_upb = INT32_MAX;               /**< upper bound for size of the transversal (e.g. color class size) */
             int level = -1;
@@ -860,7 +906,7 @@ namespace dejavu {
              * @param pwr A power that is applied to the generator first.
              */
             static void apply_perm(schreier_workspace &w, automorphism_workspace &automorphism,
-                       generating_set &generators, const int gen_num, const int pwr) {
+                                   generating_set &generators, const int gen_num, const int pwr) {
                 // load perm into workspace
                 auto generator = generators[gen_num];
 
@@ -896,7 +942,7 @@ namespace dejavu {
                 sz_upb = new_sz_upb;
             }
 
-            [[nodiscard]] int get_size_upper_bound() {
+            [[nodiscard]] int get_size_upper_bound() const {
                 return sz_upb;
             }
             /**
@@ -1239,7 +1285,7 @@ namespace dejavu {
              * @param base_pos Position in base.
              * @return Bool that indicates whether the traversal at position \p s_base_pos matches its size upper bound.
              */
-            bool is_finished(const int base_pos) {
+            [[nodiscard]] bool is_finished(const int base_pos) const {
                 return transversals[base_pos]->is_finished();
             }
 
@@ -1366,14 +1412,6 @@ namespace dejavu {
              * @return Whether the deterministic abort criterion allows termination or not.
              */
             [[nodiscard]] bool deterministic_abort_criterion() const {
-                /*int num_finished = 0;
-                int num_not_finished = 0;
-                for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
-                    num_finished += transversals[level]->is_finished();
-                    num_not_finished += !transversals[level]->is_finished();
-                    if(!transversals[level]->is_finished()) std::cout << level << " bp: " << transversals[level]->fixed_point()  << "sz: " << transversals[level]->size() << "/" << transversals[level]->get_size_upper_bound()  << std::endl;
-                }
-                    std::cout << finished_up_to_level() + 1 << "/" << num_finished << "-" << num_not_finished << "/" << base_size() << std::endl;*/
                 return (finished_up_to_level() + 1 == base_size());
             }
 
@@ -1392,9 +1430,7 @@ namespace dejavu {
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
                 // multiply the sizes of the individual levels in the Schreier table
-                for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
-                    s_grp_sz.multiply(transversals[level]->size());
-                }
+                for (auto & transversal : transversals) s_grp_sz.multiply(transversal->size());
             }
         };
 
@@ -1414,13 +1450,11 @@ namespace dejavu {
             automorphism_workspace* compressed_automorphism;
             std::vector<int> original_base;
             std::vector<int> original_base_sizes;
-            int              original_stop = 0;
-
             int              s_compressed_until = 0;
 
         public:
             double h_min_compression_ratio = 0.4; /*< only use compression if at least this ratio can be achieved */
-            double s_compression_ratio = 1.0;
+            double s_compression_ratio     = 1.0;
 
             /**
              * @return Number of stored generators using a sparse data structure.
@@ -1444,8 +1478,8 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
-            bool reset(ds::domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
-                       std::vector<int> &new_base_sizes, const int stop, bool keep_old,
+            bool reset(ds::domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w,
+                       std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
                 s_compressed_until = 0;
                 compressor = new_compressor;
@@ -1458,15 +1492,14 @@ namespace dejavu {
                     // need more management if we are using compression
                     original_base       = new_base;
                     original_base_sizes = new_base_sizes;
-                    original_stop = stop;
                     delete compressed_automorphism;
                     compressed_automorphism = new automorphism_workspace(compressor->compressed_domain_size());
                     keep_old = false;
                     std::vector<int> new_basec;
                     new_basec.reserve(new_base.size());
-                    for (int i = 0; i < new_base.size(); ++i) {
+                    for (int i = 0; i < static_cast<int>(new_base.size()); ++i)
                         new_basec.push_back(compressor->compress(new_base[i]));
-                    }
+
                     s_compression_ratio = compressor->s_compression_ratio;
                     return internal_schreier.reset(new_compressor->compressed_domain_size(), w, new_basec,
                                                     new_base_sizes, stop, keep_old,
@@ -1478,37 +1511,6 @@ namespace dejavu {
                                                     new_base_sizes, stop, keep_old,
                                                     global_fixed_points);
                 }
-            }
-
-            void consider_compress_more_from_start(schreier_workspace& w, int compress_until, coloring& c) {
-                // TODO breaks some large-cfi
-                if(compressor == nullptr || s_compression_ratio < 0.1) return;
-                assert(compressor != nullptr);
-                std::vector<int> new_base;
-                std::vector<int> new_base_sizes;
-                new_base.resize(original_base.size() - compress_until);
-                new_base_sizes.resize(original_base.size() - compress_until);
-                int j = 0;
-                for(int i = compress_until; i < original_base.size(); ++i) {
-                    new_base[j]       = original_base[i];
-                    new_base_sizes[j] = original_base_sizes[i];
-                    ++j;
-                }
-                const int new_stop = original_stop - compress_until;
-
-                if(compressor->determine_compression_ratio(c, new_base, new_stop) >= 0.1) return;
-                s_compressed_until = compress_until;
-                compressor->determine_compression_map(c, new_base, new_stop);
-                s_compression_ratio = compressor->s_compression_ratio;
-                std::vector<int> new_basec;
-                for (int &b: new_base) {
-                    new_basec.push_back(compressor->compress(b));
-                }
-                delete compressed_automorphism;
-                compressed_automorphism = new automorphism_workspace(compressor->compressed_domain_size());
-                std::vector<int> empty_vec;
-                internal_schreier.reset(compressor->compressed_domain_size(), w, new_basec,
-                                               new_base_sizes, new_stop, false,empty_vec);
             }
 
             /**
@@ -1576,15 +1578,15 @@ namespace dejavu {
              */
             void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection, int base_pos) {
                 if(compressor != nullptr) {
-                    for(int i = 0; i < selection.size(); ++i) {
+                    for(int &i : selection) {
                         assert(compressor->compress(selection[i]) >= 0);
-                        selection[i] = compressor->compress(selection[i]);
+                        i = compressor->compress(i);
                     }
                 }
                 internal_schreier.reduce_to_unfinished(w, selection, base_pos-s_compressed_until);
                 if(compressor != nullptr) {
-                    for(int i = 0; i < selection.size(); ++i) {
-                        selection[i] = compressor->decompress(selection[i]);
+                    for(int &i : selection) {
+                        i = compressor->decompress(i);
                         assert(selection[i] >= 0);
                     }
                 }
@@ -1639,15 +1641,6 @@ namespace dejavu {
             }
 
             /**
-             * Records a sift result for the probabilistic abort criterion.
-             *
-             * @param changed Whether the sift was successful or not.
-             */
-            void record_sift_result(const bool changed) {
-                internal_schreier.record_sift_result(changed);
-            }
-
-            /**
              * Reset the probabilistic abort criterion.
              */
             void reset_probabilistic_criterion() {
@@ -1680,11 +1673,11 @@ namespace dejavu {
                 internal_schreier.h_error_bound = error_bound;
             }
 
-            int get_consecutive_success() {
+            [[nodiscard]] int get_consecutive_success() const {
                 return internal_schreier.s_consecutive_success;
             }
 
-            big_number get_group_size() {
+            [[nodiscard]] big_number get_group_size() const {
                 return internal_schreier.s_grp_sz;
             }
 

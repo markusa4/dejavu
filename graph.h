@@ -24,8 +24,8 @@ namespace dejavu {
     class static_graph {
     private:
         sgraph   g;
-        int*     c = nullptr;
-        int*     edge_cnt;
+        int*     c        = nullptr;
+        int*     edge_cnt = nullptr;
         unsigned int num_vertices_defined  = 0;
         unsigned int num_edges_defined     = 0;
         unsigned int num_deg_edges_defined = 0;
@@ -48,14 +48,15 @@ namespace dejavu {
             }
         }
     public:
-        static_graph(const unsigned int nv, const unsigned int ne) {
+        [[maybe_unused]] static_graph(const int nv, const int ne) {
+            if(nv <= 0) throw std::out_of_range("number of vertices must be positive");
+            if(ne <= 0) throw std::out_of_range("number of edges must be positive");
             g.initialize(nv, 2*ne);
             g.v_size = nv;
             g.e_size = 2*ne;
             c = new int[nv];
             edge_cnt = new int[nv];
-            for(unsigned int i = 0; i < nv; ++i)
-                edge_cnt[i] = 0;
+            for(int i = 0; i < nv; ++i) edge_cnt[i] = 0;
             initialized = true;
         };
 
@@ -70,7 +71,7 @@ namespace dejavu {
                 delete[] edge_cnt;
         }
 
-        void initialize_graph(const unsigned int nv, const unsigned int ne) {
+        [[maybe_unused]] void initialize_graph(const unsigned int nv, const unsigned int ne) {
             if(initialized || finalized)
                 throw std::logic_error("can not initialize a graph that is already initialized");
             initialized = true;
@@ -83,7 +84,7 @@ namespace dejavu {
                 edge_cnt[i] = 0;
         };
 
-        unsigned int add_vertex(const int color, const int deg) {
+        [[maybe_unused]] unsigned int add_vertex(const int color, const int deg) {
             if(!initialized)
                 throw std::logic_error("uninitialized graph");
             if(finalized)
@@ -99,7 +100,7 @@ namespace dejavu {
             return vertex;
         };
 
-        void add_edge(const unsigned int v1, const unsigned int v2) {
+        [[maybe_unused]] void add_edge(const unsigned int v1, const unsigned int v2) {
             if(!initialized)
                 throw std::logic_error("uninitialized graph");
             if(finalized)
@@ -110,19 +111,23 @@ namespace dejavu {
                 throw std::out_of_range("v1 is not a defined vertex, use add_vertex to add vertices");
             if(v2 >= num_vertices_defined)
                 throw std::out_of_range("v2 is not a defined vertex, use add_vertex to add vertices");
-            if(num_edges_defined + 2 > g.e_size)
+            if(static_cast<int>(num_edges_defined + 2) > g.e_size)
                 throw std::out_of_range("too many edges");
+            if(v1 > INT32_MAX)
+                throw std::out_of_range("v1 too large, must be < INT32_MAX");
+            if(v2 > INT32_MAX)
+                throw std::out_of_range("v2 too large, must be < INT32_MAX");
             ++edge_cnt[v1];
             const int edg_cnt1 = edge_cnt[v1];
             if(edg_cnt1 > g.d[v1])
                 throw std::out_of_range("too many edges incident to v1");
-            g.e[g.v[v1] + edg_cnt1 - 1] = v2;
+            g.e[g.v[v1] + edg_cnt1 - 1] = static_cast<int>(v2);
 
             ++edge_cnt[v2];
             const int edg_cnt2 = edge_cnt[v2];
             if(edg_cnt2 > g.d[v2])
                 throw std::out_of_range("too many edges incident to v2");
-            g.e[g.v[v2] + edg_cnt2 - 1] = v1;
+            g.e[g.v[v2] + edg_cnt2 - 1] = static_cast<int>(v1);
 
             num_edges_defined += 2;
         };
@@ -131,7 +136,7 @@ namespace dejavu {
             g.sanity_check();
         }
 
-        void dump_dimacs(std::string filename) {
+        [[maybe_unused]] void dump_dimacs(const std::string& filename) {
             finalize();
             std::ofstream dumpfile;
             dumpfile.open (filename, std::ios::out);
@@ -152,47 +157,12 @@ namespace dejavu {
             }
         }
 
-        void shuffle() {
-            std::cout << "graph shuffle ";
-            finalize();
-            std::vector<int> vec;
-            std::vector<int> old_v;
-            std::vector<int> old_d;
-            std::vector<int> old_e;
-            std::vector<int> old_col;
-            for(int i = 0; i < g.v_size; ++i) {
-                vec.push_back(i);
-                old_v.push_back(g.v[i]);
-                old_d.push_back(g.d[i]);
-                old_col.push_back(c[i]);
-            }
-
-            std::random_device rd;
-            auto rng = std::default_random_engine { rd() };
-            std::shuffle(std::begin(vec), std::end(vec), rng);
-
-            for(int i = 0; i < g.v_size; ++i) {
-                std::cout << vec[i] << " ";
-            }
-            std::cout << std::endl;
-
-            for(int i = 0; i < g.v_size; ++i) {
-                g.v[vec[i]] = old_v[i];
-                g.d[vec[i]] = old_d[i];
-                c[vec[i]]   = old_col[i];
-            }
-
-            for(int i = 0; i < g.e_size; ++i) {
-                g.e[i] = vec[g.e[i]];
-            }
-        }
-
         dejavu::sgraph* get_sgraph() {
             finalize();
             return &g;
         };
 
-        int*    get_coloring() {
+        int* get_coloring() {
             finalize();
             return c;
         };

@@ -63,8 +63,8 @@ void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    std::cout << "deterministic: " << d.s_deterministic_termination << ", error: 1/2^"<< d.h_error_bound << std::endl;
-    std::cout << std::setprecision(4) << "#symmetries: " << d.s_grp_sz << std::endl;
+    std::cout << "deterministic: " << d.get_deterministic_termination() << ", error: 1/2^"<< 10 << std::endl;
+    std::cout << std::setprecision(4) << "#symmetries: " << d.get_automorphism_group_size() << std::endl;
      finished = true;
     if(del) free(colmap);
 }

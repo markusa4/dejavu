@@ -167,7 +167,6 @@ namespace dejavu {
 
                     }
                 } else {
-                    const int col_sz = c->ptn[init_color];
                     assert(c->vertex_to_col[c->lab[init_color]] == init_color);
                     cell_todo.add_cell(&queue_pointer, init_color);
                 }
@@ -193,7 +192,7 @@ namespace dejavu {
                         if (very_dense) { // dense-dense
                             refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz);
                         } else if(cell_dense) { // dense-cell
-                            refine_color_class_dense_shallow(g, c, next_color_class, next_color_class_sz);
+                            refine_color_class_dense_cell(g, c, next_color_class, next_color_class_sz);
                         } else { // dense-sparse
                             refine_color_class_dense(g, c, next_color_class, next_color_class_sz);
                         }
@@ -212,7 +211,8 @@ namespace dejavu {
                         break;
                     }
 
-                    // partition is at least as large as the one of target invariant, can skip to the end of the entire refinement
+                    // partition is at least as large as the one of target invariant, can skip to the end of the entire
+                    // refinement
                     if (c->cells == color_limit) {
                         cell_todo.reset(&queue_pointer);
                         break;
@@ -378,7 +378,7 @@ namespace dejavu {
             }
 
             // certify an automorphism on a graph
-            bool certify_automorphism(sgraph *g, const int *colmap, const int *p) {
+            [[maybe_unused]] bool certify_automorphism(sgraph *g, const int *colmap, const int *p) {
                 int i, found;
 
                 assure_initialized(g);
@@ -455,10 +455,9 @@ namespace dejavu {
             }
 
             // certify an automorphism on a graph, sparse
-            bool certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p, int supp,
-                                             const int *supp_arr) {
+            [[maybe_unused]] bool certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p,
+                                                              int supp, const int *supp_arr) {
                 int i, found;
-
                 assure_initialized(g);
 
                 for (int f = 0; f < supp; ++f) {
@@ -492,9 +491,6 @@ namespace dejavu {
                 }
 
                 return true;
-            }
-
-            ~refinement() {
             }
 
         private:
@@ -535,7 +531,6 @@ namespace dejavu {
             void refine_color_class_sparse(sgraph *g, coloring *c, int color_class,
                                            int class_size) {
                 // for all vertices of the color class...
-                bool mark_as_largest;
                 int i, j, cc, end_cc, largest_color_class_size, acc;
                 int *vertex_to_lab = c->vertex_to_lab;
                 int *lab = c->lab;
@@ -661,16 +656,12 @@ namespace dejavu {
                     assert(largest_color_class >= _col);
                     assert(largest_color_class < _col + _col_sz);
 
-                    int debug_largest = 0;
-
                     for (i = _col; i < _col + _col_sz;) {
                         const int i_sz = ptn[i] + 1;
                         const bool is_largest = i == largest_color_class;
                         report_split_color_class(c, _col, i, i_sz, is_largest);
-                        debug_largest += is_largest;
                         i += i_sz;
                     }
-                    assert(debug_largest == 1);
                 }
 
                 neighbour_sizes.reset();
@@ -678,10 +669,8 @@ namespace dejavu {
             }
 
             void refine_color_class_dense(sgraph *g, coloring *c, int color_class, int class_size) {
-                bool comp;
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 neighbours.reset();
                 scratch_set.reset();
@@ -800,11 +789,9 @@ namespace dejavu {
                 neighbours.reset();
             }
 
-            void refine_color_class_dense_shallow(sgraph *g, coloring *c, int color_class, int class_size) {
-                bool comp;
+            void refine_color_class_dense_cell(sgraph *g, coloring *c, int color_class, int class_size) {
                 int i, cc, acc, largest_color_class_size, pos;
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 //neighbours.reset_hard();
                 neighbours.reset();
@@ -866,8 +853,8 @@ namespace dejavu {
                         if (val >= 1) {
                             neighbour_sizes.set(j, val + acc);
                             acc += val;
-                            const int _col = col + col_sz - (neighbour_sizes.get(j));
-                            c->ptn[_col] = -1; // this is val - 1, actually...
+                            const int rcol = col + col_sz - (neighbour_sizes.get(j));
+                            c->ptn[rcol] = -1; // this is val - 1, actually...
                         }
                     }
 
@@ -918,7 +905,8 @@ namespace dejavu {
             }
 
             void refine_color_class_dense_dense(sgraph *g, coloring *c, int color_class, int class_size) {
-                int i, j, acc, cc, largest_color_class_size, deg;
+                int i, j, acc, cc, largest_color_class_size;
+                int deg = -1;
                 cc = color_class; // iterate over color class
 
                 neighbours.reset();
@@ -927,7 +915,7 @@ namespace dejavu {
                 while (cc < end_cc) { // increment value of neighbours of vc by 1
                     const int vc = c->lab[cc];
                     const int pe = g->v[vc];
-                    deg= g->d[vc];
+                    deg = g->d[vc];
                     const int end_i = pe + deg - (deg==g->v_size-1?deg:0); // special code for universal vertices
 
                     for (i = pe; i < end_i; i++) {
@@ -1443,11 +1431,8 @@ namespace dejavu {
             }
 
             void refine_color_class_sparse_first(sgraph *g, coloring *c, int color_class, int class_size) {
-                bool comp;
                 int v_new_color, cc, largest_color_class_size, acc;
-
                 cc = color_class; // iterate over color class
-                comp = true;
 
                 scratch_set.reset();
                 old_color_classes.reset();

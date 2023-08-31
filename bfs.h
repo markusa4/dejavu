@@ -33,8 +33,8 @@ namespace dejavu {
                 gws_schreier = schreier;
             }
 
-            void do_a_level(sgraph* g, dejavu_hook* hook, ir::shared_tree& ir_tree, groups::compressed_schreier* schreier,
-                            ir::controller& local_state, std::function<ir::type_selector_hook> *selector) {
+            void do_a_level(sgraph* g, dejavu_hook* hook, ir::shared_tree& ir_tree, ir::controller& local_state,
+                            std::function<ir::type_selector_hook> *selector) {
                 int current_level = ir_tree.get_finished_up_to();
 
                 s_deviation_prune = 0;
@@ -46,7 +46,7 @@ namespace dejavu {
                 assert(ir_tree.get_current_level_size() > 0);
 
                 queue_up_level(selector, ir_tree, current_level);
-                work_on_todo(g, hook, &ir_tree, schreier, local_state);
+                work_on_todo(g, hook, &ir_tree, local_state);
                 ir_tree.set_finished_up_to(current_level + 1);
             }
 
@@ -96,8 +96,7 @@ namespace dejavu {
                 } while(next_node != start_node);
             }
 
-            void compute_node(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree,
-                              groups::compressed_schreier* sh_schreier, ir::controller& local_state,
+            void compute_node(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree, ir::controller& local_state,
                               ir::tree_node* node, const int v, ir::limited_save* last_load) {
                 auto next_node_save = node->get_save();
 
@@ -229,15 +228,14 @@ namespace dejavu {
                 }
             }
 
-            void work_on_todo(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree, groups::compressed_schreier* schreier,
-                              ir::controller& local_state) {
+            void work_on_todo(sgraph* g, dejavu_hook* hook, ir::shared_tree* ir_tree, ir::controller& local_state) {
                 ir::limited_save* last_load = nullptr;
                 int s_count_nodes = 0;
                 while(!ir_tree->queue_missing_node_empty()) {
                     ++s_count_nodes;
                     if((s_count_nodes & 0x00000FFF) == 0) progress_current_method("bfs nodes=" +std::to_string(s_count_nodes)+", nodes_kept="+std::to_string(s_total_kept));
                     const auto todo = ir_tree->queue_missing_node_pop();
-                    compute_node(g, hook, ir_tree, schreier, local_state, todo.first, todo.second, last_load);
+                    compute_node(g, hook, ir_tree, local_state, todo.first, todo.second, last_load);
                     last_load = todo.first->get_save();
                 }
             }
