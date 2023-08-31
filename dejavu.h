@@ -234,16 +234,14 @@ namespace dejavu {
                 groups::compressed_schreier sh_schreier; /*< Schreier structure to sift automorphisms */
                 sh_schreier.set_error_bound(h_error_bound);
 
-                // initialize modules for high-level search strategies
-                search_strategy::dfs_ir      m_dfs;       /*< depth-first search */
-                search_strategy::bfs_ir      m_bfs;       /*< breadth-first search */
-                search_strategy::random_ir   m_rand;      /*< randomized search */
-                search_strategy::inprocessor m_inprocess; /*< inprocessing */
+                // randomness of the solver
+                random_source rng(h_random_use_true_random, h_random_seed);
 
-                // link high-level, local strategy modules to local workspace modules
-                m_dfs.link_to_workspace(&automorphism);
-                m_bfs.link_to_workspace(&automorphism, &schreierw);
-                m_rand.link_to_workspace(&schreierw, &automorphism);
+                // initialize modules for high-level search strategies
+                search_strategy::dfs_ir      m_dfs(automorphism); /*< depth-first search */
+                search_strategy::bfs_ir      m_bfs(automorphism, schreierw); /*< breadth-first search */
+                search_strategy::random_ir   m_rand(schreierw, automorphism, rng); /*< randomized search */
+                search_strategy::inprocessor m_inprocess; /*< inprocessing */
 
                 // initialize a coloring using colors of preprocessed graph
                 coloring local_coloring;

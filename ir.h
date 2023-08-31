@@ -561,10 +561,10 @@ namespace dejavu {
              * @param state the other state
              * @param automorphism workspace to write the automorphism to
              */
-            void singleton_automorphism(controller& state, groups::automorphism_workspace*  automorphism) {
-                automorphism->reset();
+            void singleton_automorphism(controller& state, groups::automorphism_workspace& automorphism) {
+                automorphism.reset();
                 for(int i = singleton_pt_start; i < static_cast<int>(singletons.size()); ++i) {
-                    automorphism->write_single_map(singletons[i], state.singletons[i]);
+                    automorphism.write_single_map(singletons[i], state.singletons[i]);
                 }
             }
 

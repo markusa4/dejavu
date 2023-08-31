@@ -81,6 +81,22 @@ extern volatile int dejavu_kill_request;
 
 namespace dejavu {
 
+    class random_source {
+        bool true_random = false;
+        std::mt19937 pseudo_random_device;
+        //std::default_random_engine pseudo_random_device;
+        std::random_device true_random_device;
+    public:
+        random_source(bool set_true_random, int set_seed) {
+            true_random = set_true_random;
+            pseudo_random_device.seed(set_seed);
+        }
+        int operator()() {
+            return true_random?static_cast<int>(true_random_device()&INT32_MAX):
+                               static_cast<int>(pseudo_random_device()&INT32_MAX);
+        }
+    };
+
     /**
      * A simple class to store big, positive numbers. Consists of a \a mantissa and a \a exponent, where the value of
      * the number is `mantissa^exponent`.

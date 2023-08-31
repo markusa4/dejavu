@@ -1339,14 +1339,15 @@ namespace dejavu {
              * @param automorphism Random element is saved in this automorphism_workspace.
              * @param rn_generator Random number generator used for the generation.
              */
-            void generate_random(schreier_workspace& w, automorphism_workspace& automorphism, std::default_random_engine& rn_generator) {
+            void generate_random(schreier_workspace& w, automorphism_workspace& automorphism,
+                                 random_source& rng) {
                 automorphism.reset();
 
-                const int random_mult = static_cast<int>(rn_generator() % 7); // 7
+                const int random_mult = static_cast<int>(rng() % 7); // 7
                 const int num_mult = 1 + (random_mult);
                 for(int i = 0; i < num_mult; ++i) {
                     // load generator
-                    const int next_gen_num = static_cast<int>(rn_generator() % generators.size());
+                    const int next_gen_num = static_cast<int>(rng() % generators.size());
                     assert(next_gen_num >= 0);
                     assert(next_gen_num < generators.size());
                     auto next_gen = generators[next_gen_num];
@@ -1367,13 +1368,13 @@ namespace dejavu {
              * @return Whether the generated automorphism was added to the Schreier structure or not.
              */
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
-                             std::default_random_engine& rn_generator) {
+                             random_source& rng) {
                 if(generators.size() <= 0) {
                     return false;
                 }
                 automorphism.reset();
                 automorphism.set_support01(true);
-                generate_random(w, automorphism, rn_generator);
+                generate_random(w, automorphism, rng);
                 const bool added_generator = sift(w, automorphism, false);
                 return added_generator;
             }
@@ -1632,11 +1633,11 @@ namespace dejavu {
              * @return Whether the generated automorphism was added to the Schreier structure or not.
              */
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
-                             std::default_random_engine& rn_generator) {
+                             random_source& rng) {
                 if(compressor != nullptr) {
-                    return internal_schreier.sift_random(w, *compressed_automorphism, rn_generator);
+                    return internal_schreier.sift_random(w, *compressed_automorphism, rng);
                 } else {
-                    return internal_schreier.sift_random(w, automorphism, rn_generator);
+                    return internal_schreier.sift_random(w, automorphism, rng);
                 }
             }
 

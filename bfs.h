@@ -14,8 +14,8 @@ namespace dejavu {
          * \brief Breadth-first search.
          */
         class bfs_ir {
-            groups::automorphism_workspace* gws_automorphism = nullptr;
-            groups::schreier_workspace*     gws_schreier     = nullptr;
+            groups::automorphism_workspace& gws_automorphism;
+            groups::schreier_workspace&     gws_schreier;
 
         public:
             bool h_use_deviation_pruning = true; /**< use pruning using deviation maps */
@@ -28,10 +28,8 @@ namespace dejavu {
             int s_total_leaves             = 0; /**< how many of the computed nodes were leaves */
             int s_deviation_prune          = 0; /**< how many nodes were pruned using deviation maps */
 
-            void link_to_workspace(groups::automorphism_workspace* automorphism, groups::schreier_workspace* schreier) {
-                gws_automorphism = automorphism;
-                gws_schreier = schreier;
-            }
+            bfs_ir(groups::automorphism_workspace& automorphism, groups::schreier_workspace& schreier) :
+                   gws_automorphism(automorphism), gws_schreier(schreier) {}
 
             void do_a_level(sgraph* g, dejavu_hook* hook, ir::shared_tree& ir_tree, ir::controller& local_state,
                             std::function<ir::type_selector_hook> *selector) {
@@ -159,20 +157,21 @@ namespace dejavu {
 
                 bool cert = true;
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
-                    gws_automorphism->write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                    cert = local_state.certify(g, *gws_automorphism);
+                    gws_automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
+                    cert = local_state.certify(g, gws_automorphism);
                     if(cert) {
-                        ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(*gws_automorphism);
+                        ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(gws_automorphism);
 
                         // Output automorphism
                         if (hook)
-                            (*hook)(g->v_size, gws_automorphism->perm(), gws_automorphism->nsupport(),
-                                    gws_automorphism->support());
+                            (*hook)(g->v_size, gws_automorphism.perm(), gws_automorphism.nsupport(),
+                                    gws_automorphism.support());
                     }
                     ++s_total_leaves;
-                    gws_automorphism->reset();
+                    gws_automorphism.reset();
 
-                    if(parent_node_base_pos == 0 && vert_on_base == parent_node_base_vert) ++ir_tree->h_bfs_automorphism_pw;
+                    if(parent_node_base_pos == 0 && vert_on_base == parent_node_base_vert)
+                        ++ir_tree->h_bfs_automorphism_pw;
                 }
 
 

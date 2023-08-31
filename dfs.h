@@ -32,7 +32,7 @@ namespace dejavu {
          */
         class dfs_ir {
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
-            groups::automorphism_workspace* ws_automorphism = nullptr;
+            groups::automorphism_workspace& ws_automorphism;
 
         public:
             enum termination_reason {r_none, r_fail, r_cost};
@@ -44,9 +44,7 @@ namespace dejavu {
                                                           * fraction of the cost of an entire root-to-leaf walk. */
             big_number s_grp_sz; /**< group size */
 
-            void link_to_workspace(groups::automorphism_workspace* automorphism) {
-                ws_automorphism = automorphism;
-            }
+            explicit dfs_ir(groups::automorphism_workspace& automorphism) : ws_automorphism(automorphism) {}
 
             int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right) {
                 const bool is_diffed_pre = state_right.update_diff_vertices_last_individualization(state_left);
@@ -97,9 +95,9 @@ namespace dejavu {
 
                     // no difference? check for automorphism now -- if it doesn't succeed there is no hope on this path
                     if(!is_diffed) {
-                        ws_automorphism->reset();
+                        ws_automorphism.reset();
                         state_right.singleton_automorphism(state_left, ws_automorphism);
-                        const bool found_auto = state_right.certify(g, *ws_automorphism);
+                        const bool found_auto = state_right.certify(g, ws_automorphism);
                         return found_auto;
                     }
 
@@ -122,7 +120,7 @@ namespace dejavu {
                 mark_set orbit_handled(g->v_size);
 
                 // automorphism workspace
-                ws_automorphism->reset();
+                ws_automorphism.reset();
 
                 // saucy strategy of paired states
                 state_left.link_compare(&state_right);
@@ -206,17 +204,17 @@ namespace dejavu {
                             const int wr_pos_st  = state_right.base[state_right.base.size() - 1].singleton_pt;
                             const int wr_pos_end = (int) state_right.singletons.size();
 
-                            ws_automorphism->reset();
+                            ws_automorphism.reset();
                             // ... and then check whether this implies a (sparse) automorphism
-                            ws_automorphism->write_singleton(state_right.compare_singletons,
+                            ws_automorphism.write_singleton(state_right.compare_singletons,
                                                              &state_right.singletons, wr_pos_st,
                                                              wr_pos_end);
-                            found_auto = state_right.certify(g, *ws_automorphism);
+                            found_auto = state_right.certify(g, ws_automorphism);
 
                             assert(ws_automorphism->perm()[base_vertex] == ind_v);
                             // if no luck with sparse automorphism, try more proper walk to leaf node
                             if (!found_auto) {
-                                ws_automorphism->reset();
+                                ws_automorphism.reset();
 
                                 state_left.T->reset_trace_equal();
                                 state_left.T->set_position(trace_pos_reset);
@@ -243,11 +241,11 @@ namespace dejavu {
                             assert(ws_automorphism->nsupport() > 0);
                             assert(ws_automorphism->perm()[ind_v] == base_vertex ||
                                    ws_automorphism->perm()[base_vertex] == ind_v);
-                            orbs.add_automorphism_to_orbit(*ws_automorphism);
-                            if(hook) (*hook)(g->v_size, ws_automorphism->perm(), ws_automorphism->nsupport(),
-                                             ws_automorphism->support());
+                            orbs.add_automorphism_to_orbit(ws_automorphism);
+                            if(hook) (*hook)(g->v_size, ws_automorphism.perm(), ws_automorphism.nsupport(),
+                                             ws_automorphism.support());
                         }
-                        ws_automorphism->reset();
+                        ws_automorphism.reset();
 
                         // move state back up where we started in this iteration
                         while (prev_base_pos < state_right.s_base_pos) {
