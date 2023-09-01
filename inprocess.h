@@ -128,127 +128,6 @@ namespace dejavu::search_strategy {
             local_state.use_split_limit(false);
         }
 
-        unsigned long shallow_invariant_comb(sgraph* g, ir::controller &local_state) {
-            local_state.use_reversible(true);
-            local_state.use_trace_early_out(true);
-            local_state.use_increase_deviation(true);
-            local_state.use_split_limit(true, 64); // 20
-
-            unsigned long acc = 0;
-            int pick_col = -1;
-
-            for(int i = 0; i < g->v_size;) {
-                const int col = i;
-                const int col_sz = local_state.c->ptn[col] + 1;
-                if (col_sz >= 2) {
-                    pick_col = col;
-                    break;
-                }
-                i += col_sz;
-            }
-            if(pick_col != -1) {
-                const int pick_col_sz = local_state.c->ptn[pick_col] + 1;
-                std::vector<int> verts;
-                for (int i = 0; i < pick_col_sz; ++i) verts.push_back(local_state.c->lab[pick_col + i]);
-                for (int i = 0; i < verts.size(); ++i) {
-                    local_state.T->set_hash(0);
-                    local_state.reset_trace_equal();
-                    local_state.move_to_child(g, verts[i]);
-                    acc += local_state.T->get_hash();
-                    local_state.move_to_parent();
-                }
-            }
-
-            local_state.use_trace_early_out(false);
-            local_state.use_increase_deviation(false);
-            local_state.use_split_limit(false);
-
-            return acc;
-        }
-
-        static int edgeflip(sgraph *g, coloring& c, ds::mark_set& del_e) {
-            worklist worklist_deg0(g->v_size); // serves as the "test vector"
-
-            int flipped_edge = 0;
-            int potential = 0;
-
-            for (int y = 0; y < g->v_size; ++y) worklist_deg0[y] = 0;
-
-            for (int i = 0; i < g->v_size;) {
-                int v = c.lab[i];
-                for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
-                    const int v_neigh = g->e[f];
-                    worklist_deg0[c.vertex_to_col[v_neigh]] += 1;
-                }
-
-                for (int ii = 0; ii < c.ptn[i] + 1; ++ii) {
-                    const int vx = c.lab[i + ii];
-                    bool skipped_none = true;
-                    for (int f = g->v[vx]; f < g->v[vx] + g->d[vx]; ++f) {
-                        const int v_neigh = g->e[f];
-                        if (worklist_deg0[c.vertex_to_col[v_neigh]] ==
-                            c.ptn[c.vertex_to_col[v_neigh]] + 1) {
-                            del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
-                            skipped_none = false;
-                            ++flipped_edge;
-                        }
-                    }
-                    if(skipped_none) break;
-                }
-
-                for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
-                    const int v_neigh = g->e[f];
-                    worklist_deg0[c.vertex_to_col[v_neigh]] = 0;
-                }
-
-                i += c.ptn[i] + 1;
-            }
-
-            return flipped_edge;
-        }
-
-        void perform_del_edge(dejavu::sgraph *g, mark_set& del_e) {
-            if (g->v_size <= 1)
-                return;
-
-            // int pre_esize = g->e_size;
-            // copy some stuff
-            std::vector<int> g_old_v;
-            g_old_v.clear();
-            g_old_v.reserve(g->v_size);
-
-            for (int i = 0; i < g->v_size; ++i) {
-                g_old_v.push_back(g->v[i]);
-            }
-
-            // make graph smaller using the translation array
-            int epos = 0;
-            for (int i = 0; i < g->v_size; ++i) {
-                const int old_v = i;
-                const int new_v = old_v;
-
-                if (new_v >= 0) {
-                    int new_d = 0;
-                    g->v[new_v] = epos;
-                    for (int j = g_old_v[old_v]; j < g_old_v[old_v] + g->d[old_v]; ++j) {
-                        const int ve = g->e[j];
-                        const int new_ve = ve;
-                        if (!del_e.get(j)) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
-                            ++new_d;
-                            g->e[epos] = new_ve;
-                            ++epos;
-                        }
-                    }
-
-                    g->d[new_v] = new_d;
-                }
-            }
-
-            g->e_size = epos;
-        }
-
         /**
          * Inprocess the (colored) graph using all the available solver data.
          *
@@ -408,11 +287,6 @@ namespace dejavu::search_strategy {
                         inproc_fixed_points.push_back(ind_v);
                         ++num_inds;
                     }
-                }
-                if(num_inds > 0) {
-                    /*progress_print("inpr_ind", "_",
-                                   std::to_string(local_state.c->cells));*/
-                    inproc_can_individualize.clear();
                 }
             }
 

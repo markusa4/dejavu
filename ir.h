@@ -165,7 +165,6 @@ namespace dejavu {
             worklist  diff_vertices_list; /**< vertices that differ, but in a list */
             worklist  diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
                                                *  above */
-            std::vector<int> diff_trace;
             bool diff_diverge = false; /**< paths of difference are diverging, can not properly track it anymore, and
                                          *there is also no point in tracking it anymore since they are not isomorphic */
             int singleton_pt_start = 0; /**< a pointer were we need to start reading singletons */
@@ -297,10 +296,9 @@ namespace dejavu {
              * Vertex v is now differing.
              * @param v the vertex
              */
-            void add_diff_vertex(int v, bool trace = true) {
+            void add_diff_vertex(int v) {
                 //assert(trace || (!diff_vertices.get(v) && !diff_is_singleton.get(v)));
                 if(!diff_vertices.get(v) && !diff_is_singleton.get(v)) {
-                    if(trace) diff_trace.push_back((v+1));
                     diff_vertices.set(v);
                     diff_vertices_list.push_back(v);
                     diff_vertices_list_pt[v] = diff_vertices_list.cur_pos - 1;
@@ -311,10 +309,9 @@ namespace dejavu {
              * Vertex v is now not differing anymore
              * @param v the vertex
              */
-            void remove_diff_vertex(int v, bool trace = true) {
+            void remove_diff_vertex(int v) {
                 //assert(trace || (diff_vertices.get(v)));
                 if(diff_vertices.get(v)) {
-                    if(trace) diff_trace.push_back(-(v+1));
                     const int pt      = diff_vertices_list_pt[v];
                     assert(diff_vertices_list[pt] == v);
 
@@ -549,8 +546,6 @@ namespace dejavu {
                 diff_vertices_list.reset();
                 diff_is_singleton.reset();
 
-                diff_trace.clear();
-
                 diff_tester.reset();
                 singleton_pt_start = singletons.size();
 
@@ -593,7 +588,6 @@ namespace dejavu {
              */
             bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
-                diff_trace.push_back(INT32_MAX);
                 if(touched_color_list.cur_pos != other_state.touched_color_list.cur_pos) {
                     std::cout << "diff diverge" << touched_color_list.cur_pos  << "vs. " << other_state.touched_color_list.cur_pos  << std::endl;
                     diff_diverge = true;
@@ -989,7 +983,7 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void __attribute__((noinline)) move_to_parent() {
+            void move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
                 assert(base.size() > 0);
 
@@ -1026,41 +1020,6 @@ namespace dejavu {
                 base.pop_back();
 
                 T->reset_trace_equal();
-            }
-
-
-            /**
-             * Difference-checking. Records differences between this state and the given \p other_state. Before using
-             * this, this state and \p other_state should start from the same node of the IR tree, and the difference
-             * should be reset at that point. Then, after each individualization this update function should be called.
-             * The function keeps track of all colors that are non-matching.
-             *
-             * @param other_state the other state
-             * @return whether there is a difference
-             */
-            void revert_diff_last_individualization() {
-                int i;
-
-                int const new_singleton_pos = base.back().singleton_pt;
-                for(i = singletons.size()-1; i >= new_singleton_pos; --i) {
-                    diff_is_singleton.unset(singletons[i]);
-                }
-
-                for(i = diff_trace.size()-1; i >= 0;) {
-                    const int read_diff_trace = diff_trace[i];
-                    if(read_diff_trace == INT32_MAX) break;
-                    const int vert = abs(read_diff_trace)-1;
-                    if(read_diff_trace<0) {
-                        diff_is_singleton.unset(vert);
-                        add_diff_vertex(vert, false);
-                    } else {
-                        //diff_is_singleton.unset(vert);
-                        remove_diff_vertex(vert, false);
-                    }
-                    --i;
-                }
-
-                diff_trace.resize(std::max(i,0));
             }
 
             /**

@@ -46,6 +46,7 @@ void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     auto empty_hook_func = dejavu_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
     dejavu::dejavu2 d;
+    d.set_print(true);
     bool del = false;
     if(colmap == nullptr) {
         colmap = (int*) calloc(g->v_size, sizeof(int));
