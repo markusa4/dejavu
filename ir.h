@@ -989,7 +989,7 @@ namespace dejavu {
             /**
              * Move IR node kept in this controller back to its parent.
              */
-            void move_to_parent() {
+            void __attribute__((noinline)) move_to_parent() {
                 assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
                 assert(base.size() > 0);
 

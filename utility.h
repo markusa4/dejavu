@@ -231,6 +231,11 @@ namespace dejavu {
             progress_print_header();
         }
 
+        void print_split() {
+            if(h_silent) return;
+            PRINT("\r______________________________________________________________");
+        }
+
         void print(const std::string& str) const {
             if(h_silent) return;
             PRINT("\r" << str);

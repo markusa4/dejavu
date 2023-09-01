@@ -43,7 +43,7 @@ namespace dejavu {
         int  h_random_seed = 0; /**< is true randomness is not used, here is the seed to be used */
         bool h_silent = false; /**< don't print solver progress */
         int h_bfs_memory_limit = 0x20000000;
-        bool h_decompose = true; /**< use nonuniform component decomposition */
+        bool h_decompose = true; /**< use non-uniform component decomposition */
         int h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
                                        *  previous base */
         //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed */
@@ -81,6 +81,14 @@ namespace dejavu {
          */
         [[maybe_unused]] void set_seed(int seed = 0) {
             h_random_seed = seed;
+        }
+
+        /**
+         * Whether to use non-uniform component decomposition (default is true).
+         * @param use_decompose
+         */
+        void set_decompose(bool use_decompose = true) {
+            h_decompose = use_decompose;
         }
 
         /**
@@ -210,6 +218,7 @@ namespace dejavu {
 
                 bool s_few_cells  = false;
                 bool h_used_shallow_inprocess = false;
+                bool h_used_shallow_inprocess_quadratic = false;
                 bool s_inprocessed = false; /*< flag which says that we've inprocessed the graph since last restart */
                 int s_consecutive_discard = 0; /*< count how many bases have been discarded in a row -- prevents edge
                                                 * case where all searchable bases became much larger due to BFS or other
@@ -267,19 +276,21 @@ namespace dejavu {
                 // loop for restarts
                 while (true) {
                     // "Dry land is not a myth, I've seen it!"
-                    const bool s_hard = h_budget > 256; /* graph is "hard" (was 10000)*/
+                    const bool s_hard = h_budget   > 256; /* graph is "hard" (was 10000)*/
                     const bool s_easy = s_restarts == -1; /* graph is "easy" */
 
                     ++s_restarts; /*< increase the restart counter */
                     if (s_restarts > 0) {
                         // now, we manage the restart....
                         local_state.load_reduced_state(root_save); /*< start over from root */
-                        progress_print_split();
+                        m_printer.print_split();
                         const int s_inc_fac = (s_restarts >= 3)? h_budget_inc_fact : 2;/*< factor of budget increase */
                         if (s_inproc_success >= 3) {
-                            s_random_budget_bias = 0.1;
+                            s_random_budget_bias = 0.1; // do less random search (bfs seems to work well, since we are
+                                                        // successfully inprocessing)
                             h_budget_inc_fact    = 2;
                         }
+                        if (s_inproc_success >= 6) s_random_budget_bias = 0.01; // do even less random search
                         if (s_inprocessed) h_budget = 1; /*< if we inprocessed, we hope that the graph is easy again */
                         h_budget *= s_inc_fac; /*< increase the budget */
                         s_cost    = 0;         /*< reset the cost */
@@ -425,7 +436,7 @@ namespace dejavu {
                         }
 
                         // using this data, we now make a decision
-                        next_routine = restart; /*< undecided? do a restart */
+                        next_routine = restart; /*< undecided? do a restart -- (not really) */
                         double score_rand, score_bfs;
 
                         if (!s_have_rand_estimate) { /*< don't have an estimate, so let's poke a bit with random! */
@@ -520,7 +531,11 @@ namespace dejavu {
                                 const bool h_look_close = ((m_rand.s_rolling_first_level_success > 0.5) &&
                                                           !s_short_base) || (s_have_rand_estimate &&
                                                            sh_tree.get_finished_up_to() == base_size - 1);
-                                h_rand_fail_lim_total += std::max(5.0, h_rand_fail_lim_now * s_random_budget_bias);
+                                // we increase the random ir budget -- but we apply a "budget bias", which changes
+                                // the proportion of time spent in random search versus bfs (but does not change the
+                                // decision making)
+                                h_rand_fail_lim_total +=
+                                        static_cast<int>(std::max(5.0, h_rand_fail_lim_now * s_random_budget_bias));
                                 m_rand.use_look_close(h_look_close);
                                 m_rand.h_sift_random     = !s_easy;
                                 m_rand.h_randomize_up_to = dfs_level;
@@ -604,9 +619,17 @@ namespace dejavu {
                     // we are restarting -- so we try to inprocess using the gathered data
                     const bool h_use_shallow_inprocess = !h_used_shallow_inprocess && s_inproc_success == 0 &&
                                                           s_path_fail1_avg > 0.1;
+                    const bool h_use_shallow_inprocess_quadratic =
+                            !h_used_shallow_inprocess_quadratic && s_inproc_success >= 1 + s_regular &&
+                            s_prunable && 2*local_state.c->cells > sqrt(g->v_size) && s_hard;
                     h_used_shallow_inprocess = h_used_shallow_inprocess || h_use_shallow_inprocess;
+                    h_used_shallow_inprocess_quadratic = h_used_shallow_inprocess_quadratic ||
+                                                         h_use_shallow_inprocess_quadratic;
+
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget,
-                                                          s_any_bfs_pruned, h_use_shallow_inprocess);
+                                                          s_any_bfs_pruned,
+                                                          h_use_shallow_inprocess || h_use_shallow_inprocess_quadratic,
+                                                          h_use_shallow_inprocess_quadratic);
                     s_inproc_success += s_inprocessed;
 
                     if(s_inprocessed) {

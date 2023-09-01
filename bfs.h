@@ -178,17 +178,18 @@ namespace dejavu {
                 // could check for matching OPP to base and prune based on that
                 // but that invalidates certain invariant applications that I use, so these strategies are somewhat
                 // incompatible
-                /*if(local_state.T->trace_equal() && cert && g->v_size != local_state.c->cells ) {
-                    const bool there_is_diff = local_state.there_is_difference_to_base(g->v_size);
+                /*if(local_state.T->trace_equal() && cert && g->v_size != local_state.c->cells && !is_base) {
+                    const bool there_is_diff = local_state.there_is_difference_to_base();
                     if (!there_is_diff) {
-                        gws_automorphism->reset();
-                        local_state.singleton_automorphism_base(gws_automorphism);
-                        const bool certify_sparse = local_state.certify(g, *gws_automorphism);
+                        gws_automorphism.reset();
+                        local_state.singleton_automorphism_base(&gws_automorphism);
+                        const bool certify_sparse = local_state.certify(g, gws_automorphism);
                         if(certify_sparse)  {
+                            std::cout << "found here" << std::endl;
                             if (hook)
-                                (*hook)(g->v_size, gws_automorphism->perm(), gws_automorphism->nsupport(),
-                                        gws_automorphism->support());
-                            sh_schreier->sift(*gws_schreier, *gws_automorphism, false);
+                                (*hook)(g->v_size, gws_automorphism.perm(), gws_automorphism.nsupport(),
+                                        gws_automorphism.support());
+                            //sh_schreier->sift(*gws_schreier, *gws_automorphism, false);
                         }
                     }
                 }*/
