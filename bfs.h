@@ -233,7 +233,9 @@ namespace dejavu {
                 int s_count_nodes = 0;
                 while(!ir_tree->queue_missing_node_empty()) {
                     ++s_count_nodes;
-                    if((s_count_nodes & 0x00000FFF) == 0) progress_current_method("bfs nodes=" +std::to_string(s_count_nodes)+", nodes_kept="+std::to_string(s_total_kept));
+                    if((s_count_nodes & 0x00000FFF) == 0)
+                        progress_current_method("bfs nodes=" +std::to_string(s_count_nodes)+
+                                                ", nodes_kept="+std::to_string(s_total_kept));
                     const auto todo = ir_tree->queue_missing_node_pop();
                     compute_node(g, hook, ir_tree, local_state, todo.first, todo.second, last_load);
                     last_load = todo.first->get_save();

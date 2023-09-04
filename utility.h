@@ -277,6 +277,32 @@ namespace dejavu {
                        << std::setw(12) << proc << std::setw(16) << p1 << std::setw(16) << p2);
             previous = now;
         }
+
+        void progress_current_method(const std::string& print) {
+            if(h_silent) return;
+            PRINT_NO_NEWLINE("\r>" << print);
+        }
+        void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
+                                            const std::string& var2, double var2_val) {
+            if(h_silent) return;
+            PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val);
+        }
+        void progress_current_method(const std::string& method_name, const std::string& var1, int var1_val,
+                                            const std::string& var2, int var2_val,
+                                            const std::string& var3, double var3_val) {
+            if(h_silent) return;
+            PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
+                                   << ", " << var3 << "=" << var3_val);
+        }
+
+        void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
+                                            const std::string& var2, int var2_val,
+                                            const std::string& var3, int var3_val,
+                                            const std::string& var4, int var4_val) {
+            if(h_silent) return;
+            PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
+                                   << ", " << var3 << "=" << var3_val << ", " << var4 << "=" << var4_val);
+        }
     };
 }
 

@@ -32,6 +32,7 @@ namespace dejavu {
          */
         class dfs_ir {
             int cost_snapshot = 0; /**< used to track cost-based abort criterion */
+            timed_print& ws_printer;
             groups::automorphism_workspace& ws_automorphism;
 
         public:
@@ -44,7 +45,8 @@ namespace dejavu {
                                                           * fraction of the cost of an entire root-to-leaf walk. */
             big_number s_grp_sz; /**< group size */
 
-            explicit dfs_ir(groups::automorphism_workspace& automorphism) : ws_automorphism(automorphism) {}
+            explicit dfs_ir(timed_print& printer, groups::automorphism_workspace& automorphism) :
+                            ws_printer(printer), ws_automorphism(automorphism) {}
 
             int paired_recurse_to_equal_leaf(sgraph* g, ir::controller& state_left, ir::controller& state_right,
                                              bool recurse=false) {
@@ -113,7 +115,7 @@ namespace dejavu {
             }
 
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
-                              std::vector<std::pair<int, int>>& computed_orbits) {
+                              std::vector<std::pair<int, int>>& computed_orbits, bool prune = true) {
                 if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
@@ -148,8 +150,9 @@ namespace dejavu {
                     // backtrack one level
                     state_right.move_to_parent();
                     if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
-                        progress_current_method("dfs", "base_pos", static_cast<double>(state_right.compare_base->size())
-                                                -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
+                        ws_printer.progress_current_method("dfs", "base_pos",
+                                                           static_cast<double>(state_right.compare_base->size())
+                                                        -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
                     // remember which color we are individualizing
                     const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;
@@ -258,7 +261,8 @@ namespace dejavu {
                         // if no automorphism could be determined we would have to backtrack -- so stop!
 
                         if ((!found_auto && !pruned) ||
-                            ((4*prune_cost_snapshot > cost_snapshot) && (prev_base_pos > 0))) {
+                            ((4*prune_cost_snapshot > cost_snapshot) && (prev_base_pos > 0)) ||
+                            (pruned && !prune)) {
                             fail = true;
                             if(failed_first_level == -1)
                                 failed_first_level = state_right.s_base_pos;

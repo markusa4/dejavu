@@ -247,7 +247,7 @@ namespace dejavu {
                 random_source rng(h_random_use_true_random, h_random_seed);
 
                 // initialize modules for high-level search strategies
-                search_strategy::dfs_ir      m_dfs(automorphism); /*< depth-first search */
+                search_strategy::dfs_ir      m_dfs(m_printer, automorphism); /*< depth-first search */
                 search_strategy::bfs_ir      m_bfs(automorphism, schreierw); /*< breadth-first search */
                 search_strategy::random_ir   m_rand(schreierw, automorphism, rng); /*< randomized search */
                 search_strategy::inprocessor m_inprocess; /*< inprocessing */
@@ -348,10 +348,9 @@ namespace dejavu {
                     // we first perform a depth-first search, starting from the computed leaf in local_state
                     m_dfs.h_recent_cost_snapshot_limit  = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
                     //m_dfs.h_recent_cost_snapshot_limit = 1.0;
-                    dfs_level = s_last_base_eq ? dfs_level : m_dfs.do_paired_dfs(hook, g, local_state_left,
-                                                                                 local_state,
-                                                                                 m_inprocess.inproc_maybe_individualize);
-
+                    dfs_level = s_last_base_eq ? dfs_level : m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
+                                                                                 m_inprocess.inproc_maybe_individualize,
+                                                                                 base_size > 1 || s_restarts > 0);
 
                     m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
                                    "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
@@ -484,9 +483,9 @@ namespace dejavu {
                         if (s_cost > h_budget) next_routine = restart; /*< we exceeded our budget, restart */
 
                         // ...unless...
-                        if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 && s_path_fail1_avg > 0.01 &&
-                            sh_tree.get_finished_up_to() == 0)
-                            next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
+                        //if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 && s_path_fail1_avg > 0.01 &&
+                        //    sh_tree.get_finished_up_to() == 0)
+                        //    next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
                         // silly case in which the base is so long, that an unnecessary restart has fairly high
                         // cost attached -- so if BFS can be successful, let's do that first...
                         if (next_routine == restart && 2 * base_size > s_bfs_next_level_nodes
@@ -616,6 +615,7 @@ namespace dejavu {
                         break; // we are done
                     }
 
+                    m_inprocess.set_splits_hint(m_rand.s_min_split_number);
                     // we are restarting -- so we try to inprocess using the gathered data
                     const bool h_use_shallow_inprocess = !h_used_shallow_inprocess && s_inproc_success == 0 &&
                                                           s_path_fail1_avg > 0.1;

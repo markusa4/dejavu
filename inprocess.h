@@ -15,12 +15,14 @@ namespace dejavu::search_strategy {
     public:
         // statistics
         big_number s_grp_sz; /**< group size */
+        int h_splits_hint = INT32_MAX;
 
         std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized           */
         std::vector<std::pair<int, int>> inproc_maybe_individualize; /**< vertices that can be individualized         */
         std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
 
         std::vector<int> nodes;
+        worklist hash;
 
         void sort_nodes_map(std::vector<unsigned long>* map, int* colmap) {
             struct comparator_map {
@@ -59,23 +61,41 @@ namespace dejavu::search_strategy {
         }
 
 
-        void shallow_split_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+        static void shallow_bfs_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv,
+                                          int depth = 8, bool lower_depth = true) {
             local_state.use_reversible(true);
             local_state.use_trace_early_out(true);
-            local_state.use_increase_deviation(true);
-            local_state.use_split_limit(true, 20); // 20
+            local_state.use_increase_deviation(false);
+            local_state.use_split_limit(true, depth); // 20
 
-            for(int i = 0; i < g->v_size; ++i) {
-                local_state.T->set_hash(0);
-                local_state.reset_trace_equal();
-                const int col = local_state.c->vertex_to_col[i];
-                const int col_sz = local_state.c->ptn[col] + 1;
-                if(col_sz >= 2) {
-                    local_state.move_to_child(g, i);
-                    inv[i] += local_state.T->get_hash();
-                    local_state.move_to_parent();
-                } else {
-                    inv[i] = 0;
+            bool repeat = true;
+            int best_depth = depth;
+            while (repeat) {
+                repeat = false;
+                local_state.use_split_limit(true, depth);
+                for (int i = 0; i < g->v_size; ++i) {
+                    local_state.T->set_hash(0);
+                    local_state.reset_trace_equal();
+                    const int col = local_state.c->vertex_to_col[i];
+                    const int col_sz = local_state.c->ptn[col] + 1;
+                    if (col_sz >= 2) {
+                        local_state.move_to_child(g, i);
+                        inv[i] = local_state.T->get_hash();
+                        const int splits = local_state.get_number_of_splits();
+                        local_state.move_to_parent();
+                        if(100 * i < g->v_size && lower_depth && splits < best_depth &&
+                           col == (*local_state.compare_base)[0].color) {
+                            best_depth = splits;
+                        }
+                        if(100 * i >= g->v_size && lower_depth && best_depth < depth) {
+                            depth = best_depth;
+                            lower_depth = false;
+                            repeat = true;
+                            break;
+                        }
+                    } else {
+                        inv[i] = 0;
+                    }
                 }
             }
 
@@ -84,7 +104,7 @@ namespace dejavu::search_strategy {
             local_state.use_split_limit(false);
         }
 
-        void shallow_split_invariant2(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+        static void shallow_bfs_invariant2(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
             local_state.use_reversible(true);
             local_state.use_trace_early_out(false);
             local_state.use_increase_deviation(true);
@@ -128,6 +148,38 @@ namespace dejavu::search_strategy {
             local_state.use_split_limit(false);
         }
 
+
+        void split_with_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+            hash.allocate(g->v_size);
+
+            int num_of_hashs = 0;
+            for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
+            sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
+            unsigned long last_inv = -1;
+            int last_col  = local_state.c->vertex_to_col[0];
+            for(int i = 0; i < g->v_size; ++i) {
+                const int v      = nodes[i];
+                const unsigned long v_inv = inv[v];
+                const int  v_col = local_state.c->vertex_to_col[v];
+                if(last_col != v_col) {
+                    last_col = v_col;
+                    last_inv = v_inv;
+                    ++num_of_hashs;
+                }
+                if(v_inv != last_inv) {
+                    last_inv = v_inv;
+                    ++num_of_hashs;
+                }
+                hash[v] = num_of_hashs;
+            }
+
+            g->initialize_coloring(local_state.c, hash.get_array());
+        }
+
+        void set_splits_hint(int splits_hint) {
+            h_splits_hint = splits_hint;
+        }
+
         /**
          * Inprocess the (colored) graph using all the available solver data.
          *
@@ -150,75 +202,36 @@ namespace dejavu::search_strategy {
 
             // computes a shallow breadth-first invariant
             if (use_shallow_inprocess && !(tree.get_finished_up_to() >= 1 && use_bfs_inprocess)) {
-                worklist hash(g->v_size);
-                worklist_t<unsigned long> inv(g->v_size);
+                bool changed = false;
+                int depth = std::max(std::min(h_splits_hint - 3, 16), 4);
+                do {
+                    const int cell_last = local_state.c->cells;
+                    worklist_t<unsigned long> inv(g->v_size);
 
-                nodes.reserve(g->v_size);
-                nodes.clear();
+                    nodes.reserve(g->v_size);
+                    nodes.clear();
 
-                for(int i = 0; i < g->v_size; ++i) inv[i] = 0;
-                shallow_split_invariant(g, local_state, inv);
+                    for (int i = 0; i < g->v_size; ++i) inv[i] = 0;
+                    shallow_bfs_invariant(g, local_state, inv, depth, !changed);
+                    split_with_invariant(g, local_state, inv);
 
-                int num_of_hashs = 0;
-                for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
-                sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
-                unsigned long last_inv = -1;
-                int last_col  = local_state.c->vertex_to_col[0];
-                for(int i = 0; i < g->v_size; ++i) {
-                    const int v      = nodes[i];
-                    const unsigned long v_inv = inv[v];
-                    const int  v_col = local_state.c->vertex_to_col[v];
-                    if(last_col != v_col) {
-                        last_col = v_col;
-                        last_inv = v_inv;
-                        ++num_of_hashs;
-                    }
-                    if(v_inv != last_inv) {
-                        last_inv = v_inv;
-                        ++num_of_hashs;
-                    }
-                    hash[v] = num_of_hashs;
-                }
-
-                g->initialize_coloring(local_state.c, hash.get_array());
-                const int cell_after = local_state.c->cells;
-                if (cell_after != cell_prev) {
-                    local_state.refine(g);
-                }
+                    const int cell_after = local_state.c->cells;
+                    changed = cell_after != cell_last;
+                    if (changed) local_state.refine(g);
+                    depth *= 2;
+                } while(changed && g->v_size != local_state.c->cells);
             }
 
             if (use_shallow_quadratic_inprocess) {
-                worklist hash(g->v_size);
                 worklist_t<unsigned long> inv(g->v_size);
 
                 nodes.reserve(g->v_size);
                 nodes.clear();
 
                 for(int i = 0; i < g->v_size; ++i) inv[i] = 0;
-                shallow_split_invariant2(g, local_state, inv);
+                shallow_bfs_invariant2(g, local_state, inv);
+                split_with_invariant(g, local_state, inv);
 
-                int num_of_hashs = 0;
-                for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
-                sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
-                unsigned long last_inv = -1;
-                int last_col  = local_state.c->vertex_to_col[0];
-                for(int i = 0; i < g->v_size; ++i) {
-                    const int v      = nodes[i];
-                    const unsigned long v_inv = inv[v];
-                    const int  v_col = local_state.c->vertex_to_col[v];
-                    if(last_col != v_col) {
-                        last_col = v_col;
-                        last_inv = v_inv;
-                        ++num_of_hashs;
-                    }
-                    if(v_inv != last_inv) {
-                        last_inv = v_inv;
-                        ++num_of_hashs;
-                    }
-                    hash[v] = num_of_hashs;
-                }
-
-                g->initialize_coloring(local_state.c, hash.get_array());
                 const int cell_after = local_state.c->cells;
                 if (cell_after != cell_prev) {
                     local_state.refine(g);
@@ -229,7 +242,6 @@ namespace dejavu::search_strategy {
                 worklist hash(g->v_size);
                 mark_set is_pruned(g->v_size);
                 tree.mark_first_level(is_pruned);
-
                 tree.make_node_invariant(); // "compresses" node invariant from all levels into first level
 
                 nodes.reserve(g->v_size);

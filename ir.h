@@ -394,6 +394,10 @@ namespace dejavu {
                 singletons.reserve(c->domain_size);
             }
 
+            int get_number_of_splits() {
+                return s_splits;
+            }
+
             /**
              * Sets internal trace into recording mode. We write a trace which we might want to compare to later.
              *

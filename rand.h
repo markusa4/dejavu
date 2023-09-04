@@ -142,6 +142,7 @@ namespace dejavu::search_strategy {
         int       s_paths_failany = 0;                    /**< how many total paths have failed           */
         int       s_succeed       = 0;                    /**< how many total paths have succeeded        */
         int       s_leaves        = 0;                    /**< how many leaves were added                 */
+        int       s_min_split_number = 0;
 
         int s_random_sift_success = 0;
 
@@ -178,6 +179,7 @@ namespace dejavu::search_strategy {
             s_succeed          = 0;
             s_rolling_success  = 0;
             s_rolling_first_level_success  = 1.0;
+            s_min_split_number = INT32_MAX;
         }
 
         static bool h_almost_done(groups::compressed_schreier &group) {
@@ -336,6 +338,7 @@ namespace dejavu::search_strategy {
                     // keep track of some statistics for the first individualization (these statistics are used for
                     // decisions concerning breadth-first search)
                     if(base_pos == target_level) {
+                        s_min_split_number = std::min(local_state.get_number_of_splits(), s_min_split_number);
                         s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
                         s_paths_fail1 += !local_state.T->trace_equal();
                         s_rolling_first_level_success =
@@ -412,6 +415,7 @@ namespace dejavu::search_strategy {
                     local_state.move_to_child(g, v);
 
                     if(base_pos == start_from_base_pos) {
+                        s_min_split_number = std::min(local_state.get_number_of_splits(), s_min_split_number);
                         s_trace_cost1 += local_state.T->get_position() - trace_pos_pre;
                         s_paths_fail1 += !local_state.T->trace_equal();
                         s_rolling_first_level_success =
