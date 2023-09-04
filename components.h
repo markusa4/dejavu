@@ -138,7 +138,6 @@ namespace dejavu::ir {
                 const int component = vertex_to_component[v];
                 if(component  < 0) {
                     forward_translation[v] = -1;
-                    //assert(false);
                     continue;
                 }
                 const int v_in_component = vertices_in_component[component];

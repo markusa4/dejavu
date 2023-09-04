@@ -11,6 +11,7 @@
 #include <functional>
 #include <mutex>
 #include <cassert>
+#include "coloring.h"
 
 namespace dejavu {
 
@@ -365,6 +366,7 @@ namespace dejavu {
                 assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 int *old_arr = arr;
+                arr = nullptr;
                 int old_arr_sz = arr_sz;
                 alloc(size);
                 if (old_arr) {

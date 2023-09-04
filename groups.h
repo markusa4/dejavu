@@ -516,6 +516,17 @@ namespace dejavu {
              *
              * @param aut Automorphism workspace which is applied.
              */
+            void add_automorphism_to_orbit(const int* p, const int nsupp, const int* supp) {
+                for (int i = 0; i < nsupp; ++i) {
+                    combine_orbits(p[supp[i]], supp[i]);
+                }
+            }
+
+            /**
+             * Applies an automorphism to the orbit structure.
+             *
+             * @param aut Automorphism workspace which is applied.
+             */
             void add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
                 const int  nsupp = aut.nsupport();
                 const int* supp  = aut.support();
@@ -550,6 +561,13 @@ namespace dejavu {
             }
 
             orbit() = default;
+
+            bool operator==(orbit& other_orbit) {
+                bool comp = (other_orbit.sz == sz) ;
+                for(int i = 0; i < sz && comp; ++i)
+                    comp = comp && (find_orbit(i) == other_orbit.find_orbit(i));
+                return comp;
+            }
         };
 
         /**
@@ -618,40 +636,6 @@ namespace dejavu {
                 } else {
                     // store_type == STORE_DENSE
                     loader.load(data.get_array());
-                }
-            }
-
-            /**
-             * Load inverse of stored automorphism into workspace.
-             *
-             * @param loader Store a pointer to permutation of automorphism in the arbiter.
-             * @param space Auxiliary space that may or may not be used, depending on whether the loaded automorphism is
-             *              sparse. Should only be reset once \p loader is not used anymore.
-             */
-            void load_inverse(dense_sparse_arbiter &loader, automorphism_workspace &space) {
-                if (store_type == STORE_SPARSE) {
-                    space.reset();
-                    int first_of_cycle = data.size() - 1;
-                    for (int i = data.size() - 1; i >= 0; --i) {
-                        if (data[i] < 0) first_of_cycle = i;
-
-                        const int j = abs(data[i]) - 1;
-                        const bool is_last = i == 0 || (data[i - 1] < 0);
-                        if (is_last) {
-                            space.write_single_map(j, abs(data[first_of_cycle]) - 1);
-                        } else {
-                            space.write_single_map(j, abs(data[i - 1]) - 1);
-                        }
-                    }
-                    loader.load(space.perm());
-                } else {
-                    space.reset();
-                    for (int i = 0; i < domain_size; ++i) {
-                        if (i != data[i]) {
-                            space.write_single_map(data[i], i);
-                        }
-                    }
-                    loader.load(space.perm());
                 }
             }
 
@@ -911,12 +895,8 @@ namespace dejavu {
                 auto generator = generators[gen_num];
 
                 // apply generator
-                if (pwr < 0) { // use inverse
-                    generator->load_inverse(w.loader, w.scratch_auto);
-                    // multiply
-                    automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), abs(pwr));
-                    w.scratch_auto.reset();
-                } else if (pwr > 0) { // use generator
+                assert(pwr >= 0);
+                if (pwr > 0) { // use generator
                     generator->load(w.loader, w.scratch_auto);
                     // multiply
                     if(generator->get_store_type() == stored_automorphism::STORE_DENSE) {
@@ -1369,9 +1349,7 @@ namespace dejavu {
              */
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
                              random_source& rng) {
-                if(generators.size() <= 0) {
-                    return false;
-                }
+                if(generators.size() <= 0) return false;
                 automorphism.reset();
                 automorphism.set_support01(true);
                 generate_random(w, automorphism, rng);

@@ -80,10 +80,9 @@ namespace dejavu {
                     // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
                     const int  test_deg   = g->d[c->lab[next_color_class]];
-                    const bool very_dense = test_deg >  (g->v_size / (next_color_class_sz + 1));
-                    const bool cell_dense = test_deg >  (c->cells);
-                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) { //
-                        // singleton
+                    const bool very_dense = test_deg > (g->v_size / (next_color_class_sz + 1));
+                    const bool cell_dense = test_deg > (c->cells);
+                    if (next_color_class_sz == 1 && !(g->dense && very_dense)) { // singleton
                         refine_color_class_singleton(g, c, next_color_class);
                     } else if (g->dense) {
                         if (very_dense) { // dense-dense
@@ -419,7 +418,7 @@ namespace dejavu {
 
                 int next_cell(work_set_int& _queue_pointer, coloring *c) {
                     // look at first 12 positions and pick the (first) smallest cell within these entries
-                    int sm_j = cur_pos - 1;
+                    int sm_j = cur_pos - 1; /*< AKA "smallest j" */
                     for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
                         if (c->ptn[arr[j]] < c->ptn[arr[sm_j]]) {
                             sm_j = j;
@@ -440,7 +439,7 @@ namespace dejavu {
 
                 int next_cell(work_set_int& _queue_pointer, coloring *c, worklist_t<int>& _singleton_hint) {
                     // use singleton_hint
-                    int sm_j = -1;
+                    int sm_j = -1; /*< AKA "smallest j" */
                     while (!_singleton_hint.empty() && sm_j == -1) {
                         const int next_hint = _singleton_hint.pop_back();
                         sm_j = _queue_pointer.get(next_hint);
@@ -470,7 +469,7 @@ namespace dejavu {
                 void replace_cell(work_set_int& _queue_pointer, int col_old, int col) {
                     const int pos = _queue_pointer.get(col_old);
                     arr[pos] = col;
-                    assert(queue_pointer->get(col_old) != -1);
+                    assert(_queue_pointer.get(col_old) != -1);
                     _queue_pointer.set(col_old, -1);
                     _queue_pointer.set(col, pos);
                 }
@@ -502,7 +501,7 @@ namespace dejavu {
             // worklist of color refinement algorithm
             work_set_int     queue_pointer;
             cell_worklist    cell_todo;
-            worklist_t<int> singleton_hint;
+            worklist_t<int>  singleton_hint;
 
             // helper data structures for color refinement
             mark_set        scratch_set;

@@ -88,8 +88,6 @@ namespace dejavu {
              */
             void op_individualize(const int ind_color) {
                 assert(ind_color >= 0);
-                assert(old_color >= 0);
-                assert(ind_color != old_color);
                 write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
                 write_compare(ind_color);
             }

@@ -146,6 +146,7 @@ TEST(refinement_test, trivial_graphs5) {
     c.check();
 }
 
+
 TEST(refinement_test, repeated_test1) {
     dejavu::static_graph g1;
     g1.initialize_graph(3, 2);

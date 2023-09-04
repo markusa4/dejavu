@@ -163,8 +163,6 @@ namespace dejavu::ds {
                     counter = ptn[i] + 1;
                     last_col = i;
                     assert(ptn[i] >= 0 && ptn[i] < domain_size);
-                } else {
-                    assert(vertex_to_col[lab[i]] == last_col);
                 }
             }
 

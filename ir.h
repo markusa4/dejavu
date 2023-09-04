@@ -593,7 +593,6 @@ namespace dejavu {
             bool update_diff_vertices_last_individualization(const controller& other_state) {
                 int i = base.back().touched_color_list_pt;
                 if(touched_color_list.cur_pos != other_state.touched_color_list.cur_pos) {
-                    std::cout << "diff diverge" << touched_color_list.cur_pos  << "vs. " << other_state.touched_color_list.cur_pos  << std::endl;
                     diff_diverge = true;
                     return true;
                 }
