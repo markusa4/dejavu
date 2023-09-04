@@ -32,7 +32,7 @@ bool finished = false;
 
 void empty_hook(int, const int*, int, const int *) {}
 
-void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
+void run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, bool print = true) {
     // touch the graph (mitigate cache variance)
     volatile int acc = 0;
     for(int i = 0; i < g->v_size; ++i) {
@@ -46,7 +46,7 @@ void bench_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time) {
     auto empty_hook_func = dejavu_hook(empty_hook);
     //dejavu_automorphisms(g, colmap, &empty_hook_func);
     dejavu::dejavu2 d;
-    d.set_print(true);
+    d.set_print(print);
     bool del = false;
     if(colmap == nullptr) {
         colmap = (int*) calloc(g->v_size, sizeof(int));
@@ -77,6 +77,7 @@ int commandline_mode(int argc, char **argv) {
     bool permute_graph = false;
     bool permute_graph_have_seed  = false;
     int  permute_graph_given_seed = 0;
+    bool print = true;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = std::string(argv[i]);
@@ -139,7 +140,9 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--permute_seed option requires one argument." << std::endl;
                 return 1;
             }
-        } else if (argv[i][0] != '-') {
+        }  else if (arg == "__SILENT") {
+            print = false;
+        }  else if (argv[i][0] != '-') {
             if(!entered_file) {
                 filename = argv[i];
                 entered_file = true;
@@ -188,7 +191,7 @@ int commandline_mode(int argc, char **argv) {
     std::thread killer;
     //if(timeout > 0)
     //    killer = std::thread(kill_thread, &dejavu_kill_request, timeout);
-    bench_dejavu(g, colmap, &dejavu_solve_time);
+    run_dejavu(g, colmap, &dejavu_solve_time, print);
     if(timeout > 0)
         killer.join();
 

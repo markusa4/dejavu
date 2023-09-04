@@ -22,8 +22,8 @@ extern int*           dej_test_col;
 
 
 namespace dejavu {
-    static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p, [[maybe_unused]] int nsupp,
-                   [[maybe_unused]] const int *supp) {
+    [[maybe_unused]] static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
+                                           [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
         //assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
         //assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
@@ -69,15 +69,23 @@ namespace dejavu {
 
         /**
          * Whether to use true random number generation or pseudo random (default is pseudo random).
-         * @param use_true_random whether to use true random number generation
+         * @param use_true_random (`=true`) whether to use true random number generation
          */
-        [[maybe_unused]] void set_use_true_random(bool use_true_random = false) {
+        [[maybe_unused]] void set_true_random(bool use_true_random = true) {
             h_random_use_true_random = use_true_random;
         }
 
         /**
+         * Whether to use pseudo random number generation or true random (default is pseudo random).
+         * @param use_pseudo_random (`=true`) whether to use pseudo random number generation
+         */
+        [[maybe_unused]] void set_pseudo_random(bool use_pseudo_random = true) {
+            h_random_use_true_random = !use_pseudo_random;
+        }
+
+        /**
          * Seed to use for pseudo random number generation.
-         * @param seed
+         * @param seed the seed
          */
         [[maybe_unused]] void set_seed(int seed = 0) {
             h_random_seed = seed;
@@ -95,14 +103,15 @@ namespace dejavu {
          * Use true random number generation to set the seed.
          * @param seed
          */
-        [[maybe_unused]] void set_random_seed() {
+        [[maybe_unused]] void randomize_seed() {
             std::random_device rd;
             h_random_seed = static_cast<int>(rd());
         }
 
         /**
          * Whether to print progress of the solver.
-         * @param print
+         *
+         * @param print (`=true`) whether to print
          */
         [[maybe_unused]] void set_print(bool print=true) {
             h_silent = !print;
@@ -110,7 +119,7 @@ namespace dejavu {
 
         /**
          * How large was the automorphism group computed?
-         * @return
+         * @return the automorphism group size
          */
         [[maybe_unused]] [[nodiscard]] big_number get_automorphism_group_size() const {
             return s_grp_sz;
@@ -118,7 +127,7 @@ namespace dejavu {
 
         /**
          * Did the solver terminate deterministically, i.e., is the automorphism group guaranteed to be complete?
-         * @return
+         * @return whether the solver terminated without potential error
          */
         [[maybe_unused]] [[nodiscard]] bool get_deterministic_termination() const {
             return s_deterministic_termination;
@@ -216,7 +225,7 @@ namespace dejavu {
                 double s_random_budget_bias = 1.0; /*< a bias for random search, whether we've gathered that the
                                                    *  technique does not seem to work on this graph */
 
-                bool s_few_cells  = false;
+                //bool s_few_cells  = false;
                 bool h_used_shallow_inprocess = false;
                 bool h_used_shallow_inprocess_quadratic = false;
                 bool s_inprocessed = false; /*< flag which says that we've inprocessed the graph since last restart */
@@ -248,8 +257,8 @@ namespace dejavu {
 
                 // initialize modules for high-level search strategies
                 search_strategy::dfs_ir      m_dfs(m_printer, automorphism); /*< depth-first search */
-                search_strategy::bfs_ir      m_bfs(automorphism, schreierw); /*< breadth-first search */
-                search_strategy::random_ir   m_rand(schreierw, automorphism, rng); /*< randomized search */
+                search_strategy::bfs_ir      m_bfs(m_printer, automorphism, schreierw); /*< breadth-first search */
+                search_strategy::random_ir   m_rand(m_printer, schreierw, automorphism, rng); /*< randomized search */
                 search_strategy::inprocessor m_inprocess; /*< inprocessing */
 
                 // initialize a coloring using colors of preprocessed graph
@@ -312,7 +321,7 @@ namespace dejavu {
                     // determine whether base_vertex is "large", or "short"
                     s_long_base  = base_size >  sqrt(g->v_size); /*< a "long"  base_vertex */
                     s_short_base = base_size <= 2;               /*< a "short" base_vertex */
-                    s_few_cells  = root_save.get_coloring()->cells <= 2; /*< "few"  cells in initial */
+                    //s_few_cells  = root_save.get_coloring()->cells <= 2; /*< "few"  cells in initial */
 
                     // heuristics to determine whether we want to skip this base, i.e., is this obviously worse than
                     // what we've seen before, and is there no reason to look at it?
@@ -361,8 +370,8 @@ namespace dejavu {
                         s_term = t_dfs;
                         break;
                     }
-                    const bool s_dfs_backtrack =
-                            m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
+                    //const bool s_dfs_backtrack =
+                    //        m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
                     /*< did dfs terminate because it needed to backtrack? */
 
                     // next, we go into the random path + BFS algorithm, so we set up a Schreier structure and IR tree
@@ -377,9 +386,9 @@ namespace dejavu {
                     m_compress.determine_compression_map(*root_save.get_coloring(), base_vertex, dfs_level);
 
                     // set up Schreier structure
-                    const bool reset_prob = sh_schreier.reset(&m_compress, g->v_size, schreierw, base_vertex, base_sizes,
-                                                               dfs_level,
-                                                               can_keep_previous, m_inprocess.inproc_fixed_points);
+                    const bool reset_prob = sh_schreier.reset(&m_compress, g->v_size, schreierw, base_vertex,
+                                                              base_sizes, dfs_level, can_keep_previous,
+                                                              m_inprocess.inproc_fixed_points);
                     if (reset_prob) sh_schreier.reset_probabilistic_criterion(); /*< need to reset probabilistic abort
                                                                                    *  criterion after inprocessing */
 
@@ -617,6 +626,8 @@ namespace dejavu {
 
                     m_inprocess.set_splits_hint(m_rand.s_min_split_number);
                     // we are restarting -- so we try to inprocess using the gathered data
+
+                    // decide whether we want to use shallow bfs invariants
                     const bool h_use_shallow_inprocess = !h_used_shallow_inprocess && s_inproc_success == 0 &&
                                                           s_path_fail1_avg > 0.1;
                     const bool h_use_shallow_inprocess_quadratic =
@@ -626,33 +637,35 @@ namespace dejavu {
                     h_used_shallow_inprocess_quadratic = h_used_shallow_inprocess_quadratic ||
                                                          h_use_shallow_inprocess_quadratic;
 
+                    // inprocess
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget,
                                                           s_any_bfs_pruned,
                                                           h_use_shallow_inprocess || h_use_shallow_inprocess_quadratic,
                                                           h_use_shallow_inprocess_quadratic);
+
+                    // record whether inprocessing was successful in any way
                     s_inproc_success += s_inprocessed;
+                    if(s_inprocessed) m_printer.timer_print("inprocess", local_state.c->cells, s_inproc_success);
 
-                    if(s_inprocessed) {
-                        m_printer.timer_print("inprocess", local_state.c->cells, s_inproc_success);
-                    }
-
-                    // edge case where inprocessing might finish the graph
+                    // inprocessing might finish the graph, in which case we terminate
                     if (root_save.get_coloring()->cells == g->v_size) {
                         s_term = t_inproc;
                         finished_symmetries = true;
                         break;
                     }
-                }
+                } // end of restart loop
 
+                // we are done with this component...
+                // ...did we solve it deterministically?
                 s_deterministic_termination = (s_term != t_rand_schreier) && s_deterministic_termination;
 
-                // We are done! Let's add up the total group size from all the different modules.
+                // let's add up the total group size from all the different modules.
                 s_grp_sz.multiply(m_inprocess.s_grp_sz);
                 s_grp_sz.multiply(m_dfs.s_grp_sz);
 
                 // if we finished with BFS, group size in Schreier is redundant since we also found them with BFS
                 if(s_term != t_bfs) s_grp_sz.multiply(sh_schreier.get_group_size());
-            }
+            } // end of loop for non-uniform components
             m_printer.h_silent = h_silent;
             m_printer.timer_print("done", s_deterministic_termination, s_term);
         }

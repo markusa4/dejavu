@@ -14,8 +14,9 @@ namespace dejavu {
          * \brief Breadth-first search.
          */
         class bfs_ir {
-            groups::automorphism_workspace& gws_automorphism;
-            groups::schreier_workspace&     gws_schreier;
+            timed_print& gl_printer;
+            groups::automorphism_workspace& gl_automorphism;
+            groups::schreier_workspace&     gl_schreier;
 
         public:
             bool h_use_deviation_pruning = true; /**< use pruning using deviation maps */
@@ -28,8 +29,9 @@ namespace dejavu {
             int s_total_leaves             = 0; /**< how many of the computed nodes were leaves */
             int s_deviation_prune          = 0; /**< how many nodes were pruned using deviation maps */
 
-            bfs_ir(groups::automorphism_workspace& automorphism, groups::schreier_workspace& schreier) :
-                   gws_automorphism(automorphism), gws_schreier(schreier) {}
+            bfs_ir(timed_print& printer, groups::automorphism_workspace& automorphism,
+                   groups::schreier_workspace& schreier) :
+                   gl_printer(printer), gl_automorphism(automorphism), gl_schreier(schreier) {}
 
             void do_a_level(sgraph* g, dejavu_hook* hook, ir::shared_tree& ir_tree, ir::controller& local_state,
                             std::function<ir::type_selector_hook> *selector) {
@@ -157,18 +159,18 @@ namespace dejavu {
 
                 bool cert = true;
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
-                    gws_automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
-                    cert = local_state.certify(g, gws_automorphism);
+                    gl_automorphism.write_color_diff(local_state.c->vertex_to_col, local_state.leaf_color.lab);
+                    cert = local_state.certify(g, gl_automorphism);
                     if(cert) {
-                        ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(gws_automorphism);
+                        ir_tree->h_bfs_top_level_orbit.add_automorphism_to_orbit(gl_automorphism);
 
                         // Output automorphism
                         if (hook)
-                            (*hook)(g->v_size, gws_automorphism.perm(), gws_automorphism.nsupport(),
-                                    gws_automorphism.support());
+                            (*hook)(g->v_size, gl_automorphism.perm(), gl_automorphism.nsupport(),
+                                    gl_automorphism.support());
                     }
                     ++s_total_leaves;
-                    gws_automorphism.reset();
+                    gl_automorphism.reset();
 
                     if(parent_node_base_pos == 0 && vert_on_base == parent_node_base_vert)
                         ++ir_tree->h_bfs_automorphism_pw;
@@ -181,15 +183,15 @@ namespace dejavu {
                 /*if(local_state.T->trace_equal() && cert && g->v_size != local_state.c->cells && !is_base) {
                     const bool there_is_diff = local_state.there_is_difference_to_base();
                     if (!there_is_diff) {
-                        gws_automorphism.reset();
-                        local_state.singleton_automorphism_base(&gws_automorphism);
-                        const bool certify_sparse = local_state.certify(g, gws_automorphism);
+                        gl_automorphism.reset();
+                        local_state.singleton_automorphism_base(&gl_automorphism);
+                        const bool certify_sparse = local_state.certify(g, gl_automorphism);
                         if(certify_sparse)  {
                             std::cout << "found here" << std::endl;
                             if (hook)
-                                (*hook)(g->v_size, gws_automorphism.perm(), gws_automorphism.nsupport(),
-                                        gws_automorphism.support());
-                            //sh_schreier->sift(*gws_schreier, *gws_automorphism, false);
+                                (*hook)(g->v_size, gl_automorphism.perm(), gl_automorphism.nsupport(),
+                                        gl_automorphism.support());
+                            //sh_schreier->sift(*gl_schreier, *gl_automorphism, false);
                         }
                     }
                 }*/
@@ -234,7 +236,7 @@ namespace dejavu {
                 while(!ir_tree->queue_missing_node_empty()) {
                     ++s_count_nodes;
                     if((s_count_nodes & 0x00000FFF) == 0)
-                        progress_current_method("bfs nodes=" +std::to_string(s_count_nodes)+
+                        gl_printer.progress_current_method("bfs nodes=" +std::to_string(s_count_nodes)+
                                                 ", nodes_kept="+std::to_string(s_total_kept));
                     const auto todo = ir_tree->queue_missing_node_pop();
                     compute_node(g, hook, ir_tree, local_state, todo.first, todo.second, last_load);

@@ -180,28 +180,6 @@ namespace dejavu {
         return out << number.mantissa << "*10^" << number.exponent;
     }
 
-    static void progress_current_method(const std::string& print) {
-        PRINT_NO_NEWLINE("\r>" << print);
-    }
-    static void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
-                                                                       const std::string& var2, double var2_val) {
-        PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val);
-    }
-    static void progress_current_method(const std::string& method_name, const std::string& var1, int var1_val,
-                                        const std::string& var2, int var2_val,
-                                        const std::string& var3, double var3_val) {
-        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
-                               << ", " << var3 << "=" << var3_val);
-    }
-
-    static void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
-                                        const std::string& var2, int var2_val,
-                                        const std::string& var3, int var3_val,
-                                        const std::string& var4, int var4_val) {
-        PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
-                               << ", " << var3 << "=" << var3_val << ", " << var4 << "=" << var4_val);
-    }
-
     static void progress_print_split() {
         PRINT("\r______________________________________________________________");
     }
@@ -278,18 +256,18 @@ namespace dejavu {
             previous = now;
         }
 
-        void progress_current_method(const std::string& print) {
+        void progress_current_method(const std::string& print) const  {
             if(h_silent) return;
             PRINT_NO_NEWLINE("\r>" << print);
         }
         void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
-                                            const std::string& var2, double var2_val) {
+                                            const std::string& var2, double var2_val) const  {
             if(h_silent) return;
             PRINT_NO_NEWLINE("\r>" << method_name << " " << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val);
         }
         void progress_current_method(const std::string& method_name, const std::string& var1, int var1_val,
                                             const std::string& var2, int var2_val,
-                                            const std::string& var3, double var3_val) {
+                                            const std::string& var3, double var3_val) const {
             if(h_silent) return;
             PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
                                    << ", " << var3 << "=" << var3_val);
@@ -298,7 +276,7 @@ namespace dejavu {
         void progress_current_method(const std::string& method_name, const std::string& var1, double var1_val,
                                             const std::string& var2, int var2_val,
                                             const std::string& var3, int var3_val,
-                                            const std::string& var4, int var4_val) {
+                                            const std::string& var4, int var4_val) const  {
             if(h_silent) return;
             PRINT_NO_NEWLINE("\r>" << method_name << " "  << var1 << "=" << var1_val << ", " << var2 << "=" << var2_val
                                    << ", " << var3 << "=" << var3_val << ", " << var4 << "=" << var4_val);

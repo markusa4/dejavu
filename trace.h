@@ -86,12 +86,11 @@ namespace dejavu {
              * Records an individualization.
              * @param color The color being individualized.
              */
-            void op_individualize(const int old_color, const int ind_color) {
+            void op_individualize(const int ind_color) {
                 assert(ind_color >= 0);
                 assert(old_color >= 0);
                 assert(ind_color != old_color);
                 write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
-                //write_compare(old_color);
                 write_compare(ind_color);
             }
 

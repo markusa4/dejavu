@@ -938,7 +938,7 @@ namespace dejavu {
                 // individualize vertex
                 s_individualize = true;
                 const int init_color_class = refinement::individualize_vertex(c, v, my_split_hook);
-                T->op_individualize(prev_col, c->vertex_to_col[v]);
+                T->op_individualize(c->vertex_to_col[v]);
                 s_individualize = false;
 
                 // refine coloring

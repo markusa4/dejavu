@@ -28,8 +28,9 @@ namespace dejavu::search_strategy {
         random_source& rng;
         std::vector<int> heuristic_reroll;
 
-        groups::schreier_workspace&     gws_schreierw;
-        groups::automorphism_workspace& gws_automorphism;
+        timed_print& gl_printer;
+        groups::schreier_workspace&     gl_schreierw;
+        groups::automorphism_workspace& gl_automorphism;
 
         /**
          * Loads the leaf into the \p local_state. Only works if base of leaf was stored, i.e., whenever
@@ -82,19 +83,19 @@ namespace dejavu::search_strategy {
                 }
 
                 // If there is a leaf with the same hash, load the leaf and test automorphism
-                gws_automorphism.reset();
+                gl_automorphism.reset();
 
                 // Sometimes, a lab array is already stored for the leaf
                 if(other_leaf->get_store_type() == ir::stored_leaf::STORE_LAB) {
                     const int* lab = other_leaf->get_lab_or_base();
-                    gws_automorphism.write_color_diff(local_state.c->vertex_to_col, lab);
+                    gl_automorphism.write_color_diff(local_state.c->vertex_to_col, lab);
                 } else {
                     load_state_from_leaf(g, other_state, root_save, other_leaf);
-                    gws_automorphism.write_color_diff(local_state.c->vertex_to_col, other_state.c->lab);
+                    gl_automorphism.write_color_diff(local_state.c->vertex_to_col, other_state.c->lab);
                 }
 
 
-                const bool cert = local_state.certify(g, gws_automorphism);
+                const bool cert = local_state.certify(g, gl_automorphism);
 
                 if (cert) {
                     // We found an automorphism!
@@ -102,18 +103,18 @@ namespace dejavu::search_strategy {
                     ++s_succeed;
 
                     // Output automorphism
-                    if(hook) (*hook)(g->v_size, gws_automorphism.perm(), gws_automorphism.nsupport(),
-                                     gws_automorphism.support());
+                    if(hook) (*hook)(g->v_size, gl_automorphism.perm(), gl_automorphism.nsupport(),
+                                     gl_automorphism.support());
 
                     // Sift into Schreier structure
-                    bool sift = group.sift(gws_schreierw, gws_automorphism, uniform);
-                    gws_automorphism.reset();
+                    bool sift = group.sift(gl_schreierw, gl_automorphism, uniform);
+                    gl_automorphism.reset();
 
                     if(sift && group.s_densegen() + group.s_sparsegen() > 1 && s_random_sift_success > -5) {
                         int fail = 3; // 3
                         bool any_changed = false;
                         while(fail >= 0) {
-                            const bool sift_changed = group.sift_random(gws_schreierw, gws_automorphism, rng);
+                            const bool sift_changed = group.sift_random(gl_schreierw, gl_automorphism, rng);
                             any_changed = sift_changed || any_changed;
                             fail -= !sift_changed;
                         }
@@ -122,11 +123,11 @@ namespace dejavu::search_strategy {
                         s_random_sift_success  = std::max(std::min(s_random_sift_success, 5), -5);
                     }
 
-                    gws_automorphism.reset();
+                    gl_automorphism.reset();
                     return sift;
                 }
             }
-            gws_automorphism.reset();
+            gl_automorphism.reset();
             return false;
         }
 
@@ -163,8 +164,9 @@ namespace dejavu::search_strategy {
          * @param schreier Schreier workspace
          * @param automorphism workspace to store automorphisms
          */
-        random_ir(groups::schreier_workspace& schreier, groups::automorphism_workspace& automorphism,
-                  random_source& rgenerator) : rng(rgenerator), gws_schreierw(schreier), gws_automorphism(automorphism)
+        random_ir(timed_print& printer, groups::schreier_workspace& schreier,
+                  groups::automorphism_workspace& automorphism, random_source& rgenerator) :
+                  rng(rgenerator), gl_printer(printer), gl_schreierw(schreier), gl_automorphism(automorphism)
                   {}
 
         /**
@@ -240,8 +242,8 @@ namespace dejavu::search_strategy {
                 int could_start_from = group.finished_up_to_level();
 
                 if(s_paths_failany > 8 && (s_paths & 0x00000FFF) == 0x000000FE)
-                    progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
-                                             group.s_compression_ratio);
+                    gl_printer.progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1,
+                                                       "compress", group.s_compression_ratio);
 
                 // can start from below the root if we finished Schreier table at the current root
                 if(local_state.s_base_pos <= could_start_from) {
@@ -256,8 +258,9 @@ namespace dejavu::search_strategy {
                     const double progress_now = 1.0 * s_cells_now / g->v_size;
 
                     if(progress_now - progress_initial > 0.1) {
-                        progress_current_method("random", "root_cells", 1.0 * s_cells_now / g->v_size, "base_pos",
-                                                could_start_from, "sift", s_sifting_success, "rsift", s_random_sift_success);
+                        gl_printer.progress_current_method("random", "root_cells", 1.0 * s_cells_now / g->v_size,
+                                                           "base_pos", could_start_from,
+                                                           "sift", s_sifting_success, "rsift", s_random_sift_success);
                         progress_initial = progress_now;
                     }
                 }
@@ -315,7 +318,7 @@ namespace dejavu::search_strategy {
                         for(int i = 0; i < col_sz; ++i) {
                             heuristic_reroll.push_back(local_state.c->lab[col + i]);
                         }
-                        group.reduce_to_unfinished(gws_schreierw, heuristic_reroll, base_pos);
+                        group.reduce_to_unfinished(gl_schreierw, heuristic_reroll, base_pos);
                         if(!heuristic_reroll.empty()) {
                             const int rand_reroll = rng() % static_cast<int>(heuristic_reroll.size());
                             v = heuristic_reroll[rand_reroll];
@@ -396,8 +399,8 @@ namespace dejavu::search_strategy {
                     s_paths_failany < fail_limit) {
 
                 if((s_paths & 0x000000FF) == 0x000000FE)
-                    progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1, "compress",
-                                            group.s_compression_ratio);
+                    gl_printer.progress_current_method("random", "leaves", ir_tree.stat_leaves(), "f1", s_paths_fail1,
+                                                       "compress", group.s_compression_ratio);
 
                 auto node = ir_tree.pick_node_from_level(pick_from_level, rng());
                 local_state.load_reduced_state(*node->get_save());

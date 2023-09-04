@@ -24,116 +24,13 @@ namespace dejavu {
         // bool worklist_color_hook(int color, int color_sz);
         typedef bool type_worklist_color_hook(const int, const int);
 
-        // worklist implementation for color refinement
-        class cell_worklist {
-        public:
-            void initialize(int domain_size) {
-                arr = new int[domain_size];
-                arr_sz = domain_size;
-                init = true;
-                cur_pos = 0;
-            }
-
-            ~cell_worklist() {
-                delete[] arr;
-            }
-
-            int add_cell(work_set_int *queue_pointer, int col) {
-                assert(init);
-                assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
-                queue_pointer->set(col, cur_pos);
-                arr[cur_pos] = col;
-                cur_pos++;
-                return 0;
-            }
-
-            int next_cell(work_set_int *queue_pointer, coloring *c) {
-                // look at first 12 positions and pick the (first) smallest cell within these entries
-                int sm_j = cur_pos - 1;
-                for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
-                    if (c->ptn[arr[j]] < c->ptn[arr[sm_j]]) {
-                        sm_j = j;
-                        if (c->ptn[arr[sm_j]] == 0)
-                            break;
-                    }
-                }
-
-                // swap sm_j and j
-                const int sm_col = arr[sm_j];
-                arr[sm_j] = arr[cur_pos - 1];
-                queue_pointer->set(arr[sm_j], sm_j);
-
-                cur_pos--;
-                queue_pointer->set(sm_col, -1);
-                return sm_col;
-            }
-
-            int next_cell(work_set_int *queue_pointer, coloring *c, worklist_t<int> *singleton_hint) {
-                // use singleton_hint
-                int sm_j = -1;
-                while (!singleton_hint->empty() && sm_j == -1) {
-                    const int next_hint = singleton_hint->pop_back();
-                    sm_j = queue_pointer->get(next_hint);
-                }
-
-                // look at first 12 positions and pick the (first) smallest cell within these entries
-                if (sm_j == -1) {
-                    sm_j = cur_pos - 1;
-                    for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
-                        const int size_sm_j = c->ptn[arr[sm_j]];
-                        const bool smaller = (c->ptn[arr[j]] < size_sm_j);
-                        sm_j = smaller ? j : sm_j;
-                        if (size_sm_j - smaller <= 0) break;
-                    }
-                }
-
-                // swap sm_j and j
-                const int sm_col = arr[sm_j];
-                arr[sm_j] = arr[cur_pos - 1];
-                queue_pointer->set(arr[sm_j], sm_j);
-
-                cur_pos--;
-                queue_pointer->set(sm_col, -1);
-                return sm_col;
-            }
-
-            void replace_cell(work_set_int *queue_pointer, int col_old, int col) {
-                const int pos = queue_pointer->get(col_old);
-                arr[pos] = col;
-                assert(queue_pointer->get(col_old) != -1);
-                queue_pointer->set(col_old, -1);
-                queue_pointer->set(col, pos);
-            }
-
-            void reset(work_set_int *queue_pointer) {
-                while (cur_pos > 0) {
-                    cur_pos--;
-                    queue_pointer->set(arr[cur_pos], -1);
-                }
-            }
-
-            [[nodiscard]] bool empty() const {
-                return (cur_pos == 0);
-            }
-
-            [[nodiscard]] int size() const {
-                return cur_pos;
-            }
-
-        private:
-            int *arr = nullptr;
-            int arr_sz = -1;
-            int cur_pos = -1;
-            bool init = false;
-        };
-
-/**
- * \brief Color refinement and related algorithms
- *
- * Class that is used to preserve a workspace for color refinement, automorphism certification, and other miscellaneous
- * tasks. Once initialized to a certain size, the workspace can not be enlargened and methods can only be used for
- * graphs of the initial size, or smaller.
-*/
+        /**
+         * \brief Color refinement and related algorithms
+         *
+         * Class that is used to preserve a workspace for color refinement, automorphism certification, and other miscellaneous
+         * tasks. Once initialized to a certain size, the workspace can not be enlargened and methods can only be used for
+         * graphs of the initial size, or smaller.
+        */
         class refinement {
             bool g_early_out = false;
             const std::function<type_split_color_hook>* g_split_hook;
@@ -156,26 +53,26 @@ namespace dejavu {
                                  const std::function<type_split_color_hook>* split_hook = nullptr,
                                  const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
                 assure_initialized(g);
-                cell_todo.reset(&queue_pointer);
+                cell_todo.reset(queue_pointer);
 
                 if (init_color < 0) {
                     // initialize queue with all classes (except for largest one)
                     for (int i = 0; i < c->domain_size;) {
-                        cell_todo.add_cell(&queue_pointer, i);
+                        cell_todo.add_cell(queue_pointer, i);
                         const int col_sz = c->ptn[i];
                         i += col_sz + 1;
 
                     }
                 } else {
                     assert(c->vertex_to_col[c->lab[init_color]] == init_color);
-                    cell_todo.add_cell(&queue_pointer, init_color);
+                    cell_todo.add_cell(queue_pointer, init_color);
                 }
 
                 g_early_out  = false;
                 g_split_hook = split_hook;
 
                 while (!cell_todo.empty()) {
-                    const int next_color_class    = cell_todo.next_cell(&queue_pointer, c);
+                    const int next_color_class    = cell_todo.next_cell(queue_pointer, c);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
 
                     if (worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) continue;
@@ -201,25 +98,25 @@ namespace dejavu {
                     }
 
                     if (g_early_out) {
-                        cell_todo.reset(&queue_pointer);
+                        cell_todo.reset(queue_pointer);
                         break;
                     }
 
                     // detection if coloring is discrete
                     if (c->cells == g->v_size) {
-                        cell_todo.reset(&queue_pointer);
+                        cell_todo.reset(queue_pointer);
                         break;
                     }
 
                     // partition is at least as large as the one of target invariant, can skip to the end of the entire
                     // refinement
                     if (c->cells == color_limit) {
-                        cell_todo.reset(&queue_pointer);
+                        cell_todo.reset(queue_pointer);
                         break;
                     }
                 }
             }
-
+        private:
             void report_split_color_class(coloring* c, const int old_class, const int new_class, const int new_class_sz,
                                           const bool is_largest) {
                 c->cells += (old_class != new_class);
@@ -230,22 +127,23 @@ namespace dejavu {
                 }
 
                 if (!is_largest && old_class != new_class) {
-                    cell_todo.add_cell(&queue_pointer, new_class);
+                    cell_todo.add_cell(queue_pointer, new_class);
                 } else if(is_largest) {
                     // since old color class is skipped above, this should be safe
                     int i = queue_pointer.get(old_class);
-                    if (i >= 0)                cell_todo.replace_cell(&queue_pointer, old_class, new_class);
-                    if(old_class != new_class) cell_todo.add_cell(&queue_pointer, old_class);
+                    if (i >= 0)                cell_todo.replace_cell(queue_pointer, old_class, new_class);
+                    if(old_class != new_class) cell_todo.add_cell(queue_pointer, old_class);
                 }
             }
 
+        public:
             /**
-         * Individualizes a vertex in a coloring.
-         * @param c Coloring in which the vertex is individualized.
-         * @param v Vertex to be individualized.
-         * @param split_hook Function to be called whenever a color class is split. Return value is not used.
-         * @return
-         */
+             * Individualizes a vertex in a coloring.
+             * @param c Coloring in which the vertex is individualized.
+             * @param v Vertex to be individualized.
+             * @param split_hook Function to be called whenever a color class is split. Return value is not used.
+             * @return
+             */
             static int
             individualize_vertex(coloring *c, int v, const std::function<type_split_color_hook> &split_hook = nullptr) {
                 const int color = c->vertex_to_col[v];
@@ -282,11 +180,11 @@ namespace dejavu {
                 assure_initialized(g);
                 singleton_hint.reset();
 
-                cell_todo.reset(&queue_pointer);
+                cell_todo.reset(queue_pointer);
 
                 if (init_color_class < 0) {
                     for (int i = 0; i < c->domain_size;) {
-                        cell_todo.add_cell(&queue_pointer, i);
+                        cell_todo.add_cell(queue_pointer, i);
                         const int col_sz = c->ptn[i];
                         if (col_sz == 0) {
                             singleton_hint.push_back(i);
@@ -294,11 +192,11 @@ namespace dejavu {
                         i += col_sz + 1;
                     }
                 } else {
-                    cell_todo.add_cell(&queue_pointer, init_color_class);
+                    cell_todo.add_cell(queue_pointer, init_color_class);
                 }
 
                 while (!cell_todo.empty()) {
-                    const int next_color_class = cell_todo.next_cell(&queue_pointer, c, &singleton_hint);
+                    const int next_color_class = cell_todo.next_cell(queue_pointer, c, singleton_hint);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
                     const bool very_dense = (g->d[c->lab[next_color_class]] > (g->v_size / (next_color_class_sz + 1)));
 
@@ -316,34 +214,36 @@ namespace dejavu {
                     }
 
                     if (c->cells == g->v_size) {
-                        cell_todo.reset(&queue_pointer);
+                        cell_todo.reset(queue_pointer);
                         return;
                     }
                 }
             }
 
+        private:
             void report_split_color_class_first(coloring* c, int old_class, int new_class, int new_class_sz,
                                                 bool is_largest) {
                 c->cells += (old_class != new_class);
                 assert(c->ptn[new_class] + 1 == new_class_sz);
 
                 if (!is_largest && old_class != new_class) {
-                    cell_todo.add_cell(&queue_pointer, new_class);
+                    cell_todo.add_cell(queue_pointer, new_class);
                     if (new_class_sz == 1) singleton_hint.push_back(new_class);
                 } else if(is_largest) {
                     // since old color class is skipped above, this should be safe
                     int i = queue_pointer.get(old_class);
                     if (i >= 0) {
-                        cell_todo.replace_cell(&queue_pointer, old_class, new_class);
+                        cell_todo.replace_cell(queue_pointer, old_class, new_class);
                         if(new_class_sz == 1) singleton_hint.push_back(new_class);
                     }
                     if(old_class != new_class) {
-                        cell_todo.add_cell(&queue_pointer, old_class);
+                        cell_todo.add_cell(queue_pointer, old_class);
                         if(c->ptn[old_class] + 1 == 1) singleton_hint.push_back(old_class);
                     }
                 }
             }
 
+        public:
             // certify an automorphism on a graph
             bool certify_automorphism(sgraph *g, const int *p) {
                 assure_initialized(g);
@@ -494,6 +394,109 @@ namespace dejavu {
             }
 
         private:
+            // worklist implementation for color refinement
+            class cell_worklist {
+            public:
+                void initialize(int _domain_size) {
+                    arr = new int[_domain_size];
+                    arr_sz = _domain_size;
+                    init = true;
+                    cur_pos = 0;
+                }
+
+                ~cell_worklist() {
+                    delete[] arr;
+                }
+
+                int add_cell(work_set_int& _queue_pointer, int col) {
+                    assert(init);
+                    assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
+                    _queue_pointer.set(col, cur_pos);
+                    arr[cur_pos] = col;
+                    cur_pos++;
+                    return 0;
+                }
+
+                int next_cell(work_set_int& _queue_pointer, coloring *c) {
+                    // look at first 12 positions and pick the (first) smallest cell within these entries
+                    int sm_j = cur_pos - 1;
+                    for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
+                        if (c->ptn[arr[j]] < c->ptn[arr[sm_j]]) {
+                            sm_j = j;
+                            if (c->ptn[arr[sm_j]] == 0)
+                                break;
+                        }
+                    }
+
+                    // swap sm_j and j
+                    const int sm_col = arr[sm_j];
+                    arr[sm_j] = arr[cur_pos - 1];
+                    _queue_pointer.set(arr[sm_j], sm_j);
+
+                    cur_pos--;
+                    _queue_pointer.set(sm_col, -1);
+                    return sm_col;
+                }
+
+                int next_cell(work_set_int& _queue_pointer, coloring *c, worklist_t<int>& _singleton_hint) {
+                    // use singleton_hint
+                    int sm_j = -1;
+                    while (!_singleton_hint.empty() && sm_j == -1) {
+                        const int next_hint = _singleton_hint.pop_back();
+                        sm_j = _queue_pointer.get(next_hint);
+                    }
+
+                    // look at first 12 positions and pick the (first) smallest cell within these entries
+                    if (sm_j == -1) {
+                        sm_j = cur_pos - 1;
+                        for (int j = cur_pos - 1; j >= 0 && ((cur_pos - j) <= 12); --j) {
+                            const int size_sm_j = c->ptn[arr[sm_j]];
+                            const bool smaller = (c->ptn[arr[j]] < size_sm_j);
+                            sm_j = smaller ? j : sm_j;
+                            if (size_sm_j - smaller <= 0) break;
+                        }
+                    }
+
+                    // swap sm_j and j
+                    const int sm_col = arr[sm_j];
+                    arr[sm_j] = arr[cur_pos - 1];
+                    _queue_pointer.set(arr[sm_j], sm_j);
+
+                    cur_pos--;
+                    _queue_pointer.set(sm_col, -1);
+                    return sm_col;
+                }
+
+                void replace_cell(work_set_int& _queue_pointer, int col_old, int col) {
+                    const int pos = _queue_pointer.get(col_old);
+                    arr[pos] = col;
+                    assert(queue_pointer->get(col_old) != -1);
+                    _queue_pointer.set(col_old, -1);
+                    _queue_pointer.set(col, pos);
+                }
+
+                void reset(work_set_int& _queue_pointer) {
+                    while (cur_pos > 0) {
+                        cur_pos--;
+                        _queue_pointer.set(arr[cur_pos], -1);
+                    }
+                }
+
+                [[nodiscard]] bool empty() const {
+                    return (cur_pos == 0);
+                }
+
+                [[nodiscard]] int size() const {
+                    return cur_pos;
+                }
+
+            private:
+                int *arr = nullptr;
+                int arr_sz = -1;
+                int cur_pos = -1;
+                bool init = false;
+            };
+
             int domain_size = -1;
 
             // worklist of color refinement algorithm
@@ -502,13 +505,13 @@ namespace dejavu {
             worklist_t<int> singleton_hint;
 
             // helper data structures for color refinement
-            mark_set         scratch_set;
-            worklist_t<int>  vertex_worklist;
-            work_set_t<int>  color_vertices_considered; // todo should use different datastructure, with n space not 2n
-            work_set_t<int>  neighbours;
-            work_set_t<int>  neighbour_sizes;
-            worklist_t<int>  old_color_classes;
-            workspace        scratch;
+            mark_set        scratch_set;
+            worklist_t<int> vertex_worklist;
+            workset_t<int>  color_vertices_considered; // todo should use different datastructure, with n space not 2n
+            workset_t<int>  neighbours;
+            workset_t<int>  neighbour_sizes;
+            worklist_t<int> old_color_classes;
+            workspace       scratch;
 
             void assure_initialized(const sgraph *g) {
                 if (g->v_size > domain_size) {

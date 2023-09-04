@@ -451,7 +451,7 @@ namespace dejavu {
 
         // work set with arbitrary type
         template<class T>
-        class work_set_t {
+        class workset_t {
         public:
             void initialize(int size) {
                 s = new T[size];
@@ -497,7 +497,7 @@ namespace dejavu {
                 ++s[index];
             }
 
-            ~work_set_t() {
+            ~workset_t() {
                 if (init)
                     delete[] s;
             }
@@ -509,7 +509,7 @@ namespace dejavu {
             int sz = 0;
         };
 
-        typedef work_set_t<int> work_set_int;
+        typedef workset_t<int> work_set_int;
 
         /**
          * \brief Sets specialized for quick resets
