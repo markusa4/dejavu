@@ -118,7 +118,7 @@ namespace dejavu {
     private:
         dejavu_hook   my_hook;
         std::ostream& my_ostream;
-        ds::mark_set  test_set;
+        dejavu::ds::mark_set  test_set;
 
         void hook_func(int n, const int *p, int nsupp, const int *supp) {
             test_set.initialize(n);

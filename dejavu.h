@@ -523,8 +523,12 @@ namespace dejavu {
                         if (search_strategy::random_ir::h_almost_done(sh_schreier) &&
                             next_routine == restart)
                             next_routine = random_ir;
-                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4)
+                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4) {
                             next_routine = random_ir;
+                        }
+                        if (m_rand.s_rolling_success > 0.2  && s_cost <= h_budget * 6) { // TODO maybe?
+                            next_routine = random_ir;
+                        }
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
                             next_routine == restart)
                             next_routine = random_ir;

@@ -19,8 +19,8 @@ bool finished = false;
 
 void empty_hook(int, const int*, int, const int *) {}
 
-void run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, bool print = true, bool true_random = false,
-                bool randomize_seed = false, dejavu_hook* hook = nullptr) {
+dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, bool print = true,
+                              bool true_random = false, bool randomize_seed = false, dejavu_hook* hook = nullptr) {
     // touch the graph (mitigate cache variance)
     volatile int acc = 0;
     for(int i = 0; i < g->v_size; ++i) acc += g->v[i] + g->d[i];
@@ -51,12 +51,14 @@ void run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, bool 
     d.automorphisms(g, colmap, &empty_hook_func);
 #endif*/
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    dejavu::big_number grp_sz = d.get_automorphism_group_size();
     if(print) std::cout << "------------------------------------------------------------------" << std::endl;
-    if(print) std::cout << std::setprecision(4) << "symmetries=" << d.get_automorphism_group_size()
+    if(print) std::cout << std::setprecision(4) << "symmetries=" << grp_sz
                         << ", deterministic=" << (d.get_deterministic_termination()?"true":"false")
                         << ", error=1/2^"<< d.get_error_bound() << "," << std::endl;
      finished = true;
     if(del) free(colmap);
+    return grp_sz;
 }
 
 int commandline_mode(int argc, char **argv) {
@@ -72,6 +74,7 @@ int commandline_mode(int argc, char **argv) {
     bool true_random_seed = false;
 
     bool benchmark_mode = false;
+    bool write_grp_sz = false;
     bool write_auto_stdout = false;
     bool        write_auto_file      = false;
     std::string write_auto_file_name;
@@ -92,6 +95,15 @@ int commandline_mode(int argc, char **argv) {
             std::cout << "    " << std::left << std::setw(20) <<
             "--silent" << std::setw(16) <<
             "Does not print progress of the solver" << std::endl;
+            std::cout << "    " << std::left << std::setw(20) <<
+            "--gens" << std::setw(16) <<
+            "Prints found generators line-by-line to console" << std::endl;
+            std::cout << "    " << std::left << std::setw(20) <<
+            "--gens-file [f]" << std::setw(16) <<
+           "Writes found generators line-by-line to file F" << std::endl;
+            std::cout << "    " << std::left << std::setw(20) <<
+            "--grp-sz" << std::setw(16) <<
+            "Prints group size to console (even if --silent)" << std::endl;
             std::cout << "    "  << std::left << std::setw(20) <<
             "--pseudo-random" << std::setw(16) <<
             "Uses pseudo random numbers (default)" << std::endl;
@@ -137,15 +149,17 @@ int commandline_mode(int argc, char **argv) {
                 std::cerr << "--err option requires one argument." << std::endl;
                 return 1;
             }
-        } else if (arg == "__WRITE_AUTO") {
+        } else if (arg == "__GRP_SZ") {
+            write_grp_sz = true;
+        } else if (arg == "__GENS") {
             write_auto_stdout = true;
-        }  else if (arg == "__WRITE_AUTO_FILE") {
+        }  else if (arg == "__GENS_FILE") {
             if (i + 1 < argc) {
                 i++;
                 write_auto_file = true;
                 write_auto_file_name = argv[i];
             } else {
-                std::cerr << "--write-auto-file option requires one argument." << std::endl;
+                std::cerr << "--write-gens-file option requires one argument." << std::endl;
                 return 1;
             }
         } else if (arg == "__TRUE_RANDOM") {
@@ -252,8 +266,9 @@ int commandline_mode(int argc, char **argv) {
     // now run the solver with the given options...
     double dejavu_solve_time;
     finished = false;
-    run_dejavu(g, colmap, &dejavu_solve_time, print, true_random, true_random_seed, hook);
+    auto grp_sz = run_dejavu(g, colmap, &dejavu_solve_time, print, true_random, true_random_seed, hook);
     if(print) std::cout << "solve_time=" << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
+    if(!print && write_grp_sz) std::cout << grp_sz << std::endl;
     return 0;
 }
 
