@@ -64,7 +64,6 @@ dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_sol
 int commandline_mode(int argc, char **argv) {
     std::string filename = "";
     bool entered_file = false;
-    int  timeout = -1;
     bool permute_graph = false;
     bool permute_graph_have_seed  = false;
     int  permute_graph_given_seed = 0;
@@ -73,7 +72,6 @@ int commandline_mode(int argc, char **argv) {
     bool true_random = false;
     bool true_random_seed = false;
 
-    bool benchmark_mode = false;
     bool write_grp_sz = false;
     bool write_auto_stdout = false;
     bool        write_auto_file      = false;
@@ -131,14 +129,6 @@ int commandline_mode(int argc, char **argv) {
                 entered_file = true;
             } else {
                 std::cerr << "--file option requires one argument." << std::endl;
-                return 1;
-            }
-        } else if (arg == "__TIMEOUT") {
-            if (i + 1 < argc) {
-                i++;
-                timeout = atoi(argv[i]);
-            } else {
-                std::cerr << "--timeout option requires one argument." << std::endl;
                 return 1;
             }
         } else if (arg == "__ERR") {

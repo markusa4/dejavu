@@ -542,6 +542,10 @@ namespace dejavu {
              * @param domain_size size of the underlying domain
              */
             void initialize(int domain_size) {
+                if(sz == domain_size) {
+                    reset();
+                    return;
+                }
                 sz = domain_size;
                 map_arr.allocate(domain_size);
                 orb_sz.allocate(domain_size);
@@ -1097,13 +1101,13 @@ namespace dejavu {
         };
 
         /**
-         * \brief Schreier structure with fixed base.
+         * \brief Schreier structure
          *
-         * Enables sifting of automorphisms into a Schreier structure with fixed base. Can be used across multiple threads
-         * in a safe manner, i.e., the structure can lock appropriate parts of itself.
+         * Enables sifting of automorphisms into a Schreier structure with given base. Intended for internal use in
+         * dejavu.
          *
          */
-        class shared_schreier {
+        class random_schreier_skinny {
         private:
             int domain_size    = -1;
             int finished_up_to = -1;
@@ -1141,7 +1145,7 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              */
             void initialize(const int new_domain_size, std::vector<int> &base, std::vector<int> &base_sizes,
-                            const int stop) {
+                            const int stop = INT32_MAX) {
                 assert(base.size() >= stop);
                 domain_size = new_domain_size;
                 assert(this->domain_size > 0);
@@ -1153,12 +1157,53 @@ namespace dejavu {
                 finished_up_to = -1;
 
                 //transversals.set_size(stop);
-                for (int i = 0; i < stop; ++i) {
+                for (int i = 0; i < stop && i < static_cast<int>(base.size()); ++i) {
                     transversals.push_back(new shared_transversal());
-                    //transversals[i] = new shared_transversal();
                     transversals[i]->initialize(base[i], i, base_sizes[i]);
                 }
                 init = true;
+            }
+
+            void set_base(schreier_workspace &w, automorphism_workspace& automorphism, random_source& rng,
+                          std::vector<int> &new_base, int err = 10) {
+                assert(init);
+                const int old_size = static_cast<int>(transversals.size());
+                const int new_size = static_cast<int>(new_base.size());
+
+                // compare with stored base, keep whatever is possible
+                int keep_until = 0;
+                for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
+                    if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
+                }
+
+                if(keep_until == new_size) return;
+
+                finished_up_to = -1;
+                transversals.resize(new_size);
+
+
+                for(int i = 0; i < keep_until; ++i) {
+                    transversals[i]->set_size_upper_bound(INT32_MAX);
+                }
+                for (int i = keep_until; i < new_size; ++i) {
+                    if(i < old_size) delete transversals[i];
+                    transversals[i] = new shared_transversal();
+                    assert(new_base[i] >= 0);
+                    transversals[i]->initialize(new_base[i], i, INT32_MAX);
+                }
+
+                sift_random(w, automorphism, rng, err);
+            }
+
+            void sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
+                             random_source& rng, int err) {
+                int fail = err;
+                bool any_changed = false;
+                while(fail >= 0) {
+                    const bool sift_changed = sift_random(w, automorphism, rng);
+                    any_changed = sift_changed || any_changed;
+                    fail -= !sift_changed;
+                }
             }
 
             /**
@@ -1208,8 +1253,6 @@ namespace dejavu {
                     transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
                 }
 
-                // TODO resift old generators if desired
-
                 return true;
             }
 
@@ -1223,7 +1266,8 @@ namespace dejavu {
             void determine_potential_individualization(std::vector<std::pair<int, int>>* save_to_individualize,
                                                        coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
-                    const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
+                    const int corresponding_root_color_sz =
+                            root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
                     if(transversals[i]->size() >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
                         save_to_individualize->emplace_back(transversals[i]->fixed_point(), corresponding_root_color_sz);
                     }
@@ -1295,7 +1339,8 @@ namespace dejavu {
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool sift(schreier_workspace &w, automorphism_workspace &automorphism, bool uniform = false) {
+            bool sift(schreier_workspace &w, automorphism_workspace &automorphism, bool uniform = false,
+                      bool keep_at_end = false) {
                 bool changed = false; /*< keeps track of whether we changed the Schreier structure while sifting */
 
                 automorphism.set_support01(true); // we don't need to track full support
@@ -1310,6 +1355,10 @@ namespace dejavu {
                         //std::cout << "sift until " << level << ", c: " << changed << std::endl;
                         break; // if automorphism is the identity now, no need to sift further
                     }
+                }
+
+                if(automorphism.nsupport() != 0 && keep_at_end) {
+                    generators.add_generator(w, automorphism);
                 }
 
                 // keep track of how far this Schreier structure is finished (matches given upper bounds)
@@ -1432,6 +1481,105 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief API for the dejavu Schreier structure
+         *
+         * Enables sifting of automorphisms into a Schreier structure with given base. The Schreier structure does not
+         * compute proper random elements of the group, hence no guarantees regarding the error bound are given.
+         *
+         * TODO get_orbit functions!
+         *
+         */
+        class random_schreier {
+        private:
+            int h_domain_size    = -1;
+            random_schreier_skinny schreier;
+
+            automorphism_workspace ws_auto;
+            schreier_workspace     ws_schreier;
+            random_source rng;
+            int h_error_bound = 10; /**< higher value reduces likelihood of error (AKA missing generators) */
+            bool init = false;
+
+        public:
+            /**
+             * @return Number of stored generators using a sparse data structure.
+             */
+            [[nodiscard]] int number_of_generators() const {
+                return schreier.s_sparsegen() + schreier.s_densegen();
+            }
+
+            explicit random_schreier(int domain_size, int error_bound, bool true_random = false, int seed = 0) :
+                                     ws_auto(domain_size), ws_schreier(domain_size), rng(true_random, seed) {
+                h_error_bound = error_bound;
+                h_domain_size = domain_size;
+            }
+
+            void set_base(std::vector<int> &new_base) {
+                if(!init) {
+                    std::vector<int> base_sizes;
+                    base_sizes.reserve(new_base.size());
+                    for(int i = 0; i < static_cast<int>(new_base.size()); ++i) base_sizes.push_back(INT32_MAX);
+                    schreier.initialize(h_domain_size, new_base, base_sizes);
+                    init = true;
+                } else schreier.set_base(ws_schreier, ws_auto, rng, new_base, h_error_bound);
+            }
+
+            void sift_random() {
+                schreier.sift_random(ws_schreier, ws_auto, rng, h_error_bound);
+            }
+
+            /**
+             * @param pos Position in base.
+             * @return Vertex fixed at position \p pos in base.
+             */
+            [[nodiscard]] int base_point(int pos) const {
+                return schreier.base_point(pos);
+            }
+
+            /**
+             * @return Size of base of this Schreier structure.
+             */
+            [[nodiscard]] int base_size() const {
+                return schreier.base_size();
+            }
+
+            /**
+             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
+             *
+             * @param base_pos Position in base.
+             * @param v Vertex to check.
+             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
+             */
+            bool is_in_base_orbit(const int base_pos, const int v) {
+                return schreier.is_in_base_orbit(base_pos, v);
+            }
+
+            [[nodiscard]]int get_base_orbit_size(const int base_pos) {
+                return schreier.get_base_orbit_size(base_pos);
+            }
+
+            /**
+             * Sift automorphism into the Schreier structure.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
+             * @return Whether automorphism was added to the Schreier structure or not.
+             */
+            bool sift(automorphism_workspace &automorphism) {
+                // TODO copy automorphism to ws_auto?
+                return schreier.sift(ws_schreier, automorphism, false, true);
+            }
+
+            /**
+             * @return Size of group described by this Schreier structure.
+             */
+            big_number group_size() {
+                schreier.compute_group_size();
+                return schreier.s_grp_sz;
+            }
+        };
+
         class domain_compressor {
             std::vector<int> map_to_small;
             std::vector<int> map_to_big;
@@ -1516,7 +1664,7 @@ namespace dejavu {
          */
         class compressed_schreier {
         private:
-            shared_schreier         internal_schreier;
+            random_schreier_skinny         internal_schreier;
             domain_compressor*      compressor;
             automorphism_workspace* compressed_automorphism;
             std::vector<int> original_base;

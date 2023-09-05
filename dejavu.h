@@ -663,7 +663,7 @@ namespace dejavu {
                     s_inprocessed = m_inprocess.inprocess(g, sh_tree, sh_schreier, local_state, root_save, h_budget,
                                                           s_any_bfs_pruned,
                                                           h_use_shallow_inprocess || h_use_shallow_inprocess_quadratic,
-                                                          h_use_shallow_inprocess_quadratic);
+                                                          h_use_shallow_inprocess_quadratic, m_dfs.orbs);
 
                     // record whether inprocessing was successful in any way
                     s_inproc_success += s_inprocessed;

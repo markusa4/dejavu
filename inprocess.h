@@ -62,9 +62,10 @@ namespace dejavu::search_strategy {
 
 
         static void shallow_bfs_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv,
+                                          groups::orbit& orbit_partition,
                                           int depth = 8, bool lower_depth = true) {
             local_state.use_reversible(true);
-            local_state.use_trace_early_out(true);
+            local_state.use_trace_early_out(lower_depth); // TODO bad for groups128, otherwise seems fine
             local_state.use_increase_deviation(false);
             local_state.use_split_limit(true, depth); // 20
 
@@ -74,11 +75,13 @@ namespace dejavu::search_strategy {
                 repeat = false;
                 local_state.use_split_limit(true, depth);
                 for (int i = 0; i < g->v_size; ++i) {
+                    if(!orbit_partition.represents_orbit(i)) continue;
+
                     local_state.T->set_hash(0);
                     local_state.reset_trace_equal();
                     const int col = local_state.c->vertex_to_col[i];
                     const int col_sz = local_state.c->ptn[col] + 1;
-                    if (col_sz >= 2) {
+                    if (col_sz >= 2 && col_sz != orbit_partition.orbit_size(i)) {
                         local_state.move_to_child(g, i);
                         inv[i] = local_state.T->get_hash();
                         const int splits = local_state.get_number_of_splits();
@@ -97,6 +100,8 @@ namespace dejavu::search_strategy {
                         inv[i] = 0;
                     }
                 }
+
+                for (int i = 0; i < g->v_size; ++i) inv[i] = inv[orbit_partition.find_orbit(i)];
             }
 
             local_state.use_trace_early_out(false);
@@ -193,7 +198,7 @@ namespace dejavu::search_strategy {
          */
         bool inprocess(sgraph *g, ir::shared_tree &tree, groups::compressed_schreier &group, ir::controller &local_state,
                        ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess,
-                       bool use_shallow_inprocess, bool use_shallow_quadratic_inprocess) {
+                       bool use_shallow_inprocess, bool use_shallow_quadratic_inprocess, groups::orbit& orbit_partition) {
             local_state.load_reduced_state(root_save);
 
             const int cell_prev = root_save.get_coloring()->cells; /*< keep track how many cells we have initially*/
@@ -203,7 +208,9 @@ namespace dejavu::search_strategy {
             // computes a shallow breadth-first invariant
             if (use_shallow_inprocess && !(tree.get_finished_up_to() >= 1 && use_bfs_inprocess)) {
                 bool changed = false;
+                int its = 0;
                 int depth = std::max(std::min(h_splits_hint - 3, 16), 4);
+                //int depth = h_splits_hint;
                 do {
                     const int cell_last = local_state.c->cells;
                     worklist_t<unsigned long> inv(g->v_size);
@@ -212,14 +219,15 @@ namespace dejavu::search_strategy {
                     nodes.clear();
 
                     for (int i = 0; i < g->v_size; ++i) inv[i] = 0;
-                    shallow_bfs_invariant(g, local_state, inv, depth, !changed);
+                    shallow_bfs_invariant(g, local_state, inv, orbit_partition, depth, !changed);
                     split_with_invariant(g, local_state, inv);
 
                     const int cell_after = local_state.c->cells;
                     changed = cell_after != cell_last;
                     if (changed) local_state.refine(g);
                     depth *= 2;
-                } while(changed && g->v_size != local_state.c->cells);
+                    its += 1;
+                } while(changed && g->v_size != local_state.c->cells && its < 3);
             }
 
             if (use_shallow_quadratic_inprocess) {
@@ -300,6 +308,7 @@ namespace dejavu::search_strategy {
                         ++num_inds;
                     }
                 }
+                if(num_inds > 0) orbit_partition.reset();
             }
 
             inproc_can_individualize.clear();

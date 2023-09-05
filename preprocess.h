@@ -3224,13 +3224,6 @@ namespace sassy {
                 schedule = &default_schedule;
             }
 
-            std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-
-            //PRINT("____________________________________________________");
-            //PRINT(std::setw(16) << std::setprecision(2) << std::left <<"T (ms)"                                  << std::setw(16) << "proc"  << std::setw(10) << "n"        << std::setw(10)        << "m");
-            //PRINT("____________________________________________________");
-            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "start" << std::setw(10) << g->v_size << std::setw(10) << g->e_size );
-
             if(print) print->print_header();
 
             if(h_translate_only) {
@@ -3275,8 +3268,6 @@ namespace sassy {
                 return;
             g->dense = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
 
-            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_setup" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-
             const int test_d = g->d[0];
             int k;
             for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k) {};
@@ -3292,14 +3283,12 @@ namespace sassy {
             edge_scratch.allocate(g->e_size);
 
             order_according_to_color(g, colmap);
-            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_order" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
             if(print) print->timer_print("order", g->v_size, g->e_size);
             g->initialize_coloring(&c, colmap);
 
             if(k == g->v_size && c.cells == 1) {
                 // graph is regular
                 skipped_preprocessing = true;
-                //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "regular" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                 if(print) print->timer_print("regular", g->v_size, g->e_size);
                 return;
             }
@@ -3393,7 +3382,6 @@ namespace sassy {
                 i += col_sz;
             }
             copy_coloring_to_colmap(&c, colmap);
-            //PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
             if(print) print->timer_print("colorref", g->v_size, c.cells);
 
             //if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
@@ -3420,18 +3408,10 @@ namespace sassy {
                             if(!has_deg_0 && !has_deg_1 && !has_discrete && !graph_changed) break;
                             red_deg10_assume_cref(g, colmap, hook);
                             perform_del(g, colmap);
-                            //PRINT("(prep-red) after 01 reduction (G, E) " << g->v_size << ", " << g->e_size);
-                            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg01" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             if(print) print->timer_print("deg01", g->v_size, g->e_size);
 
                             if(!(g->v_size == pre_v_size && g->e_size == pre_e_size && !color_refinement_effective)) {
                                 order_according_to_color(g, colmap);
-                                /*PRINT(std::setw(16) << std::left <<
-                                                    (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                                            std::chrono::high_resolution_clock::now() -
-                                                            timer).count()) / 1000000.0 << std::setw(16)
-                                                    << "color_order" << std::setw(10) << g->v_size << std::setw(10)
-                                                    << g->e_size);*/
                                 if(print) print->timer_print("order", g->v_size, g->e_size);
                             }
                             assert(_automorphism_supp.cur_pos == 0);
@@ -3441,7 +3421,6 @@ namespace sassy {
                             if(!has_deg_2 && !graph_changed) break;
                             red_deg2_path_size_1(g, colmap);
                             perform_del_add_edge(g, colmap);
-                            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg2ma" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             if(print) print->timer_print("deg2ma", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
 
@@ -3461,11 +3440,6 @@ namespace sassy {
                                 R_stack.refine_coloring_first(g, &c);
                                 copy_coloring_to_colmap(&c, colmap);
 
-                                /*PRINT(std::setw(16) << std::left <<
-                                                    (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                                            std::chrono::high_resolution_clock::now() -
-                                                            timer).count()) / 1000000.0 << std::setw(16) << "twins"
-                                                    << std::setw(10) << g->v_size << std::setw(10) << g->e_size);*/
                                 if(print) print->timer_print("twins", g->v_size, g->e_size);
                                 assert(_automorphism_supp.cur_pos == 0);
 
@@ -3488,8 +3462,6 @@ namespace sassy {
                                 perform_del_discrete(g, colmap);
                             }
 
-
-                            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "deg2ue" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             if(print) print->timer_print("deg2ue", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
@@ -3502,7 +3474,6 @@ namespace sassy {
                             red_deg2_densifysc1(g, colmap);
                             perform_del_add_edge_general(g, colmap);
 
-                            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "densify2" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
                             if(print) print->timer_print("densify2", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
@@ -3510,7 +3481,7 @@ namespace sassy {
                         case preop::qcedgeflip: {
                             red_quotient_edge_flip(g, colmap);
                             perform_del_edge(g);
-                            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "qcedgeflip" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+
                             if(print) print->timer_print("qcedgeflip", g->v_size, g->e_size);
                             break;
                         }

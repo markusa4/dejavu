@@ -114,6 +114,8 @@ namespace dejavu {
                 return false;
             }
 
+            groups::orbit orbs;
+
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
                               std::vector<std::pair<int, int>>& computed_orbits, bool prune = true) {
                 if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
@@ -121,7 +123,7 @@ namespace dejavu {
                 s_grp_sz.exponent = 0;
 
                 // orbit algorithm structure
-                groups::orbit orbs(g->v_size);
+                orbs.initialize(g->v_size);
                 mark_set orbit_handled(g->v_size);
 
                 // automorphism workspace
