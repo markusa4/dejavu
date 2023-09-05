@@ -325,7 +325,7 @@ namespace dejavu::search_strategy {
                         }
                     }
 
-                    /*if(group.is_in_base_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
+                    /*if(group.is_in_fixed_orbit(base_pos, v) && base_aligned && ir_tree.stored_leaves.s_leaves <= 1) {
                         v = group.base_point(local_state.s_base_pos);
                         assert(local_state.c->vertex_to_col[v] == col);
                         uniform = false; // not uniform anymore!

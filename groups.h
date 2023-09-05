@@ -662,6 +662,32 @@ namespace dejavu {
                 }
             }
 
+            void load(automorphism_workspace &automorphism) {
+                if (store_type == STORE_SPARSE) {
+                    automorphism.reset();
+                    int first_of_cycle = 0;
+                    for (int i = 0; i < data.size(); ++i) {
+                        const int j = abs(data[i]) - 1;
+                        const bool is_last = data[i] < 0;
+                        assert(i == data.size() - 1 ? is_last : true);
+                        if (is_last) {
+                            automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
+                            first_of_cycle = i + 1;
+                        } else {
+                            assert(i + 1 < data.size());
+                            automorphism.write_single_map(j, abs(data[i + 1]) - 1);
+                        }
+                    }
+                } else {
+                    automorphism.reset();
+                    for(int i = 0; i < domain_size; ++i) {
+                        const int v_from = i;
+                        const int v_to   = data.get_array()[i];
+                        if(v_from != v_to) automorphism.write_single_map(v_from, v_to);
+                    }
+                }
+            }
+
             /**
              * Store the given automorphism workspace.
              *
@@ -995,8 +1021,16 @@ namespace dejavu {
             /**
              * @return Point fixed by this transversal.
              */
-            [[nodiscard]] int fixed_point() const {
+            [[nodiscard]] int get_fixed_point() const {
                 return fixed;
+            }
+
+            [[nodiscard]] const std::vector<int>& get_fixed_orbit() {
+                return fixed_orbit;
+            }
+
+            [[nodiscard]] const std::vector<int>& get_generators() {
+                return fixed_orbit_to_perm;
             }
 
             /**
@@ -1173,7 +1207,7 @@ namespace dejavu {
                 // compare with stored base, keep whatever is possible
                 int keep_until = 0;
                 for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
-                    if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
+                    if (transversals[keep_until]->get_fixed_point() != new_base[keep_until]) break;
                 }
 
                 if(keep_until == new_size) return;
@@ -1228,7 +1262,7 @@ namespace dejavu {
                 int keep_until = 0;
                 if(keep_old) {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
-                        if (transversals[keep_until]->fixed_point() != new_base[keep_until]) break;
+                        if (transversals[keep_until]->get_fixed_point() != new_base[keep_until]) break;
                     }
                 } else {
                     //generators.clear();
@@ -1267,9 +1301,9 @@ namespace dejavu {
                                                        coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz =
-                            root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->fixed_point()]] + 1;
+                            root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->get_fixed_point()]] + 1;
                     if(transversals[i]->size() >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
-                        save_to_individualize->emplace_back(transversals[i]->fixed_point(), corresponding_root_color_sz);
+                        save_to_individualize->emplace_back(transversals[i]->get_fixed_point(), corresponding_root_color_sz);
                     }
                 }
             }
@@ -1279,7 +1313,7 @@ namespace dejavu {
              * @return Vertex fixed at position \p pos in base.
              */
             [[nodiscard]] int base_point(int pos) const {
-                return transversals[pos]->fixed_point();
+                return transversals[pos]->get_fixed_point();
             }
 
             /**
@@ -1296,7 +1330,7 @@ namespace dejavu {
              * @param v Vertex to check.
              * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
              */
-            bool is_in_base_orbit(const int base_pos, const int v) {
+            bool is_in_fixed_orbit(const int base_pos, const int v) {
                 if (base_pos >= static_cast<int>(transversals.size())) return false;
                 if(v < 0) return false;
                 assert(base_pos >= 0);
@@ -1305,7 +1339,19 @@ namespace dejavu {
                 return search != -1;
             }
 
-            [[nodiscard]]int get_base_orbit_size(const int base_pos) {
+            const std::vector<int>& get_fixed_orbit(const int base_pos) {
+                assert(base_pos >= 0);
+                assert(base_pos < transversals.size());
+                return transversals[base_pos]->get_fixed_orbit();
+            }
+
+            const std::vector<int>& get_stabilizer_generators(const int base_pos) {
+                assert(base_pos >= 0);
+                assert(base_pos < transversals.size());
+                return transversals[base_pos]->get_generators();
+            }
+
+            [[nodiscard]]int get_fixed_orbit_size(const int base_pos) {
                 if (base_pos >= static_cast<int>(transversals.size())) return 0;
                 return transversals[base_pos]->size();
             }
@@ -1408,6 +1454,11 @@ namespace dejavu {
                 }
             }
 
+            void load_generator(automorphism_workspace& automorphism, int generator) {
+                auto next_gen = generators[generator];
+                next_gen->load(automorphism);
+            }
+
             /**
              * Sift a (semi-)randomly generated element into the Schreier structure.
              *
@@ -1498,6 +1549,9 @@ namespace dejavu {
             automorphism_workspace ws_auto;
             schreier_workspace     ws_schreier;
             random_source rng;
+
+            mark_set auxiliary_set;
+
             int h_error_bound = 10; /**< higher value reduces likelihood of error (AKA missing generators) */
             bool init = false;
 
@@ -1505,16 +1559,41 @@ namespace dejavu {
             /**
              * @return Number of stored generators using a sparse data structure.
              */
-            [[nodiscard]] int number_of_generators() const {
+            [[nodiscard]] int get_number_of_generators() const {
                 return schreier.s_sparsegen() + schreier.s_densegen();
             }
 
-            explicit random_schreier(int domain_size, int error_bound, bool true_random = false, int seed = 0) :
-                                     ws_auto(domain_size), ws_schreier(domain_size), rng(true_random, seed) {
-                h_error_bound = error_bound;
+            /**
+             * Loads the `i-th` generator into the given automorphism_workspace. Valid values for `i` are between `0`
+             * and `get_number_of_generators()-1`.
+             *
+             * @param i will load the `i-th` generator
+             * @param automorphism workspace to load the generator into
+             */
+            void get_generator(int i, automorphism_workspace& automorphism) {
+                schreier.load_generator(automorphism, i);
+            }
+
+            /**
+             * Initializes a random Schreier structure with the given parameters.
+             *
+             * @param domain_size the size of the domain (e.g., number of vertices of the graph)
+             * @param error higher values reduce the likelihood of missing generators (default is 10)
+             * @param true_random whether to use true random number generation
+             * @param seed the seed if pseudo random numbers are being used
+             */
+            explicit random_schreier(int domain_size, int error = 10, bool true_random = false, int seed = 0) :
+                                     ws_auto(domain_size), ws_schreier(domain_size), rng(true_random, seed),
+                                     auxiliary_set(domain_size) {
+                h_error_bound = error;
                 h_domain_size = domain_size;
             }
 
+            /**
+             * Sets the base of the Schreier structure.
+             *
+             * @param new_base the base
+             */
             void set_base(std::vector<int> &new_base) {
                 if(!init) {
                     std::vector<int> base_sizes;
@@ -1523,6 +1602,7 @@ namespace dejavu {
                     schreier.initialize(h_domain_size, new_base, base_sizes);
                     init = true;
                 } else schreier.set_base(ws_schreier, ws_auto, rng, new_base, h_error_bound);
+                sift_random();
             }
 
             void sift_random() {
@@ -1533,7 +1613,7 @@ namespace dejavu {
              * @param pos Position in base.
              * @return Vertex fixed at position \p pos in base.
              */
-            [[nodiscard]] int base_point(int pos) const {
+            [[nodiscard]] int get_fixed_point(int pos) const {
                 return schreier.base_point(pos);
             }
 
@@ -1551,12 +1631,40 @@ namespace dejavu {
              * @param v Vertex to check.
              * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
              */
-            bool is_in_base_orbit(const int base_pos, const int v) {
-                return schreier.is_in_base_orbit(base_pos, v);
+            bool is_in_fixed_orbit(const int base_pos, const int v) {
+                return schreier.is_in_fixed_orbit(base_pos, v);
+            }
+
+            /**
+             * Returns the orbit of the fixed point at \p base_pos.
+             *
+             * @param base_pos
+             * @param fixed_orbit
+             */
+            const std::vector<int>& get_fixed_orbit(const int base_pos) {
+                return schreier.get_fixed_orbit(base_pos);
+            }
+
+            /**
+             * Computes the entire orbit partition at \p base_pos.
+             *
+             * @param base_pos
+             * @param orbit_partition
+             */
+            void get_stabilizer_orbit(int base_pos, orbit& orbit_partition) {
+                const std::vector<int>& generators = schreier.get_stabilizer_generators(base_pos);
+                auxiliary_set.reset();
+                orbit_partition.reset();
+                for(auto i : generators) {
+                    if(auxiliary_set.get(i)) continue;
+                    auxiliary_set.set(i);
+                    schreier.load_generator(ws_auto, i);
+                    orbit_partition.add_automorphism_to_orbit(ws_auto);
+                }
             }
 
             [[nodiscard]]int get_base_orbit_size(const int base_pos) {
-                return schreier.get_base_orbit_size(base_pos);
+                return schreier.get_fixed_orbit_size(base_pos);
             }
 
             /**
@@ -1567,18 +1675,52 @@ namespace dejavu {
              * @return Whether automorphism was added to the Schreier structure or not.
              */
             bool sift(automorphism_workspace &automorphism) {
-                // TODO copy automorphism to ws_auto?
                 return schreier.sift(ws_schreier, automorphism, false, true);
+            }
+
+            bool sift(int, const int *p, int nsupp, const int *supp) {
+                ws_auto.reset();
+                for(int i = 0; i < nsupp; ++i) {
+                    const int v_from = supp[i];
+                    const int v_to   = p[v_from];
+                    if(v_from != v_to) {
+                        ws_auto.write_single_map(v_from, v_to);
+                    }
+                }
+                const bool result = schreier.sift(ws_schreier, ws_auto, false, true);
+                ws_auto.reset();
+                return result;
             }
 
             /**
              * @return Size of group described by this Schreier structure.
              */
             big_number group_size() {
+                sift_random();
                 schreier.compute_group_size();
                 return schreier.s_grp_sz;
             }
         };
+
+        class schreier_hook {
+        private:
+            dejavu_hook my_hook;
+            random_schreier& my_schreier;
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                my_schreier.sift(n, p, nsupp, supp);
+            }
+        public:
+            explicit schreier_hook(random_schreier& schreier) : my_schreier(schreier) {}
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
 
         class domain_compressor {
             std::vector<int> map_to_small;
@@ -1750,7 +1892,7 @@ namespace dejavu {
 
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz = root_coloring->ptn[root_coloring->vertex_to_col[original_base[i]]] + 1;
-                    if(internal_schreier.get_base_orbit_size(i) >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
+                    if(internal_schreier.get_fixed_orbit_size(i) >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
                         save_to_individualize->emplace_back(original_base[i], corresponding_root_color_sz);
                     }
                 }
@@ -1784,7 +1926,7 @@ namespace dejavu {
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
                 int v_translate = compressor != nullptr? compressor->compress(v) : v;
-                return internal_schreier.is_in_base_orbit(base_pos-s_compressed_until, v_translate);
+                return internal_schreier.is_in_fixed_orbit(base_pos - s_compressed_until, v_translate);
             }
 
             /**
