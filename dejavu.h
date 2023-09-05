@@ -7,6 +7,7 @@
 
 #define DEJAVU_VERSION_MAJOR 2
 #define DEJAVU_VERSION_MINOR 0
+#define DEJAVU_VERSION_IS_BETA true
 
 #include "dfs.h"
 #include "bfs.h"
@@ -42,10 +43,10 @@ namespace dejavu {
         bool h_random_use_true_random = false; /**< use true randomness where randomness affects error probabilities */
         int  h_random_seed = 0; /**< is true randomness is not used, here is the seed to be used */
         bool h_silent = false; /**< don't print solver progress */
-        int h_bfs_memory_limit = 0x20000000;
+        int  h_bfs_memory_limit = 0x20000000;
         bool h_decompose = true; /**< use non-uniform component decomposition */
-        int h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
-                                       *  previous base */
+        int  h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
+                                        *  previous base */
         //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed */
 
         //bool h_cert_original = true; /**< certify all automorphisms on the original graph, and skip non-certified */
@@ -61,6 +62,7 @@ namespace dejavu {
         /**
          * Error probability is below `1/2^error_bound`, default value is 10. Thus, the default value
          * misses a generator with probabiltiy at most 1/2^10 < 0.098% (assuming truely randomly generated numbers).
+         *
          * @param error_bound the new error bound
          */
         [[maybe_unused]] void set_error_bound(int error_bound = 10) {
@@ -68,7 +70,19 @@ namespace dejavu {
         }
 
         /**
-         * Whether to use true random number generation or pseudo random (default is pseudo random).
+         * Error probability is below `1/2^error_bound`, default value is 10. Thus, the default value
+         * misses a generator with probabiltiy at most 1/2^10 < 0.098% (assuming truely randomly generated numbers).
+         *
+         * @return the currently configured error bound
+         */
+        [[nodiscard]] int get_error_bound() const {
+            return h_error_bound;
+        }
+
+        /**
+         * Whether to use random device as provided by the operating system (AKA 'true random') or pseudo random
+         * (default is pseudo random).
+         *
          * @param use_true_random (`=true`) whether to use true random number generation
          */
         [[maybe_unused]] void set_true_random(bool use_true_random = true) {
@@ -76,7 +90,9 @@ namespace dejavu {
         }
 
         /**
-         * Whether to use pseudo random number generation or true random (default is pseudo random).
+         * Whether to use pseudo random number generation or random device as provided by the operating system
+         * (default is pseudo random).
+         *
          * @param use_pseudo_random (`=true`) whether to use pseudo random number generation
          */
         [[maybe_unused]] void set_pseudo_random(bool use_pseudo_random = true) {
@@ -93,15 +109,16 @@ namespace dejavu {
 
         /**
          * Whether to use non-uniform component decomposition (default is true).
-         * @param use_decompose
+         *
+         * @param use_decompose (`=true`) whether to use decomposition
          */
         void set_decompose(bool use_decompose = true) {
             h_decompose = use_decompose;
         }
 
         /**
-         * Use true random number generation to set the seed.
-         * @param seed
+         * Use 'true random' number generation to set the seed.
+         *
          */
         [[maybe_unused]] void randomize_seed() {
             std::random_device rd;
@@ -154,6 +171,7 @@ namespace dejavu {
 
             // want to print progress with a timer, initialize module
             timed_print m_printer;
+            m_printer.h_silent = h_silent;
 
             // no colmap provided? let's substitute a trivial vertex coloring
             worklist colmap_substitute;
@@ -164,7 +182,7 @@ namespace dejavu {
             }
 
             // first, we try to preprocess
-            sassy::preprocessor m_prep; /*< initializes the preprocessor */
+            sassy::preprocessor m_prep(&m_printer); /*< initializes the preprocessor */
 
             // preprocess the graph using sassy
             m_printer.print("preprocessing");
@@ -204,7 +222,7 @@ namespace dejavu {
                 // print that we are solving now...
                 m_printer.h_silent = h_silent || (g->v_size <= 128 && i != 0);
                 if(!m_printer.h_silent)
-                    PRINT("\r\nsolving_component " << i << "/" << s_num_components-1 << " (n=" << g->v_size << ")")
+                    PRINT("\r\nsolving_component " << i+1 << "/" << s_num_components << " (n=" << g->v_size << ")")
                 m_printer.print_header();
                 m_printer.timer_split();
 
@@ -243,7 +261,7 @@ namespace dejavu {
                 // local modules and workspace, to be used by other modules
                 ir::cell_selector_factory m_selectors; /*< cell selector creation */
                 ir::refinement        m_refinement;    /*< workspace for color refinement and other utilities */
-                ds::domain_compressor m_compress; /*< can compress a workspace of vertices to a subset of vertices */
+                groups::domain_compressor m_compress;/*< can compress a workspace of vertices to a subset of vertices */
                 groups::automorphism_workspace automorphism(g->v_size); /*< workspace to keep an automorphism */
                 groups::schreier_workspace     schreierw(g->v_size);    /*< workspace for Schreier-Sims */
 

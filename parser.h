@@ -3,13 +3,10 @@
 #include "sgraph.h"
 #include <string>
 
-static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap, int seed_permute=0) {
-    //const size_t bufsize = 4*1024;
-    //char buf[bufsize];
+static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
+                                   int seed_permute=0) {
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-    std::cout << "Graph: \t\t" << filename << std::endl;
     std::ifstream infile(filename);
-    //infile.rdbuf()->pubsetbuf(buf, bufsize);
 
     std::vector<int> reshuffle;
 
@@ -114,17 +111,10 @@ static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* 
     g->v_size = nv;
     g->e_size = 2 * ne;
 
-    std::cout << "Vertices: \t" << g->v_size << std::endl;
-    std::cout << "Edges: \t\t" << g->e_size << std::endl;
-    //std::cout << "Degrees: \t";
-    //for(auto it = degrees.begin(); it != degrees.end(); ++it)
-    //    std::cout << *it << ", ";
-    //std::cout << std::endl;
-
     assert(nv == g->v_size);
     assert(2 * ne == g->e_size);
     const double parse_time = (double) (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-    std::cout << "Parse time: " << parse_time / 1000000.0 << "ms" << std::endl;
+    if(!silent) std::cout << std::setprecision(2) << "parse_time=" << parse_time / 1000000.0 << "ms";
 }
 
 

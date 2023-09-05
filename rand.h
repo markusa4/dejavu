@@ -185,7 +185,7 @@ namespace dejavu::search_strategy {
         }
 
         static bool h_almost_done(groups::compressed_schreier &group) {
-            return group.get_consecutive_success() >= 1;
+            return group.get_consecutive_success() >= 2;
         }
 
         static void

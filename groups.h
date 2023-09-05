@@ -570,6 +570,25 @@ namespace dejavu {
             }
         };
 
+        class orbit_hook {
+        private:
+            dejavu_hook my_hook;
+            orbit& my_orbit;
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                my_orbit.add_automorphism_to_orbit(p, nsupp, supp);
+            }
+        public:
+            explicit orbit_hook(orbit& save_orbit) : my_orbit(save_orbit) {}
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
         /**
          * \brief Stores a link to an automorphism.
          *
@@ -1413,7 +1432,80 @@ namespace dejavu {
             }
         };
 
+        class domain_compressor {
+            std::vector<int> map_to_small;
+            std::vector<int> map_to_big;
+            bool do_compress = false;
+            int s_vertices_active = 0;
+            int domain_size = 0;
 
+            void reset() {
+                s_compression_ratio = 1.0;
+                do_compress = false;
+            }
+        public:
+            double s_compression_ratio = 1.0;
+
+            void determine_compression_map(coloring& c, std::vector<int>& base, int stop) {
+                do_compress = true;
+                domain_size = c.domain_size;
+
+                mark_set color_was_added(c.domain_size);
+                mark_set test_vertices_active(c.domain_size);
+
+                color_was_added.reset();
+                test_vertices_active.reset();
+
+                s_vertices_active = 0;
+
+                for(int i = 0; i < stop; ++i) {
+                    const int base_vertex = base[i];
+                    const int col = c.vertex_to_col[base_vertex];
+                    if(!color_was_added.get(col)) {
+                        color_was_added.set(col);
+                        const int col_sz = c.ptn[col] + 1;
+                        s_vertices_active += col_sz;
+                        for(int j = 0; j < col_sz; ++j) {
+                            const int add_v = c.lab[col + j];
+                            test_vertices_active.set(add_v);
+                        }
+                    }
+                }
+
+                map_to_small.resize(c.domain_size);
+                map_to_big.resize(s_vertices_active);
+                int next_active_v_maps_to = 0;
+                for(int v = 0; v < c.domain_size; ++v) {
+                    if(test_vertices_active.get(v)) {
+                        map_to_small[v] = next_active_v_maps_to;
+                        map_to_big[next_active_v_maps_to] = v;
+                        ++next_active_v_maps_to;
+                    } else {
+                        map_to_small[v] = -1;
+                    }
+                }
+                s_compression_ratio = 1.0;
+                if(domain_size > 0) s_compression_ratio = 1.0 * s_vertices_active / domain_size;
+            }
+
+            [[nodiscard]] int compressed_domain_size() const {
+                return s_vertices_active;
+            }
+
+            [[nodiscard]] int decompressed_domain_size() const {
+                return domain_size;
+            }
+
+            int compress(int v) {
+                if(!do_compress) return v;
+                return map_to_small[v];
+            }
+
+            int decompress(int v) {
+                if(!do_compress) return v;
+                return map_to_big[v];
+            }
+        };
 
         /**
          * \brief Schreier structure with fixed base. Implements precisely the interface as used by the dejavu
@@ -1457,7 +1549,7 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
-            bool reset(ds::domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w,
+            bool reset(domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w,
                        std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
                 s_compressed_until = 0;

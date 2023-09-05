@@ -16,6 +16,7 @@
 #include <memory>
 #include <chrono>
 #include <iomanip>
+#include "ds.h"
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -76,10 +77,79 @@ static inline bool file_exists(const std::string& name) {
     return f.good();
 }
 
-typedef const std::function<void(int, const int *, int, const int *)> dejavu_hook;
+typedef void type_dejavu_hook(int, const int*, int, const int*);
+typedef std::function<void(int, const int*, int, const int*)> dejavu_hook;
 extern volatile int dejavu_kill_request;
 
 namespace dejavu {
+
+    class multi_hook {
+    private:
+        std::vector<dejavu_hook*> hooks;
+        dejavu_hook my_hook;
+        void hook_func(int n, const int *p, int nsupp, const int *supp) {
+            for(dejavu_hook* hook : hooks) {
+                (*hook)(n, p, nsupp, supp);
+            }
+        }
+    public:
+        void add_hook(dejavu_hook* hook) {
+            hooks.push_back(hook);
+        }
+
+        void clear() {
+            hooks.clear();
+        }
+
+        [[nodiscard]] size_t size() const {
+            return hooks.size();
+        }
+
+        dejavu_hook* get_hook() {
+            my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                    { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                               std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+            };
+            return &my_hook;
+        }
+    };
+
+    class ostream_hook {
+    private:
+        dejavu_hook   my_hook;
+        std::ostream& my_ostream;
+        ds::mark_set  test_set;
+
+        void hook_func(int n, const int *p, int nsupp, const int *supp) {
+            test_set.initialize(n);
+            test_set.reset();
+            for(int i = 0; i < nsupp; ++i) {
+                const int v_from = supp[i];
+                if(test_set.get(v_from)) continue;
+                int v_next = p[v_from];
+                if(v_from == v_next) continue;
+                test_set.set(v_from);
+                my_ostream << "(" << v_from;
+                while(!test_set.get(v_next)) {
+                    test_set.set(v_next);
+                    my_ostream << " " << v_next;
+                    v_next = p[v_next];
+                }
+                my_ostream << ")";
+            }
+            my_ostream << std::endl;
+        }
+    public:
+        explicit ostream_hook(std::ostream& ostream) : my_ostream(ostream) {}
+
+        dejavu_hook* get_hook() {
+            my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+            { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                               std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+            };
+            return &my_hook;
+        }
+    };
 
     class random_source {
         bool true_random = false;
@@ -186,7 +256,7 @@ namespace dejavu {
 
     static void progress_print_header() {
         progress_print_split();
-        PRINT(std::setw(11) << std::left <<"T (ms)" << std::setw(11) << "δ (ms)" << std::setw(14) << "proc"
+        PRINT(std::setw(11) << std::left <<"T (ms)" << std::setw(11) << "delta(ms)" << std::setw(12) << "proc"
               << std::setw(16) << "p1"        << std::setw(16)        << "p2");
         progress_print_split();
     }

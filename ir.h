@@ -258,7 +258,8 @@ namespace dejavu {
             std::function<type_split_color_hook> self_split_hook() {
                 return [this](auto && PH1, auto && PH2, auto && PH3) { return
                         split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                                std::forward<decltype(PH3)>(PH3)); };
+                                std::forward<decltype(PH3)>(PH3));
+                };
             }
 
 
