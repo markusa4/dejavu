@@ -15,45 +15,10 @@ dejavu::ir::refinement test_r;
 dejavu::sgraph dej_test_graph;
 int*   dej_test_col;
 
-bool finished = false;
-
 void empty_hook(int, const int*, int, const int *) {}
 
-dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, int error_bound = 10,
-                              bool print = true, bool true_random = false, bool randomize_seed = false,
-                              dejavu_hook* hook = nullptr) {
-    // touch the graph (mitigate cache variance)
-    volatile int acc = 0;
-    for(int i = 0; i < g->v_size; ++i) acc += g->v[i] + g->d[i];
-    for(int i = 0; i < g->e_size; ++i) acc += g->e[i];
-
-    bool del = false;
-    if(colmap == nullptr) {
-        colmap = (int*) calloc(g->v_size, sizeof(int));
-        del = true;
-    }
-
-    Clock::time_point timer = Clock::now();
-    dejavu::dejavu2 d;
-    d.set_error_bound(error_bound);
-    d.set_print(print);
-    if(randomize_seed) d.randomize_seed();
-    d.set_true_random(true_random);
-    d.automorphisms(g, colmap, hook);
-
-    *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
-    dejavu::big_number grp_sz = d.get_automorphism_group_size();
-    if(print) std::cout << "------------------------------------------------------------------" << std::endl;
-    if(print) std::cout << std::setprecision(4) << "symmetries=" << grp_sz
-                        << ", deterministic=" << (d.get_deterministic_termination()?"true":"false")
-                        << ", error=1/2^"<< d.get_error_bound() << "," << std::endl;
-     finished = true;
-    if(del) free(colmap);
-    return grp_sz;
-}
-
 int commandline_mode(int argc, char **argv) {
-    std::string filename = "";
+    std::string filename;
     bool entered_file = false;
     bool permute_graph = false;
     bool permute_graph_have_seed  = false;
@@ -66,6 +31,7 @@ int commandline_mode(int argc, char **argv) {
     int error_bound = 10;
 
     bool write_grp_sz = false;
+    bool write_benchmark_lines = false;
     bool write_auto_stdout = false;
     bool        write_auto_file      = false;
     std::string write_auto_file_name;
@@ -134,6 +100,8 @@ int commandline_mode(int argc, char **argv) {
             }
         } else if (arg == "__GRP_SZ") {
             write_grp_sz = true;
+        }  else if (arg == "__BENCHMARK_LINES") {
+            write_benchmark_lines = true;
         } else if (arg == "__GENS") {
             write_auto_stdout = true;
         }  else if (arg == "__GENS_FILE") {
@@ -202,7 +170,7 @@ int commandline_mode(int argc, char **argv) {
                         (DEJAVU_VERSION_IS_BETA?"beta":"") << std::endl;
     if(print) std::cout << "------------------------------------------------------------------" << std::endl;
 
-    dejavu::sgraph *g = new dejavu::sgraph();
+    dejavu::sgraph g;
     if(print) std::cout << "parsing '" << filename << "'" << std::endl;
     int* colmap = nullptr;
 
@@ -216,8 +184,8 @@ int commandline_mode(int argc, char **argv) {
         if(print) std::cout << (true_random?"true_random=true, ":"") << (true_random_seed?"true_random_seed=true":"");
         if(print) std::cout << "permutation_seed=" << permute_seed << ", ";
     }
-    parse_dimacs_file_fast(filename, g, &colmap, !print, permute_seed);
-    if(print) std::cout << ", n=" << g->v_size << ", " << "m=" << g->e_size/2 << std::endl << std::endl;
+    parse_dimacs_file_fast(filename, &g, &colmap, !print, permute_seed);
+    if(print) std::cout << ", n=" << g.v_size << ", " << "m=" << g.e_size/2 << std::endl << std::endl;
 
     // manage hooks
     auto empty_hook_func = dejavu_hook(empty_hook);
@@ -246,10 +214,36 @@ int commandline_mode(int argc, char **argv) {
     else hook = hooks.get_hook();
 
     // now run the solver with the given options...
-    double dejavu_solve_time;
-    finished = false;
-    auto grp_sz = run_dejavu(g, colmap, &dejavu_solve_time, error_bound, print, true_random, true_random_seed, hook);
-    if(print) std::cout << "solve_time=" << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
+    volatile int acc = 0;
+    for (int i = 0; i < g.v_size; ++i) acc += g.v[i] + g.d[i];
+    for (int i = 0; i < g.e_size; ++i) acc += g.e[i];
+
+    bool del = false;
+    if (colmap == nullptr) {
+        colmap = (int *) calloc(g.v_size, sizeof(int));
+        del = true;
+    }
+
+    Clock::time_point timer = Clock::now();
+    dejavu::dejavu2 d;
+    d.set_error_bound(error_bound);
+    d.set_print(print);
+    if (true_random_seed) d.randomize_seed();
+    d.set_true_random(true_random);
+    d.automorphisms(&g, colmap, hook);
+
+    long dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    dejavu::big_number grp_sz = d.get_automorphism_group_size();
+    if (print) std::cout << "------------------------------------------------------------------" << std::endl;
+    if (print || write_benchmark_lines)
+        std::cout << std::setprecision(4) << "symmetries=" << grp_sz
+                  << ", deterministic=" << (d.get_deterministic_termination() ? "true" : "false")
+                  << ", error=1/2^" << d.get_error_bound() << "," << std::endl;
+
+    if (del) free(colmap);
+
+    if(print || write_benchmark_lines) std::cout << "solve_time=" <<
+                                       static_cast<double>(dejavu_solve_time) / 1000000.0 << "ms" << std::endl;
     if(!print && write_grp_sz) std::cout << grp_sz << std::endl;
     return 0;
 }

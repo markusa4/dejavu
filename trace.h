@@ -58,7 +58,7 @@ namespace dejavu {
                 d = std::min(INT32_MAX-10,d);
                 assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 write_compare_no_limit(d);
-                assert(record?data.size()==position:true);
+                assert(record?static_cast<int>(data.size())==position:true);
             }
 
             void write_compare_no_limit(int d) {
@@ -286,7 +286,7 @@ namespace dejavu {
                 compare_trace = nullptr;
                 position = 0;
                 hash = 0;
-                assert(record?data.size()==position:true);
+                assert(record?static_cast<int>(data.size())==position:true);
                 reset_trace_equal();
             }
 
@@ -305,7 +305,7 @@ namespace dejavu {
                 assert_refine_act = false;
                 this->position = new_position;
                 if(record) data.resize(position);
-                assert(record?data.size()==position:true);
+                assert(record?static_cast<int>(data.size())==position:true);
             }
 
             [[nodiscard]] int get_position() const {

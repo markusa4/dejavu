@@ -113,7 +113,8 @@ namespace dejavu::ir {
         int map_back(int component, int vertex) {
             assert(component >= 0);
             assert(component < num_components);
-            assert(component_to_backward_translation[component] + vertex < backward_translation.size());
+            assert(component_to_backward_translation[component] + vertex <
+                   static_cast<int>(backward_translation.size()));
             return (num_components <= 1? vertex :
                     backward_translation[component_to_backward_translation[component] + vertex]);
         }

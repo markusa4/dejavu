@@ -2152,7 +2152,7 @@ namespace dejavu {
                         next = next->get_next();
                     } while (next != first);
                     tree_level_size[level] = tree_data_jump_map[level].size();
-                    assert(tree_data_jump_map[level].size() == tree_level_size[level]);
+                    assert(static_cast<int>(tree_data_jump_map[level].size()) == tree_level_size[level]);
                 }
             }
 

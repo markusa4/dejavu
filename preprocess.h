@@ -258,14 +258,14 @@ namespace sassy {
                     }
 
                     assert(!del.get(vertex));
-                    assert(twin_class_sz -1 == add_to_string.size());
-                    assert(twin_counter[vertex] == add_to_string.size());
+                    assert(twin_class_sz -1 == static_cast<int>(add_to_string.size()));
+                    assert(twin_counter[vertex] == static_cast<int>(add_to_string.size()));
                     const int orig_vertex = translate_back(vertex);
                     [[maybe_unused]] int debug_sz = (int) recovery_strings[orig_vertex].size();
                     for(auto& other_vertex : add_to_string) {
                         assert(del.get(other_vertex));
                         const int orig_other  = translate_back(other_vertex);
-                        assert(debug_sz == recovery_strings[orig_other].size());
+                        assert(debug_sz == static_cast<int>(recovery_strings[orig_other].size()));
                         recovery_strings[orig_vertex].push_back(orig_other);
                         for(int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
                             recovery_strings[orig_vertex].push_back(recovery_strings[orig_other][k]);
@@ -3272,16 +3272,6 @@ namespace sassy {
             int k;
             for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k) {};
 
-            backward_translation_layers.emplace_back();
-            const size_t back_ind = backward_translation_layers.size() - 1;
-            translation_layers.emplace_back();
-            // const int fwd_ind = translation_layers.size() - 1;
-            backward_translation_layers[back_ind].reserve(g->v_size);
-            for (int i = 0; i < g->v_size; ++i)
-                backward_translation_layers[back_ind].push_back(i);
-
-            edge_scratch.allocate(g->e_size);
-
             order_according_to_color(g, colmap);
             if(print) print->timer_print("order", g->v_size, g->e_size);
             g->initialize_coloring(&c, colmap);
@@ -3301,7 +3291,6 @@ namespace sassy {
             if(R1 == nullptr) R1 = &R_stack;
 
             R1->refine_coloring_first(g, &c, -1);
-
             const bool color_refinement_effective = pre_cells != c.cells;
 
             if (c.cells == g->v_size) {
@@ -3311,6 +3300,13 @@ namespace sassy {
                 if(print) print->timer_print("discrete", g->v_size, g->e_size);
                 return;
             }
+
+            backward_translation_layers.emplace_back();
+            const size_t back_ind = backward_translation_layers.size() - 1;
+            translation_layers.emplace_back();
+            backward_translation_layers[back_ind].reserve(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) backward_translation_layers[back_ind].push_back(i);
+            edge_scratch.allocate(g->e_size);
 
             add_edge_buff.clear();
             add_edge_buff.reserve(domain_size);

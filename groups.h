@@ -1235,8 +1235,8 @@ namespace dejavu {
              */
             void initialize(const int new_domain_size, std::vector<int> &base, std::vector<int> &base_sizes,
                             int stop = INT32_MAX) {
-                if(stop >= base.size()) stop = static_cast<int>(base.size());
-                assert(base.size() >= stop);
+                stop = std::min(static_cast<int>(base.size()), stop);
+                assert(static_cast<int>(base.size()) >= stop);
                 domain_size = new_domain_size;
                 assert(this->domain_size > 0);
                 generators.initialize(domain_size);
@@ -1381,7 +1381,7 @@ namespace dejavu {
              * @return Size of base of this Schreier structure.
              */
             [[nodiscard]] int base_size() const {
-                return transversals.size();
+                return static_cast<int>(transversals.size());
             }
 
             /**
@@ -1392,23 +1392,23 @@ namespace dejavu {
              * @return Bool indicating whether \p v is contained in the transversal at position \p s_base_pos.
              */
             bool is_in_fixed_orbit(const int base_pos, const int v) {
-                if (base_pos >= static_cast<int>(transversals.size())) return false;
+                if (base_pos >= base_size()) return false;
                 if(v < 0) return false;
                 assert(base_pos >= 0);
-                assert(base_pos < transversals.size());
+                assert(base_pos < base_size());
                 const int search = transversals[base_pos]->find_point(v);
                 return search != -1;
             }
 
             const std::vector<int>& get_fixed_orbit(const int base_pos) {
                 assert(base_pos >= 0);
-                assert(base_pos < transversals.size());
+                assert(base_pos < base_size());
                 return transversals[base_pos]->get_fixed_orbit();
             }
 
             const std::vector<int>& get_stabilizer_generators(const int base_pos) {
                 assert(base_pos >= 0);
-                assert(base_pos < transversals.size());
+                assert(base_pos < base_size());
                 return transversals[base_pos]->get_generators();
             }
 
