@@ -3229,7 +3229,7 @@ namespace sassy {
             int test_col = colmap[0];
             int l;
             for (l = 1; l < (g->v_size) && (colmap[l] == test_col); ++l);
-            
+
             if(k == g->v_size && l == g->v_size) {
                 // graph is regular
                 skipped_preprocessing = true;

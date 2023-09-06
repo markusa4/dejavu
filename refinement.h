@@ -16,6 +16,110 @@ namespace dejavu {
 
     namespace ir {
 
+        class certification {
+        private:
+            static bool bijection_check(markset& scratch_set, int n, const int *p) {
+                scratch_set.reset();
+                bool comp = true;
+                for(int i = 0; i < n && comp; ++i) {
+                    const int v = p[i];
+                    comp = comp && !scratch_set.get(v);
+                    scratch_set.set(v);
+                }
+                return comp;
+            }
+
+            static bool cycle_check(markset& scratch_set, const int *p, int supp, const int *supp_arr) {
+                scratch_set.reset();
+                bool comp = true;
+                for(int i = 0; i < supp && comp; ++i) {
+                    const int v = supp_arr[i];
+                    if(scratch_set.get(v)) continue;
+                    int v_next = p[v];
+                    while(v_next != v && comp) {
+                        comp = comp && !scratch_set.get(v_next);
+                        scratch_set.set(v_next);
+                        v_next = p[v_next];
+                    }
+                }
+                return comp;
+            }
+
+        public:
+            // certify an automorphism on a graph
+            static bool certify_automorphism(markset& scratch_set, sgraph *g, const int *p) {
+                if(!bijection_check(scratch_set, g->v_size, p)) return false;
+
+                for (int i = 0; i < g->v_size; ++i) {
+                    const int image_i = p[i];
+                    if (image_i == i) continue;
+
+                    scratch_set.reset();
+                    // automorphism must preserve neighbours
+                    int found = 0;
+                    const int start_pt = g->v[i];
+                    const int end_pt   = g->v[i] + g->d[i];
+                    for (int j = start_pt; j < end_pt; ++j) {
+                        const int vertex_j = g->e[j];
+                        const int image_j = p[vertex_j];
+                        scratch_set.set(image_j);
+                        found += 1;
+                    }
+                    const int image_start_pt = g->v[image_i];
+                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
+                    for (int j = image_start_pt; j < image_end_pt; ++j) {
+                        const int vertex_j = g->e[j];
+                        if (!scratch_set.get(vertex_j)) return false;
+                        scratch_set.unset(vertex_j);
+                        found -= 1;
+                    }
+                    if (found != 0) return false;
+                }
+
+                return true;
+            }
+
+            // certify an automorphism on a graph, sparse
+            static bool certify_automorphism_sparse(markset& scratch_set, const sgraph *g, const int *p, int supp,
+                                                    const int *supp_arr) {
+                int i, found;
+                if(!cycle_check(scratch_set, p, supp, supp_arr)) return false;
+
+                for (int f = 0; f < supp; ++f) {
+                    i = supp_arr[f];
+                    const int image_i = p[i];
+                    scratch_set.reset();
+                    // automorphism must preserve neighbours
+                    found = 0;
+                    const int start_pt = g->v[i];
+                    const int end_pt   = g->v[i] + g->d[i];
+                    for (int j = start_pt; j < end_pt; ++j) {
+                        const int vertex_j = g->e[j];
+                        const int image_j = p[vertex_j];
+                        scratch_set.set(image_j);
+                        found += 1;
+                    }
+                    const int image_start_pt = g->v[image_i];
+                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
+                    for (int j = image_start_pt; j < image_end_pt; ++j) {
+                        const int vertex_j = g->e[j];
+                        if (!scratch_set.get(vertex_j)) {
+                            scratch_set.reset();
+                            return false;
+                        }
+                        found -= 1;
+                    }
+                    if (found != 0) {
+                        scratch_set.reset();
+                        return false;
+                    }
+                }
+                scratch_set.reset();
+                return true;
+            }
+        };
+
+
         // return whether to continue color refinement
         // bool split_color_hook(int color_initial, int new_color, int new_color_sz);
         typedef bool type_split_color_hook(const int, const int, const int);
@@ -246,198 +350,13 @@ namespace dejavu {
             // certify an automorphism on a graph
             bool certify_automorphism(sgraph *g, const int *p) {
                 assure_initialized(g);
-
-                if(!bijection_check(g->v_size, p)) return false;
-
-                for (int i = 0; i < g->v_size; ++i) {
-                    const int image_i = p[i];
-                    if (image_i == i) continue;
-
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    int found = 0;
-                    const int start_pt = g->v[i];
-                    const int end_pt   = g->v[i] + g->d[i];
-                    for (int j = start_pt; j < end_pt; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        scratch_set.set(image_j);
-                        found += 1;
-                    }
-                    const int image_start_pt = g->v[image_i];
-                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
-                    for (int j = image_start_pt; j < image_end_pt; ++j) {
-                        const int vertex_j = g->e[j];
-                        if (!scratch_set.get(vertex_j)) return false;
-                        scratch_set.unset(vertex_j);
-                        found -= 1;
-                    }
-                    if (found != 0) return false;
-                }
-
-                return true;
-            }
-
-            // certify an automorphism on a graph
-            [[maybe_unused]] bool certify_automorphism(sgraph *g, const int *colmap, const int *p) {
-                int i, found;
-
-                assure_initialized(g);
-
-                if(!bijection_check(g->v_size, p)) return false;
-
-                for (i = 0; i < g->v_size; ++i) {
-                    const int image_i = p[i];
-                    if (image_i == i)
-                        continue;
-                    if (colmap[i] != colmap[image_i]) // colors must be equal
-                        return false;
-
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    found = 0;
-                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        scratch_set.set(image_j);
-                        found += 1;
-                    }
-                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        if (!scratch_set.get(vertex_j)) {
-                            return false;
-                        }
-                        scratch_set.unset(vertex_j);
-                        found -= 1;
-                    }
-                    if (found != 0) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            /**
-             * Check whether the given array defines a bijection.
-             *
-             * @param n size of the array
-             * @param p the array
-             * @return whether `i -> p[i]` is a bijection
-             */
-            bool bijection_check(int n, const int *p) {
-                scratch_set.reset();
-                bool comp = true;
-                for(int i = 0; i < n && comp; ++i) {
-                    const int v = p[i];
-                    comp = comp && !scratch_set.get(v);
-                    scratch_set.set(v);
-                }
-                return comp;
-            }
-
-            /**
-             * Check whether the points in the given support of the array define a bijection.
-             *
-             * @param p the array
-             * @param supp the number of points in the support
-             * @param supp_arr the support of p
-             * @return
-             */
-            bool cycle_check(const int *p, int supp, const int *supp_arr) {
-                scratch_set.reset();
-                bool comp = true;
-                for(int i = 0; i < supp && comp; ++i) {
-                    const int v = supp_arr[i];
-                    if(scratch_set.get(v)) continue;
-                    int v_next = p[v];
-                    while(v_next != v && comp) {
-                        comp = comp && !scratch_set.get(v_next);
-                        scratch_set.set(v_next);
-                        v_next = p[v_next];
-                    }
-                }
-                return comp;
+                return certification::certify_automorphism(scratch_set, g, p);
             }
 
             // certify an automorphism on a graph, sparse
             bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
-                int i, found;
-
                 assure_initialized(g);
-
-                if(!cycle_check(p, supp, supp_arr)) return false;
-
-                for (int f = 0; f < supp; ++f) {
-                    i = supp_arr[f];
-                    const int image_i = p[i];
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    found = 0;
-                    const int start_pt = g->v[i];
-                    const int end_pt   = g->v[i] + g->d[i];
-                    for (int j = start_pt; j < end_pt; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        scratch_set.set(image_j);
-                        found += 1;
-                    }
-                    const int image_start_pt = g->v[image_i];
-                    const int image_end_pt   = g->v[image_i] + g->d[image_i];
-                    for (int j = image_start_pt; j < image_end_pt; ++j) {
-                        const int vertex_j = g->e[j];
-                        if (!scratch_set.get(vertex_j)) {
-                            scratch_set.reset();
-                            return false;
-                        }
-                        found -= 1;
-                    }
-                    if (found != 0) {
-                        scratch_set.reset();
-                        return false;
-                    }
-                }
-                scratch_set.reset();
-                return true;
-            }
-
-            // certify an automorphism on a graph, sparse
-            [[maybe_unused]] bool certify_automorphism_sparse(const sgraph *g, const int *colmap, const int *p,
-                                                              int supp, const int *supp_arr) {
-                int i, found;
-                assure_initialized(g);
-
-                for (int f = 0; f < supp; ++f) {
-                    i = supp_arr[f];
-                    const int image_i = p[i];
-                    if (colmap[i] != colmap[image_i]) // colors must be equal
-                        return false;
-
-                    scratch_set.reset();
-                    // automorphism must preserve neighbours
-                    found = 0;
-                    for (int j = g->v[i]; j < g->v[i] + g->d[i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        const int image_j = p[vertex_j];
-                        if (colmap[vertex_j] != colmap[image_j])
-                            return false;
-                        scratch_set.set(image_j);
-                        found += 1;
-                    }
-                    for (int j = g->v[image_i]; j < g->v[image_i] + g->d[image_i]; ++j) {
-                        const int vertex_j = g->e[j];
-                        if (!scratch_set.get(vertex_j)) {
-                            return false;
-                        }
-                        scratch_set.unset(vertex_j);
-                        found -= 1;
-                    }
-                    if (found != 0) {
-                        return false;
-                    }
-                }
-
-                return true;
+                return certification::certify_automorphism_sparse(scratch_set, g, p, supp, supp_arr);
             }
 
         private:

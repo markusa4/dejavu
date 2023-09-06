@@ -213,17 +213,10 @@ int commandline_mode(int argc, char **argv) {
     if(hooks.size() == 0) hook = &empty_hook_func; // using empty_hook_func for fair benchmarks, 'nullptr' is faster
     else hook = hooks.get_hook();
 
+    // no coloring given? let's insert the trivial coloring
+    if (colmap == nullptr) colmap = (int *) calloc(g.v_size, sizeof(int));
+
     // now run the solver with the given options...
-    volatile int acc = 0;
-    for (int i = 0; i < g.v_size; ++i) acc += g.v[i] + g.d[i];
-    for (int i = 0; i < g.e_size; ++i) acc += g.e[i];
-
-    bool del = false;
-    if (colmap == nullptr) {
-        colmap = (int *) calloc(g.v_size, sizeof(int));
-        del = true;
-    }
-
     Clock::time_point timer = Clock::now();
 
     dejavu::dejavu2 d;
@@ -241,8 +234,6 @@ int commandline_mode(int argc, char **argv) {
         std::cout << std::setprecision(4) << "symmetries=" << grp_sz
                   << ", deterministic=" << (d.get_deterministic_termination() ? "true" : "false")
                   << ", error=1/2^" << d.get_error_bound() << "," << std::endl;
-
-    if (del) free(colmap);
 
     if(print || write_benchmark_lines) std::cout << "solve_time=" <<
                                        static_cast<double>(dejavu_solve_time) / 1000000.0 << "ms" << std::endl;

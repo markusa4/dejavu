@@ -9,6 +9,7 @@
 #include "coloring.h"
 #include "sgraph.h"
 #include "trace.h"
+#include "graph.h"
 
 namespace dejavu {
 
@@ -2189,6 +2190,51 @@ namespace dejavu {
             ~shared_tree() {
                 for(auto & i : garbage_collector) delete i;
             };
+        };
+
+        /**
+         * \brief Certification on the original graph
+         *
+         * Certifies all automorphisms on the original graph. By default, in dejavu, all automorphisms are certified on
+         * the remainder of the graph still left to solve. Essentially, this means that preprocessing routines that
+         * shrink the graph are not certified.
+         *
+         * This hook saves the original graph before solving, and certifies all the returned automorphisms on the
+         * original graph before calling other hooks.
+         */
+        class strong_certification_hook {
+        private:
+            dejavu_hook  my_hook;
+            dejavu_hook* my_call_hook;
+            markset scratch_set;
+
+            sgraph* my_g;
+
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                const bool certify = certification::certify_automorphism_sparse(scratch_set, my_g, p, nsupp, supp);
+                if(!certify) return;
+                (*my_call_hook)(n, p, nsupp, supp);
+            }
+        public:
+            explicit strong_certification_hook(static_graph& g, dejavu_hook* call_hook) {
+                my_g->copy_graph(g.get_sgraph());
+                my_call_hook = call_hook;
+                scratch_set.initialize(g.get_sgraph()->v_size);
+            }
+
+            explicit strong_certification_hook(sgraph& g, dejavu_hook* call_hook) {
+                my_g->copy_graph(&g);
+                my_call_hook = call_hook;
+                scratch_set.initialize(g.v_size);
+            }
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
         };
     }
 }
