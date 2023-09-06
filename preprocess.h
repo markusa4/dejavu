@@ -95,7 +95,6 @@ namespace sassy {
         int domain_size   = 0;      /**< size of the underlying domain (i.e., number of vertices) */
         bool h_deact_deg1 = false;  /**< no degree 0,1 processing */
         bool h_deact_deg2 = false;  /**< no degree 2   processing */
-        bool h_translate_only = false;
 
         preprocessor() = default;
         explicit preprocessor(dejavu::ir::refinement* R) {
@@ -3141,14 +3140,8 @@ namespace sassy {
 
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
             bool in_order = true;
-            for(int i = 0; i < g->v_size-1; ++i) {
-                in_order = in_order && (colmap[i] <= colmap[i+1]);
-                if(!in_order)
-                    break;
-            }
-            if(in_order) {
-                return;
-            }
+            for(int i = 0; i < g->v_size-1 && in_order; ++i) in_order = in_order && (colmap[i] <= colmap[i+1]);
+            if(in_order) return;
 
             g->initialize_coloring(&c, colmap);
             dejavu::worklist old_arr(g->v_size);
@@ -3219,46 +3212,8 @@ namespace sassy {
             // deg01, qcedgeflip, deg2ma, deg2ue, redloop, densify2
             //deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2
 
-            if(schedule == nullptr) {
-                schedule = &default_schedule;
-            }
-
+            if(schedule == nullptr) schedule = &default_schedule;
             if(print) print->print_header();
-
-            if(h_translate_only) {
-                translate_layer_fwd.reserve(g->v_size);
-                backward_translation_layers.emplace_back();
-                const size_t back_ind = backward_translation_layers.size() - 1;
-                translation_layers.emplace_back();
-                // const int fwd_ind = translation_layers.size() - 1;
-                backward_translation_layers[back_ind].reserve(g->v_size);
-                for (int i = 0; i < g->v_size; ++i)
-                    backward_translation_layers[back_ind].push_back(i);
-
-                automorphism.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i) {
-                    automorphism.push_back(i);
-                }
-                automorphism_supp.allocate(g->v_size);
-                _automorphism.allocate(g->v_size);
-                _automorphism_supp.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i)
-                    _automorphism[i] = i;
-                aux_automorphism.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i) {
-                    aux_automorphism.push_back(i);
-                }
-                aux_automorphism_supp.allocate(g->v_size);
-
-                domain_size = g->v_size;
-
-                recovery_strings.reserve(g->v_size);
-                for (int i = 0; i < domain_size; ++i) recovery_strings.emplace_back();
-
-                saved_hook = hook;
-                save_preprocessor = this;
-                return;
-            }
 
             domain_size = g->v_size;
             saved_hook = hook;
@@ -3269,7 +3224,18 @@ namespace sassy {
 
             const int test_d = g->d[0];
             int k;
-            for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k) {};
+            for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k);
+
+            int test_col = colmap[0];
+            int l;
+            for (l = 1; l < (g->v_size) && (colmap[l] == test_col); ++l);
+            
+            if(k == g->v_size && l == g->v_size) {
+                // graph is regular
+                skipped_preprocessing = true;
+                if(print) print->timer_print("regular", g->v_size, g->e_size);
+                return;
+            }
 
             backward_translation_layers.emplace_back();
             const size_t back_ind = backward_translation_layers.size() - 1;
@@ -3278,16 +3244,10 @@ namespace sassy {
             for (int i = 0; i < g->v_size; ++i) backward_translation_layers[back_ind].push_back(i);
             edge_scratch.allocate(g->e_size);
 
-            order_according_to_color(g, colmap);
+            if(g->v_size > 64)   order_according_to_color(g, colmap);
+            else                 order_edgelist(g);
             if(print) print->timer_print("order", g->v_size, g->e_size);
             g->initialize_coloring(&c, colmap);
-
-            if(k == g->v_size && c.cells == 1) {
-                // graph is regular
-                skipped_preprocessing = true;
-                if(print) print->timer_print("regular", g->v_size, g->e_size);
-                return;
-            }
 
             const int pre_v_size = g->v_size;
             const int pre_e_size = g->e_size;
