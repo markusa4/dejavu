@@ -3151,7 +3151,6 @@ namespace sassy {
             }
 
             g->initialize_coloring(&c, colmap);
-
             dejavu::worklist old_arr(g->v_size);
 
             std::memcpy(old_arr.get_array(), g->v, g->v_size*sizeof(int));
@@ -3272,6 +3271,13 @@ namespace sassy {
             int k;
             for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k) {};
 
+            backward_translation_layers.emplace_back();
+            const size_t back_ind = backward_translation_layers.size() - 1;
+            translation_layers.emplace_back();
+            backward_translation_layers[back_ind].reserve(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) backward_translation_layers[back_ind].push_back(i);
+            edge_scratch.allocate(g->e_size);
+
             order_according_to_color(g, colmap);
             if(print) print->timer_print("order", g->v_size, g->e_size);
             g->initialize_coloring(&c, colmap);
@@ -3300,13 +3306,6 @@ namespace sassy {
                 if(print) print->timer_print("discrete", g->v_size, g->e_size);
                 return;
             }
-
-            backward_translation_layers.emplace_back();
-            const size_t back_ind = backward_translation_layers.size() - 1;
-            translation_layers.emplace_back();
-            backward_translation_layers[back_ind].reserve(g->v_size);
-            for (int i = 0; i < g->v_size; ++i) backward_translation_layers[back_ind].push_back(i);
-            edge_scratch.allocate(g->e_size);
 
             add_edge_buff.clear();
             add_edge_buff.reserve(domain_size);

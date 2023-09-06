@@ -205,7 +205,7 @@ int commandline_mode(int argc, char **argv) {
     // debug hook
 #ifndef NDEBUG
     auto test_hook_func = dejavu_hook(dejavu::test_hook);
-    dej_test_graph.copy_graph(g);
+    dej_test_graph.copy_graph(&g);
     hooks.add_hook(&test_hook_func);
 #endif
 
@@ -225,6 +225,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     Clock::time_point timer = Clock::now();
+
     dejavu::dejavu2 d;
     d.set_error_bound(error_bound);
     d.set_print(print);
@@ -234,6 +235,7 @@ int commandline_mode(int argc, char **argv) {
 
     long dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     dejavu::big_number grp_sz = d.get_automorphism_group_size();
+
     if (print) std::cout << "------------------------------------------------------------------" << std::endl;
     if (print || write_benchmark_lines)
         std::cout << std::setprecision(4) << "symmetries=" << grp_sz
