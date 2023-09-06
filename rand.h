@@ -103,8 +103,8 @@ namespace dejavu::search_strategy {
                     ++s_succeed;
 
                     // Output automorphism
-                    if(hook) (*hook)(g->v_size, gl_automorphism.perm(), gl_automorphism.nsupport(),
-                                     gl_automorphism.support());
+                    if(hook) (*hook)(g->v_size, gl_automorphism.p(), gl_automorphism.nsupp(),
+                                     gl_automorphism.supp());
 
                     // Sift into Schreier structure
                     bool sift = group.sift(gl_schreierw, gl_automorphism, uniform);

@@ -1054,11 +1054,11 @@ namespace dejavu {
              * @return Whether \p automorphism is an automorphism of \p g.
              */
             bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
-                if(automorphism.nsupport() > g->v_size/4) {
-                    return R->certify_automorphism(g, automorphism.perm());
+                if(automorphism.nsupp() > g->v_size / 4) {
+                    return R->certify_automorphism(g, automorphism.p());
                 } else {
-                    return R->certify_automorphism_sparse(g, automorphism.perm(), automorphism.nsupport(),
-                                                          automorphism.support());
+                    return R->certify_automorphism_sparse(g, automorphism.p(), automorphism.nsupp(),
+                                                          automorphism.supp());
                 }
             }
         };

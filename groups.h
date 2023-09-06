@@ -157,6 +157,26 @@ namespace dejavu {
              *
              * Closely follows the implementation in nauty / Traces.
              *
+             * @param other Automorphism in sparse notation that is applied to this automorphism in.
+             * @param pwr Power with which \p other is applied to this automorphism.
+             */
+            [[maybe_unused]] void apply(automorphism_workspace& other, int pwr = 1) {
+                thread_local worklist scratch_apply1;
+                thread_local worklist scratch_apply2;
+                thread_local markset  scratch_apply3;
+                scratch_apply1.allocate(domain_size);
+                scratch_apply2.allocate(domain_size);
+                scratch_apply3.initialize(domain_size);
+
+                apply(scratch_apply1, scratch_apply2, scratch_apply3, other, pwr);
+            }
+
+            /**
+             * Apply another automorphism to the stored automorphism. To be more precise, `other^pwr` is applied to
+             * the automorphism stored in this object.
+             *
+             * Closely follows the implementation in nauty / Traces.
+             *
              * @param scratch_apply1 Auxiliary workspace used for the operation.
              * @param scratch_apply2 Auxiliary workspace used for the operation.
              * @param scratch_apply3 Auxiliary workspace used for the operation.
@@ -164,12 +184,12 @@ namespace dejavu {
              * @param pwr Power with which \p other is applied to this automorphism.
              */
             [[maybe_unused]] void apply(worklist &scratch_apply1, worklist &scratch_apply2, markset &scratch_apply3,
-                                        automorphism_workspace *other, int pwr = 1) {
-                if(!other->support01 && other->nsupport() <= domain_size / 4) {
-                    apply_sparse(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), other->support(),
-                                 other->nsupport(), pwr);
+                                        automorphism_workspace& other, int pwr = 1) {
+                if(!other.support01 && other.nsupp() <= domain_size / 4) {
+                    apply_sparse(scratch_apply1, scratch_apply2, scratch_apply3, other.p(), other.supp(),
+                                 other.nsupp(), pwr);
                 } else {
-                    apply(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), pwr);
+                    apply(scratch_apply1, scratch_apply2, scratch_apply3, other.p(), pwr);
 
                 }
             }
@@ -408,21 +428,21 @@ namespace dejavu {
             /**
              * @return Integer array \p p describing the stored automorphism, where point v is mapped to \p p[v].
              */
-            [[nodiscard]] int *perm() const {
+            [[nodiscard]] int *p() const {
                 return automorphism.get_array();
             }
 
             /**
              * @return Integer array which contains all vertices in the support of the contained automorphism.
              */
-            [[nodiscard]] int* support() const {
+            [[nodiscard]] int* supp() const {
                 return automorphism_supp.get_array();
             }
 
             /**
              * @return Size of the support.
              */
-            [[nodiscard]] int nsupport() const {
+            [[nodiscard]] int nsupp() const {
                 return automorphism_supp.cur_pos;
             }
         };
@@ -546,9 +566,9 @@ namespace dejavu {
              * @param aut Automorphism workspace which is applied.
              */
             void add_automorphism_to_orbit(groups::automorphism_workspace& aut) {
-                const int  nsupp = aut.nsupport();
-                const int* supp  = aut.support();
-                const int* p     = aut.perm();
+                const int  nsupp = aut.nsupp();
+                const int* supp  = aut.supp();
+                const int* p     = aut.p();
                 for (int i = 0; i < nsupp; ++i) {
                     combine_orbits(p[supp[i]], supp[i]);
                 }
@@ -673,7 +693,7 @@ namespace dejavu {
                             space.write_single_map(j, abs(data[i + 1]) - 1);
                         }
                     }
-                    loader.load(space.perm());
+                    loader.load(space.p());
                 } else {
                     // store_type == STORE_DENSE
                     loader.load(data.get_array());
@@ -716,7 +736,7 @@ namespace dejavu {
                 assert(data.empty());
 
                 int support = 0;
-                for (int i = 0; i < domain_size; ++i) support += (automorphism.perm()[i] != i);
+                for (int i = 0; i < domain_size; ++i) support += (automorphism.p()[i] != i);
 
                 // decide whether to store dense or sparse representation
                 if (support < domain_size / 4) {
@@ -725,16 +745,16 @@ namespace dejavu {
 
                     data.allocate(support);
                     for (int i = 0; i < domain_size; ++i) {
-                        if (automorphism.perm()[i] == i) continue;
+                        if (automorphism.p()[i] == i) continue;
                         const int j = i;
                         if (helper.get(j)) continue;
                         helper.set(j);
-                        int map_j = automorphism.perm()[j];
+                        int map_j = automorphism.p()[j];
                         assert(map_j != j);
                         while (!helper.get(map_j)) {
                             data.push_back(map_j + 1);
                             helper.set(map_j);
-                            map_j = automorphism.perm()[map_j];
+                            map_j = automorphism.p()[map_j];
                         }
                         assert(map_j == j);
                         data.push_back(-(j + 1));
@@ -745,7 +765,7 @@ namespace dejavu {
                     store_type = STORE_DENSE;
                     data.allocate(domain_size);
                     data.set_size(domain_size);
-                    memcpy(data.get_array(), automorphism.perm(), domain_size * sizeof(int));
+                    memcpy(data.get_array(), automorphism.p(), domain_size * sizeof(int));
                     assert(data.size() == domain_size);
                 }
             }
@@ -970,7 +990,7 @@ namespace dejavu {
                         automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), pwr);
                     } else {
                         automorphism.apply_sparse(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(),
-                                           w.scratch_auto.support(), w.scratch_auto.nsupport(), pwr);
+                                                  w.scratch_auto.supp(), w.scratch_auto.nsupp(), pwr);
                     }
                     w.scratch_auto.reset();
                 }
@@ -1088,28 +1108,28 @@ namespace dejavu {
                 // watch out, we may enlarge fixed_orbit in the loop below
                 for (int i = 0; i < static_cast<int>(fixed_orbit.size()); ++i) {
                     const int p = fixed_orbit[i];
-                    int j = automorphism.perm()[p];
+                    int j = automorphism.p()[p];
                     assert(j >= 0);
                     if (j == p || w.scratch1.get(j)) continue;
 
                     int pwr = 0; // power we save in Schreier vector
-                    for (int jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) {
+                    for (int jj = j; !w.scratch1.get(jj); jj = automorphism.p()[jj]) {
                         ++pwr;
                     }
 
                     while (!w.scratch1.get(j)) {
-                        // we change this traversal
+                        // we change this transversal
                         changed = true;
 
                         // add generator to generating set (once)
                         if (gen_num == -1) gen_num = generators.add_generator(w, automorphism);
 
-                        // add entry to traversal
+                        // add entry to transversal
                         add_to_fixed_orbit(j, gen_num, pwr);
                         w.scratch1.set(j);
 
                         // we check out the entire cycle of j now
-                        j = automorphism.perm()[j];
+                        j = automorphism.p()[j];
                         --pwr;
                     }
                 }
@@ -1135,7 +1155,7 @@ namespace dejavu {
              */
             bool fix_automorphism(schreier_workspace &w, generating_set &generators,
                                   automorphism_workspace &automorphism) const {
-                int fixed_map = automorphism.perm()[fixed]; // Where is fixed mapped to?
+                int fixed_map = automorphism.p()[fixed]; // Where is fixed mapped to?
 
                 // as long as `fixed` is not yet fixed, we apply automorphisms from the transversal as prescribed by
                 // the Schreier vector
@@ -1145,10 +1165,10 @@ namespace dejavu {
                     const int perm = fixed_orbit_to_perm[pos]; // generator to apply for `fixed_map`
                     const int pwr  = fixed_orbit_to_pwr[pos];  // power to use for `fixed_map`
                     apply_perm(w, automorphism, generators, perm, pwr);
-                    fixed_map = automorphism.perm()[fixed]; // Fixed now? Or we need to go again?
+                    fixed_map = automorphism.p()[fixed]; // Fixed now? Or we need to go again?
                 }
-                assert(automorphism.perm()[fixed] == fixed);
-                return automorphism.nsupport() == 0;
+                assert(automorphism.p()[fixed] == fixed);
+                return automorphism.nsupp() == 0;
             }
 
 
@@ -1169,6 +1189,7 @@ namespace dejavu {
 
             generating_set generators;
             std::vector<shared_transversal *> transversals;
+            std::vector<int> stabilized_generators;
 
             bool init = false;
 
@@ -1248,6 +1269,8 @@ namespace dejavu {
                     transversals[i]->initialize(new_base[i], i, INT32_MAX);
                 }
 
+                stabilized_generators.clear();
+
                 // TODO resift all generators once?
                 sift_random(w, automorphism, rng, err);
             }
@@ -1310,6 +1333,8 @@ namespace dejavu {
                     transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
                 }
 
+                stabilized_generators.clear();
+
                 return true;
             }
 
@@ -1347,11 +1372,11 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
+             * Checks whether a vertex \p v is contained in the transversal at position \p s_base_pos.
              *
              * @param base_pos Position in base.
              * @param v Vertex to check.
-             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
+             * @return Bool indicating whether \p v is contained in the transversal at position \p s_base_pos.
              */
             bool is_in_fixed_orbit(const int base_pos, const int v) {
                 if (base_pos >= static_cast<int>(transversals.size())) return false;
@@ -1374,6 +1399,10 @@ namespace dejavu {
                 return transversals[base_pos]->get_generators();
             }
 
+            const std::vector<int>& get_stabilized_generators() {
+                return stabilized_generators;
+            }
+
             [[nodiscard]]int get_fixed_orbit_size(const int base_pos) {
                 if (base_pos >= static_cast<int>(transversals.size())) return 0;
                 return transversals[base_pos]->size();
@@ -1392,10 +1421,10 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether the traversal at position \p s_base_pos matches its size upper bound.
+             * Checks whether the transversal at position \p s_base_pos matches its size upper bound.
              *
              * @param base_pos Position in base.
-             * @return Bool that indicates whether the traversal at position \p s_base_pos matches its size upper bound.
+             * @return Bool that indicates whether the transversal at position \p s_base_pos matches its size upper bound.
              */
             [[nodiscard]] bool is_finished(const int base_pos) const {
                 return transversals[base_pos]->is_finished();
@@ -1414,7 +1443,7 @@ namespace dejavu {
 
                 automorphism.set_support01(true); // we don't need to track full support
                 for (int level = 0; level < static_cast<int>(transversals.size()); ++level) { // sift level-by-level
-                    // first, we try to extend the traversal using the new automorphism
+                    // first, we try to extend the transversal using the new automorphism
                     changed = transversals[level]->extend_with_automorphism(w, generators, automorphism)
                               || changed;
 
@@ -1423,8 +1452,9 @@ namespace dejavu {
                     if (identity) break; // if automorphism is the identity now, no need to sift further
                 }
 
-                if(automorphism.nsupport() != 0 && keep_at_end) {
-                    generators.add_generator(w, automorphism);
+                if(automorphism.nsupp() != 0 && keep_at_end) {
+                    const int gen_id = generators.add_generator(w, automorphism);
+                    stabilized_generators.push_back(gen_id);
                 }
 
                 // keep track of how far this Schreier structure is finished (matches given upper bounds)
@@ -1643,11 +1673,11 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
+             * Checks whether a vertex \p v is contained in the transversal at position \p s_base_pos.
              *
              * @param base_pos Position in base.
              * @param v Vertex to check.
-             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
+             * @return Bool indicating whether \p v is contained in the transversal at position \p s_base_pos.
              */
             bool is_in_fixed_orbit(const int base_pos, const int v) {
                 return schreier.is_in_fixed_orbit(base_pos, v);
@@ -1679,12 +1709,24 @@ namespace dejavu {
              * @param orbit_partition orbits will be read into this orbit structure
              */
             void get_stabilizer_orbit(int base_pos, orbit& orbit_partition) {
-                const std::vector<int>& generators = schreier.get_stabilizer_generators(base_pos);
+                auxiliary_set.initialize(get_number_of_generators());
                 auxiliary_set.reset();
                 orbit_partition.reset();
-                for(auto i : generators) {
-                    if(auxiliary_set.get(i)) continue;
-                    auxiliary_set.set(i);
+
+                // TODO this can be done much more efficiently...
+                for(int j = base_pos; j < schreier.base_size(); ++j) {
+                    const std::vector<int> &generators = schreier.get_stabilizer_generators(j);
+                    for (auto i: generators) {
+                        if (i < 0) continue;
+                        assert(i < get_number_of_generators());
+                        if (auxiliary_set.get(i)) continue;
+                        auxiliary_set.set(i);
+                        schreier.load_generator(ws_auto, i);
+                        orbit_partition.add_automorphism_to_orbit(ws_auto);
+                    }
+                }
+
+                for(auto i : schreier.get_stabilized_generators()) {
                     schreier.load_generator(ws_auto, i);
                     orbit_partition.add_automorphism_to_orbit(ws_auto);
                 }
@@ -1698,13 +1740,22 @@ namespace dejavu {
              * @return Whether automorphism was added to the Schreier structure or not.
              */
             bool sift(automorphism_workspace &automorphism, bool known_in_group = false) {
-                return sift(h_domain_size, automorphism.perm(), automorphism.nsupport(), automorphism.support(),
+                return sift(h_domain_size, automorphism.p(), automorphism.nsupp(), automorphism.supp(),
                             known_in_group);
             }
 
+            /**
+             * Sift automorphism into the Schreier structure.
+             *
+             * @param p complete bijection of the automorphism
+             * @param nsupp number of points in the support of automorphism
+             * @param supp support of automorphism
+             * @param known_in_group whether we know that the given automorphism is already in the group or not
+             * @return whether a transversal changed
+             */
             bool sift(int, const int *p, int nsupp, const int *supp, bool known_in_group = false) {
                 ws_auto.reset();
-                for(int i = 0; i < h_domain_size; ++i) assert(ws_auto.perm()[i] == i);
+                for(int i = 0; i < h_domain_size; ++i) assert(ws_auto.p()[i] == i);
 
                 for(int i = 0; i < nsupp; ++i) {
                     const int v_from = supp[i];
@@ -1952,11 +2003,11 @@ namespace dejavu {
             }
 
             /**
-             * Checks whether a vertex \p v is contained in the traversal at position \p s_base_pos.
+             * Checks whether a vertex \p v is contained in the transversal at position \p s_base_pos.
              *
              * @param base_pos Position in base.
              * @param v Vertex to check.
-             * @return Bool indicating whether \p v is contained in the traversal at position \p s_base_pos.
+             * @return Bool indicating whether \p v is contained in the transversal at position \p s_base_pos.
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
                 int v_translate = compressor != nullptr? compressor->compress(v) : v;
@@ -1991,11 +2042,11 @@ namespace dejavu {
             void compress_automorphism(automorphism_workspace &automorphism, automorphism_workspace &automorphism_compress) {
                 automorphism_compress.reset();
 
-                const int support = automorphism.nsupport();
+                const int support = automorphism.nsupp();
                 for(int i = 0; i < support; ++i) {
-                    const int vsupport = automorphism.support()[i];
+                    const int vsupport = automorphism.supp()[i];
                     const int vsupportc = compressor->compress(vsupport);
-                    const int vmapsto = automorphism.perm()[vsupport];
+                    const int vmapsto = automorphism.p()[vsupport];
                     const int vmapstoc = compressor->compress(vmapsto);
                     if(vsupportc >= 0) {
                         assert(vmapstoc >= 0);

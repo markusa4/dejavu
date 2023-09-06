@@ -342,7 +342,7 @@ namespace dejavu {
              * @param p the array
              * @param supp the number of points in the support
              * @param supp_arr the support of p
-             * @return 
+             * @return
              */
             bool cycle_check(const int *p, int supp, const int *supp_arr) {
                 scratch_set.reset();

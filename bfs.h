@@ -166,8 +166,8 @@ namespace dejavu {
 
                         // Output automorphism
                         if (hook)
-                            (*hook)(g->v_size, gl_automorphism.perm(), gl_automorphism.nsupport(),
-                                    gl_automorphism.support());
+                            (*hook)(g->v_size, gl_automorphism.p(), gl_automorphism.nsupp(),
+                                    gl_automorphism.supp());
                     }
                     ++s_total_leaves;
                     gl_automorphism.reset();

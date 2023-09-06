@@ -221,7 +221,7 @@ namespace dejavu {
 
                             found_auto = state_right.certify(g, ws_automorphism);
 
-                            assert(ws_automorphism.perm()[base_vertex] == ind_v);
+                            assert(ws_automorphism.p()[base_vertex] == ind_v);
                             // if no luck with sparse automorphism, try more proper walk to leaf node
                             if (!found_auto) {
                                 ws_automorphism.reset();
@@ -248,12 +248,12 @@ namespace dejavu {
 
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
-                            assert(ws_automorphism.nsupport() > 0);
-                            assert(ws_automorphism.perm()[ind_v] == base_vertex ||
-                                   ws_automorphism.perm()[base_vertex] == ind_v);
+                            assert(ws_automorphism.nsupp() > 0);
+                            assert(ws_automorphism.p()[ind_v] == base_vertex ||
+                                           ws_automorphism.p()[base_vertex] == ind_v);
                             orbs.add_automorphism_to_orbit(ws_automorphism);
-                            if(hook) (*hook)(g->v_size, ws_automorphism.perm(), ws_automorphism.nsupport(),
-                                             ws_automorphism.support());
+                            if(hook) (*hook)(g->v_size, ws_automorphism.p(), ws_automorphism.nsupp(),
+                                             ws_automorphism.supp());
                         }
                         ws_automorphism.reset();
 

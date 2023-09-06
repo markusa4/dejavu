@@ -19,8 +19,9 @@ bool finished = false;
 
 void empty_hook(int, const int*, int, const int *) {}
 
-dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, bool print = true,
-                              bool true_random = false, bool randomize_seed = false, dejavu_hook* hook = nullptr) {
+dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_solve_time, int error_bound = 10,
+                              bool print = true, bool true_random = false, bool randomize_seed = false,
+                              dejavu_hook* hook = nullptr) {
     // touch the graph (mitigate cache variance)
     volatile int acc = 0;
     for(int i = 0; i < g->v_size; ++i) acc += g->v[i] + g->d[i];
@@ -34,22 +35,12 @@ dejavu::big_number run_dejavu(dejavu::sgraph* g, int* colmap, double* dejavu_sol
 
     Clock::time_point timer = Clock::now();
     dejavu::dejavu2 d;
+    d.set_error_bound(error_bound);
     d.set_print(print);
     if(randomize_seed) d.randomize_seed();
     d.set_true_random(true_random);
-
     d.automorphisms(g, colmap, hook);
 
-/*#ifndef NDEBUG
-    auto test_hook_func = dejavu_hook(dejavu::test_hook);
-    dej_test_graph.copy_graph(g);
-    dej_test_col = (int*) calloc(g->v_size, sizeof(int));
-    memcpy(dej_test_col, colmap, sizeof(int) * g->v_size);
-    d.automorphisms(g, colmap, &test_hook_func);
-    free(dej_test_col);
-#else
-    d.automorphisms(g, colmap, &empty_hook_func);
-#endif*/
     *dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     dejavu::big_number grp_sz = d.get_automorphism_group_size();
     if(print) std::cout << "------------------------------------------------------------------" << std::endl;
@@ -72,6 +63,8 @@ int commandline_mode(int argc, char **argv) {
     bool true_random = false;
     bool true_random_seed = false;
 
+    int error_bound = 10;
+
     bool write_grp_sz = false;
     bool write_auto_stdout = false;
     bool        write_auto_file      = false;
@@ -84,8 +77,8 @@ int commandline_mode(int argc, char **argv) {
 
         if (arg == "__HELP" || arg == "_H") {
             std::cout << "Usage: dejavu [file] [options]" << std::endl;
-            std::cout << "Computes the automorphism group of the graph described in the given FILE." << std::endl;
-            std::cout << "The FILE must describe a graph using the DIMACS format." << std::endl;
+            std::cout << "Computes the automorphism group of undirected graph described in FILE." << std::endl;
+            std::cout << "FILE is expected to be in DIMACS format." << std::endl;
             std::cout << "Options:" << std::endl;
             std::cout << "    "  << std::left << std::setw(20) <<
             "--err [n]" << std::setw(16) <<
@@ -134,7 +127,7 @@ int commandline_mode(int argc, char **argv) {
         } else if (arg == "__ERR") {
             if (i + 1 < argc) {
                 i++;
-                //config.CONFIG_RAND_ABORT = atoi(argv[i]);
+                error_bound = atoi(argv[i]);
             } else {
                 std::cerr << "--err option requires one argument." << std::endl;
                 return 1;
@@ -196,7 +189,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     if (!entered_file) {
-        std::cerr << "no file was specified, usage: dejavu [file] [options]" << std::endl;
+        std::cerr << "no file was specified, usage: dejavu [file] [options], use --help for options" << std::endl;
         return 1;
     }
 
@@ -256,7 +249,7 @@ int commandline_mode(int argc, char **argv) {
     // now run the solver with the given options...
     double dejavu_solve_time;
     finished = false;
-    auto grp_sz = run_dejavu(g, colmap, &dejavu_solve_time, print, true_random, true_random_seed, hook);
+    auto grp_sz = run_dejavu(g, colmap, &dejavu_solve_time, error_bound, print, true_random, true_random_seed, hook);
     if(print) std::cout << "solve_time=" << dejavu_solve_time / 1000000.0 << "ms" << std::endl;
     if(!print && write_grp_sz) std::cout << grp_sz << std::endl;
     return 0;

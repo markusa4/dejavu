@@ -10,25 +10,9 @@
 
 dejavu::groups::orbit orbits1;
 dejavu::groups::orbit orbits2;
-dejavu::ds::markset cycle_tester;
 
 [[maybe_unused]] static void orbit1_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                        [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
-    cycle_tester.initialize(n);
-    cycle_tester.reset();
-
-    for(int i = 0; i < nsupp; ++i) {
-        const int v = supp[i];
-        if(cycle_tester.get(v)) continue;
-        int v_next = p[v];
-        while(v_next != v) {
-            assert(!cycle_tester.get(v_next));
-            cycle_tester.set(v_next);
-            v_next = p[v_next];
-        }
-        cycle_tester.set(v);
-    }
-
     assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
     orbits1.add_automorphism_to_orbit(p, nsupp, supp);
 }
@@ -68,7 +52,7 @@ void read_symmetry_file(const std::string& filename, int domain_size, dejavu_hoo
                 auto_ws.write_single_map(from, to);
             }
         }
-        (*hook)(domain_size, auto_ws.perm(), auto_ws.nsupport(), auto_ws.support());
+        (*hook)(domain_size, auto_ws.p(), auto_ws.nsupp(), auto_ws.supp());
         auto_ws.reset();
     }
 }
@@ -104,6 +88,7 @@ void test_graph_orbit_check(std::string filename) {
 
     std::cout << "Running dejavu " << filename << "..." << std::endl;
     dejavu::dejavu2 d;
+    d.set_print(false);
     d.automorphisms(g, colmap, &test_hook_dejavu);
 
     auto test_hook_sym_file = dejavu_hook(orbit2_test_hook);
