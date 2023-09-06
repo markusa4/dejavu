@@ -3,7 +3,6 @@
 // See LICENSE for extended copyright information.
 
 #include <iostream>
-#include "parser.h"
 #include <thread>
 #include "dejavu.h"
 #include <chrono>
@@ -184,7 +183,7 @@ int commandline_mode(int argc, char **argv) {
         if(print) std::cout << (true_random?"true_random=true, ":"") << (true_random_seed?"true_random_seed=true":"");
         if(print) std::cout << "permutation_seed=" << permute_seed << ", ";
     }
-    parse_dimacs_file_fast(filename, &g, &colmap, !print, permute_seed);
+    parse_dimacs(filename, &g, &colmap, !print, permute_seed);
     if(print) std::cout << ", n=" << g.v_size << ", " << "m=" << g.e_size/2 << std::endl << std::endl;
 
     // manage hooks
