@@ -26,8 +26,6 @@ namespace dejavu {
     [[maybe_unused]] static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                            [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
         assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
-        //assert(test_r.certify_automorphism(&dej_test_graph, dej_test_col, p));
-        //assert(test_r.certify_automorphism_sparse(&dej_test_graph, dej_test_col, p, nsupp, supp));
     }
 
     /**
@@ -351,7 +349,6 @@ namespace dejavu {
                     // immediately discard this base if deemed too unfavourable by the heuristics above, unless we are
                     // discarding too often
                     if ((s_too_big || s_too_long) && s_consecutive_discard < 3) {
-                        // TODO was s_inproc_success < 1
                         m_printer.timer_print("skip", local_state.s_base_pos, s_last_base_size);
                         ++s_consecutive_discard;
                         continue;
@@ -520,15 +517,10 @@ namespace dejavu {
 
                         // ... and if we are "almost done" with random search, we stretch the budget a bit
                         // here are some definitions for "almost done", because I can not come up with a single one
-                        if (search_strategy::random_ir::h_almost_done(sh_schreier) &&
-                            next_routine == restart)
+                        if (search_strategy::random_ir::h_almost_done(sh_schreier) && next_routine == restart)
                             next_routine = random_ir;
-                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4) {
-                            next_routine = random_ir;
-                        }
-                        if (m_rand.s_rolling_success > 0.2  && s_cost <= h_budget * 6) { // TODO maybe?
-                            next_routine = random_ir;
-                        }
+                        if (m_rand.s_rolling_success > 0.1  && s_cost <= h_budget * 4) next_routine = random_ir;
+                        if (m_rand.s_rolling_success > 0.2  && s_cost <= h_budget * 6) next_routine = random_ir;
                         if (s_hard && m_rand.s_succeed >= 1 && s_cost <= m_rand.s_succeed * h_budget * 10 &&
                             next_routine == restart)
                             next_routine = random_ir;

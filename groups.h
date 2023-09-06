@@ -368,8 +368,10 @@ namespace dejavu {
 
 
             /**
-             * Create automorphism from two canonically-ordered vectors of singletons. The resulting automorphism maps
+             * Create mapping from two canonically-ordered vectors of singletons. The resulting automorphism maps
              * `singletons1[i]` to `singletons2[i]` for `i` in `pos_start, ..., pos_end`.
+             *
+             * May result in a mapping that is not a bijection.
              *
              * @param singletons1 first vector of singletons
              * @param singletons2 second vector of singletons
@@ -390,7 +392,13 @@ namespace dejavu {
                 invalidate_inverse_automorphism();
             }
 
+            /**
+             * Heuristic that turns the internal mapping into a bijection (in some way).
+             *
+             * @param scratch_set some auxiliary workspace
+             */
             void cycle_completion(markset& scratch_set) {
+                scratch_set.reset();
                 for(int i = 0; i < automorphism_supp.size(); ++i) {
                     const int v = automorphism_supp[i];
                     if(scratch_set.get(v)) continue;
@@ -408,6 +416,11 @@ namespace dejavu {
                 invalidate_inverse_automorphism();
             }
 
+            /**
+             * Write
+             * @param from
+             * @param to
+             */
             void write_single_map(const int from, const int to) {
                 assert(automorphism[from] == from);
                 if (from != to) {

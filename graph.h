@@ -7,7 +7,7 @@ namespace dejavu {
     /**
      * \brief Graph with static number of vertices and edges
      *
-     * Graph format based on the internal format of dejavu (sgraph), but adding sanity checks and easy access to the
+     * Graph format based on the internal format of dejavu (`sgraph`), but adding sanity checks and easy access to the
      * construction. Essentially, this class provides a more convenient interface to construct `sgraph`s.
      *
      * The graph must first be initialized (either using the respective constructor or using initialize_graph). For the

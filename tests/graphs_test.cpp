@@ -57,7 +57,32 @@ void read_symmetry_file(const std::string& filename, int domain_size, dejavu_hoo
     }
 }
 
+dejavu::big_number read_grp_sz_file(const std::string& filename) {
+    std::ifstream infile(filename);
+    std::string line;
+    dejavu::big_number result;
+    while (std::getline(infile, line)){
+        std::string man_str;
+        std::string exp_str;
+        int read_mode = 0;
+        for(std::string::size_type i = 0; i < line.size(); ++i) {
+            if (read_mode == 0 && line[i] != '*') {
+                man_str += line[i];
+            } else if (read_mode == 0 && line[i] == '*') {
+                read_mode = 1;
+            } else if (read_mode == 1 && line[i] == '^') {
+                read_mode = 2;
+            } else if (read_mode == 2) {
+                exp_str += line[i];
+            }
+        }
+        result.mantissa = std::stod(man_str);
+        result.exponent = std::stoi(exp_str);
+        break;
+    }
 
+    return result;
+}
 
 
 void test_graph(std::string filename) {
@@ -74,6 +99,7 @@ void test_graph(std::string filename) {
 
 void test_graph_orbit_check(std::string filename) {
     std::string sym_filename = filename + ".sym";
+    std::string grp_sz_filename = filename + ".grp_sz";
     dejavu::sgraph *g = new dejavu::sgraph();
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
@@ -97,6 +123,13 @@ void test_graph_orbit_check(std::string filename) {
 
     std::cout << "Comparing orbits..." << std::endl;
     EXPECT_TRUE(orbits1 == orbits2);
+
+    dejavu::big_number file_grp_sz = read_grp_sz_file(grp_sz_filename);
+    file_grp_sz.multiply(1);
+    dejavu::big_number dejavu_grp_sz = d.get_automorphism_group_size();
+    std::cout << "Comparing group size " << file_grp_sz << ":" << dejavu_grp_sz << "..." << std::endl;
+    EXPECT_EQ(dejavu_grp_sz.exponent, file_grp_sz.exponent);
+    EXPECT_NEAR(dejavu_grp_sz.mantissa, file_grp_sz.mantissa, 0.1);
 }
 
 TEST(graphs_test, graph_suite_comb) {
@@ -146,6 +179,7 @@ TEST(graphs_test, graph_suite_prep) {
     test_graph_orbit_check(directory + "academictimetablesmall.dimacs");
     test_graph_orbit_check(directory + "heuristic_199.dimacs");
     test_graph_orbit_check(directory + "vlsat2_11_26.cnf.dimacs");
+    test_graph_orbit_check(directory + "vlsat2_44_545.cnf.dimacs");
 }
 
 TEST(graphs_test, graph_suite_ref) {

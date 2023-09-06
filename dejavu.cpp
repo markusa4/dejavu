@@ -198,7 +198,6 @@ int commandline_mode(int argc, char **argv) {
         return 1;
     }
 
-    //if(print) std::cout << "------------------------------------------------------------------" << std::endl;
     if(print) std::cout << "dejavu version=" << DEJAVU_VERSION_MAJOR << "." << DEJAVU_VERSION_MINOR <<
                         (DEJAVU_VERSION_IS_BETA?"beta":"") << std::endl;
     if(print) std::cout << "------------------------------------------------------------------" << std::endl;

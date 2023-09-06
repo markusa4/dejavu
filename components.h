@@ -31,10 +31,12 @@ namespace dejavu::ir {
 
         int current_component      = 0;
         int total_size             = 0;
+        int in_handle              = 0;
 
         for(int i = 0; i < g->v_size; ++i) {
             if(handled.get(i)) continue;
             handled.set(i);
+            ++in_handle;
 
             wl.push_back(i);
             int current_component_size = 0;
@@ -53,11 +55,14 @@ namespace dejavu::ir {
                 (*vertex_to_component)[k] = current_component;
                 ++current_component_size;
 
+                if(in_handle == g->v_size) continue;
+
                 const int deg = g->d[k];
                 const int vpt = g->v[k];
                 for (int j = vpt; j < vpt + deg; ++j) {
                     const int neighbour = g->e[j];
                     if(!handled.get(neighbour)) {
+                        ++in_handle;
                         handled.set(neighbour);
                         wl.push_back(neighbour);
                     }
@@ -67,6 +72,7 @@ namespace dejavu::ir {
                     for (int j = col; j < col + col_sz; ++j) {
                         const int neighbour = c.lab[j];
                         if (!handled.get(neighbour)) {
+                            ++in_handle;
                             handled.set(neighbour);
                             wl.push_back(neighbour);
                         }
