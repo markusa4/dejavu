@@ -52,8 +52,8 @@ namespace sassy {
 
         bool skipped_preprocessing = false;
 
-        dejavu::mark_set del;
-        dejavu::mark_set del_e;
+        dejavu::markset del;
+        dejavu::markset del_e;
 
         std::vector<std::vector<int>> translation_layers;
         std::vector<std::vector<int>> backward_translation_layers;
@@ -64,10 +64,10 @@ namespace sassy {
         std::vector<std::vector<int>> add_edge_buff;
         dejavu::worklist worklist_deg0;
         dejavu::worklist worklist_deg1;
-        dejavu::mark_set add_edge_buff_act;
+        dejavu::markset add_edge_buff_act;
         dejavu::ir::refinement* R1 = nullptr;
 
-        dejavu::mark_set touched_color_cache;
+        dejavu::markset touched_color_cache;
 
         std::vector<int> g_old_v;
         std::vector<int> g_old_e;
@@ -158,14 +158,14 @@ namespace sassy {
             //coloring col;
             g->initialize_coloring(&c, colmap);
 
-            dejavu::ds::mark_set  test_twin(g->v_size);
+            dejavu::ds::markset  test_twin(g->v_size);
             std::vector<int> add_to_string;
             dejavu::ds::worklist twin_counter(g->v_size);
 
-            dejavu::ds::mark_set  potential_twin(g->v_size);
+            dejavu::ds::markset  potential_twin(g->v_size);
             dejavu::ds::worklist potential_twin_counter(g->v_size);
 
-            dejavu::ds::mark_set  touched(g->v_size);
+            dejavu::ds::markset  touched(g->v_size);
 
             std::vector<int> potential_twin_list;
 
@@ -488,7 +488,7 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::mark_set* path_done,
+        static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::markset* path_done,
                               dejavu::worklist* path) {
             int current_vertex = start;
             int last_vertex    = block;
@@ -525,7 +525,7 @@ namespace sassy {
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
         static std::pair<int, int> walk_to_endpoint(dejavu::sgraph *g, const int start, const int block,
-                                                    dejavu::mark_set* path_done) {
+                                                    dejavu::markset* path_done) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -592,8 +592,8 @@ namespace sassy {
             if (g->v_size <= 1 || h_deact_deg2)
                 return;
 
-            dejavu::mark_set color_test(g->v_size);
-            dejavu::mark_set color_unique(g->v_size);
+            dejavu::markset color_test(g->v_size);
+            dejavu::markset color_unique(g->v_size);
 
             //coloring col;
             g->initialize_coloring(&c, colmap);
@@ -612,7 +612,7 @@ namespace sassy {
                 endpoint_cnt.push_back(0);
             }
 
-            dejavu::mark_set  path_done(g->v_size);
+            dejavu::markset  path_done(g->v_size);
             dejavu::worklist color_pos(g->v_size);
             dejavu::worklist filter(g->v_size);
             dejavu::worklist path_list(g->v_size);
@@ -940,8 +940,8 @@ namespace sassy {
         void red_deg2_densify(dejavu::sgraph *g, int *colmap) {
             if (g->v_size <= 1 || h_deact_deg2) return;
 
-            dejavu::mark_set color_test(g->v_size);
-            dejavu::mark_set color_unique(g->v_size);
+            dejavu::markset color_test(g->v_size);
+            dejavu::markset color_unique(g->v_size);
 
             //coloring col;
             g->initialize_coloring(&c, colmap);
@@ -956,7 +956,7 @@ namespace sassy {
             dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
-            dejavu::mark_set  path_done(g->v_size);
+            dejavu::markset  path_done(g->v_size);
             dejavu::worklist color_pos(g->v_size);
             dejavu::worklist color_deg(g->v_size);
             dejavu::worklist hub_vertex_position(g->v_size);
@@ -966,7 +966,7 @@ namespace sassy {
             dejavu::worklist path(g->v_size);
             dejavu::worklist connected_paths(g->e_size);
             dejavu::worklist connected_endpoints(g->e_size);
-            dejavu::mark_set  duplicate_endpoints(g->v_size);
+            dejavu::markset  duplicate_endpoints(g->v_size);
 
             // collect and count endpoints
             int total_paths = 0;
@@ -1221,13 +1221,13 @@ namespace sassy {
             dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
-            dejavu::mark_set  path_done(g->v_size);
+            dejavu::markset  path_done(g->v_size);
             dejavu::worklist filter(g->v_size);
             dejavu::worklist path_list(g->v_size);
             dejavu::worklist path(g->v_size);
             dejavu::worklist connected_paths(g->e_size);
             dejavu::worklist connected_endpoints(g->e_size);
-            dejavu::mark_set  duplicate_endpoints(g->v_size);
+            dejavu::markset  duplicate_endpoints(g->v_size);
 
             // collect and count endpoints
             int total_paths = 0;
@@ -1442,7 +1442,7 @@ namespace sassy {
 
             int cycles_recolored = 0;
 
-            dejavu::mark_set  path_done(g->v_size);
+            dejavu::markset  path_done(g->v_size);
             dejavu::worklist path(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
@@ -1488,9 +1488,9 @@ namespace sassy {
             if (g->v_size <= 1 || h_deact_deg2)
                 return;
 
-            dejavu::ds::mark_set color_test(g->v_size);
+            dejavu::ds::markset color_test(g->v_size);
 
-            dejavu::ds::mark_set color_unique(g->v_size);
+            dejavu::ds::markset color_unique(g->v_size);
 
             //coloring col;
             g->initialize_coloring(&c, colmap);
@@ -1505,7 +1505,7 @@ namespace sassy {
             dejavu::ds::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
-            dejavu::ds::mark_set path_done(g->v_size);
+            dejavu::ds::markset path_done(g->v_size);
             dejavu::ds::worklist color_pos(g->v_size);
             dejavu::ds::worklist not_unique(2*g->v_size);
             dejavu::ds::worklist not_unique_analysis(g->v_size);
@@ -1760,7 +1760,7 @@ namespace sassy {
             worklist_deg0.reset();
             worklist_deg1.reset();
 
-            dejavu::mark_set  is_parent(g->v_size);
+            dejavu::markset  is_parent(g->v_size);
             dejavu::worklist pair_match(g->v_size);
             dejavu::worklist parentlist(g->v_size);
             dejavu::worklist childcount(g->v_size);
@@ -3343,7 +3343,7 @@ namespace sassy {
             domain_size = g->v_size;
 
             // assumes colmap is array of length g->v_size
-            del = dejavu::mark_set();
+            del = dejavu::markset();
             del.initialize(g->v_size);
 
             recovery_strings.reserve(g->v_size);
@@ -3393,7 +3393,7 @@ namespace sassy {
             if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
 
             if (schedule != nullptr) {
-                del_e = dejavu::mark_set();
+                del_e = dejavu::markset();
                 del_e.initialize(g->e_size);
 
                 for (size_t pc = 0; pc < schedule->size(); ++pc) {

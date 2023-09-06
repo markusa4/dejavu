@@ -25,8 +25,8 @@ namespace dejavu::ir {
         g->initialize_coloring(&c, colmap); // TODO certainly possible without a coloring, just keep a
                                             // TODO color_to_component array
 
-        ds::mark_set  handled(g->v_size);
-        ds::mark_set  col_handled(g->v_size);
+        ds::markset  handled(g->v_size);
+        ds::markset  col_handled(g->v_size);
         ds::worklist  wl(g->v_size);
 
         int current_component      = 0;

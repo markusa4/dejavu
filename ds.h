@@ -518,7 +518,7 @@ namespace dejavu {
          *
          * Set on a statically specified domain of elements 1, ..., size, with O(1) \a set and \a get.
          */
-        class mark_set {
+        class markset {
             int *s   = nullptr;
             int mark = 0;
             int sz = 0;
@@ -531,13 +531,13 @@ namespace dejavu {
             /**
              * Initializes a set of size 0
              */
-            mark_set() = default;
+            markset() = default;
 
             /**
              * Initialize this set with the given \p size.
              * @param size size to initialize this set to
              */
-            explicit mark_set(int size) {
+            explicit markset(int size) {
                 initialize(size);
             }
 
@@ -597,7 +597,7 @@ namespace dejavu {
                 ++mark;
             }
 
-            void copy(mark_set* other) {
+            void copy(markset* other) {
                 initialize(other->sz);
                 for(int i = 0; i < other->sz; ++i) {
                     s[i] = other->s[i];
@@ -606,7 +606,7 @@ namespace dejavu {
                 sz   = other->sz;
             }
 
-            ~mark_set() {
+            ~markset() {
                 if(s) free(s);
             }
         };

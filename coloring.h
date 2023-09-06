@@ -7,7 +7,7 @@
 
 #include <vector>
 #include <cassert>
-#include "utility.h"
+#include <cstring>
 
 namespace dejavu::ds {
     /**

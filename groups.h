@@ -163,8 +163,8 @@ namespace dejavu {
              * @param other Automorphism in sparse notation that is applied to this automorphism in.
              * @param pwr Power with which \p other is applied to this automorphism.
              */
-            [[maybe_unused]] void apply(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
-                       automorphism_workspace *other, int pwr = 1) {
+            [[maybe_unused]] void apply(worklist &scratch_apply1, worklist &scratch_apply2, markset &scratch_apply3,
+                                        automorphism_workspace *other, int pwr = 1) {
                 if(!other->support01 && other->nsupport() <= domain_size / 4) {
                     apply_sparse(scratch_apply1, scratch_apply2, scratch_apply3, other->perm(), other->support(),
                                  other->nsupport(), pwr);
@@ -186,8 +186,8 @@ namespace dejavu {
              * @param other Automorphism in dense notation that is applied to this automorphism.
              * @param pwr Power with which \p other is applied to this automorphism.
              */
-            void apply(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
-                  const int *p, int pwr = 1) {
+            void apply(worklist &scratch_apply1, worklist &scratch_apply2, markset &scratch_apply3,
+                       const int *p, int pwr = 1) {
                 if (pwr == 0) return;
                 if (pwr <= 5) {
                     if (pwr == 1)
@@ -250,8 +250,8 @@ namespace dejavu {
                 invalidate_inverse_automorphism();
             }
 
-            void apply_sparse(worklist &scratch_apply1, worklist &scratch_apply2, mark_set &scratch_apply3,
-                       const int *p, const int* support, const int nsupport, int pwr = 1) {
+            void apply_sparse(worklist &scratch_apply1, worklist &scratch_apply2, markset &scratch_apply3,
+                              const int *p, const int* support, const int nsupport, int pwr = 1) {
                 if (pwr == 0) return;
                 // sparse version only implemented for pwr <= 6 right now
                 if(pwr <= 6) {
@@ -365,6 +365,24 @@ namespace dejavu {
                     if (from != to) {
                         automorphism_supp.push_back(from);
                         automorphism[from] = to;
+                    }
+                }
+                invalidate_inverse_automorphism();
+            }
+
+            void cycle_completion(markset& scratch_set) {
+                for(int i = 0; i < automorphism_supp.size(); ++i) {
+                    const int v = automorphism_supp[i];
+                    if(scratch_set.get(v)) continue;
+                    int v_next = automorphism[v];
+                    while(v_next != v) {
+                        if(scratch_set.get(v_next)) break;
+                        scratch_set.set(v_next);
+                        if(v_next == automorphism[v_next]) {
+                            automorphism_supp.push_back(v_next);
+                            automorphism[v_next] = v;
+                        }
+                        v_next = automorphism[v_next];
                     }
                 }
                 invalidate_inverse_automorphism();
@@ -693,7 +711,7 @@ namespace dejavu {
              *
              * @param automorphism The automorphism to be stored.
              */
-            void store(int new_domain_size, automorphism_workspace &automorphism, mark_set &helper) {
+            void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
                 domain_size = new_domain_size;
                 assert(data.empty());
 
@@ -757,11 +775,11 @@ namespace dejavu {
 
             dense_sparse_arbiter loader; /**< used for indiscriminate loading of dense and sparse automorphisms */
 
-            mark_set scratch1;        /**< auxiliary space */
-            mark_set scratch2;        /**< auxiliary space */
+            markset scratch1;        /**< auxiliary space */
+            markset scratch2;        /**< auxiliary space */
             worklist scratch_apply1; /**< auxiliary space used for `apply` operations */
             worklist scratch_apply2; /**< auxiliary space used for `apply` operations */
-            mark_set scratch_apply3; /**< auxiliary space used for `apply` operations */
+            markset scratch_apply3; /**< auxiliary space used for `apply` operations */
             automorphism_workspace scratch_auto; /**< used to store a sparse automorphism*/
         };
 
@@ -1071,10 +1089,13 @@ namespace dejavu {
                 for (int i = 0; i < static_cast<int>(fixed_orbit.size()); ++i) {
                     const int p = fixed_orbit[i];
                     int j = automorphism.perm()[p];
+                    assert(j >= 0);
                     if (j == p || w.scratch1.get(j)) continue;
 
                     int pwr = 0; // power we save in Schreier vector
-                    for (int jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) ++pwr;
+                    for (int jj = j; !w.scratch1.get(jj); jj = automorphism.perm()[jj]) {
+                        ++pwr;
+                    }
 
                     while (!w.scratch1.get(j)) {
                         // we change this traversal
@@ -1141,7 +1162,7 @@ namespace dejavu {
          * dejavu.
          *
          */
-        class random_schreier_skinny {
+        class random_schreier_internal {
         private:
             int domain_size    = -1;
             int finished_up_to = -1;
@@ -1179,7 +1200,8 @@ namespace dejavu {
              * @param stop integer which indicates to stop reading the base at this position
              */
             void initialize(const int new_domain_size, std::vector<int> &base, std::vector<int> &base_sizes,
-                            const int stop = INT32_MAX) {
+                            int stop = INT32_MAX) {
+                if(stop >= base.size()) stop = static_cast<int>(base.size());
                 assert(base.size() >= stop);
                 domain_size = new_domain_size;
                 assert(this->domain_size > 0);
@@ -1226,6 +1248,7 @@ namespace dejavu {
                     transversals[i]->initialize(new_base[i], i, INT32_MAX);
                 }
 
+                // TODO resift all generators once?
                 sift_random(w, automorphism, rng, err);
             }
 
@@ -1397,10 +1420,7 @@ namespace dejavu {
 
                     // secondly, we fix the point of this transversal in automorphism
                     const bool identity = transversals[level]->fix_automorphism(w, generators, automorphism);
-                    if (identity) {
-                        //std::cout << "sift until " << level << ", c: " << changed << std::endl;
-                        break; // if automorphism is the identity now, no need to sift further
-                    }
+                    if (identity) break; // if automorphism is the identity now, no need to sift further
                 }
 
                 if(automorphism.nsupport() != 0 && keep_at_end) {
@@ -1538,19 +1558,17 @@ namespace dejavu {
          * Enables sifting of automorphisms into a Schreier structure with given base. The Schreier structure does not
          * compute proper random elements of the group, hence no guarantees regarding the error bound are given.
          *
-         * TODO get_orbit functions!
-         *
          */
         class random_schreier {
         private:
             int h_domain_size    = -1;
-            random_schreier_skinny schreier;
+            random_schreier_internal schreier;
 
             automorphism_workspace ws_auto;
             schreier_workspace     ws_schreier;
             random_source rng;
 
-            mark_set auxiliary_set;
+            markset auxiliary_set;
 
             int h_error_bound = 10; /**< higher value reduces likelihood of error (AKA missing generators) */
             bool init = false;
@@ -1610,18 +1628,18 @@ namespace dejavu {
             }
 
             /**
+             * @return Size of base of this Schreier structure.
+             */
+            [[nodiscard]] int base_size() const {
+                return schreier.base_size();
+            }
+
+            /**
              * @param pos Position in base.
              * @return Vertex fixed at position \p pos in base.
              */
             [[nodiscard]] int get_fixed_point(int pos) const {
                 return schreier.base_point(pos);
-            }
-
-            /**
-             * @return Size of base of this Schreier structure.
-             */
-            [[nodiscard]] int base_size() const {
-                return schreier.base_size();
             }
 
             /**
@@ -1636,10 +1654,19 @@ namespace dejavu {
             }
 
             /**
+             * Returns the orbit size of the fixed point at \p base_pos.
+             * @param base_pos position of base to look at
+             * @return the orbit size
+             */
+            [[nodiscard]]int get_fixed_orbit_size(const int base_pos) {
+                return schreier.get_fixed_orbit_size(base_pos);
+            }
+
+            /**
              * Returns the orbit of the fixed point at \p base_pos.
              *
-             * @param base_pos
-             * @param fixed_orbit
+             * @param base_pos position of base to look at
+             * @return the fixed orbit
              */
             const std::vector<int>& get_fixed_orbit(const int base_pos) {
                 return schreier.get_fixed_orbit(base_pos);
@@ -1648,8 +1675,8 @@ namespace dejavu {
             /**
              * Computes the entire orbit partition at \p base_pos.
              *
-             * @param base_pos
-             * @param orbit_partition
+             * @param base_pos position of base to look at
+             * @param orbit_partition orbits will be read into this orbit structure
              */
             void get_stabilizer_orbit(int base_pos, orbit& orbit_partition) {
                 const std::vector<int>& generators = schreier.get_stabilizer_generators(base_pos);
@@ -1663,10 +1690,6 @@ namespace dejavu {
                 }
             }
 
-            [[nodiscard]]int get_base_orbit_size(const int base_pos) {
-                return schreier.get_fixed_orbit_size(base_pos);
-            }
-
             /**
              * Sift automorphism into the Schreier structure.
              *
@@ -1674,20 +1697,31 @@ namespace dejavu {
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
-            bool sift(automorphism_workspace &automorphism) {
-                return schreier.sift(ws_schreier, automorphism, false, true);
+            bool sift(automorphism_workspace &automorphism, bool known_in_group = false) {
+                return sift(h_domain_size, automorphism.perm(), automorphism.nsupport(), automorphism.support(),
+                            known_in_group);
             }
 
-            bool sift(int, const int *p, int nsupp, const int *supp) {
+            bool sift(int, const int *p, int nsupp, const int *supp, bool known_in_group = false) {
                 ws_auto.reset();
+                for(int i = 0; i < h_domain_size; ++i) assert(ws_auto.perm()[i] == i);
+
                 for(int i = 0; i < nsupp; ++i) {
                     const int v_from = supp[i];
                     const int v_to   = p[v_from];
-                    if(v_from != v_to) {
-                        ws_auto.write_single_map(v_from, v_to);
-                    }
+                    if(v_from != v_to) ws_auto.write_single_map(v_from, v_to);
                 }
-                const bool result = schreier.sift(ws_schreier, ws_auto, false, true);
+
+                /*markset debug(h_domain_size);
+                for(int i = 0; i < h_domain_size; ++i) {
+                    assert(!debug.get(ws_auto.perm()[i]));
+                    debug.set(ws_auto.perm()[i]);
+                }*/
+
+
+                //std::cout << "sifting..." << std::endl;
+                const bool result = schreier.sift(ws_schreier, ws_auto, false, !known_in_group);
+                //std::cout << "sifting done " << result << std::endl;
                 ws_auto.reset();
                 return result;
             }
@@ -1702,6 +1736,11 @@ namespace dejavu {
             }
         };
 
+        /**
+         * \brief Hook to feed a Schreier structure
+         *
+         * Hook that can be used to feed generators into a `random_schreier` structure.
+         */
         class schreier_hook {
         private:
             dejavu_hook my_hook;
@@ -1740,8 +1779,8 @@ namespace dejavu {
                 do_compress = true;
                 domain_size = c.domain_size;
 
-                mark_set color_was_added(c.domain_size);
-                mark_set test_vertices_active(c.domain_size);
+                markset color_was_added(c.domain_size);
+                markset test_vertices_active(c.domain_size);
 
                 color_was_added.reset();
                 test_vertices_active.reset();
@@ -1801,17 +1840,15 @@ namespace dejavu {
          * \brief Schreier structure with fixed base. Implements precisely the interface as used by the dejavu
          * automorphism solver.
          *
-         * Internally, stores a shared_schreier structure in a compressed form using a domain_compressor.
-         *
+         * Internally, stores a `random_schreier_internal` structure in a compressed form using `domain_compressor`.
          */
         class compressed_schreier {
         private:
-            random_schreier_skinny         internal_schreier;
-            domain_compressor*      compressor;
-            automorphism_workspace* compressed_automorphism;
+            random_schreier_internal internal_schreier;
+            domain_compressor*       compressor;
+            automorphism_workspace*  compressed_automorphism;
             std::vector<int> original_base;
             std::vector<int> original_base_sizes;
-            int              s_compressed_until = 0;
 
         public:
             double h_min_compression_ratio = 0.4; /*< only use compression if at least this ratio can be achieved */
@@ -1842,7 +1879,6 @@ namespace dejavu {
             bool reset(domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w,
                        std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
-                s_compressed_until = 0;
                 compressor = new_compressor;
                 // do not use compression at all if ration too bad (to save on translation cost, and such that keep_old
                 // works for difficult graphs)
@@ -1883,8 +1919,6 @@ namespace dejavu {
              */
             void determine_potential_individualization(std::vector<std::pair<int, int>>* save_to_individualize,
                                                        coloring* root_coloring) {
-                if(s_compressed_until > 0) return; // let's not bother with this case...
-
                 if(compressor == nullptr) {
                     internal_schreier.determine_potential_individualization(save_to_individualize, root_coloring);
                     return;
@@ -1926,7 +1960,7 @@ namespace dejavu {
              */
             bool is_in_base_orbit(const int base_pos, const int v) {
                 int v_translate = compressor != nullptr? compressor->compress(v) : v;
-                return internal_schreier.is_in_fixed_orbit(base_pos - s_compressed_until, v_translate);
+                return internal_schreier.is_in_fixed_orbit(base_pos, v_translate);
             }
 
             /**
@@ -1944,7 +1978,7 @@ namespace dejavu {
                         selection[i] = compressor->compress(selection[i]);
                     }
                 }
-                internal_schreier.reduce_to_unfinished(w, selection, base_pos-s_compressed_until);
+                internal_schreier.reduce_to_unfinished(w, selection, base_pos);
                 if(compressor != nullptr) {
                     for(int i = 0; i < static_cast<int>(selection.size()); ++i) {
                         selection[i] = compressor->decompress(selection[i]);
@@ -2048,7 +2082,7 @@ namespace dejavu {
              *         -1 indicates no level has been finished.
              */
             [[nodiscard]] int finished_up_to_level() const {
-                return s_compressed_until + internal_schreier.finished_up_to_level();
+                return internal_schreier.finished_up_to_level();
             }
 
             /**

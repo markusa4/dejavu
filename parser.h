@@ -1,7 +1,11 @@
 #ifndef DEJAVU_PARSER_H
 #define DEJAVU_PARSER_H
+
 #include "sgraph.h"
 #include <string>
+#include <random>
+#include <iomanip>
+#include <fstream>
 
 static void parse_dimacs_file_fast(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
                                    int seed_permute=0) {

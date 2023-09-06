@@ -206,7 +206,7 @@ namespace dejavu {
             }
 
             // multiedge test
-            dejavu::ds::mark_set multiedge_test;
+            dejavu::ds::markset multiedge_test;
             multiedge_test.initialize(v_size);
             for(int i = 0; i < v_size; ++i) {
                 multiedge_test.reset();

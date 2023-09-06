@@ -124,7 +124,8 @@ namespace dejavu {
 
                 // orbit algorithm structure
                 orbs.initialize(g->v_size);
-                mark_set orbit_handled(g->v_size);
+                markset orbit_handled(g->v_size);
+                markset workspace(g->v_size);
 
                 // automorphism workspace
                 ws_automorphism.reset();
@@ -216,6 +217,8 @@ namespace dejavu {
                             ws_automorphism.write_singleton(state_right.compare_singletons,
                                                              &state_right.singletons, wr_pos_st,
                                                              wr_pos_end);
+                            if(g->v_size != state_right.c->cells) ws_automorphism.cycle_completion(workspace);
+
                             found_auto = state_right.certify(g, ws_automorphism);
 
                             assert(ws_automorphism.perm()[base_vertex] == ind_v);

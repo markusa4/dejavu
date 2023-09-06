@@ -115,7 +115,7 @@ namespace dejavu::search_strategy {
             local_state.use_increase_deviation(true);
             local_state.use_split_limit(true, 8);
 
-            mark_set original_colors(g->v_size);
+            markset original_colors(g->v_size);
             for(int _col = 0; _col < g->v_size;) {
                 const int _col_sz = local_state.c->ptn[_col] + 1;
                 original_colors.set(_col);
@@ -248,7 +248,7 @@ namespace dejavu::search_strategy {
 
             if (tree.get_finished_up_to() >= 1 && use_bfs_inprocess) {
                 worklist hash(g->v_size);
-                mark_set is_pruned(g->v_size);
+                markset is_pruned(g->v_size);
                 tree.mark_first_level(is_pruned);
                 tree.make_node_invariant(); // "compresses" node invariant from all levels into first level
 

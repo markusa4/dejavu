@@ -10,9 +10,25 @@
 
 dejavu::groups::orbit orbits1;
 dejavu::groups::orbit orbits2;
+dejavu::ds::markset cycle_tester;
 
 [[maybe_unused]] static void orbit1_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                        [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
+    cycle_tester.initialize(n);
+    cycle_tester.reset();
+
+    for(int i = 0; i < nsupp; ++i) {
+        const int v = supp[i];
+        if(cycle_tester.get(v)) continue;
+        int v_next = p[v];
+        while(v_next != v) {
+            assert(!cycle_tester.get(v_next));
+            cycle_tester.set(v_next);
+            v_next = p[v_next];
+        }
+        cycle_tester.set(v);
+    }
+
     assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
     orbits1.add_automorphism_to_orbit(p, nsupp, supp);
 }
@@ -136,6 +152,8 @@ TEST(graphs_test, graph_suite_comb) {
 
 TEST(graphs_test, graph_suite_prep) {
     std::string directory = TEST_RESOURCE_DIR;
+    test_graph_orbit_check(directory + "k-100.dimacs");
+    test_graph_orbit_check(directory + "e-100.dimacs");
     test_graph_orbit_check(directory + "rantree-100.bliss");
     test_graph_orbit_check(directory + "highschool1-aigio.dimacs");
     test_graph_orbit_check(directory + "AS.bliss");

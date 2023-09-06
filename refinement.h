@@ -247,6 +247,8 @@ namespace dejavu {
             bool certify_automorphism(sgraph *g, const int *p) {
                 assure_initialized(g);
 
+                if(!bijection_check(g->v_size, p)) return false;
+
                 for (int i = 0; i < g->v_size; ++i) {
                     const int image_i = p[i];
                     if (image_i == i) continue;
@@ -282,6 +284,8 @@ namespace dejavu {
 
                 assure_initialized(g);
 
+                if(!bijection_check(g->v_size, p)) return false;
+
                 for (i = 0; i < g->v_size; ++i) {
                     const int image_i = p[i];
                     if (image_i == i)
@@ -314,11 +318,55 @@ namespace dejavu {
                 return true;
             }
 
+            /**
+             * Check whether the given array defines a bijection.
+             *
+             * @param n size of the array
+             * @param p the array
+             * @return whether `i -> p[i]` is a bijection
+             */
+            bool bijection_check(int n, const int *p) {
+                scratch_set.reset();
+                bool comp = true;
+                for(int i = 0; i < n && comp; ++i) {
+                    const int v = p[i];
+                    comp = comp && !scratch_set.get(v);
+                    scratch_set.set(v);
+                }
+                return comp;
+            }
+
+            /**
+             * Check whether the points in the given support of the array define a bijection.
+             *
+             * @param p the array
+             * @param supp the number of points in the support
+             * @param supp_arr the support of p
+             * @return 
+             */
+            bool cycle_check(const int *p, int supp, const int *supp_arr) {
+                scratch_set.reset();
+                bool comp = true;
+                for(int i = 0; i < supp && comp; ++i) {
+                    const int v = supp_arr[i];
+                    if(scratch_set.get(v)) continue;
+                    int v_next = p[v];
+                    while(v_next != v && comp) {
+                        comp = comp && !scratch_set.get(v_next);
+                        scratch_set.set(v_next);
+                        v_next = p[v_next];
+                    }
+                }
+                return comp;
+            }
+
             // certify an automorphism on a graph, sparse
             bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
                 int i, found;
 
                 assure_initialized(g);
+
+                if(!cycle_check(p, supp, supp_arr)) return false;
 
                 for (int f = 0; f < supp; ++f) {
                     i = supp_arr[f];
@@ -504,7 +552,7 @@ namespace dejavu {
             worklist_t<int>  singleton_hint;
 
             // helper data structures for color refinement
-            mark_set        scratch_set;
+            markset        scratch_set;
             worklist_t<int> vertex_worklist;
             workset_t<int>  color_vertices_considered; // todo should use different datastructure, with n space not 2n
             workset_t<int>  neighbours;

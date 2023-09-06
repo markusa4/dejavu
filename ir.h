@@ -153,15 +153,15 @@ namespace dejavu {
             std::vector<int>       internal_compare_base_vertex; /** comparison base */
             std::vector<base_info> internal_compare_base;        /** additional info of the comparison base */
 
-            mark_set  touched_color; /**< were changes in this color already tracked? */
+            markset  touched_color; /**< were changes in this color already tracked? */
             worklist  touched_color_list; /**< color touched_color_list[i] was changed... */
             worklist  prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
 
             // the following workspaces are only used for the paired color dfs (AKA the saucy-style dfs) -- not needed
             // for normal bfs, dfs, or random search operation
-            mark_set  diff_tester;        /**< used for algorithms for 'difference testing' */
-            mark_set  diff_vertices;      /**< vertices that differ */
-            mark_set  diff_is_singleton;  /**< vertices are singleton */
+            markset  diff_tester;        /**< used for algorithms for 'difference testing' */
+            markset  diff_vertices;      /**< vertices that differ */
+            markset  diff_is_singleton;  /**< vertices are singleton */
             worklist  diff_vertices_list; /**< vertices that differ, but in a list */
             worklist  diff_vertices_list_pt; /**< vertex v is stored at position diff_vertices_list_pt[v] in the list
                                                *  above */
@@ -1075,7 +1075,7 @@ namespace dejavu {
             std::vector<int> saved_color_base;
             std::vector<int> saved_color_sizes;
             std::function<type_selector_hook> dynamic_seletor;
-            mark_set test_set;
+            markset test_set;
             std::vector<int> candidates;
             big_number ir_tree_size_estimate;;
 
@@ -1438,7 +1438,7 @@ namespace dejavu {
                 candidates.clear();
                 candidates.reserve(locked_lim);
 
-                mark_set neighbour_color;
+                markset neighbour_color;
                 neighbour_color.initialize(g->v_size);
 
                 while (state->get_coloring()->cells != g->v_size) {
@@ -2097,7 +2097,7 @@ namespace dejavu {
                 return missing_nodes.pop();
             }
 
-            void mark_first_level(mark_set& marks) {
+            void mark_first_level(markset& marks) {
                 if(tree_data[1] == nullptr) return;
 
                 marks.reset();
