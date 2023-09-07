@@ -9,7 +9,6 @@
 #include <iostream>
 #include <cstring>
 #include <functional>
-#include <mutex>
 #include <cassert>
 #include "coloring.h"
 
@@ -35,16 +34,13 @@ namespace dejavu {
         }
 
         /**
-         * \brief Shared queue datastructure
+         * \brief Stack datastructure
          *
-         * A queue which can be accessed across multiple threads.
-         *
-         * @tparam T Type of elements stored in the queue.
+         * @tparam T Type of elements stored on the stack.
          */
         template<class T>
-        class shared_queue_t {
+        class stack_t {
         private:
-            std::mutex lock;
             std::vector<T> queue;
         public:
             /**
@@ -52,9 +48,7 @@ namespace dejavu {
              * @param t Element to be added.
              */
             void add(T &t) {
-                lock.lock();
                 queue.emplace_back(t);
-                lock.unlock();
             }
 
             /**
@@ -62,9 +56,7 @@ namespace dejavu {
              * @param n Space to be reserved.
              */
             void reserve(int n) {
-                lock.lock();
                 queue.reserve(n);
-                lock.unlock();
             }
 
             /**
@@ -80,10 +72,8 @@ namespace dejavu {
              * @return The element popped from the queue.
              */
             T pop() {
-                lock.lock();
                 auto element = queue.back();
                 queue.pop_back();
-                lock.unlock();
                 return element;
             }
         };
@@ -293,7 +283,7 @@ namespace dejavu {
         typedef worklist_t<int> worklist;
 
         /**
-         * \brief Fixed-size array, 0-initialized
+         * \brief Fixed-size integer array, 0-initialized
          *
          * An array of fixed size, with some further convenience functions.
          *
@@ -408,57 +398,18 @@ namespace dejavu {
             int *arr = nullptr; /**< internal array */
         };
 
-        // queue with fixed size limitation
-        class work_queue {
-        public:
-            void initialize(int size) {
-                if(init) delete[] queue;
-                sz = size;
-                pos = 0;
-                queue = new int[size];
-                init = true;
-            }
-
-            void push(int val) {
-                assert(pos != sz);
-                queue[pos] = val;
-                pos++;
-            }
-
-            int pop() {
-                assert(pos > 0);
-                pos--;
-                return queue[pos];
-            }
-
-            [[nodiscard]] bool empty() const {
-                return (pos == 0);
-            }
-
-            ~work_queue() {
-                if (init) {
-                    delete[] queue;
-                }
-            }
-
-            void reset() {
-                pos = 0;
-            }
-
-        private:
-            int *queue = nullptr;
-            int pos    = 0;
-            bool init  = false;
-            int sz     = 0;
-        };
-
-        // work set with arbitrary type
+        /**
+         * \brief Set with counting
+         *
+         * Set on a statically specified domain of elements 1, ..., size, where each element holds an additional
+         * counter. Time complexity is O(1) for \a set, \a inc, \a get, and amortized O(1) for \a reset.
+         */
         template<class T>
         class workset_t {
         public:
             void initialize(int size) {
                 s = new T[size];
-                reset_queue.initialize(size);
+                reset_queue.allocate(size);
 
                 memset(s, -1, size * sizeof(T)); // TODO should use calloc
 
@@ -479,7 +430,7 @@ namespace dejavu {
             }
 
             void reset() {
-                while (!reset_queue.empty()) s[reset_queue.pop()] = -1;
+                while (!reset_queue.empty()) s[reset_queue.pop_back()] = -1;
             }
 
             void reset_hard() {
@@ -491,7 +442,7 @@ namespace dejavu {
                 assert(index >= 0);
                 assert(index < sz);
                 if (s[index]++ == -1)
-                    reset_queue.push(index);
+                    reset_queue.push_back(index);
                 return s[index];
             }
 
@@ -505,7 +456,7 @@ namespace dejavu {
                     delete[] s;
             }
 
-            work_queue reset_queue;
+            worklist reset_queue;
         private:
             bool init = false;
             T   *s = nullptr;
@@ -515,7 +466,7 @@ namespace dejavu {
         typedef workset_t<int> work_set_int;
 
         /**
-         * \brief Sets specialized for quick resets
+         * \brief Set specialized for quick resets
          *
          * Set on a statically specified domain of elements 1, ..., size, with O(1) \a set and \a get.
          */

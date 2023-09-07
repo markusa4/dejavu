@@ -12,7 +12,6 @@ typedef std::chrono::high_resolution_clock Clock;
 
 dejavu::ir::refinement test_r;
 dejavu::sgraph dej_test_graph;
-int*   dej_test_col;
 
 void empty_hook(int, const int*, int, const int *) {}
 
@@ -188,10 +187,10 @@ int commandline_mode(int argc, char **argv) {
 
     // manage hooks
     auto empty_hook_func = dejavu_hook(empty_hook);
-    dejavu::multi_hook hooks;
+    dejavu::hooks::multi_hook hooks;
     std::ofstream output_file;
-    dejavu::ostream_hook file_hook(output_file);
-    dejavu::ostream_hook cout_hook(std::cout);
+    dejavu::hooks::ostream_hook file_hook(output_file);
+    dejavu::hooks::ostream_hook cout_hook(std::cout);
     dejavu_hook* hook;
 
     // write automorphism to file or cout
@@ -218,7 +217,7 @@ int commandline_mode(int argc, char **argv) {
     // now run the solver with the given options...
     Clock::time_point timer = Clock::now();
 
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.set_error_bound(error_bound);
     d.set_print(print);
     if (true_random_seed) d.randomize_seed();

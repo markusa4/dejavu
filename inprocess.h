@@ -11,6 +11,13 @@
 #include "components.h"
 
 namespace dejavu::search_strategy {
+
+    /**
+     * \brief Inprocessing for symmetry detection
+     *
+     * Reads a graph and aspects of the state of the individualization-refinement search. Then, it tries to simplify
+     * the graph according to the given state, as well as further techniques such as invariants.
+     */
     class inprocessor {
     public:
         // statistics
@@ -18,49 +25,17 @@ namespace dejavu::search_strategy {
         int h_splits_hint = INT32_MAX;
 
         std::vector<std::pair<int, int>> inproc_can_individualize; /**< vertices that can be individualized           */
-        std::vector<std::pair<int, int>> inproc_maybe_individualize; /**< vertices that can be individualized         */
-        std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
 
-        std::vector<int> nodes;
-        worklist hash;
-
-        void sort_nodes_map(std::vector<unsigned long>* map, int* colmap) {
-            struct comparator_map {
-                std::vector<unsigned long> *map;
-                int* colmap;
-
-                explicit comparator_map(std::vector<unsigned long> *map, int* colmap) {
-                    this->map = map;
-                    this->colmap = colmap;
-                }
-
-                bool operator()(const int &a, const int &b) const {
-                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && ((*map)[a] < (*map)[b]));
-                }
-            };
-            auto c = comparator_map(map, colmap);
-            std::sort(nodes.begin(), nodes.end(), c);
-        }
-
-        void sort_nodes_map(unsigned long* map, int* colmap) {
-            struct comparator_map {
-                unsigned long *map;
-                int* colmap;
-
-                explicit comparator_map(unsigned long *map, int* colmap) {
-                    this->map = map;
-                    this->colmap = colmap;
-                }
-
-                bool operator()(const int &a, const int &b) const {
-                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && (map[a] < map[b]));
-                }
-            };
-            auto c = comparator_map(map, colmap);
-            std::sort(nodes.begin(), nodes.end(), c);
-        }
-
-
+        /**
+         * Computes an invariant using a `shallow` breadth-first search.
+         *
+         * @param g the graph
+         * @param local_state state used to perform IR computations
+         * @param inv place to store the invariant
+         * @param orbit_partition (partial) orbit partition of the graph, if available
+         * @param depth depth of trace to look at
+         * @param lower_depth whether to try to lower the depth, if a smaller distinguishing depth is found
+         */
         static void shallow_bfs_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv,
                                           groups::orbit& orbit_partition,
                                           int depth = 8, bool lower_depth = true) {
@@ -108,7 +83,90 @@ namespace dejavu::search_strategy {
             local_state.use_increase_deviation(false);
             local_state.use_split_limit(false);
         }
+        std::vector<std::pair<int, int>> inproc_maybe_individualize; /**< vertices that can be individualized         */
 
+        std::vector<int>                 inproc_fixed_points;      /**< vertices fixed by inprocessing                */
+        std::vector<int> nodes;
+
+        worklist hash;
+
+        void sort_nodes_map(std::vector<unsigned long>* map, int* colmap) {
+            struct comparator_map {
+                std::vector<unsigned long> *map;
+                int* colmap;
+
+                explicit comparator_map(std::vector<unsigned long> *map, int* colmap) {
+                    this->map = map;
+                    this->colmap = colmap;
+                }
+
+                bool operator()(const int &a, const int &b) const {
+                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && ((*map)[a] < (*map)[b]));
+                }
+            };
+            auto c = comparator_map(map, colmap);
+            std::sort(nodes.begin(), nodes.end(), c);
+        }
+
+        /**
+         * Refines the given IR state according to the given invariant.
+         *
+         * @param g the graph
+         * @param local_state the IR state
+         * @param inv the node invariant
+         */
+        void split_with_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+            hash.allocate(g->v_size);
+
+            int num_of_hashs = 0;
+            for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
+            sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
+            unsigned long last_inv = -1;
+            int last_col  = local_state.c->vertex_to_col[0];
+            for(int i = 0; i < g->v_size; ++i) {
+                const int v      = nodes[i];
+                const unsigned long v_inv = inv[v];
+                const int  v_col = local_state.c->vertex_to_col[v];
+                if(last_col != v_col) {
+                    last_col = v_col;
+                    last_inv = v_inv;
+                    ++num_of_hashs;
+                }
+                if(v_inv != last_inv) {
+                    last_inv = v_inv;
+                    ++num_of_hashs;
+                }
+                hash[v] = num_of_hashs;
+            }
+
+            g->initialize_coloring(local_state.c, hash.get_array());
+        }
+
+        void sort_nodes_map(unsigned long* map, int* colmap) {
+            struct comparator_map {
+                unsigned long *map;
+                int* colmap;
+
+                explicit comparator_map(unsigned long *map, int* colmap) {
+                    this->map = map;
+                    this->colmap = colmap;
+                }
+
+                bool operator()(const int &a, const int &b) const {
+                    return (colmap[a] < colmap[b]) || ((colmap[a] == colmap[b]) && (map[a] < map[b]));
+                }
+            };
+            auto c = comparator_map(map, colmap);
+            std::sort(nodes.begin(), nodes.end(), c);
+        }
+
+        /**
+         * Computes an invariant using a `shallow` breadth-first search for 2 consecutive levels.
+         *
+         * @param g the graph
+         * @param local_state state used to perform IR computations
+         * @param inv place to store the invariant
+         */
         static void shallow_bfs_invariant2(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
             local_state.use_reversible(true);
             local_state.use_trace_early_out(false);
@@ -153,34 +211,10 @@ namespace dejavu::search_strategy {
             local_state.use_split_limit(false);
         }
 
-
-        void split_with_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
-            hash.allocate(g->v_size);
-
-            int num_of_hashs = 0;
-            for(int i = 0; i < g->v_size; ++i) nodes.push_back(i);
-            sort_nodes_map(inv.get_array(), local_state.c->vertex_to_col);
-            unsigned long last_inv = -1;
-            int last_col  = local_state.c->vertex_to_col[0];
-            for(int i = 0; i < g->v_size; ++i) {
-                const int v      = nodes[i];
-                const unsigned long v_inv = inv[v];
-                const int  v_col = local_state.c->vertex_to_col[v];
-                if(last_col != v_col) {
-                    last_col = v_col;
-                    last_inv = v_inv;
-                    ++num_of_hashs;
-                }
-                if(v_inv != last_inv) {
-                    last_inv = v_inv;
-                    ++num_of_hashs;
-                }
-                hash[v] = num_of_hashs;
-            }
-
-            g->initialize_coloring(local_state.c, hash.get_array());
-        }
-
+        /**
+         * Give hint as to how deep we need to look for shallow invariants.
+         * @param splits_hint the hint
+         */
         void set_splits_hint(int splits_hint) {
             h_splits_hint = splits_hint;
         }
@@ -193,8 +227,9 @@ namespace dejavu::search_strategy {
          * @param group currently available group of symmetries
          * @param local_state workspace to perform individualization&refinement in
          * @param root_save the current coloring of the IR tree root
-         * @param budget
-         * @return whether any preprocessing was performed
+         * @param budget a limit on the budget
+         *
+         * @return whether any of the inprocessing techniques succeeded
          */
         bool inprocess(sgraph *g, ir::shared_tree &tree, groups::compressed_schreier &group, ir::controller &local_state,
                        ir::limited_save &root_save, [[maybe_unused]] int budget, bool use_bfs_inprocess,
@@ -230,6 +265,7 @@ namespace dejavu::search_strategy {
                 } while(changed && g->v_size != local_state.c->cells && its < 3);
             }
 
+            // computes a shallow breadth-first invariant for 2 levels
             if (use_shallow_quadratic_inprocess) {
                 worklist_t<unsigned long> inv(g->v_size);
 
@@ -246,8 +282,8 @@ namespace dejavu::search_strategy {
                 }
             }
 
+            // applies the computed breadth-first levels as a node invariant
             if (tree.get_finished_up_to() >= 1 && use_bfs_inprocess) {
-                worklist hash(g->v_size);
                 markset is_pruned(g->v_size);
                 tree.mark_first_level(is_pruned);
                 tree.make_node_invariant(); // "compresses" node invariant from all levels into first level
@@ -284,6 +320,7 @@ namespace dejavu::search_strategy {
                 }
             }
 
+            // performs individualizations if some of the initial cells of coloring coincide with their colors
             group.determine_potential_individualization(&inproc_can_individualize, local_state.get_coloring());
             if (!inproc_can_individualize.empty() || !inproc_maybe_individualize.empty()) {
                 int num_inds = 0;
@@ -314,6 +351,7 @@ namespace dejavu::search_strategy {
             inproc_can_individualize.clear();
             inproc_maybe_individualize.clear();
 
+            // did inprocessing succeed? if so, save the new state and report the change
             if(cell_prev != local_state.c->cells) {
                 local_state.save_reduced_state(root_save);
                 touched_coloring = true;

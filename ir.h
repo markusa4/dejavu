@@ -22,8 +22,8 @@ namespace dejavu {
         /**
          * \brief Mode of trace for IR search
          *
-         * The ir_mode determines in which mode the trace is used: whether a new trace is recorded, or whether the current
-         * computation is compared to a stored trace.
+         * The `ir_mode` determines in which mode the trace is used: whether a new trace is recorded, or whether the
+         * current computation is compared to a stored trace.
          *
          */
         enum ir_mode {
@@ -101,14 +101,14 @@ namespace dejavu {
          * \brief Tracks information for a base point
          */
         struct base_info {
-            int color;
-            int color_sz;
-            int cells;
-            int touched_color_list_pt;
-            int singleton_pt;
+            int color; /**< color of the base point */
+            int color_sz; /**< color size of the base point */
+            int cells; /**< number of cells of the coloring*/
+            int touched_color_list_pt; /**< position of the touched color list */
+            int singleton_pt; /**< position of the singleton list */
 
-            int  trace_pos;
-            unsigned long trace_hash;
+            int  trace_pos; /**< position of the trace */
+            unsigned long trace_hash; /**< hash of the trace */
 
             base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt, int tracePos,
                       unsigned long traceHash) :
@@ -1767,7 +1767,6 @@ namespace dejavu {
          *
          */
         class shared_leaves {
-            std::mutex lock;
             std::unordered_multimap<unsigned long, stored_leaf*> leaf_store;
             std::vector<stored_leaf*> garbage_collector;
 
@@ -1795,14 +1794,10 @@ namespace dejavu {
              * @return
              */
             stored_leaf* lookup_leaf(unsigned long hash) {
-                lock.lock();
                 auto find = leaf_store.find(hash);
                 if(find != leaf_store.end()) {
-                    auto result = find->second;
-                    lock.unlock();
-                    return result;
+                    return find->second;
                 } else {
-                    lock.unlock();
                     return nullptr;
                 }
             }
@@ -1814,13 +1809,9 @@ namespace dejavu {
              * @param ptr
              */
             void add_leaf(unsigned long hash, coloring& c, std::vector<int>& base) {
-                lock.lock();
 
                 // check whether hash already exists
-                if(leaf_store.contains(hash)) {
-                    lock.unlock();
-                    return;
-                }
+                if(leaf_store.contains(hash)) return;
 
                 // if not, add the leaf
                 const bool full_save = s_leaves < h_full_save_limit;
@@ -1831,7 +1822,6 @@ namespace dejavu {
                 leaf_store.insert(std::pair<unsigned long, stored_leaf*>(hash, new_leaf));
                 garbage_collector.push_back(new_leaf);
                 ++s_leaves;
-                lock.unlock();
             }
 
             /**
@@ -1848,7 +1838,6 @@ namespace dejavu {
          * \brief A node of an IR tree
          */
         class tree_node {
-            std::mutex    lock;
             limited_save* data = nullptr;
             bool          owns_data = true;
             tree_node*    next;
@@ -1922,7 +1911,7 @@ namespace dejavu {
          * Can be used across multiple threads.
          */
         class shared_tree {
-            shared_queue_t<missing_node>         missing_nodes;
+            stack_t<missing_node>         missing_nodes;
             std::vector<tree_node*>              tree_data;
             std::vector<std::vector<tree_node*>> tree_data_jump_map;
             std::vector<int>        tree_level_size;
@@ -2189,51 +2178,6 @@ namespace dejavu {
             ~shared_tree() {
                 for(auto & i : garbage_collector) delete i;
             };
-        };
-
-        /**
-         * \brief Certification on the original graph
-         *
-         * Certifies all automorphisms on the original graph. By default, in dejavu, all automorphisms are certified on
-         * the remainder of the graph still left to solve. Essentially, this means that preprocessing routines that
-         * shrink the graph are not certified.
-         *
-         * This hook saves the original graph before solving, and certifies all the returned automorphisms on the
-         * original graph before calling other hooks.
-         */
-        class strong_certification_hook {
-        private:
-            dejavu_hook  my_hook;
-            dejavu_hook* my_call_hook;
-            markset scratch_set;
-
-            sgraph* my_g;
-
-            void hook_func(int n, const int *p, int nsupp, const int *supp) {
-                const bool certify = certification::certify_automorphism_sparse(scratch_set, my_g, p, nsupp, supp);
-                if(!certify) return;
-                (*my_call_hook)(n, p, nsupp, supp);
-            }
-        public:
-            explicit strong_certification_hook(static_graph& g, dejavu_hook* call_hook) {
-                my_g->copy_graph(g.get_sgraph());
-                my_call_hook = call_hook;
-                scratch_set.initialize(g.get_sgraph()->v_size);
-            }
-
-            explicit strong_certification_hook(sgraph& g, dejavu_hook* call_hook) {
-                my_g->copy_graph(&g);
-                my_call_hook = call_hook;
-                scratch_set.initialize(g.v_size);
-            }
-
-            dejavu_hook* get_hook() {
-                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
-                };
-                return &my_hook;
-            }
         };
     }
 }

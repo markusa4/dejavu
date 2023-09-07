@@ -637,25 +637,6 @@ namespace dejavu {
             }
         };
 
-        class orbit_hook {
-        private:
-            dejavu_hook my_hook;
-            orbit& my_orbit;
-            void hook_func(int n, const int *p, int nsupp, const int *supp) {
-                my_orbit.add_automorphism_to_orbit(p, nsupp, supp);
-            }
-        public:
-            explicit orbit_hook(orbit& save_orbit) : my_orbit(save_orbit) {}
-
-            dejavu_hook* get_hook() {
-                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
-                };
-                return &my_hook;
-            }
-        };
-
         /**
          * \brief Stores a link to an automorphism.
          *
@@ -831,10 +812,8 @@ namespace dejavu {
         /**
          * \brief Stores a generating set.
          *
-         * Can be used across multiple threads.
          */
         class generating_set {
-            std::mutex lock_generators;          /**< locks the generators */
             std::vector<stored_automorphism *> generators; /** list of generators */
             int domain_size = 0;
         public:
@@ -857,11 +836,9 @@ namespace dejavu {
              * @return Identifier of the new generator in the generating set.
              */
             int add_generator(schreier_workspace &w, automorphism_workspace &automorphism) {
-                lock_generators.lock();
                 generators.emplace_back(new stored_automorphism);
                 const auto num = generators.size() - 1;
                 generators[num]->store(domain_size, automorphism, w.scratch2);
-                lock_generators.unlock();
 
                 s_stored_sparse += (generators[num]->get_store_type() ==
                                     stored_automorphism::stored_automorphism_type::STORE_SPARSE);
@@ -1813,30 +1790,8 @@ namespace dejavu {
         };
 
         /**
-         * \brief Hook to feed a Schreier structure
-         *
-         * Hook that can be used to feed generators into a `random_schreier` structure.
+         * \brief Compresses vertex set to smaller window
          */
-        class schreier_hook {
-        private:
-            dejavu_hook my_hook;
-            random_schreier& my_schreier;
-            void hook_func(int n, const int *p, int nsupp, const int *supp) {
-                my_schreier.sift(n, p, nsupp, supp);
-            }
-        public:
-            explicit schreier_hook(random_schreier& schreier) : my_schreier(schreier) {}
-
-            dejavu_hook* get_hook() {
-                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
-                };
-                return &my_hook;
-            }
-        };
-
-
         class domain_compressor {
             std::vector<int> map_to_small;
             std::vector<int> map_to_big;
@@ -1851,6 +1806,12 @@ namespace dejavu {
         public:
             double s_compression_ratio = 1.0;
 
+            /**
+             * Determines which colors of given vertex coloring are not needed for the given base
+             * @param c the vertex coloring
+             * @param base the base
+             * @param stop place to stop reading the \a base
+             */
             void determine_compression_map(coloring& c, std::vector<int>& base, int stop) {
                 do_compress = true;
                 domain_size = c.domain_size;
@@ -1893,19 +1854,35 @@ namespace dejavu {
                 if(domain_size > 0) s_compression_ratio = 1.0 * s_vertices_active / domain_size;
             }
 
+            /**
+             * @return how large the compressed domain is
+             */
             [[nodiscard]] int compressed_domain_size() const {
                 return s_vertices_active;
             }
 
+            /**
+             * @return how large the original domain is
+             */
             [[nodiscard]] int decompressed_domain_size() const {
                 return domain_size;
             }
 
+            /**
+             * Mapping from original domain to compressed domain.
+             * @param v vertex of the original domain
+             * @return \a v in the compressed domain, or `-1` if not contained in compressed domain
+             */
             int compress(int v) {
                 if(!do_compress) return v;
                 return map_to_small[v];
             }
 
+            /**
+             * Mapping from compressed domain to original domain
+             * @param v vertex of compressed domain
+             * @return \a v in the original domain
+             */
             int decompress(int v) {
                 if(!do_compress) return v;
                 return map_to_big[v];
@@ -1913,8 +1890,7 @@ namespace dejavu {
         };
 
         /**
-         * \brief Schreier structure with fixed base. Implements precisely the interface as used by the dejavu
-         * automorphism solver.
+         * \brief Compressed Schreier structure.
          *
          * Internally, stores a `random_schreier_internal` structure in a compressed form using `domain_compressor`.
          */

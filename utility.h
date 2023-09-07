@@ -2,9 +2,7 @@
 // This file is part of dejavu 2.0.
 // See LICENSE for extended copyright information.
 
-#include <atomic>
 #include <iostream>
-#include <mutex>
 #include <algorithm>
 #include <random>
 #include <unordered_map>
@@ -193,88 +191,35 @@ static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** c
 
 typedef void type_dejavu_hook(int, const int*, int, const int*);
 typedef std::function<void(int, const int*, int, const int*)> dejavu_hook;
-extern volatile int dejavu_kill_request;
 
 namespace dejavu {
 
-    class multi_hook {
-    private:
-        std::vector<dejavu_hook*> hooks;
-        dejavu_hook my_hook;
-        void hook_func(int n, const int *p, int nsupp, const int *supp) {
-            for(dejavu_hook* hook : hooks) {
-                (*hook)(n, p, nsupp, supp);
-            }
-        }
-    public:
-        void add_hook(dejavu_hook* hook) {
-            hooks.push_back(hook);
-        }
-
-        void clear() {
-            hooks.clear();
-        }
-
-        [[nodiscard]] size_t size() const {
-            return hooks.size();
-        }
-
-        dejavu_hook* get_hook() {
-            my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                    { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                               std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
-            };
-            return &my_hook;
-        }
-    };
-
-    class ostream_hook {
-    private:
-        dejavu_hook   my_hook;
-        std::ostream& my_ostream;
-        dejavu::ds::markset  test_set;
-
-        void hook_func(int n, const int *p, int nsupp, const int *supp) {
-            test_set.initialize(n);
-            test_set.reset();
-            for(int i = 0; i < nsupp; ++i) {
-                const int v_from = supp[i];
-                if(test_set.get(v_from)) continue;
-                int v_next = p[v_from];
-                if(v_from == v_next) continue;
-                test_set.set(v_from);
-                my_ostream << "(" << v_from;
-                while(!test_set.get(v_next)) {
-                    test_set.set(v_next);
-                    my_ostream << " " << v_next;
-                    v_next = p[v_next];
-                }
-                my_ostream << ")";
-            }
-            my_ostream << std::endl;
-        }
-    public:
-        explicit ostream_hook(std::ostream& ostream) : my_ostream(ostream) {}
-
-        dejavu_hook* get_hook() {
-            my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-            { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                               std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
-            };
-            return &my_hook;
-        }
-    };
-
+    /**
+     * \brief Random number generation
+     *
+     * Either uses a pseudo random number generator, or random device of OS.
+     */
     class random_source {
         bool true_random = false;
         std::mt19937 pseudo_random_device;
         //std::default_random_engine pseudo_random_device;
         std::random_device true_random_device;
     public:
+        /**
+         * Creates random source with given parameters.
+         *
+         * @param set_true_random use random device of OS if true, or pseudo random if false
+         * @param set_seed sets seed of pseudo random number generator
+         */
         random_source(bool set_true_random, int set_seed) {
             true_random = set_true_random;
             pseudo_random_device.seed(set_seed);
         }
+
+        /**
+         * Returns a random number
+         * @return
+         */
         int operator()() {
             return true_random?static_cast<int>(true_random_device()&INT32_MAX):
                                static_cast<int>(pseudo_random_device()&INT32_MAX);
@@ -282,10 +227,12 @@ namespace dejavu {
     };
 
     /**
+     * \brief Stores big numbers
+     *
      * A simple class to store big, positive numbers. Consists of a \a mantissa and a \a exponent, where the value of
      * the number is `mantissa^exponent`.
      *
-     * Used to store group sizes.
+     * Used to store automorphism group sizes.
      */
     class big_number {
     public:
@@ -375,7 +322,9 @@ namespace dejavu {
         progress_print_split();
     }
 
-
+    /**
+     * \brief Prints stuff to the console
+     */
     class timed_print {
         std::chrono::high_resolution_clock::time_point first;
         std::chrono::high_resolution_clock::time_point previous;

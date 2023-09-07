@@ -16,7 +16,7 @@
 #include <iomanip>
 #include <ctime>
 
-namespace sassy {
+namespace dejavu {
     using dejavu::ds::coloring;
 
     class preprocessor;

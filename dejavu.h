@@ -34,10 +34,11 @@ namespace dejavu {
      * Contains the high-level strategy of the dejavu solver, controlling the interactions between different modules
      * of the solver.
      */
-    class dejavu2 {
+    class solver {
     private:
-        int h_error_bound       = 10; /**< error probability is below `1/2^h_error_bound`, default value of 10 thus
-                                       *   misses a generator with probabiltiy at most 1/2^10 < 0.098% */
+        int h_error_bound       = 10; /**< assuming uniform random numbers, error probability is below
+                                        * `1/2^h_error_bound`, default value of 10 thus misses a generator
+                                        *  with probabiltiy at most 1/2^10 < 0.098% */
         bool h_random_use_true_random = false; /**< use true randomness where randomness affects error probabilities */
         int  h_random_seed = 0; /**< is true randomness is not used, here is the seed to be used */
         bool h_silent = false; /**< don't print solver progress */
@@ -58,8 +59,9 @@ namespace dejavu {
         big_number s_grp_sz; /**< size of the automorphism group computed in last run */
     public:
         /**
-         * Error probability is below `1/2^error_bound`, default value is 10. Thus, the default value
-         * misses a generator with probabiltiy at most 1/2^10 < 0.098% (assuming truely randomly generated numbers).
+         * Assuming uniform random numbers, error probability is below `1/2^error_bound`, default value is 10. Thus, the
+         * default value misses a generator with probabiltiy at most 1/2^10 < 0.098% (assuming truely randomly generated
+         * numbers).
          *
          * @param error_bound the new error bound
          */
@@ -68,8 +70,8 @@ namespace dejavu {
         }
 
         /**
-         * Error probability is below `1/2^error_bound`, default value is 10. Thus, the default value
-         * misses a generator with probabiltiy at most 1/2^10 < 0.098% (assuming truely randomly generated numbers).
+         * Assuming uniform random numbers, error probability is below `1/2^error_bound`, default value is 10. Thus, the
+         * default value misses a generator with probabiltiy at most 1/2^10 < 0.098%.
          *
          * @return the currently configured error bound
          */
@@ -148,6 +150,14 @@ namespace dejavu {
             return s_deterministic_termination;
         }
 
+        /**
+         * Compute the automorphisms of the graph \p g. Automorphisms are returned using the function pointer \p hook.
+         *
+         * @param g The graph.
+         * @param hook The hook used for returning automorphisms. A null pointer is admissible if this is not needed.
+         *
+         * \sa A description of the graph format can be found in graph.
+         */
         void automorphisms(static_graph* g, dejavu_hook* hook = nullptr) {
             automorphisms(g->get_sgraph(), g->get_coloring(), hook);
         }
@@ -180,7 +190,7 @@ namespace dejavu {
             }
 
             // first, we try to preprocess
-            sassy::preprocessor m_prep(&m_printer); /*< initializes the preprocessor */
+            preprocessor m_prep(&m_printer); /*< initializes the preprocessor */
 
             // preprocess the graph using sassy
             m_printer.print("preprocessing");
@@ -192,7 +202,7 @@ namespace dejavu {
             if(g->v_size <= 1) return;
 
             // if the preprocessor changed the vertex set of the graph, need to use reverse translation
-            dejavu_hook dhook = sassy::preprocessor::_dejavu_hook;
+            dejavu_hook dhook = preprocessor::_dejavu_hook;
             hook = &dhook; /*< change hook to sassy hook */
 
             // attempt to split into multiple quotient components than can be handled individually
@@ -684,6 +694,183 @@ namespace dejavu {
             m_printer.timer_print("done", s_deterministic_termination, s_term);
         }
     };
+
+    /**
+     * \brief A collection of dejavu hooks
+     */
+    namespace hooks {
+        /**
+         * \brief Calls several other hooks
+         *
+         * A hook that is used to call several other hooks.
+         */
+        class multi_hook {
+        private:
+            std::vector<dejavu_hook*> hooks;
+            dejavu_hook my_hook;
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                for(dejavu_hook* hook : hooks) {
+                    (*hook)(n, p, nsupp, supp);
+                }
+            }
+        public:
+            void add_hook(dejavu_hook* hook) {
+                hooks.push_back(hook);
+            }
+
+            void clear() {
+                hooks.clear();
+            }
+
+            [[nodiscard]] size_t size() const {
+                return hooks.size();
+            }
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
+        /**
+         * \brief Writes to an ostream
+         *
+         * Hook that writes all the given symmetries to the given output stream (e.g., cout or an output file).
+         */
+        class ostream_hook {
+        private:
+            dejavu_hook   my_hook;
+            std::ostream& my_ostream;
+            dejavu::ds::markset  test_set;
+
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                test_set.initialize(n);
+                test_set.reset();
+                for(int i = 0; i < nsupp; ++i) {
+                    const int v_from = supp[i];
+                    if(test_set.get(v_from)) continue;
+                    int v_next = p[v_from];
+                    if(v_from == v_next) continue;
+                    test_set.set(v_from);
+                    my_ostream << "(" << v_from;
+                    while(!test_set.get(v_next)) {
+                        test_set.set(v_next);
+                        my_ostream << " " << v_next;
+                        v_next = p[v_next];
+                    }
+                    my_ostream << ")";
+                }
+                my_ostream << std::endl;
+            }
+        public:
+            explicit ostream_hook(std::ostream& ostream) : my_ostream(ostream) {}
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
+        /**
+         * \brief Certification on the original graph
+         *
+         * Certifies all automorphisms on the original graph. By default, in dejavu, all automorphisms are certified on
+         * the remainder of the graph still left to solve. Essentially, this means that preprocessing routines that
+         * shrink the graph are not certified.
+         *
+         * This hook saves the original graph before solving, and certifies all the returned automorphisms on the
+         * original graph before calling other hooks.
+         */
+        class strong_certification_hook {
+        private:
+            dejavu_hook  my_hook;
+            dejavu_hook* my_call_hook;
+            markset scratch_set;
+
+            sgraph* my_g;
+
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                const bool certify = ir::certification::certify_automorphism_sparse(scratch_set, my_g, p, nsupp, supp);
+                if(!certify) return;
+                (*my_call_hook)(n, p, nsupp, supp);
+            }
+        public:
+            explicit strong_certification_hook(static_graph& g, dejavu_hook* call_hook) {
+                my_g->copy_graph(g.get_sgraph());
+                my_call_hook = call_hook;
+                scratch_set.initialize(g.get_sgraph()->v_size);
+            }
+
+            explicit strong_certification_hook(sgraph& g, dejavu_hook* call_hook) {
+                my_g->copy_graph(&g);
+                my_call_hook = call_hook;
+                scratch_set.initialize(g.v_size);
+            }
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
+        /**
+         * \brief Hook to feed a Schreier structure
+         *
+         * Hook that can be used to feed generators into a `random_schreier` structure.
+         */
+        class schreier_hook {
+        private:
+            dejavu_hook my_hook;
+            groups::random_schreier& my_schreier;
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                my_schreier.sift(n, p, nsupp, supp);
+            }
+        public:
+            explicit schreier_hook(groups::random_schreier& schreier) : my_schreier(schreier) {}
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+
+        /**
+         * \brief Hook to feed an orbit structure
+         *
+         * Can be used to compute the orbit partition of a graph.
+         */
+        class orbit_hook {
+        private:
+            dejavu_hook my_hook;
+            groups::orbit& my_orbit;
+            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+                my_orbit.add_automorphism_to_orbit(p, nsupp, supp);
+            }
+        public:
+            explicit orbit_hook(groups::orbit& save_orbit) : my_orbit(save_orbit) {}
+
+            dejavu_hook* get_hook() {
+                my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
+                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                                   std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
+                };
+                return &my_hook;
+            }
+        };
+    }
+
 }
 
 #endif //DEJAVU_DEJAVU_H

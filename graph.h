@@ -4,6 +4,11 @@
 #include <fstream>
 
 namespace dejavu {
+    /**
+     * \brief Internal graph data structure
+     *
+     * Graph data strcture as used internally by the dejavu solver. See \
+     */
     class sgraph {
         struct vertexComparator {
             vertexComparator(const sgraph &g) : g(g) {}

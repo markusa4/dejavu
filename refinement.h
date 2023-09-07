@@ -16,6 +16,11 @@ namespace dejavu {
 
     namespace ir {
 
+        /**
+         * \brief Certifies automorphisms
+         *
+         * Contains methods to certify whether a given vertex mapping is a symmetry of a given graph.
+         */
         class certification {
         private:
             static bool bijection_check(markset& scratch_set, int n, const int *p) {
