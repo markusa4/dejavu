@@ -7,9 +7,8 @@
 
 #include "refinement.h"
 #include "coloring.h"
-#include "sgraph.h"
-#include "trace.h"
 #include "graph.h"
+#include "trace.h"
 
 namespace dejavu {
 

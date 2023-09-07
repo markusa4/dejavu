@@ -226,6 +226,7 @@ namespace dejavu {
                 T *old_arr = nullptr;
                 int old_arr_sz = arr_sz;
                 if (arr) old_arr = arr;
+                arr = nullptr;
                 alloc(size);
                 if (old_arr != nullptr) {
                     int cp_pt = std::min(old_arr_sz, arr_sz);

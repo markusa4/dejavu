@@ -6,7 +6,7 @@
 #define DEJAVU_GROUPS_H
 
 #include "coloring.h"
-#include "sgraph.h"
+#include "graph.h"
 #include "trace.h"
 
 namespace dejavu {
@@ -94,7 +94,7 @@ namespace dejavu {
              *
              * @param domain_size Size of the domain on which automorphisms operate
              */
-            explicit automorphism_workspace(int domain_size) {
+            explicit automorphism_workspace(int domain_size = 0) {
                 automorphism.allocate(domain_size);
                 for (int i = 0; i < domain_size; ++i) {
                     automorphism[i] = i;
@@ -103,6 +103,18 @@ namespace dejavu {
                 inverse_automorphism.allocate(domain_size);
                 invalidate_inverse_automorphism();
                 this->domain_size = domain_size;
+            }
+
+            void resize(int new_domain_size) {
+                automorphism.resize(new_domain_size);
+                for (int i = 0; i < new_domain_size; ++i) {
+                    automorphism[i] = i;
+                }
+                automorphism_supp.resize(new_domain_size);
+                automorphism_supp.reset();
+                inverse_automorphism.resize(new_domain_size);
+                invalidate_inverse_automorphism();
+                this->domain_size = new_domain_size;
             }
 
             /**
@@ -1201,7 +1213,7 @@ namespace dejavu {
             int finished_up_to = -1;
 
             generating_set generators;
-            std::vector<shared_transversal *> transversals;
+            std::vector<shared_transversal> transversals;
             std::vector<int> stabilized_generators;
 
             bool init = false;
@@ -1248,8 +1260,8 @@ namespace dejavu {
 
                 //transversals.set_size(stop);
                 for (int i = 0; i < stop && i < static_cast<int>(base.size()); ++i) {
-                    transversals.push_back(new shared_transversal());
-                    transversals[i]->initialize(base[i], i, base_sizes[i]);
+                    transversals.emplace_back();
+                    transversals[i].initialize(base[i], i, base_sizes[i]);
                 }
                 init = true;
             }
@@ -1263,7 +1275,7 @@ namespace dejavu {
                 // compare with stored base, keep whatever is possible
                 int keep_until = 0;
                 for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
-                    if (transversals[keep_until]->get_fixed_point() != new_base[keep_until]) break;
+                    if (transversals[keep_until].get_fixed_point() != new_base[keep_until]) break;
                 }
 
                 if(keep_until == new_size) return;
@@ -1273,13 +1285,13 @@ namespace dejavu {
 
 
                 for(int i = 0; i < keep_until; ++i) {
-                    transversals[i]->set_size_upper_bound(INT32_MAX);
+                    transversals[i].set_size_upper_bound(INT32_MAX);
                 }
                 for (int i = keep_until; i < new_size; ++i) {
-                    if(i < old_size) delete transversals[i];
-                    transversals[i] = new shared_transversal();
+                    //if(i < old_size) delete transversals[i];
+                    transversals[i] = shared_transversal();
                     assert(new_base[i] >= 0);
-                    transversals[i]->initialize(new_base[i], i, INT32_MAX);
+                    transversals[i].initialize(new_base[i], i, INT32_MAX);
                 }
 
                 stabilized_generators.clear();
@@ -1321,7 +1333,7 @@ namespace dejavu {
                 int keep_until = 0;
                 if(keep_old) {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
-                        if (transversals[keep_until]->get_fixed_point() != new_base[keep_until]) break;
+                        if (transversals[keep_until].get_fixed_point() != new_base[keep_until]) break;
                     }
                 } else {
                     //generators.clear();
@@ -1337,13 +1349,13 @@ namespace dejavu {
 
 
                 for(int i = 0; i < keep_until; ++i) {
-                    transversals[i]->set_size_upper_bound(new_base_sizes[i]);
+                    transversals[i].set_size_upper_bound(new_base_sizes[i]);
                 }
                 for (int i = keep_until; i < stop; ++i) {
-                    if(i < old_size) delete transversals[i];
-                    transversals[i] = new shared_transversal();
+                    //if(i < old_size) delete transversals[i];
+                    transversals[i] = shared_transversal();
                     assert(new_base[i] >= 0);
-                    transversals[i]->initialize(new_base[i], i, new_base_sizes[i]);
+                    transversals[i].initialize(new_base[i], i, new_base_sizes[i]);
                 }
 
                 stabilized_generators.clear();
@@ -1362,9 +1374,9 @@ namespace dejavu {
                                                        coloring* root_coloring) {
                 for (int i = base_size()-1; i >= 0; --i) {
                     const int corresponding_root_color_sz =
-                            root_coloring->ptn[root_coloring->vertex_to_col[transversals[i]->get_fixed_point()]] + 1;
-                    if(transversals[i]->size() >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
-                        save_to_individualize->emplace_back(transversals[i]->get_fixed_point(), corresponding_root_color_sz);
+                            root_coloring->ptn[root_coloring->vertex_to_col[transversals[i].get_fixed_point()]] + 1;
+                    if(transversals[i].size() >= corresponding_root_color_sz && corresponding_root_color_sz > 1) {
+                        save_to_individualize->emplace_back(transversals[i].get_fixed_point(), corresponding_root_color_sz);
                     }
                 }
             }
@@ -1374,7 +1386,7 @@ namespace dejavu {
              * @return Vertex fixed at position \p pos in base.
              */
             [[nodiscard]] int base_point(int pos) const {
-                return transversals[pos]->get_fixed_point();
+                return transversals[pos].get_fixed_point();
             }
 
             /**
@@ -1396,20 +1408,20 @@ namespace dejavu {
                 if(v < 0) return false;
                 assert(base_pos >= 0);
                 assert(base_pos < base_size());
-                const int search = transversals[base_pos]->find_point(v);
+                const int search = transversals[base_pos].find_point(v);
                 return search != -1;
             }
 
             const std::vector<int>& get_fixed_orbit(const int base_pos) {
                 assert(base_pos >= 0);
                 assert(base_pos < base_size());
-                return transversals[base_pos]->get_fixed_orbit();
+                return transversals[base_pos].get_fixed_orbit();
             }
 
             const std::vector<int>& get_stabilizer_generators(const int base_pos) {
                 assert(base_pos >= 0);
                 assert(base_pos < base_size());
-                return transversals[base_pos]->get_generators();
+                return transversals[base_pos].get_generators();
             }
 
             const std::vector<int>& get_stabilized_generators() {
@@ -1418,7 +1430,7 @@ namespace dejavu {
 
             [[nodiscard]]int get_fixed_orbit_size(const int base_pos) {
                 if (base_pos >= static_cast<int>(transversals.size())) return 0;
-                return transversals[base_pos]->size();
+                return transversals[base_pos].size();
             }
 
             /**
@@ -1430,7 +1442,7 @@ namespace dejavu {
              * @param base_pos Position in base.
              */
             void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection, int base_pos) {
-                transversals[base_pos]->reduce_to_unfinished(w, selection);
+                transversals[base_pos].reduce_to_unfinished(w, selection);
             }
 
             /**
@@ -1440,7 +1452,7 @@ namespace dejavu {
              * @return Bool that indicates whether the transversal at position \p s_base_pos matches its size upper bound.
              */
             [[nodiscard]] bool is_finished(const int base_pos) const {
-                return transversals[base_pos]->is_finished();
+                return transversals[base_pos].is_finished();
             }
 
             /**
@@ -1457,11 +1469,11 @@ namespace dejavu {
                 automorphism.set_support01(true); // we don't need to track full support
                 for (int level = 0; level < static_cast<int>(transversals.size()); ++level) { // sift level-by-level
                     // first, we try to extend the transversal using the new automorphism
-                    changed = transversals[level]->extend_with_automorphism(w, generators, automorphism)
+                    changed = transversals[level].extend_with_automorphism(w, generators, automorphism)
                               || changed;
 
                     // secondly, we fix the point of this transversal in automorphism
-                    const bool identity = transversals[level]->fix_automorphism(w, generators, automorphism);
+                    const bool identity = transversals[level].fix_automorphism(w, generators, automorphism);
                     if (identity) break; // if automorphism is the identity now, no need to sift further
                 }
 
@@ -1472,7 +1484,7 @@ namespace dejavu {
 
                 // keep track of how far this Schreier structure is finished (matches given upper bounds)
                 for (int level = finished_up_to + 1; level < static_cast<int>(transversals.size()); ++level) {
-                    if (finished_up_to == level - 1 && transversals[level]->is_finished()) {
+                    if (finished_up_to == level - 1 && transversals[level].is_finished()) {
                         ++finished_up_to;
                     } else {
                         break;
@@ -1591,7 +1603,7 @@ namespace dejavu {
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
                 // multiply the sizes of the individual levels in the Schreier table
-                for (auto & transversal : transversals) s_grp_sz.multiply(transversal->size());
+                for (auto & transversal : transversals) s_grp_sz.multiply(transversal.size());
             }
         };
 
@@ -1910,7 +1922,7 @@ namespace dejavu {
         private:
             random_schreier_internal internal_schreier;
             domain_compressor*       compressor;
-            automorphism_workspace*  compressed_automorphism;
+            automorphism_workspace   compressed_automorphism;
             std::vector<int> original_base;
             std::vector<int> original_base_sizes;
 
@@ -1953,8 +1965,7 @@ namespace dejavu {
                     // need more management if we are using compression
                     original_base       = new_base;
                     original_base_sizes = new_base_sizes;
-                    delete compressed_automorphism;
-                    compressed_automorphism = new automorphism_workspace(compressor->compressed_domain_size());
+                    compressed_automorphism.resize(compressor->compressed_domain_size());
                     keep_old = false;
                     std::vector<int> new_basec;
                     new_basec.reserve(new_base.size());
@@ -2077,8 +2088,8 @@ namespace dejavu {
              */
             bool sift(schreier_workspace &w, automorphism_workspace &automorphism, bool uniform = false) {
                 if(compressor != nullptr) {
-                    compress_automorphism(automorphism, *compressed_automorphism);
-                    return internal_schreier.sift(w, *compressed_automorphism, uniform);
+                    compress_automorphism(automorphism, compressed_automorphism);
+                    return internal_schreier.sift(w, compressed_automorphism, uniform);
                 } else {
                     return internal_schreier.sift(w, automorphism, uniform);
                 }
@@ -2094,7 +2105,7 @@ namespace dejavu {
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
                              random_source& rng) {
                 if(compressor != nullptr) {
-                    return internal_schreier.sift_random(w, *compressed_automorphism, rng);
+                    return internal_schreier.sift_random(w, compressed_automorphism, rng);
                 } else {
                     return internal_schreier.sift_random(w, automorphism, rng);
                 }

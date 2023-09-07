@@ -9,7 +9,7 @@
 #include <chrono>
 #include "refinement.h"
 #include "coloring.h"
-#include "sgraph.h"
+#include "graph.h"
 #include "trace.h"
 #include "groups.h"
 #include "ir.h"

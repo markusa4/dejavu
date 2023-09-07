@@ -78,7 +78,7 @@ int commandline_mode(int argc, char **argv) {
             return 0;
         } else if (arg == "__VERSION" || arg == "_V") {
             std::cout << DEJAVU_VERSION_MAJOR << "." << DEJAVU_VERSION_MINOR <<
-                        (DEJAVU_VERSION_IS_BETA?"beta":"") << std::endl;
+                        (DEJAVU_VERSION_IS_PREVIEW?"preview":"") << std::endl;
             return 0;
         } else if (arg == "__FILE") {
             if (i + 1 < argc) {
@@ -166,7 +166,7 @@ int commandline_mode(int argc, char **argv) {
     }
 
     if(print) std::cout << "dejavu version=" << DEJAVU_VERSION_MAJOR << "." << DEJAVU_VERSION_MINOR <<
-                        (DEJAVU_VERSION_IS_BETA?"beta":"") << std::endl;
+                        (DEJAVU_VERSION_IS_PREVIEW?"preview":"") << std::endl;
     if(print) std::cout << "------------------------------------------------------------------" << std::endl;
 
     dejavu::sgraph g;
@@ -237,6 +237,8 @@ int commandline_mode(int argc, char **argv) {
     if(print || write_benchmark_lines) std::cout << "solve_time=" <<
                                        static_cast<double>(dejavu_solve_time) / 1000000.0 << "ms" << std::endl;
     if(!print && write_grp_sz) std::cout << grp_sz << std::endl;
+
+    free(colmap);
     return 0;
 }
 

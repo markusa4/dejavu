@@ -144,7 +144,7 @@ static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** c
                 break;
             case 'n':
                 if(*colmap == nullptr)
-                    *colmap = new int[nv];
+                    *colmap = (int *) calloc(nv, sizeof(int));
                 nv1_string = "";
                 nv2_string = "";
                 for(i = 2; i < line.size() && line[i] != ' '; ++i) {

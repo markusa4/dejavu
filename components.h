@@ -5,7 +5,7 @@
 #ifndef DEJAVU_COMPONENTS_H
 #define DEJAVU_COMPONENTS_H
 
-#include "sgraph.h"
+#include "graph.h"
 #include "coloring.h"
 #include "ds.h"
 

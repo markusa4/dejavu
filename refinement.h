@@ -7,7 +7,7 @@
 
 #include "ds.h"
 #include "coloring.h"
-#include "sgraph.h"
+#include "graph.h"
 #include "utility.h"
 
 namespace dejavu {
