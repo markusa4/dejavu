@@ -61,6 +61,9 @@ namespace dejavu {
         std::vector<int>              backward_translation;
         std::vector<std::vector<int>> recovery_strings;
 
+        std::vector<std::pair<int, int>> baked_recovery_string_pt;
+        std::vector<int>                 baked_recovery_string;
+
         std::vector<std::vector<int>> add_edge_buff;
         dejavu::worklist worklist_deg0;
         dejavu::worklist worklist_deg1;
@@ -151,6 +154,18 @@ namespace dejavu {
                 backward_translation[i] = next_v;
             }
             layers_melded = true;
+
+            baked_recovery_string.reserve(domain_size);
+            baked_recovery_string_pt.reserve(domain_size);
+
+            for (int i = 0; i < reduced_size; ++i) {
+                const int orig_i = backward_translation[i];
+                const int pt_start = static_cast<int>(baked_recovery_string.size());
+                for(auto v : recovery_strings[orig_i]) baked_recovery_string.push_back(v);
+                const int pt_end = static_cast<int>(baked_recovery_string.size());
+                baked_recovery_string_pt.emplace_back(pt_start, pt_end);
+            }
+            recovery_strings.clear();
         }
 
         int remove_twins(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
@@ -546,8 +561,11 @@ namespace dejavu {
         }
 
         void order_edgelist(dejavu::sgraph *g) {
-            memcpy(edge_scratch.get_array(), g->e, g->e_size*sizeof(int));
+            int k;
+            for(k = 1; k < g->v_size && g->v[k-1] <= g->v[k]; ++k);
+            if(k == g->v_size) return; // already ordered
 
+            memcpy(edge_scratch.get_array(), g->e, g->e_size*sizeof(int));
             int epos = 0;
             for(int i = 0; i < g->v_size; ++i) {
                 const int eptr = g->v[i];
@@ -1087,7 +1105,9 @@ namespace dejavu {
                     const int endpoint     = connected_endpoints[g->v[test_vertex] + j];
                     assert(g->d[endpoint] != 2);
                     const int endpoint_col = c.vertex_to_col[endpoint];
-                    if(color_unique.get(neighbour_col) && color != endpoint_col) { // if unique
+                    const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
+                    if(color_unique.get(neighbour_col) && color != endpoint_col &&
+                       endpoint_col_sz >= color_size) { // if unique
                         filter.push_back(j); // add index to filter
                     }
                 }
@@ -1193,7 +1213,7 @@ namespace dejavu {
                             assert(path[l] >= 0);
                             assert(path[l] < g->v_size);
                             const int path_v_orig = translate_back(path[l]);
-                            //if(hub_vertex_orig == path_v_orig) continue; // TODO oops!
+                            //if(hub_vertex_orig == path_v_orig) continue;
                             assert(path_v_orig >= 0);
                             assert(path_v_orig < domain_size);
                             recovery.push_back(path_v_orig);
@@ -2027,7 +2047,7 @@ namespace dejavu {
 
                     // descending shared_tree of child_from while writing map
                     stack1.reset();
-                    map.reset(); // TODO: could be automorphism_supp, then reset automorphism_supp only half-way
+                    map.reset();
                     map.push_back(child_from);
                     stack1.push_back(std::pair<int, int>(g->v[child_from], g->v[child_from] + childcount[child_from]));
                     while (!stack1.empty()) {
@@ -2697,7 +2717,7 @@ namespace dejavu {
 
             int discrete_cnt = 0;
             worklist_deg0.reset();
-            for (int i = 0; i < domain_size; ++i) { // TODO: this is shit
+            for (int i = 0; i < domain_size; ++i) {
                 worklist_deg0.push_back(0);
             }
             for (int i = 0; i < g->v_size; ++i) {
@@ -2934,21 +2954,32 @@ namespace dejavu {
                     assert(orig_v_to < domain_size);
                     assert(orig_v_to >= 0);
                     assert(automorphism[orig_v_from] == orig_v_from);
-                    if(recovery_strings[orig_v_to].size() == 0 || recovery_strings[orig_v_to][0] != INT32_MAX) {
+                    const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
+                    const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
+                    const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
+                    const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
+                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
+                    [[maybe_unused]] const int from_recovery_string_size =
+                            from_recovery_string_end_pt - from_recovery_string_start_pt;
+                    if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
                         automorphism[orig_v_from] = orig_v_to;
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    assert(orig_v_to   < (int)recovery_strings.size());
-                    assert(orig_v_from < (int)recovery_strings.size());
-                    assert(recovery_strings[orig_v_to].size() ==
-                           recovery_strings[orig_v_from].size());
+                    //assert(orig_v_to   < (int)recovery_strings.size());
+                    //assert(orig_v_from < (int)recovery_strings.size());
+                    //assert(recovery_strings[orig_v_to].size() ==
+                    //       recovery_strings[orig_v_from].size());
+                    assert(from_recovery_string_size == to_recovery_string_size);
 
-                    for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
-                        assert(j <= recovery_strings[orig_v_from].size());
-                        assert(j <= recovery_strings[orig_v_to].size());
-                        const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t   = recovery_strings[orig_v_to][j];
+                    for (int j = 0; j < to_recovery_string_size; ++j) {
+                        //assert(j <= recovery_strings[orig_v_from].size());
+                        //assert(j <= recovery_strings[orig_v_to].size());
+                        //const int v_from_t = recovery_strings[orig_v_from][j];
+                        //const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
+                        const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
 
                         if(v_from_t == INT32_MAX) continue;
 
@@ -2997,17 +3028,30 @@ namespace dejavu {
                     assert(orig_v_to < domain_size);
                     assert(orig_v_to >= 0);
                     assert(automorphism[orig_v_from] == orig_v_from);
-                    if(recovery_strings[orig_v_to].size() == 0 || recovery_strings[orig_v_to][0] != INT32_MAX) {
+
+                    const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
+                    const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
+                    const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
+                    const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
+                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
+                    [[maybe_unused]] const int from_recovery_string_size =
+                            from_recovery_string_end_pt - from_recovery_string_start_pt;
+
+                    if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
                         automorphism[orig_v_from] = orig_v_to;
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    assert(recovery_strings[orig_v_to].size() ==
-                           recovery_strings[orig_v_from].size());
+                    assert(from_recovery_string_size == to_recovery_string_size);
 
-                    for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
-                        const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t   = recovery_strings[orig_v_to][j];
+                    for (int j = 0; j < to_recovery_string_size; ++j) {
+                        //assert(j <= recovery_strings[orig_v_from].size());
+                        //assert(j <= recovery_strings[orig_v_to].size());
+                        //const int v_from_t = recovery_strings[orig_v_from][j];
+                        //const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
+                        const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
 
                         if(v_from_t == INT32_MAX) continue;
 
@@ -3141,7 +3185,10 @@ namespace dejavu {
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
             bool in_order = true;
             for(int i = 0; i < g->v_size-1 && in_order; ++i) in_order = in_order && (colmap[i] <= colmap[i+1]);
-            if(in_order) return;
+            if(in_order) {
+                order_edgelist(g);
+                return;
+            }
 
             g->initialize_coloring(&c, colmap);
             dejavu::worklist old_arr(g->v_size);
@@ -3498,7 +3545,7 @@ namespace dejavu {
             return true;
         }
 
-        // dejavu usage specific: (TODO!)
+        // dejavu usage specific
         [[maybe_unused]] static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
             if(p->skipped_preprocessing && !p->decomposer) {

@@ -2109,7 +2109,6 @@ namespace dejavu {
 
             void add_node(int level, limited_save* data, tree_node* parent, bool is_base = false) {
                 assert(data != nullptr);
-                // TODO use locks
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;
                     tree_data[level] = new tree_node(data, nullptr, parent, level != 0);

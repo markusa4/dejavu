@@ -324,9 +324,10 @@ namespace dejavu {
 
             void copy(workspace* other) {
                 alloc(other->arr_sz);
-                for(int i = 0; i < other->arr_sz; ++i) {
-                    arr[i] = other->arr[i]; // TODO use memcpy
-                }
+                memcpy(arr, other->arr, other->arr_sz  * sizeof(int));
+                /*for(int i = 0; i < other->arr_sz; ++i) {
+                    arr[i] = other->arr[i];
+                }*/
                 arr_sz  = other->arr_sz;
             }
 
@@ -411,7 +412,7 @@ namespace dejavu {
                 s = new T[size];
                 reset_queue.allocate(size);
 
-                memset(s, -1, size * sizeof(T)); // TODO should use calloc
+                memset(s, -1, size * sizeof(T));
 
                 init = true;
                 sz = size;

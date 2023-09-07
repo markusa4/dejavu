@@ -6,7 +6,7 @@
 #include "../dejavu.h"
 
 using dejavu::groups::orbit;
-using dejavu::groups::orbit_hook;
+using dejavu::hooks::orbit_hook;
 
 TEST(orbit_test, orbit_construction_test) {
     orbit o;
@@ -75,7 +75,7 @@ TEST(orbit_test, orbit_hook_test) {
     g1.add_edge(1, 2);
     g1.add_edge(0, 2);
 
-    dejavu::dejavu2 d1;
+    dejavu::solver d1;
     d1.automorphisms(&g1, hook.get_hook());
 
     ASSERT_TRUE(o.are_in_same_orbit(0, 1));
@@ -110,7 +110,7 @@ TEST(orbit_test, orbit_hook_test) {
     g2.add_edge(1, 2);
     g2.add_edge(0, 2);
 
-    dejavu::dejavu2 d2;
+    dejavu::solver d2;
     d2.automorphisms(&g2, hook.get_hook());
 
     ASSERT_TRUE(o.are_in_same_orbit(0, 1));

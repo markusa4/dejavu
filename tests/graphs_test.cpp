@@ -4,7 +4,6 @@
 
 #include "gtest/gtest.h"
 #include "../dejavu.h"
-#include "../parser.h"
 #include <filesystem>
 
 
@@ -89,11 +88,11 @@ void test_graph(std::string filename) {
     dejavu::sgraph *g = new dejavu::sgraph();
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    parse_dimacs_file_fast(filename, g, &colmap);
+    parse_dimacs(filename, g, &colmap);
 
     auto test_hook_ = dejavu_hook(dejavu::test_hook);
 
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(g, colmap);
 }
 
@@ -103,7 +102,7 @@ void test_graph_orbit_check(std::string filename) {
     dejavu::sgraph *g = new dejavu::sgraph();
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
-    parse_dimacs_file_fast(filename, g, &colmap);
+    parse_dimacs(filename, g, &colmap);
 
     dej_test_graph.copy_graph(g);
     const int domain_size = g->v_size;
@@ -113,7 +112,7 @@ void test_graph_orbit_check(std::string filename) {
     auto test_hook_dejavu = dejavu_hook(orbit1_test_hook);
 
     std::cout << "Running dejavu " << filename << "..." << std::endl;
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.set_print(false);
     d.automorphisms(g, colmap, &test_hook_dejavu);
 

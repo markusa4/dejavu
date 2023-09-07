@@ -282,8 +282,16 @@ namespace dejavu {
                 return color + color_class_size;
             }
 
-            // color refinement that does not produce an isomorphism-invariant partitioning, but uses more optimization
-            // techniques -- meant to be used as the first refinement in automorphism computation
+            /**
+             * The color refinement algorithm. Refines a given coloring with respect to a given graph. This color
+             * refinement does not produce an isomorphism-invariant ordered partitioning, but uses more optimization
+             * techniques -- meant to be used as the first refinement in automorphism computation
+             *
+             * @param g The graph.
+             * @param c The coloring to be refined.
+             * @param init_color Initialize the worklist with a single color class (e.g., after individualization). The
+             * default value -1 denotes that the worklist is initialized with all color classes of the coloring.
+             */
             void refine_coloring_first(sgraph *g, coloring *c, int init_color_class = -1) {
                 assure_initialized(g);
                 singleton_hint.reset();
@@ -352,13 +360,33 @@ namespace dejavu {
             }
 
         public:
-            // certify an automorphism on a graph
+            /**
+             * Certifies automorphism of a graph. Uses the `certification` methods, but provides the auxiliary data
+             * structure.
+             *
+             * \sa certification
+             *
+             * @param g the graph
+             * @param p the mapping to be certified
+             * @return whether \a p is an automorphism of g
+             */
             bool certify_automorphism(sgraph *g, const int *p) {
                 assure_initialized(g);
                 return certification::certify_automorphism(scratch_set, g, p);
             }
 
-            // certify an automorphism on a graph, sparse
+            /**
+             * Certifies (sparse) automorphism of a graph. Uses the `certification` methods, but provides the
+             * auxiliary data structure. Does not certify points outside the given support.
+             *
+             * \sa certification
+             *
+             * @param g the graph
+             * @param p the mapping to be certified
+             * @param supp the number of points in the support of p
+             * @param supp_arr the points in the support of p
+             * @return whether \a p is an automorphism of g (assuming the support is provided correctly)
+             */
             bool certify_automorphism_sparse(const sgraph *g, const int *p, int supp, const int *supp_arr) {
                 assure_initialized(g);
                 return certification::certify_automorphism_sparse(scratch_set, g, p, supp, supp_arr);

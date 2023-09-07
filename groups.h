@@ -1100,8 +1100,6 @@ namespace dejavu {
                                           automorphism_workspace &automorphism) {
                 if (finished) return false; // Already finished transversal? Nothing to do, then!
 
-                // TODO maybe attempt to not load the orbit sometimes?
-
                 // load orbit of this transversal to our workspace, such that we have random access to points in O(1)
                 load_orbit_to_scratch(w);
                 bool changed = false; /*< we changed this transversal? */
@@ -1172,9 +1170,6 @@ namespace dejavu {
                 assert(automorphism.p()[fixed] == fixed);
                 return automorphism.nsupp() == 0;
             }
-
-
-            // TODO: flip to dense over certain threshold -- could also include "semi-dense" with sorted list or hash
         };
 
         /**
