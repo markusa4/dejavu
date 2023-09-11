@@ -46,7 +46,7 @@ int commandline_mode(int argc, char **argv) {
             std::cout << "Options:" << std::endl;
             std::cout << "    "  << std::left << std::setw(20) <<
             "--err [n]" << std::setw(16) <<
-            "Sets the error to be bounded by 1/2^N" << std::endl;
+            "Sets the error to be bounded by 1/2^N, assuming uniform random numbers" << std::endl;
             std::cout << "    " << std::left << std::setw(20) <<
             "--silent" << std::setw(16) <<
             "Does not print progress of the solver" << std::endl;

@@ -793,22 +793,22 @@ namespace dejavu {
             dejavu_hook* my_call_hook;
             markset scratch_set;
 
-            sgraph* my_g;
+            sgraph my_g;
 
             void hook_func(int n, const int *p, int nsupp, const int *supp) {
-                const bool certify = ir::certification::certify_automorphism_sparse(scratch_set, my_g, p, nsupp, supp);
+                const bool certify = ir::certification::certify_automorphism_sparse(scratch_set, &my_g, p, nsupp, supp);
                 if(!certify) return;
                 (*my_call_hook)(n, p, nsupp, supp);
             }
         public:
             explicit strong_certification_hook(static_graph& g, dejavu_hook* call_hook) {
-                my_g->copy_graph(g.get_sgraph());
+                my_g.copy_graph(g.get_sgraph());
                 my_call_hook = call_hook;
                 scratch_set.initialize(g.get_sgraph()->v_size);
             }
 
             explicit strong_certification_hook(sgraph& g, dejavu_hook* call_hook) {
-                my_g->copy_graph(&g);
+                my_g.copy_graph(&g);
                 my_call_hook = call_hook;
                 scratch_set.initialize(g.v_size);
             }
