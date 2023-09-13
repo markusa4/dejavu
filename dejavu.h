@@ -9,6 +9,8 @@
 #define DEJAVU_VERSION_MINOR 0
 #define DEJAVU_VERSION_IS_PREVIEW true
 
+#include <utility>
+
 #include "dfs.h"
 #include "bfs.h"
 #include "rand.h"
@@ -160,6 +162,11 @@ namespace dejavu {
          */
         void automorphisms(static_graph* g, dejavu_hook* hook = nullptr) {
             automorphisms(g->get_sgraph(), g->get_coloring(), hook);
+        }
+
+        void automorphisms(static_graph* g, dejavu_hook hook) {
+            dejavu_hook hook_to_hook_ptr = std::move(hook);
+            automorphisms(g->get_sgraph(), g->get_coloring(), &hook_to_hook_ptr);
         }
 
         /**
