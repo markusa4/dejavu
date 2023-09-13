@@ -15,12 +15,12 @@ TEST(simple_graphs_test, trivial_graphs1) {
 
     dejavu::static_graph g1;
     g1.initialize_graph(0, 0);
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(&g1, &test_hook);
 
     EXPECT_EQ(count_auto, 0);
-    EXPECT_EQ(d.s_grp_sz.exponent, 0);
-    EXPECT_NEAR(d.s_grp_sz.mantissa, 1.0, 0.001);
+    EXPECT_EQ(d.get_automorphism_group_size().exponent, 0);
+    EXPECT_NEAR(d.get_automorphism_group_size().mantissa, 1.0, 0.001);
 }
 
 TEST(simple_graphs_test, trivial_graphs2) {
@@ -29,12 +29,12 @@ TEST(simple_graphs_test, trivial_graphs2) {
     dejavu::static_graph g1;
     g1.initialize_graph(1, 0);
     g1.add_vertex(0,0);
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(&g1, &test_hook);
 
     EXPECT_EQ(count_auto, 0);
-    EXPECT_EQ(d.s_grp_sz.exponent, 0);
-    EXPECT_NEAR(d.s_grp_sz.mantissa, 1.0, 0.001);
+    EXPECT_EQ(d.get_automorphism_group_size().exponent, 0);
+    EXPECT_NEAR(d.get_automorphism_group_size().mantissa, 1.0, 0.001);
 }
 
 TEST(simple_graphs_test, trivial_graphs3) {
@@ -45,12 +45,12 @@ TEST(simple_graphs_test, trivial_graphs3) {
     g1.add_vertex(0,1);
     g1.add_vertex(1,1);
     g1.add_edge(0, 1);
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(&g1, &test_hook);
 
     EXPECT_EQ(count_auto, 0);
-    EXPECT_EQ(d.s_grp_sz.exponent, 0);
-    EXPECT_NEAR(d.s_grp_sz.mantissa, 1.0, 0.001);
+    EXPECT_EQ(d.get_automorphism_group_size().exponent, 0);
+    EXPECT_NEAR(d.get_automorphism_group_size().mantissa, 1.0, 0.001);
 }
 
 TEST(simple_graphs_test, trivial_graphs4) {
@@ -61,10 +61,10 @@ TEST(simple_graphs_test, trivial_graphs4) {
     g1.add_vertex(0,1);
     g1.add_vertex(0,1);
     g1.add_edge(0, 1);
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(&g1, &test_hook);
-    EXPECT_EQ(d.s_grp_sz.exponent, 0);
-    EXPECT_NEAR(d.s_grp_sz.mantissa, 2.0, 0.001);
+    EXPECT_EQ(d.get_automorphism_group_size().exponent, 0);
+    EXPECT_NEAR(d.get_automorphism_group_size().mantissa, 2.0, 0.001);
 }
 
 TEST(simple_graphs_test, trivial_graphs5) {
@@ -77,8 +77,8 @@ TEST(simple_graphs_test, trivial_graphs5) {
     g1.add_vertex(0,1);
     g1.add_edge(0, 1);
     g1.add_edge(1, 2);
-    dejavu::dejavu2 d;
+    dejavu::solver d;
     d.automorphisms(&g1, &test_hook);
-    EXPECT_EQ(d.s_grp_sz.exponent, 0);
-    EXPECT_NEAR(d.s_grp_sz.mantissa, 2.0, 0.001);
+    EXPECT_EQ(d.get_automorphism_group_size().exponent, 0);
+    EXPECT_NEAR(d.get_automorphism_group_size().mantissa, 2.0, 0.001);
 }

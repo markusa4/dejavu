@@ -5,10 +5,10 @@
 #include "gtest/gtest.h"
 #include "../ds.h"
 
-using dejavu::ds::mark_set;
+using dejavu::ds::markset;
 
 TEST(markset_test, basic_construction) {
-    mark_set m;
+    markset m;
     m.initialize(128);
     for(int i = 0; i < 128; ++i) {
         EXPECT_EQ(m.get(i), false);
@@ -25,14 +25,14 @@ TEST(markset_test, basic_construction) {
         EXPECT_EQ(m.get(i), false);
     }
 
-    mark_set m2(128);
+    markset m2(128);
     for(int i = 0; i < 128; ++i) {
         EXPECT_EQ(m2.get(i), false);
     }
 }
 
 TEST(markset_test, basic_reset) {
-    mark_set m;
+    markset m;
     m.initialize(128);
     for(int i = 0; i < 128; ++i) {
         if(i % 2 == 0) m.set(i);
@@ -48,7 +48,7 @@ TEST(markset_test, basic_reset) {
 }
 
 TEST(markset_test, unset) {
-    mark_set m;
+    markset m;
     m.initialize(128);
     EXPECT_EQ(m.get(47), false);
     m.set(47);
@@ -58,7 +58,7 @@ TEST(markset_test, unset) {
 }
 
 TEST(markset_test, many_resets) {
-    mark_set m;
+    markset m;
     m.initialize(4);
     for(long i = 0; i < INT16_MAX; ++i) {
         EXPECT_EQ(m.get(1), false);

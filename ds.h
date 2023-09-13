@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cstring>
 #include <functional>
-#include <mutex>
 #include <cassert>
+#include "coloring.h"
 
 namespace dejavu {
 
@@ -30,69 +30,17 @@ namespace dejavu {
          */
         template<class T>
         void inline sort_t(T *arr, int sz) {
-#define min(x, y) (x<y?x:y)
-#define max(x, y) (x<y?y:x)
-#define SWAP(x, y) { const T a = min(arr[x], arr[y]); \
-                    const T b = max(arr[x], arr[y]); \
-                    arr[x] = a; arr[y] = b; }
-            switch (sz) {
-                case 0:
-                case 1:
-                    break;
-                case 2: SWAP(0, 1);
-                    break;
-                case 3: SWAP(0, 1);
-                    SWAP(0, 2);
-                    SWAP(1, 2);
-                    break;
-                case 4: SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(0, 2);
-                    SWAP(1, 3);
-                    SWAP(1, 2);
-                    break;
-                case 5: SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(0, 2);
-                    SWAP(1, 4);
-                    SWAP(0, 1);
-                    SWAP(2, 3);
-                    SWAP(1, 2);
-                    SWAP(3, 4);
-                    SWAP(2, 3);
-                    break;
-                case 6: SWAP(1, 2);
-                    SWAP(4, 5);
-                    SWAP(0, 2);
-                    SWAP(3, 5);
-                    SWAP(0, 1);
-                    SWAP(3, 4);
-                    SWAP(1, 4);
-                    SWAP(0, 3);
-                    SWAP(2, 5);
-                    SWAP(1, 3);
-                    SWAP(2, 4);
-                    SWAP(2, 3);
-                    break;
-                default:
-                    std::sort(arr, arr + sz);
-            }
-#undef SWAP
-#undef min
-#undef max
+            std::sort(arr, arr + sz);
         }
 
         /**
-         * \brief Shared queue datastructure
+         * \brief Stack datastructure
          *
-         * A queue which can be accessed across multiple threads.
-         *
-         * @tparam T Type of elements stored in the queue.
+         * @tparam T Type of elements stored on the stack.
          */
         template<class T>
-        class shared_queue_t {
+        class stack_t {
         private:
-            std::mutex lock;
             std::vector<T> queue;
         public:
             /**
@@ -100,9 +48,7 @@ namespace dejavu {
              * @param t Element to be added.
              */
             void add(T &t) {
-                lock.lock();
                 queue.emplace_back(t);
-                lock.unlock();
             }
 
             /**
@@ -110,9 +56,7 @@ namespace dejavu {
              * @param n Space to be reserved.
              */
             void reserve(int n) {
-                lock.lock();
                 queue.reserve(n);
-                lock.unlock();
             }
 
             /**
@@ -128,29 +72,27 @@ namespace dejavu {
              * @return The element popped from the queue.
              */
             T pop() {
-                lock.lock();
                 auto element = queue.back();
                 queue.pop_back();
-                lock.unlock();
                 return element;
             }
         };
 
         /**
-         * \brief Fixed-size array
+         * \brief Fixed-size array, uninitialized
          *
          * An array of fixed size, with some further convenience functions.
          *
          * @tparam T The type of array elements.
          */
         template<class T>
-        class work_list_t {
+        class worklist_t {
         private:
             /**
              * Allocate an array of size \p size.
              * @param size Space to allocate.
              */
-            void alloc(const unsigned int size) {
+            void alloc(const int size) {
                 dealloc();
                 //arr = (T *) malloc(sizeof(T) * size);
                 arr = new T[size];
@@ -167,7 +109,7 @@ namespace dejavu {
             /**
              * Default constructor, does not allocate any memory.
              */
-            work_list_t() = default;
+            worklist_t() = default;
 
             /**
              * Constructor that allocates the internal array with size \p size. The allocated memory is not
@@ -175,8 +117,18 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            explicit work_list_t(unsigned int size) {
+            explicit worklist_t(int size) {
+                assert(size >= 0);
                 allocate(size);
+            }
+
+            void copy(worklist_t<T>* other) {
+                alloc(other->arr_sz);
+                for(int i = 0; i < other->arr_sz; ++i) {
+                    arr[i] = other->arr[i];
+                }
+                arr_sz  = other->arr_sz;
+                cur_pos = other->cur_pos;
             }
 
             /**
@@ -185,7 +137,8 @@ namespace dejavu {
              *
              * @param size Size to allocate.
              */
-            void allocate(unsigned int size) {
+            void allocate(int size) {
+                assert(size >= 0);
                 alloc(size);
                 cur_pos = 0;
             }
@@ -257,23 +210,25 @@ namespace dejavu {
              *
              * @param size New size to allocate the array to.
              */
-            void resize(const unsigned int size) {
+            void resize(const int size) {
+                assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 T *old_arr = nullptr;
-                unsigned int old_arr_sz = arr_sz;
+                int old_arr_sz = arr_sz;
                 if (arr) old_arr = arr;
+                arr = nullptr;
                 alloc(size);
                 if (old_arr != nullptr) {
                     int cp_pt = std::min(old_arr_sz, arr_sz);
                     memcpy(arr, old_arr, cp_pt * sizeof(T));
-                    free(old_arr);
+                    delete[] old_arr;
                 }
             }
 
             /**
              * Deallocates the internal array.
              */
-            ~work_list_t() {
+            ~worklist_t() {
                 dealloc();
             }
 
@@ -321,67 +276,143 @@ namespace dejavu {
 
             int cur_pos = 0; /**< current position */
         private:
-            unsigned int arr_sz = 0;      /**< size to which \a arr is currently allocated*/
+            int arr_sz = 0;       /**< size to which \a arr is currently allocated*/
             T *arr     = nullptr; /**< internal array */
         };
 
-        // frequently used types
-        typedef work_list_t<int> work_list;
-        typedef work_list_t<std::pair<std::pair<int, int>, bool>> work_list_pair_bool;
+        typedef worklist_t<int> worklist;
 
-        // queue with fixed size limitation
-        class work_queue {
+        /**
+         * \brief Fixed-size integer array, 0-initialized
+         *
+         * An array of fixed size, with some further convenience functions.
+         *
+         */
+        class workspace {
+        private:
+            /**
+             * Allocate an array of size \p size.
+             * @param size Space to allocate.
+             */
+            void alloc(const int size) {
+                assert(size >= 0);
+                dealloc();
+                arr = (int*) calloc(size, sizeof(int));
+                arr_sz = size;
+            }
+
+            void dealloc() {
+                if(arr) free(arr);
+                arr = nullptr;
+            }
+
         public:
-            void initialize(int size) {
-                if(init) delete[] queue;
-                sz = size;
-                pos = 0;
-                queue = new int[size];
-                init = true;
+            /**
+             * Default constructor, does not allocate any memory.
+             */
+            workspace() = default;
+
+            /**
+             * Constructor that allocates the internal array with size \p size. The allocated memory is not
+             * initialized.
+             *
+             * @param size Size to allocate.
+             */
+            explicit workspace(int size) {
+                allocate(size);
             }
 
-            void push(int val) {
-                assert(pos != sz);
-                queue[pos] = val;
-                pos++;
+            void copy(workspace* other) {
+                alloc(other->arr_sz);
+                memcpy(arr, other->arr, other->arr_sz  * sizeof(int));
+                /*for(int i = 0; i < other->arr_sz; ++i) {
+                    arr[i] = other->arr[i];
+                }*/
+                arr_sz  = other->arr_sz;
             }
 
-            int pop() {
-                assert(pos > 0);
-                pos--;
-                return queue[pos];
+            /**
+             * Allocates the internal array with size \p size. The allocated memory is not
+             * initialized. Initializes the internal position \a cur_pos of the array at 0.
+             *
+             * @param size Size to allocate.
+             */
+            void allocate(int size) {
+                alloc(size);
             }
 
-            [[nodiscard]] bool empty() const {
-                return (pos == 0);
+            /**
+             * Sets the entire array to 0.
+             */
+            inline void reset() {
+                memset(arr, 0, arr_sz * sizeof(int));
             }
 
-            ~work_queue() {
-                if (init) {
-                    delete[] queue;
+            /**
+             * Resizes the internal array to `size`. Copies the contents of the old array into the new one. If the new
+             * size is larger than the old one, the new space is only allocated and not initialized.
+             *
+             * @param size New size to allocate the array to.
+             */
+            void resize(const int size) {
+                assert(size >= 0);
+                if (arr && size <= arr_sz) return;
+                int *old_arr = arr;
+                arr = nullptr;
+                int old_arr_sz = arr_sz;
+                alloc(size);
+                if (old_arr) {
+                    int cp_pt = std::min(old_arr_sz, arr_sz);
+                    memcpy(arr, old_arr, cp_pt * sizeof(int));
+                    free(old_arr);
                 }
             }
 
-            void reset() {
-                pos = 0;
+            /**
+             * Deallocates the internal array.
+             */
+            ~workspace() {
+                dealloc();
+            }
+
+            /**
+             * @return A pointer to the internal memory.
+             */
+            [[nodiscard]] inline int* get_array() const {
+                return arr;
+            }
+
+            /**
+             * Access element \p index in the internal array \p arr.
+             *
+             * @param index Index of the internal array.
+             * @return The element `arr[index]`.
+             */
+            inline int &operator[](int index) const {
+                assert(index >= 0);
+                assert(index < arr_sz);
+                return arr[index];
             }
 
         private:
-            int *queue = nullptr;
-            int pos    = 0;
-            bool init  = false;
-            int sz     = 0;
+            int arr_sz = 0;     /**< size to which \a arr is currently allocated*/
+            int *arr = nullptr; /**< internal array */
         };
 
-        // work set with arbitrary type
+        /**
+         * \brief Set with counting
+         *
+         * Set on a statically specified domain of elements 1, ..., size, where each element holds an additional
+         * counter. Time complexity is O(1) for \a set, \a inc, \a get, and amortized O(1) for \a reset.
+         */
         template<class T>
-        class work_set_t {
+        class workset_t {
         public:
             void initialize(int size) {
                 s = new T[size];
-                reset_queue.initialize(size);
+                reset_queue.allocate(size);
 
-                memset(s, -1, size * sizeof(T)); // TODO should use calloc
+                memset(s, -1, size * sizeof(T));
 
                 init = true;
                 sz = size;
@@ -400,8 +431,7 @@ namespace dejavu {
             }
 
             void reset() {
-                while (!reset_queue.empty())
-                    s[reset_queue.pop()] = -1;
+                while (!reset_queue.empty()) s[reset_queue.pop_back()] = -1;
             }
 
             void reset_hard() {
@@ -413,35 +443,35 @@ namespace dejavu {
                 assert(index >= 0);
                 assert(index < sz);
                 if (s[index]++ == -1)
-                    reset_queue.push(index);
+                    reset_queue.push_back(index);
                 return s[index];
             }
 
-            void inc_nr(int index) {
+            void inline inc_nr(int index) {
                 assert(index >= 0 && index < sz);
                 ++s[index];
             }
 
-            ~work_set_t() {
+            ~workset_t() {
                 if (init)
                     delete[] s;
             }
 
-            work_queue reset_queue;
+            worklist reset_queue;
         private:
             bool init = false;
             T   *s = nullptr;
             int sz = 0;
         };
 
-        typedef work_set_t<int> work_set_int;
+        typedef workset_t<int> work_set_int;
 
         /**
-         * \brief Sets specialized for quick resets
+         * \brief Set specialized for quick resets
          *
          * Set on a statically specified domain of elements 1, ..., size, with O(1) \a set and \a get.
          */
-        class mark_set {
+        class markset {
             int *s   = nullptr;
             int mark = 0;
             int sz = 0;
@@ -454,13 +484,13 @@ namespace dejavu {
             /**
              * Initializes a set of size 0
              */
-            mark_set() = default;
+            markset() = default;
 
             /**
              * Initialize this set with the given \p size.
              * @param size size to initialize this set to
              */
-            explicit mark_set(int size) {
+            explicit markset(int size) {
                 initialize(size);
             }
 
@@ -520,7 +550,16 @@ namespace dejavu {
                 ++mark;
             }
 
-            ~mark_set() {
+            void copy(markset* other) {
+                initialize(other->sz);
+                for(int i = 0; i < other->sz; ++i) {
+                    s[i] = other->s[i];
+                }
+                mark = other->mark;
+                sz   = other->sz;
+            }
+
+            ~markset() {
                 if(s) free(s);
             }
         };

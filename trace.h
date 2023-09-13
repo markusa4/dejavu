@@ -6,11 +6,11 @@
 
 namespace dejavu {
     namespace ir {
-        #define TRACE_MARKER_INDIVIDUALIZE     (INT32_MAX-7)
-        #define TRACE_MARKER_REFINE_START      (INT32_MAX-2)
-        #define TRACE_MARKER_REFINE_END        (INT32_MAX-3)
-        #define TRACE_MARKER_REFINE_CELL_START (INT32_MAX-4)
-        #define TRACE_MARKER_REFINE_CELL_END   (INT32_MAX-5)
+#define TRACE_MARKER_INDIVIDUALIZE     (INT32_MAX-7)
+#define TRACE_MARKER_REFINE_START      (INT32_MAX-2)
+#define TRACE_MARKER_REFINE_END        (INT32_MAX-3)
+#define TRACE_MARKER_REFINE_CELL_START (INT32_MAX-4)
+#define TRACE_MARKER_REFINE_CELL_END   (INT32_MAX-5)
 
         /**
          * \brief The trace invariant.
@@ -35,11 +35,11 @@ namespace dejavu {
 
             // mode
             bool compare = false; /**< whether to compare operations to a stored trace*/
-            bool record = false; /**< whether to record a trace */
+            bool record  = false; /**< whether to record a trace */
 
             // housekeeping
-            int cell_act_spot      = -1;
-            int cell_old_color     = -1;
+            // int cell_act_spot      = -1;
+            // int cell_old_color     = -1;
             bool assert_cell_act   = false;
             bool assert_refine_act = false;
 
@@ -47,7 +47,7 @@ namespace dejavu {
             int position = 0;
             bool comp = true;
 
-            void add_to_hash(int d) {
+            void inline add_to_hash(int d) {
                 unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
                 hash    = hash << 8;                    // shift hash left by 5 bits
                 hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
@@ -55,44 +55,40 @@ namespace dejavu {
             }
 
             void write_compare(int d) {
-                d = d % (INT32_MAX-10);
+                d = std::min(INT32_MAX-10,d);
                 assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 write_compare_no_limit(d);
+                assert(record?static_cast<int>(data.size())==position:true);
             }
 
             void write_compare_no_limit(int d) {
                 add_to_hash(d);
-                if (record)
-                    data.push_back(d);
-                if (compare) {
-                    if(position < (int) compare_trace->data.size()) {
-                        assert(compare_trace->data.size() > position);
-                        comp = comp && compare_trace->data[position] == d;
-                    } else {
-                        comp = false;
-                    }
-                }
+                if (record)  data.push_back(d);
+                if (compare) comp = comp && (position < ((int) compare_trace->data.size()))
+                                    && (compare_trace->data[position] == d);
                 ++position;
             }
 
-            void write_skip_compare(int d) {
+            /*void write_skip_compare(int d) {
                 d = std::min(INT32_MAX-10,d);
+                assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 if (record) data.push_back(d);
                 ++position;
-            }
+            }*/
 
         public:
+
+            trace* get_compare_trace() {
+                return compare_trace;
+            }
 
             /**
              * Records an individualization.
              * @param color The color being individualized.
              */
-            void op_individualize(int old_color, int ind_color) {
+            void op_individualize(const int ind_color) {
                 assert(ind_color >= 0);
-                assert(old_color >= 0);
-                assert(ind_color != old_color);
                 write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
-                write_compare(old_color);
                 write_compare(ind_color);
             }
 
@@ -109,12 +105,13 @@ namespace dejavu {
              * Records the start of a refinement with respect to a color.
              * @param color The color in respect to which the coloring is refined.
              */
-            void op_refine_cell_start(int color) {
+            void op_refine_cell_start([[maybe_unused]] int color) {
                 assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
-                cell_old_color = color;
-                cell_act_spot = (int) data.size();
-                write_skip_compare(false);
+                //write_compare(color);
+                // cell_old_color = color;
+                //cell_act_spot = (int) data.size();
+                //write_skip_compare(false);
                 assert_cell_act = true;
             }
 
@@ -125,8 +122,7 @@ namespace dejavu {
             void op_refine_cell_record(int new_color) {
                 assert(!comp || assert_cell_act);
                 write_compare(new_color);
-                if (new_color != cell_old_color && record)
-                    data[cell_act_spot] = true;
+                //if (new_color != cell_old_color && record) data[cell_act_spot] = true;
             }
 
             void op_additional_info(int d) {
@@ -139,6 +135,7 @@ namespace dejavu {
             void op_refine_cell_end() {
                 assert(!comp || assert_cell_act);
                 assert_cell_act = false;
+                //
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
             }
 
@@ -158,17 +155,18 @@ namespace dejavu {
              * @return Determines whether in the stored trace, the next color in respect to which was refined created new colors
              * (i.e., whether the next color is splitting).
              */
-            bool blueprint_is_next_cell_active() {
-                if (!compare)
-                    return true;
+            [[maybe_unused]] bool blueprint_is_next_cell_active() {
+                if (!compare || !comp || position > static_cast<int>(compare_trace->data.size())) return true;
 
                 assert(compare_trace);
                 size_t read_pt = position;
                 assert(compare_trace->data.size() > read_pt);
+                for(; read_pt > 0 && compare_trace->data[read_pt] != TRACE_MARKER_REFINE_CELL_START; --read_pt);
                 assert(compare_trace->data[read_pt] == TRACE_MARKER_REFINE_CELL_START);
                 ++read_pt;
+
                 assert(compare_trace->data.size() > read_pt);
-                assert(compare_trace->data[read_pt] == false || compare_trace->data[read_pt] == true);
+                assert((compare_trace->data[read_pt] == false) || (compare_trace->data[read_pt] == true));
                 return compare_trace->data[read_pt];
             }
 
@@ -178,30 +176,33 @@ namespace dejavu {
              * Skips the \a position to the start of the next refinement with respect to a color. To be used after
              * \a blueprint_is_next_cell_active() determined the current color to be non-splitting.
              */
-            void blueprint_skip_to_next_cell() {
-                assert(compare_trace->data[position] == TRACE_MARKER_REFINE_CELL_START);
-                while (compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
+            [[maybe_unused]] void blueprint_skip_to_next_cell() {
+                while (position < static_cast<int>(compare_trace->data.size()) &&
+                       compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
                     assert(compare_trace->data.size() > (size_t) position);
                     ++position;
                 }
                 ++position;
+                assert_cell_act = false;
             }
 
             /**
              * Rewinds the \a position to the previous individualization.
              */
-            void rewind_to_individualization() {
+            [[maybe_unused]] void rewind_to_individualization() {
+                assert_cell_act = false;
+                assert_refine_act = false;
                 if (record) {
-                    int read_pt = (int) data.size() - 1;
-                    while (read_pt >= 0 && data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                    int read_pt = std::max((int) data.size() - 1, 0);
+                    while (read_pt > 0 && data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         --read_pt;
                     }
                     data.resize(read_pt);
                     position = read_pt;
                 }
                 if (compare) {
-                    int read_pt = position - 1;
-                    while (read_pt >= 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                    int read_pt = std::max(position - 1, 0);
+                    while (read_pt > 0 && compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         --read_pt;
                     }
                     position = read_pt;
@@ -219,7 +220,7 @@ namespace dejavu {
                 if (compare) {
                     int read_pt = position - 1;
                     while ((size_t) read_pt < compare_trace->data.size() &&
-                           compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
+                            compare_trace->data[read_pt] != TRACE_MARKER_INDIVIDUALIZE) {
                         ++read_pt;
                     }
                     position = read_pt;
@@ -248,7 +249,7 @@ namespace dejavu {
             /**
              * @return A hash value summarizing the operations recorded in this trace.
              */
-            [[nodiscard]] long get_hash() const {
+            [[nodiscard]] unsigned long get_hash() const {
                 return hash;
             }
 
@@ -256,7 +257,7 @@ namespace dejavu {
              * Sets the hash value to a pre-determined value.
              * @param hash The hash value.
              */
-            void set_hash(long new_hash) {
+            void set_hash(unsigned long new_hash) {
                 this->hash = new_hash;
             }
 
@@ -273,12 +274,19 @@ namespace dejavu {
             void reset_trace_equal() {
                 comp = true;
             }
+            /**
+ * Resets the trace to find new deviations from the stored trace.
+ */
+            void reset_trace_unequal() {
+                comp = false;
+            }
 
             void reset() {
                 data.clear();
                 compare_trace = nullptr;
                 position = 0;
                 hash = 0;
+                assert(record?static_cast<int>(data.size())==position:true);
                 reset_trace_equal();
             }
 
@@ -287,11 +295,17 @@ namespace dejavu {
                 this->record = new_record;
             }
 
+            void reserve(const int n) {
+                data.reserve(n);
+            }
+
             // position the trace
             void set_position(int new_position) {
                 assert_cell_act   = false;
                 assert_refine_act = false;
                 this->position = new_position;
+                if(record) data.resize(position);
+                assert(record?static_cast<int>(data.size())==position:true);
             }
 
             [[nodiscard]] int get_position() const {

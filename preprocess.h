@@ -1,302 +1,112 @@
+// Copyright 2023 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef SASSY_H
 #define SASSY_H
 
-#define SASSY_VERSION_MAJOR 1
-#define SASSY_VERSION_MINOR 1
+#define SASSY_VERSION_MAJOR 2
+#define SASSY_VERSION_MINOR 0
 
 #include "graph.h"
+#include "ds.h"
+#include "refinement.h"
+#include "components.h"
 #include <vector>
 #include <iomanip>
 #include <ctime>
 
-namespace sassy {
-
+namespace dejavu {
     using dejavu::ds::coloring;
-
-    // ring queue for pairs of integers
-    class ring_pair {
-        std::pair<int, int> *arr = nullptr;
-        bool init = false;
-        int arr_sz = -1;
-        int front_pos = -1;
-        int back_pos = -1;
-
-    public:
-        void initialize(int size) {
-            if(init)
-                delete[] arr;
-            arr = new std::pair<int, int>[size];
-            arr_sz = size;
-            back_pos = 0;
-            front_pos = 0;
-            init = true;
-        }
-
-        void push_back(std::pair<int, int> value) {
-            arr[back_pos] = value;
-            back_pos = (back_pos + 1) % arr_sz;
-        }
-
-        std::pair<int, int> *front() {
-            return &arr[front_pos];
-        }
-
-        void pop() {
-            front_pos = (front_pos + 1) % arr_sz;
-        }
-
-        [[nodiscard]] bool empty() const {
-            return (front_pos == back_pos);
-        }
-
-        ~ring_pair() {
-            if (init)
-                delete[] arr;
-        }
-
-        void reset() {
-            front_pos = back_pos;
-        }
-    };
-
-    enum selector_type {
-        SELECTOR_FIRST, SELECTOR_LARGEST, SELECTOR_SMALLEST, SELECTOR_TRACES, SELECTOR_RANDOM
-    };
-
-    class selector {
-        int skipstart = 0;
-        int hint = -1;
-        int hint_sz = -1;
-
-        ring_pair largest_cache;
-        dejavu::ds::work_list non_trivial_list;
-        int init = false;
-
-    public:
-        int seeded_select_color(coloring *c, int seed) {
-            std::vector<int> cells;
-            for (int i = 0; i < c->domain_size;) {
-                if (c->ptn[i] > 0) {
-                    cells.push_back(i);
-                }
-                i += c->ptn[i] + 1;
-            }
-            if (cells.size() == 0) {
-                return -1;
-            } else {
-                int target_cell = seed % cells.size();
-                return cells[target_cell];
-            }
-        }
-
-        int select_color_largest(coloring *c) {
-            if (!init) {
-                largest_cache.initialize(c->domain_size);
-                non_trivial_list.allocate(c->domain_size);
-                init = true;
-            }
-
-            while (!largest_cache.empty()) {
-                std::pair<int, int> *elem = largest_cache.front();
-                if (c->ptn[elem->first] == elem->second) {
-                    assert(c->ptn[elem->first] > 0);
-                    return elem->first;
-                }
-                largest_cache.pop();
-            }
-
-            int largest_cell = -1;
-            int largest_cell_sz = -1;
-            bool only_trivial = true;
-
-            assert(skipstart < c->domain_size);
-            for (int i = skipstart; i < c->domain_size;) {
-                assert(c->vertex_to_col[c->lab[i]] == i);
-                assert(i < c->domain_size);
-                if (c->ptn[i] != 0 && only_trivial) {
-                    skipstart = i;
-                    only_trivial = false;
-                }
-                if (c->ptn[i] > largest_cell_sz && c->ptn[i] > 0) {
-                    largest_cell = i;
-                    largest_cell_sz = c->ptn[i];
-                    largest_cache.reset();
-                    largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
-                } else if (c->ptn[i] == largest_cell_sz) {
-                    largest_cache.push_back(std::pair<int, int>(i, c->ptn[i]));
-                }
-
-                i += c->ptn[i] + 1;
-            }
-            assert(c->ptn[largest_cell] > 0);
-            return largest_cell;
-        }
-
-        int select_color_smallest(coloring *c) {
-            int smallest_cell = -1;
-            int smallest_cell_sz = c->domain_size + 1;
-            bool only_trivial = true;
-            for (int i = skipstart; i < c->domain_size; i += c->ptn[i] + 1) {
-                if (c->ptn[i] != 0) {
-                    if (only_trivial) {
-                        skipstart = i;
-                        only_trivial = false;
-                    }
-                    if ((c->ptn[i] + 1) < smallest_cell_sz) {
-                        smallest_cell = i;
-                        smallest_cell_sz = (c->ptn[i] + 1);
-                        if (smallest_cell_sz == 2) {
-                            break;
-                        }
-                    }
-                }
-            }
-            return smallest_cell;
-        }
-
-        int select_color_first(coloring *c) {
-            int first_cell = -1;
-
-            for (int i = skipstart; i < c->domain_size;) {
-                if (c->ptn[i] > 0) {
-                    skipstart = i;
-                    first_cell = i;
-                    break;
-                }
-                i += c->ptn[i] + 1;
-            }
-            return first_cell;
-        }
-
-        void empty_cache() {
-            skipstart = 0;
-            hint = -1;
-            hint_sz = -1;
-            largest_cache.reset();
-        }
-
-        int
-        select_color_dynamic(dejavu::sgraph *g, coloring *c, selector_type cell_selector_type) {
-            if (c->cells == g->v_size)
-                return -1;
-            switch (cell_selector_type) {
-                case SELECTOR_RANDOM:
-                    return seeded_select_color(c, 0);
-                case SELECTOR_LARGEST:
-                    return select_color_largest(c);
-                case SELECTOR_SMALLEST:
-                    return select_color_smallest(c);
-                case SELECTOR_TRACES:
-                    return select_color_largest(c);
-                case SELECTOR_FIRST:
-                default:
-                    return select_color_first(c);
-            }
-        }
-    };
 
     class preprocessor;
     static preprocessor* save_preprocessor;
 
-    enum preop {
-        deg01, deg2ue, deg2ma, qcedgeflip, probeqc, probe2qc, probeflat, redloop
-    };
-
-    // preprocessor for symmetry detection
-    // see README.md for usage!
+    /**
+     * \brief preprocessor for symmetry detection
+     *
+     * Shrinks a graph using a variety of techniques such as color refinement, low degree vertex detection, twin
+     * removal, or uniform components in the quotient graph.
+     *
+     */
     class preprocessor {
-    public:
-        //long double base = 1;
-        //int exp     = 0;
-        dejavu::big_number grp_sz;
-        int domain_size;
-
-        bool CONFIG_PRINT = false;
-        bool CONFIG_IR_FULL_INVARIANT = false; // uses a complete invariant and no certification if enabled
-        bool CONFIG_IR_IDLE_SKIP = true;  // blueprints
-        bool CONFIG_IR_INDIVIDUALIZE_EARLY = false; // experimental feature, based on an idea by Adolfo Piperno
-        bool CONFIG_PREP_DEACT_PROBE = false; // preprocessor: no probing
-        bool CONFIG_PREP_DEACT_DEG01 = false; // preprocessor: no degree 0,1 processing
-        bool CONFIG_PREP_DEACT_DEG2 = false;  // preprocessor: no degree 2   processing
-        bool CONFIG_IR_REFINE_EARLYOUT_LATE = false;
-        bool CONFIG_TRANSLATE_ONLY = false;
-
     private:
+        /**
+         * Operations of the preprocessor.
+         */
+        enum preop { deg01, deg2ue, deg2ma, qcedgeflip, densify2, twins };
+
         //inline static preprocessor* save_preprocessor;
-        dejavu_hook*                 saved_hook;
+        dejavu_hook* saved_hook = nullptr;
+
+        dejavu::timed_print* print;
 
         coloring c;
-        dejavu::work_list automorphism;
-        dejavu::work_list automorphism_supp;
+        dejavu::worklist automorphism;
+        dejavu::worklist automorphism_supp;
 
-        dejavu::work_list aux_automorphism;
-        dejavu::work_list aux_automorphism_supp;
+        dejavu::worklist aux_automorphism;
+        dejavu::worklist aux_automorphism_supp;
 
         bool layers_melded = false;
 
         bool skipped_preprocessing = false;
 
-        dejavu::mark_set del;
-        dejavu::mark_set del_e;
-
-        dejavu::groups::orbit orbit;
+        dejavu::markset del;
+        dejavu::markset del_e;
 
         std::vector<std::vector<int>> translation_layers;
         std::vector<std::vector<int>> backward_translation_layers;
 
-        std::vector<int> ind_cols;
-        std::vector<int> cell_cnt;
-
         std::vector<int>              backward_translation;
         std::vector<std::vector<int>> recovery_strings;
-        int avg_support_sparse_ir        = 0;
-        int avg_reached_end_of_component = 0;
-        double avg_end_of_comp           = 0.0;
+
+        std::vector<std::pair<int, int>> baked_recovery_string_pt;
+        std::vector<int>                 baked_recovery_string;
 
         std::vector<std::vector<int>> add_edge_buff;
-        dejavu::work_list worklist_deg0;
-        dejavu::work_list worklist_deg1;
-        dejavu::mark_set add_edge_buff_act;
-        dejavu::ir::refinement* R1;
+        dejavu::worklist worklist_deg0;
+        dejavu::worklist worklist_deg1;
+        dejavu::markset add_edge_buff_act;
+        dejavu::ir::refinement* R1 = nullptr;
 
-        dejavu::mark_set touched_color_cache;
-        dejavu::work_list touched_color_list_cache;
+        dejavu::markset touched_color_cache;
 
         std::vector<int> g_old_v;
-        dejavu::work_list edge_scratch;
+        std::vector<int> g_old_e;
+        dejavu::worklist edge_scratch;
 
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
 
-        std::vector<int> quotient_component_worklist_col;
-        std::vector<int> quotient_component_worklist_col_sz;
-        std::vector<int> quotient_component_worklist_v;
-        std::vector<std::pair<int, int>> quotient_component_worklist_boundary;
-        std::vector<std::pair<int, int>> quotient_component_worklist_boundary_swap;
-        std::vector<int> quotient_component_workspace;
+        std::vector<int>                                  recovery_edge_attached;
+        std::vector<std::vector<std::tuple<int,int,int>>> recovery_edge_adjacent;
 
-        std::vector<int> quotient_component_touched;
-        std::vector<int> quotient_component_touched_swap;
-
-        dejavu::mark_set seen_vertex;
-        dejavu::mark_set seen_color;
-        bool init_quotient_arrays = false;
-        std::vector<int> worklist;
-
-        dejavu::work_list _automorphism;
-        dejavu::work_list _automorphism_supp;
+        dejavu::worklist _automorphism;
+        dejavu::worklist _automorphism_supp;
         std::vector<int> save_colmap;
-        dejavu::mark_set  touched_color;
-        dejavu::work_list touched_color_list;
 
-        dejavu::work_list before_move;
+        dejavu::worklist before_move;
+
+        dejavu::ir::graph_decomposer* decomposer = nullptr;
+        int current_component = 0;
 
         bool ir_quotient_component_init = false;
 
-        std::vector<int> save_colmap_v_to_col;
-        std::vector<int> save_colmap_v_to_lab;
-        std::vector<int> save_colmap_ptn;
     public:
+        dejavu::big_number grp_sz; /**< group size as determined and removed by the preprocessor */
+        int domain_size   = 0;      /**< size of the underlying domain (i.e., number of vertices) */
+        bool h_deact_deg1 = false;  /**< no degree 0,1 processing */
+        bool h_deact_deg2 = false;  /**< no degree 2   processing */
+
+        preprocessor() = default;
+        explicit preprocessor(dejavu::ir::refinement* R) {
+            R1 = R;
+        }
+
+        explicit preprocessor(dejavu::timed_print* printer) : print(printer) {};
+
+
         // for a vertex v of reduced graph, return corresponding vertex of the original graph
         int translate_back(int v) {
             const int layers = static_cast<int>(translation_layers.size());
@@ -310,6 +120,12 @@ namespace sassy {
         void multiply_to_group_size(int n) {
             grp_sz.multiply(n);
         }
+
+        void inject_decomposer(dejavu::ir::graph_decomposer* new_decomposer, int component) {
+            decomposer = new_decomposer;
+            current_component = component;
+        }
+
     private:
         // combine translation layers
         void meld_translation_layers() {
@@ -327,18 +143,162 @@ namespace sassy {
             }
 
 
-            backward_translation.reserve(layers - 1);
             const int reduced_size = static_cast<int>(backward_translation_layers[layers - 1].size());
-            for (int i = 0; i < reduced_size; ++i)
-                backward_translation.push_back(i);
+            backward_translation.reserve(reduced_size);
+            for (int i = 0; i < reduced_size; ++i) backward_translation.push_back(i);
             for (int i = 0; i < reduced_size; ++i) {
                 int next_v = i;
-                for (int l = layers - 1; l >= 0; --l) {
+                for (int l = layers - 1; l >= 0; --l) { // TODO inefficient
                     next_v = backward_translation_layers[l][next_v];
                 }
                 backward_translation[i] = next_v;
             }
             layers_melded = true;
+
+            baked_recovery_string.reserve(domain_size);
+            baked_recovery_string_pt.reserve(domain_size);
+
+            for (int i = 0; i < reduced_size; ++i) {
+                const int orig_i = backward_translation[i];
+                const int pt_start = static_cast<int>(baked_recovery_string.size());
+                for(auto v : recovery_strings[orig_i]) baked_recovery_string.push_back(v);
+                const int pt_end = static_cast<int>(baked_recovery_string.size());
+                baked_recovery_string_pt.emplace_back(pt_start, pt_end);
+            }
+            recovery_strings.clear();
+        }
+
+        int remove_twins(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
+
+            dejavu::ds::markset  test_twin(g->v_size);
+            std::vector<int> add_to_string;
+            dejavu::ds::worklist twin_counter(g->v_size);
+
+            dejavu::ds::markset  potential_twin(g->v_size);
+            dejavu::ds::worklist potential_twin_counter(g->v_size);
+
+            dejavu::ds::markset  touched(g->v_size);
+
+            std::vector<int> potential_twin_list;
+
+            del.reset();
+
+            int d_limit = std::max(static_cast<int>(sqrt(sqrt(g->v_size))), 8);
+
+            int s_twins = 0;
+            for(int i = 0; i < g->v_size; ++i) twin_counter[i] = 0;
+                // iterate over color classes
+            for(int i = 0; i < g->v_size;) {
+                const int color = i;
+                const int color_size = c.ptn[color] + 1;
+                i += color_size;
+
+                for(int j = 0; j < color_size; ++j) {
+                    if(j == 2 && s_twins == 0) break;
+                    const int vertex = c.lab[color + j];
+                    if(g->d[vertex] > d_limit) break;
+
+                    touched.set(vertex);
+                    int twin_class_sz = 1;
+
+                    bool limit_breached = false;
+
+                    add_to_string.clear();
+                    if(del.get(vertex)) continue;
+                    test_twin.reset();
+                    potential_twin.reset();
+                    potential_twin_list.clear();
+                    for(int k = 0; k < g->d[vertex]; ++k) {
+                        const int neighbour = g->e[g->v[vertex] + k];
+                        test_twin.set(neighbour);
+                        if(g->d[neighbour] > d_limit) {
+                            limit_breached = true;
+                            break;
+                        }
+                        for(int l = 0; l < g->d[neighbour]; ++l) {
+                            const int neighbour_neighbour = g->e[g->v[neighbour] + l];
+                            if(touched.get(neighbour_neighbour)) continue;
+                            if(potential_twin.get(neighbour_neighbour)) {
+                                potential_twin_counter[neighbour_neighbour] += 1;
+                            } else {
+                                potential_twin.set(neighbour_neighbour);
+                                potential_twin_counter[neighbour_neighbour] = 1;
+                                potential_twin_list.push_back(neighbour_neighbour);
+                            }
+                        }
+                    }
+                    if(limit_breached) break;
+
+                    //for(int jj = j+1; jj < color_size; ++jj) {
+                    for(int other_vertex : potential_twin_list) {
+                        bool is_twin = true;
+                        //const int other_vertex = col.lab[color + jj];
+                        if(potential_twin_counter[other_vertex] < g->d[vertex] - 1) continue;
+                        if(vertex == other_vertex || del.get(other_vertex) ||
+                                c.vertex_to_col[other_vertex] != c.vertex_to_col[vertex]) continue;
+                        assert(g->d[vertex] == g->d[other_vertex]);
+                        for(int k = 0; k < g->d[other_vertex]; ++k) {
+                            const int neighbour = g->e[g->v[other_vertex] + k];
+                            if(neighbour == vertex) continue;
+                            if(!test_twin.get(neighbour)) {
+                                is_twin = false;
+                                break;
+                            }
+                        }
+
+                        if(is_twin) {
+                            ++s_twins;
+                            ++twin_counter[vertex];
+                            assert(vertex != other_vertex);
+                            ++twin_class_sz;
+                            multiply_to_group_size(twin_class_sz);
+                            del.set(other_vertex);
+                            add_to_string.push_back(other_vertex);
+
+                            _automorphism[vertex]       = other_vertex;
+                            _automorphism[other_vertex] = vertex;
+                            _automorphism_supp.push_back(vertex);
+                            _automorphism_supp.push_back(other_vertex);
+
+                            pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                     _automorphism_supp.get_array(), hook);
+
+                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
+                                               _automorphism_supp.get_array());
+                            _automorphism_supp.reset();
+                        }
+                    }
+
+                    assert(!del.get(vertex));
+                    assert(twin_class_sz -1 == static_cast<int>(add_to_string.size()));
+                    assert(twin_counter[vertex] == static_cast<int>(add_to_string.size()));
+                    const int orig_vertex = translate_back(vertex);
+                    [[maybe_unused]] int debug_sz = (int) recovery_strings[orig_vertex].size();
+                    for(auto& other_vertex : add_to_string) {
+                        assert(del.get(other_vertex));
+                        const int orig_other  = translate_back(other_vertex);
+                        assert(debug_sz == static_cast<int>(recovery_strings[orig_other].size()));
+                        recovery_strings[orig_vertex].push_back(orig_other);
+                        for(int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
+                            recovery_strings[orig_vertex].push_back(recovery_strings[orig_other][k]);
+                        }
+                    }
+                }
+
+                add_to_string.clear();
+                for(int j = 0; j < color_size; ++j) {
+                    const int vertex = c.lab[color + j];
+                    if(!del.get(vertex)) {
+                        assert(colmap[vertex] + twin_counter[vertex] < color + color_size);
+                        colmap[vertex] = color + twin_counter[vertex];
+                        add_to_string.push_back(vertex);
+                    }
+                }
+            }
+
+            return s_twins;
         }
 
         // reset internal automorphism structure to the identity
@@ -367,14 +327,13 @@ namespace sassy {
 
         // check for degree 2 matchings between color classes and mark for deletion
         void red_deg2_path_size_1(dejavu::sgraph *g, int *colmap) {
-            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
+            if (g->v_size <= 1 || h_deact_deg2)
                 return;
 
             del.reset();
-            int found_match = 0;
 
-            coloring test_col;
-            g->initialize_coloring(&test_col, colmap);
+            //coloring test_col;
+            g->initialize_coloring(&c, colmap);
 
             assure_ir_quotient_init(g);
 
@@ -394,28 +353,28 @@ namespace sassy {
              //   add_edge_buff.emplace_back(); // could do this smarter... i know how many edges end up here
 
             for (int i = 0; i < g->v_size;) {
-                const int test_v = test_col.lab[i];
-                const int path_col_sz = test_col.ptn[i];
+                const int test_v = c.lab[i];
+                const int path_col_sz = c.ptn[i];
                 if (g->d[test_v] == 2) {
                     const int n1 = g->e[g->v[test_v] + 0];
                     const int n2 = g->e[g->v[test_v] + 1];
                     if (g->d[n1] != 2 && g->d[n2] != 2) {
                         // relevant path of length 1
-                        const int col_n1 = test_col.vertex_to_col[n1];
-                        const int col_n2 = test_col.vertex_to_col[n2];
+                        const int col_n1 = c.vertex_to_col[n1];
+                        const int col_n2 = c.vertex_to_col[n2];
 
-                        const int col_sz_n1 = test_col.ptn[test_col.vertex_to_col[n1]];
-                        const int col_sz_n2 = test_col.ptn[test_col.vertex_to_col[n2]];
+                        const int col_sz_n1 = c.ptn[c.vertex_to_col[n1]];
+                        const int col_sz_n2 = c.ptn[c.vertex_to_col[n2]];
 
                         if (col_sz_n1 != col_sz_n2 || col_sz_n1 != path_col_sz || col_n1 == col_n2) {
-                            i += test_col.ptn[i] + 1;
+                            i += c.ptn[i] + 1;
                             continue;
                         }
 
                         bool already_matched_n1_n2 = false;
 
-                        const int already_match_pt1 = g->v[test_col.lab[col_n1]];
-                        const int already_match_pt2 = g->v[test_col.lab[col_n2]];
+                        const int already_match_pt1 = g->v[c.lab[col_n1]];
+                        const int already_match_pt2 = g->v[c.lab[col_n2]];
 
                         if (touched_color_cache.get(col_n1) && touched_color_cache.get(col_n2)) {
                             for (int j = 0; j < worklist_deg0[col_n1]; ++j) {
@@ -433,8 +392,8 @@ namespace sassy {
                             // const bool match_same_cols = matching_same_cols1 && matching_same_cols2;
 
                             bool check_if_match = true;
-                            for (int f = 0; f < test_col.ptn[i] + 1; ++f) {
-                                const int _test_v = test_col.lab[i + f];
+                            for (int f = 0; f < c.ptn[i] + 1; ++f) {
+                                const int _test_v = c.lab[i + f];
                                 const int _n1 = g->e[g->v[_test_v] + 0];
                                 const int _n2 = g->e[g->v[_test_v] + 1];
                                 check_if_match = check_if_match && (worklist_deg1[_n1] == _n2);
@@ -443,17 +402,16 @@ namespace sassy {
                             }
 
                             if (check_if_match) {
-                                found_match += test_col.ptn[i] + 1;
-                                for (int f = 0; f < test_col.ptn[i] + 1; ++f) {
-                                    const int _test_v = test_col.lab[i + f];
+                                for (int f = 0; f < c.ptn[i] + 1; ++f) {
+                                    const int _test_v = c.lab[i + f];
                                     del.set(_test_v);
                                 }
-                                for (int f = 0; f < test_col.ptn[i] + 1; ++f) {
-                                    const int _test_v = test_col.lab[i + f];
+                                for (int f = 0; f < c.ptn[i] + 1; ++f) {
+                                    const int _test_v = c.lab[i + f];
                                     const int _n1 = g->e[g->v[_test_v] + 0];
                                     const int _n2 = g->e[g->v[_test_v] + 1];
                                     int can_n;
-                                    if (test_col.vertex_to_col[_n1] < test_col.vertex_to_col[_n2])
+                                    if (c.vertex_to_col[_n1] < c.vertex_to_col[_n2])
                                         can_n = _n1;
                                     else
                                         can_n = _n2;
@@ -467,13 +425,13 @@ namespace sassy {
                             }
 
 
-                            i += test_col.ptn[i] + 1;
+                            i += c.ptn[i] + 1;
                             continue;
                         }
 
                         if (touched_color_cache.get(col_n1) && touched_color_cache.get(col_n2) &&
                             already_matched_n1_n2) {
-                            i += test_col.ptn[i] + 1;
+                            i += c.ptn[i] + 1;
                             continue;
                         }
 
@@ -488,12 +446,12 @@ namespace sassy {
                         }
 
                         if (col_cycle) {
-                            i += test_col.ptn[i] + 1;
+                            i += c.ptn[i] + 1;
                             continue;
                         }
 
-                        edge_scratch[already_match_pt1 +
-                                     worklist_deg0[col_n1]] = col_n2; // overwrites itself, need canonical vertex for color
+                        edge_scratch[already_match_pt1 + worklist_deg0[col_n1]] = col_n2;
+                        // overwrites itself, need canonical vertex for color
                         edge_scratch[already_match_pt2 + worklist_deg0[col_n2]] = col_n1;
                         ++worklist_deg0[col_n1];
                         ++worklist_deg0[col_n2];
@@ -501,12 +459,10 @@ namespace sassy {
                         touched_color_cache.set(col_n1);
                         touched_color_cache.set(col_n2);
 
-                        found_match += test_col.ptn[i] + 1;
-
                         //const size_t debug_str_sz = recovery_strings[translate_back(test_v)].size();
 
-                        for (int f = 0; f < test_col.ptn[i] + 1; ++f) {
-                            const int _test_v = test_col.lab[i + f];
+                        for (int f = 0; f < c.ptn[i] + 1; ++f) {
+                            const int _test_v = c.lab[i + f];
                             assert(g->d[_test_v] == 2);
                             const int _n1 = g->e[g->v[_test_v] + 0];
                             const int _n2 = g->e[g->v[_test_v] + 1];
@@ -521,7 +477,7 @@ namespace sassy {
                             del.set(_test_v);
 
                             int can_n;
-                            if (test_col.vertex_to_col[_n1] < test_col.vertex_to_col[_n2])
+                            if (c.vertex_to_col[_n1] < c.vertex_to_col[_n2])
                                 can_n = _n1;
                             else
                                 can_n = _n2;
@@ -535,29 +491,26 @@ namespace sassy {
                         }
                     }
                 }
-                i += test_col.ptn[i] + 1;
+                i += c.ptn[i] + 1;
             }
 
             worklist_deg0.reset();
             worklist_deg1.reset();
             touched_color_cache.reset();
-            //PRINT("(prep-red) deg2_matching, vertices deleted: " << found_match << "/" << g->v_size);
         }
 
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::mark_set* path_done,
-                              dejavu::work_list* path) {
+        static int walk_cycle(dejavu::sgraph *g, const int start, const int block, dejavu::markset* path_done,
+                              dejavu::worklist* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
             int length = 1;
 
-            if(path)
-                path->push_back(block);
-            if(path_done)
-                path_done->set(block);
+            if(path)      path->push_back(block);
+            if(path_done) path_done->set(block);
 
             while(true) {
                 if (g->d[current_vertex] != 2) {
@@ -566,20 +519,14 @@ namespace sassy {
                 }
                 ++length;
 
-                if(path)
-                    path->push_back(current_vertex);
-
-                if(path_done)
-                    path_done->set(current_vertex);
+                if(path)      path->push_back(current_vertex);
+                if(path_done) path_done->set(current_vertex);
 
                 const int next_vertex1 = g->e[g->v[current_vertex] + 0];
                 const int next_vertex2 = g->e[g->v[current_vertex] + 1];
                 int next_vertex = next_vertex1;
-                if(next_vertex1 == last_vertex)
-                    next_vertex = next_vertex2;
-
-                if(next_vertex == block)
-                    break;
+                if(next_vertex1 == last_vertex) next_vertex = next_vertex2;
+                if(next_vertex  == block)       break;
 
                 last_vertex    = current_vertex;
                 current_vertex = next_vertex;
@@ -592,7 +539,7 @@ namespace sassy {
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
         static std::pair<int, int> walk_to_endpoint(dejavu::sgraph *g, const int start, const int block,
-                                                    dejavu::mark_set* path_done) {
+                                                    dejavu::markset* path_done) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -614,8 +561,11 @@ namespace sassy {
         }
 
         void order_edgelist(dejavu::sgraph *g) {
-            memcpy(edge_scratch.get_array(), g->e, g->e_size*sizeof(int));
+            int k;
+            for(k = 1; k < g->v_size && g->v[k-1] <= g->v[k]; ++k);
+            if(k == g->v_size) return; // already ordered
 
+            memcpy(edge_scratch.get_array(), g->e, g->e_size*sizeof(int));
             int epos = 0;
             for(int i = 0; i < g->v_size; ++i) {
                 const int eptr = g->v[i];
@@ -631,7 +581,8 @@ namespace sassy {
         // in g, walk from 'start' (degree 2) until vertex of not-degree 2 is reached
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
-        static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block, dejavu::work_list* path) {
+        static int walk_to_endpoint_collect_path(dejavu::sgraph *g, const int start, const int block,
+                                                 dejavu::worklist* path) {
             int current_vertex = start;
             int last_vertex    = block;
 
@@ -654,16 +605,15 @@ namespace sassy {
         }
 
         // color-wise degree2 unique endpoint algorithm
-        void red_deg2_unique_endpoint_new(dejavu::sgraph *g, int *colmap) {
-            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
+        void red_deg2_unique_endpoint(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1 || h_deact_deg2)
                 return;
 
-            dejavu::mark_set color_test(g->v_size);
+            dejavu::markset color_test(g->v_size);
+            dejavu::markset color_unique(g->v_size);
 
-            dejavu::mark_set color_unique(g->v_size);
-
-            coloring col;
-            g->initialize_coloring(&col, colmap);
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
 
             add_edge_buff_act.reset();
             for (int i = 0; i < g->v_size; ++i) {
@@ -674,24 +624,23 @@ namespace sassy {
 
             worklist_deg1.reset();
 
-            dejavu::work_list endpoint_cnt(g->v_size);
+            dejavu::worklist endpoint_cnt(g->v_size);
             for (int i = 0; i < g->v_size; ++i) {
                 endpoint_cnt.push_back(0);
             }
 
-            dejavu::mark_set  path_done(g->v_size);
-            dejavu::work_list color_pos(g->v_size);
-            dejavu::work_list filter(g->v_size);
-            dejavu::work_list not_unique(g->v_size);
-            dejavu::work_list not_unique_analysis(g->v_size);
-            dejavu::work_list path_list(g->v_size);
-            dejavu::work_list path(g->v_size);
-            dejavu::work_list connected_paths(g->e_size);
-            dejavu::work_list connected_endpoints(g->e_size);
+            dejavu::markset  path_done(g->v_size);
+            dejavu::worklist color_pos(g->v_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
 
             // collect and count endpoints
-            int total_paths = 0;
-            int total_deleted_vertices = 0;
+            [[maybe_unused]] int total_paths = 0;
+            [[maybe_unused]] int total_deleted_vertices = 0;
+            [[maybe_unused]] int total_paths_excluded_not_unique = 0;
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -707,7 +656,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -721,7 +671,8 @@ namespace sassy {
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
                         ++endpoint_cnt[n2];
-                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n2);
@@ -737,21 +688,17 @@ namespace sassy {
             // iterate over color classes
             for(int i = 0; i < g->v_size;) {
                 const int color      = i;
-                const int color_size = col.ptn[color] + 1;
+                const int color_size = c.ptn[color] + 1;
                 i += color_size;
-                const int test_vertex = col.lab[color];
+                const int test_vertex = c.lab[color];
                 const int endpoints   = endpoint_cnt[test_vertex];
 
-                //if(endpoints != 1)
-                //    continue;
-
                 for(int j = 0; j < color_size; ++j) {
-                    assert(endpoint_cnt[col.lab[color + j]] == endpoints);
+                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
                 }
 
-                if(endpoints == 0) {
-                    continue;
-                }
+                if(endpoints == 0) continue;
+
 
                 color_test.reset();
                 color_unique.reset();
@@ -759,24 +706,21 @@ namespace sassy {
                 // check which neighbouring paths have unique color
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     if(color_test.get(neighbour_col)) {
                         color_unique.set(neighbour_col); // means "not unique"
+                        total_paths_excluded_not_unique += color_size;
                     }
                     color_test.set(neighbour_col);
                 }
 
                 filter.reset();
-                not_unique.reset();
                 // filter to indices with unique colors
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     if(!color_unique.get(neighbour_col)) { // if unique
                         filter.push_back(j); // add index to filter
-                    } else {
-                        not_unique.push_back(neighbour);
-                        not_unique.push_back(connected_endpoints[g->v[test_vertex] + j]);
                     }
                 }
 
@@ -787,7 +731,7 @@ namespace sassy {
                 // check which neighbouring endpoints have unique color and are NOT connected to `color`
                 for(int j = 0; j < g->d[test_vertex]; ++j) {
                     const int neighbour     = g->e[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     color_test.set(neighbour_col);
                 }
 
@@ -797,8 +741,9 @@ namespace sassy {
                 for(int k = 0; k < filter.cur_pos; ++k) {
                     const int j = filter[k];
                     const int neighbour_endpoint = connected_endpoints[g->v[test_vertex] + j];
-                    const int neighbour_col      = col.vertex_to_col[neighbour_endpoint];
+                    const int neighbour_col      = c.vertex_to_col[neighbour_endpoint];
                     if(color_test.get(neighbour_col)) {
+                        total_paths_excluded_not_unique += color_size;
                         color_unique.set(neighbour_col);
                     }
                     color_test.set(neighbour_col);
@@ -809,7 +754,7 @@ namespace sassy {
                 for(int k = 0; k < filter.cur_pos; ++k) {
                     const int j = filter[k];
                     const int neighbour     = connected_endpoints[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     if(!color_unique.get(neighbour_col)) {
                         filter[write_pos] = j;
                         ++write_pos;
@@ -823,7 +768,7 @@ namespace sassy {
                 color_unique.reset();
                 for(int k = 0; k < filter.cur_pos; ++k) {
                     const int j = filter[k];
-                    const int filter_to_col = col.vertex_to_col[connected_paths[g->v[test_vertex] + j]];
+                    const int filter_to_col = c.vertex_to_col[connected_paths[g->v[test_vertex] + j]];
                     color_unique.set(filter_to_col);
                     filter[k] = filter_to_col;
                     //color_unique.set(col.vertex_to_col[connected_endpoints[filter[k]]]);
@@ -842,14 +787,14 @@ namespace sassy {
                 [[maybe_unused]] int reduced_verts_last = 0;
 
                 for(int j = 0; j < color_size; ++j) {
-                    const int vertex = col.lab[color + j];
+                    const int vertex = c.lab[color + j];
 
                     [[maybe_unused]] int sanity_check = 0;
                     // paths left in filter (color_unique) are now collected for reduction
                     color_test.reset();
                     for(int k = 0; k < g->d[vertex]; ++k) {
                         const int neighbour     = g->e[g->v[vertex] + k];
-                        const int neighbour_col = col.vertex_to_col[neighbour];
+                        const int neighbour_col = c.vertex_to_col[neighbour];
                         if(color_unique.get(neighbour_col)) {
                             const int pos = color_pos[neighbour_col];
                             path_list[pos] = neighbour;
@@ -898,8 +843,9 @@ namespace sassy {
                         // write path into recovery_strings
                         const int unique_endpoint_orig = translate_back(vertex);
                         // attach all represented vertices of path to unique_endpoint_orig in canonical fashion
-                        //path.sort_after_map(colmap); // should not be necessary
-                        recovery_strings[unique_endpoint_orig].reserve(2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
+                        // path.sort_after_map(colmap); // should not be necessary
+                        recovery_strings[unique_endpoint_orig].reserve(
+                                2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
                         for (int l = 0; l < path.cur_pos; ++l) {
                             assert(path[l] >= 0);
                             assert(path[l] < g->v_size);
@@ -922,23 +868,602 @@ namespace sassy {
                     reduced_verts_last = reduced_verts;
                 }
             }
+        }
 
-            //PRINT("(prep-red) deg2_unique_endpoint, vertices deleted: " << total_deleted_vertices << "/" << g->v_size);
+        /**
+         * Attaches a canonical recovery string to an edge of the original graph. The edge does not actually have to be
+         * in the graph, but when p is the automorphism, the string attached to {v1,v2} is mapped to {p(v1), p(v2)}.
+         * Note that the edges are unordered.
+         *
+         * @param v1 first vertex of edge
+         * @param v2 second v ertex of edge
+         * @param recovery canonical recovery string attached to {v1, v2} -- vector will be cleared by the function
+         */
+        void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
+            const int pos = static_cast<int>(recovery_edge_attached.size());
+            assert(recovery.size() != 0);
+            for(int i = 0; i < static_cast<int>(recovery.size()); ++i) {
+                recovery_edge_attached.push_back(recovery[i]);
+            }
+            const int len = static_cast<int>(recovery.size());
+            recovery_edge_adjacent[v1].emplace_back(v2,pos,len);
+            recovery_edge_adjacent[v2].emplace_back(v1,pos,len);
+        }
+
+        /**
+         * Adds the canonical recovery information attached to neighbors of \p v to the given \p automorphism with
+         * support \p automorphism_supp.
+         *
+         * @param v vertex to consider
+         * @param automorphism given automorphism to be extended with canonical recovery information
+         * @param automorphism_supp support worklist of \p automorphism
+         * @param help_array an array of `domain_size` required for auxiliary data
+         */
+        void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::worklist* automorphism_supp,
+                                                     dejavu::ds::worklist* help_array1,
+                                                     dejavu::ds::worklist* help_array2) {
+            if(recovery_edge_adjacent[v].empty()) return;
+            const int v_map    = automorphism[v];
+            const int test_map = automorphism[v_map];
+            if(test_map == v && v > v_map) return;
+
+            for(auto & j : recovery_edge_adjacent[v]) {
+                const int other = std::get<0>(j);
+                const int id    = std::get<1>(j);
+
+                assert(other != v);
+                const int other_map = automorphism[other];
+
+                (*help_array1)[other_map] = id;
+                (*help_array2)[other_map] = other;
+            }
+
+            assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
+
+            for(int j = 0; j < static_cast<int>(recovery_edge_adjacent[v_map].size()); ++j) {
+                const int other_map = std::get<0>(recovery_edge_adjacent[v_map][j]);
+                const int id        = std::get<1>(recovery_edge_adjacent[v_map][j]);
+                const int len       = std::get<2>(recovery_edge_adjacent[v_map][j]);
+
+                assert(other_map != v_map);
+                const int orig_id = (*help_array1)[other_map];
+                (*help_array1)[other_map] = other_map;
+                const int other = (*help_array2)[other_map];
+
+                assert(v_map     == automorphism[v]);
+                assert(other_map == automorphism[other]);
+
+                if(v_map == v && other_map == other) continue;
+                if(v_map != v && other_map != other && v > other) continue;
+
+                for(int k = 0; k < len; ++k) {
+                    const int v_from = recovery_edge_attached[orig_id + k];
+                    const int v_to   = recovery_edge_attached[id      + k];
+                    if(v_from != v_to) {
+                        if(automorphism[v_from] == v_from) { // I'm doing it from both sides right now...
+                            automorphism[v_from] = v_to;
+                            automorphism_supp->push_back(v_from);
+                        }
+                    }
+                }
+            }
+        }
+
+        /**
+         * Summarizes paths of a graph \p g by introducing "hub vertices" that encode multiple paths at once.
+         *
+         * @param g the graph
+         * @param colmap vertex coloring of the graph \p g
+         */
+        void red_deg2_densify(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1 || h_deact_deg2) return;
+
+            dejavu::markset color_test(g->v_size);
+            dejavu::markset color_unique(g->v_size);
+
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
+            add_edge_buff_act.reset();
+            for (int i = 0; i < g->v_size; ++i) {
+                add_edge_buff[i].clear();
+            }
+
+            del.reset();
+            worklist_deg1.reset();
+
+            dejavu::worklist endpoint_cnt(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
+
+            dejavu::markset  path_done(g->v_size);
+            dejavu::worklist color_pos(g->v_size);
+            dejavu::worklist color_deg(g->v_size);
+            dejavu::worklist hub_vertex_position(g->v_size);
+            dejavu::worklist color_canonical_v(g->v_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
+            dejavu::markset  duplicate_endpoints(g->v_size);
+
+            // collect and count endpoints
+            int total_paths = 0;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                if(g->d[i] == 2) {
+                    hub_vertex_position[i] = -1;
+                    if(recovery_strings[translate_back(i)].size() > 0) {
+                        path_done.set(i); // not ideal...
+                    }
+                    if(path_done.get(i))
+                        continue;
+                    const int n1 = g->e[g->v[i] + 0];
+                    const int n2 = g->e[g->v[i] + 1];
+                    // n1 or n2 is endpoint? then walk to other endpoint and collect information...
+                    if(g->d[n1] != 2) {
+                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done);
+                        if(other_endpoint.first == n1) // big self-loop
+                            continue;
+                        connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
+                        connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
+                        ++endpoint_cnt[n1];
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n1);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n1 != other_endpoint.first);
+                        ++total_paths;
+                    } else if(g->d[n2] != 2) {
+                        const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
+                        if(other_endpoint.first == n2) // big self-loop
+                            continue;
+                        connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
+                        connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
+                        ++endpoint_cnt[n2];
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n2);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n2 != other_endpoint.first);
+                        ++total_paths;
+                    }
+                }
+            }
+
+            // let's not apply this reduction unless there is a substantial amount of degree 2 vertices -- performing
+            // the technique adds some bloat to the lifting process, so we should not overdo it
+            if(total_paths < g->v_size/10) return;
+
+            recovery_edge_adjacent.resize(domain_size);
+            path_done.reset();
+
+            // iterate over color classes
+            for(int i = 0; i < g->v_size;) {
+                const int color      = i;
+                const int color_size = c.ptn[color] + 1;
+                i += color_size;
+                const int test_vertex = c.lab[color];
+                const int endpoints   = endpoint_cnt[test_vertex];
+
+                for(int j = 0; j < color_size; ++j) {
+                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
+                }
+
+                // only want to look at endpoints of paths
+                if(endpoints == 0) continue;
+
+                color_test.reset();
+                color_unique.reset();
+
+                // only interested in paths with non-unique color, otherwise we could use unique endpoint algorithm
+                // check which neighbouring paths have non-unique color
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+
+                    assert(g->d[neighbour] == 2);
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+                    if(color_test.get(neighbour_col) && !path_done.get(neighbour)) {
+                        ++color_deg[neighbour_col];
+                        color_unique.set(neighbour_col); // means "not unique"
+                    } else {
+                        color_deg[neighbour_col] = 1;
+                    }
+                    color_test.set(neighbour_col);
+                }
+
+                // Make sure there are no duplicate endpoints, i.e., paths going from the same vertex to the same
+                // vertex!
+                bool duplicate_endpoint_flag = false;
+                for(int j = 0; j < color_size; ++j) {
+                    const int endpt_test_vertex = c.lab[color + j];
+                    duplicate_endpoints.reset();
+                    duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
+                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    for (int k = 0; k < endpoints; ++k) {
+                        const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
+                        if(duplicate_endpoints.get(endpoint)) {
+                            duplicate_endpoint_flag = true;
+                            break;
+                        }
+                        duplicate_endpoints.set(endpoint);
+                    }
+                    if(duplicate_endpoint_flag) break;
+                }
+
+                // There were duplicate endpoints, so we should stop with this color class!
+                if(duplicate_endpoint_flag) continue;
+
+                filter.reset();
+                // Filter to indices with non-unique colors
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    assert(g->d[neighbour] == 2);
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+                    const int endpoint     = connected_endpoints[g->v[test_vertex] + j];
+                    assert(g->d[endpoint] != 2);
+                    const int endpoint_col = c.vertex_to_col[endpoint];
+                    const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
+                    if(color_unique.get(neighbour_col) && color != endpoint_col &&
+                       endpoint_col_sz >= color_size) { // if unique
+                        filter.push_back(j); // add index to filter
+                    }
+                }
+
+
+                path.reset();
+                color_test.reset();
+                color_unique.reset();
+
+                int use_pos = 0;
+                for(int k = 0; k < filter.cur_pos; ++k) {
+                    const int filter_col = c.vertex_to_col[connected_paths[g->v[test_vertex] + filter[k]]];
+                    if(!color_unique.get(filter_col)) {
+                        color_pos[filter_col] = use_pos;
+                        color_unique.set(filter_col);
+                        use_pos += color_deg[filter_col];
+                    }
+                }
+
+                const int num_paths = filter.cur_pos;
+
+                // do next steps for all vertices in color classes...
+                [[maybe_unused]] int reduced_verts_last = 0;
+                for(int j = 0; j < color_size; ++j) {
+                    const int vertex = c.lab[color + j];
+
+                    // reset color_deg to 0
+                    for(int k = 0; k < filter.cur_pos; ++k) {
+                        const int filter_col = c.vertex_to_col[connected_paths[g->v[test_vertex] + filter[k]]];
+                        color_deg[filter_col] = 0;
+                    }
+
+                    [[maybe_unused]] int sanity_check_num_paths = 0;
+
+                    for(int k = 0; k < g->d[vertex]; ++k) {
+                        const int neighbour     = g->e[g->v[vertex] + k];
+                        const int neighbour_col = c.vertex_to_col[neighbour];
+                        if(color_unique.get(neighbour_col)) {
+                            const int pos = color_pos[neighbour_col] + color_deg[neighbour_col];
+                            path_list[pos] = neighbour;
+                            assert(g->d[neighbour] == 2);
+                            color_canonical_v[neighbour_col] = neighbour; // "hub vertex" used to emulate all the paths
+                            ++color_deg[neighbour_col];
+                            ++sanity_check_num_paths;
+                        }
+                    }
+
+                    assert(num_paths == sanity_check_num_paths);
+
+                    for(int k = 0; k < num_paths; ++k) {
+                        const int path_start_vertex = path_list[k];
+                        assert(g->d[path_start_vertex] == 2);
+                        if(path_done.get(path_start_vertex)) {
+                            continue;
+                        }
+
+                        // get path and endpoint
+                        path.reset();
+                        const int other_endpoint = walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
+                        assert(path.cur_pos > 0);
+                        assert(vertex != other_endpoint);
+                        assert(other_endpoint != path_start_vertex);
+
+
+                        const int hub_vertex = color_canonical_v[c.vertex_to_col[path_start_vertex]];
+                        assert(hub_vertex >= 0);
+                        assert(!del.get(hub_vertex));
+                        assert(g->d[hub_vertex] == 2);
+                        assert(is_adjacent(g, hub_vertex, vertex));
+
+                        // mark path for deletion
+                        for(int l = 0; l < path.cur_pos; ++l) {
+                            const int del_v = path[l];
+                            assert(g->d[del_v] == 2);
+                            assert(!del.get(del_v));
+                            del.set(del_v);
+                            assert(!path_done.get(del_v));
+                            path_done.set(del_v);
+                        }
+                        del.unset(hub_vertex); // don't delete canonical vertex
+                        assert(!del.get(hub_vertex));
+
+                        // connect endpoints of path to hub vertex (the canonical vertex)
+                        // make sure not do double up on hub_vertex original path
+                        if(!is_adjacent(g, hub_vertex, other_endpoint)) {
+                            add_edge_buff[other_endpoint].push_back(hub_vertex);
+                            add_edge_buff_act.set(other_endpoint);
+                            add_edge_buff[hub_vertex].push_back(other_endpoint);
+                            add_edge_buff_act.set(hub_vertex);
+                        }
+
+                        // write path into recovery_strings
+                        const int hub_vertex_orig = translate_back(hub_vertex);
+
+                        // mark hub vertex in recovery string such that it gets mapped to nothing
+                        // TODO should this be handled by translate_back? we can "translate_back" to \epsilon?
+                        // TODO just collect hub vertices and "handle this at the end"?
+                        if(recovery_strings[hub_vertex_orig].empty())
+                            recovery_strings[hub_vertex_orig].push_back(INT32_MAX);
+
+                        std::vector<int> recovery;
+                        for (int l = 0; l < path.cur_pos; ++l) {
+                            assert(path[l] >= 0);
+                            assert(path[l] < g->v_size);
+                            const int path_v_orig = translate_back(path[l]);
+                            //if(hub_vertex_orig == path_v_orig) continue;
+                            assert(path_v_orig >= 0);
+                            assert(path_v_orig < domain_size);
+                            recovery.push_back(path_v_orig);
+                            assert(path_v_orig != hub_vertex_orig? recovery_strings[path_v_orig].size() == 0: true);
+                        }
+
+                        recovery_attach_to_edge(translate_back(vertex), translate_back(other_endpoint), recovery);
+                    }
+                }
+            }
+        }
+
+        void red_deg2_densifysc1(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1 || h_deact_deg2) return;
+
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
+            add_edge_buff_act.reset();
+            for (int i = 0; i < g->v_size; ++i) add_edge_buff[i].clear();
+
+            del.reset();
+            worklist_deg1.reset();
+
+            dejavu::worklist endpoint_cnt(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
+
+            dejavu::markset  path_done(g->v_size);
+            dejavu::worklist filter(g->v_size);
+            dejavu::worklist path_list(g->v_size);
+            dejavu::worklist path(g->v_size);
+            dejavu::worklist connected_paths(g->e_size);
+            dejavu::worklist connected_endpoints(g->e_size);
+            dejavu::markset  duplicate_endpoints(g->v_size);
+
+            // collect and count endpoints
+            int total_paths = 0;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                if(g->d[i] == 2) {
+                    if(path_done.get(i))
+                        continue;
+                    const int n1 = g->e[g->v[i] + 0];
+                    const int n2 = g->e[g->v[i] + 1];
+                    // n1 or n2 is endpoint? then walk to other endpoint and collect information...
+                    if(g->d[n1] != 2 && g->d[n2] != 2) { // only want paths of length 1
+                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done);
+                        if(other_endpoint.first == n1) // big self-loop
+                            continue;
+                        connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
+                        connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
+                        ++endpoint_cnt[n1];
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
+                        connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
+                        ++endpoint_cnt[other_endpoint.first];
+                        assert(other_endpoint.first != n1);
+                        assert(g->d[other_endpoint.first] != 2);
+                        assert(n1 != other_endpoint.first);
+                        ++total_paths;
+                    }
+                }
+            }
+
+            // let's not apply this reduction unless there is a substantial amount of degree 2 vertices -- performing
+            // the technique adds some bloat to the lifting process, so we should not overdo it
+            if(total_paths < g->v_size/10) return;
+
+            recovery_edge_adjacent.resize(domain_size);
+            path_done.reset();
+
+            // iterate over color classes
+            for(int i = 0; i < g->v_size;) {
+                const int color      = i;
+                const int color_size = c.ptn[color] + 1;
+                i += color_size;
+                const int test_vertex = c.lab[color];
+                const int endpoints   = endpoint_cnt[test_vertex];
+
+                for(int j = 0; j < color_size; ++j) {
+                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
+                }
+
+                // only want to look at endpoints of paths
+                if(endpoints == 0) continue;
+
+                // only interested in paths with non-unique color, otherwise we could use unique endpoint algorithm
+                // check which neighbouring paths have non-unique color
+                int color_deg_single = 0;
+                bool only_one = true;
+                int relevant_neighbour_color = -1;
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    const int endpoint      = connected_endpoints[g->v[test_vertex] + j];
+                    assert(g->d[endpoint] != 2);
+                    assert(g->d[neighbour] == 2);
+                    const int endpoint_col = c.vertex_to_col[endpoint];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+                    if(!path_done.get(neighbour) && endpoint_col == color) {
+                        if(relevant_neighbour_color == -1) {
+                            relevant_neighbour_color = neighbour_col;
+                        }
+                        only_one = only_one && (relevant_neighbour_color == neighbour_col);
+                        color_deg_single += 1;
+                    }
+                }
+
+                if(!only_one || color_deg_single == 0) continue;
+
+                bool duplicate_endpoint_flag = false;
+                // Make sure there is no self-connection to own color already!
+                for(int j = g->v[test_vertex]; j < g->v[test_vertex] + g->d[test_vertex]; ++j) {
+                    const int neighbour = g->e[j];
+                    if(c.vertex_to_col[neighbour] == color) {
+                        duplicate_endpoint_flag = true;
+                        break;
+                    }
+                }
+
+                // Make sure there are no duplicate endpoints, i.e., paths going from the same vertex to the same
+                // vertex!
+                for(int j = 0; j < color_size; ++j) {
+                    const int endpt_test_vertex = c.lab[color + j];
+                    duplicate_endpoints.reset();
+                    duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
+                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    for (int k = 0; k < endpoints; ++k) {
+                        const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
+                        const int neighbour_col = c.vertex_to_col[neighbour];
+                        if(neighbour_col != relevant_neighbour_color) continue;
+                        assert(g->d[neighbour] == 2);
+                        const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
+                        assert(c.vertex_to_col[endpoint] == color);
+                        if(duplicate_endpoints.get(endpoint)) {
+                            duplicate_endpoint_flag = true;
+                            break;
+                        }
+                        duplicate_endpoints.set(endpoint);
+                    }
+                    if(duplicate_endpoint_flag) break;
+                }
+
+                // There were duplicate endpoints, so we should stop with this color class!
+                if(duplicate_endpoint_flag) continue;
+
+                filter.reset();
+                // Filter to indices with non-unique colors
+                for(int j = 0; j < endpoints; ++j) {
+                    const int neighbour     = connected_paths[g->v[test_vertex] + j];
+                    assert(g->d[neighbour] == 2);
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+                    if(neighbour_col == relevant_neighbour_color) { // if unique
+                        assert(neighbour_col == relevant_neighbour_color);
+                        filter.push_back(j); // add index to filter
+                    }
+                }
+
+                path.reset();
+                const int num_paths = filter.cur_pos;
+
+                // do next steps for all vertices in color classes...
+                [[maybe_unused]] int reduced_verts_last = 0;
+                for(int j = 0; j < color_size; ++j) {
+                    const int vertex = c.lab[color + j];
+
+                    // reset color_deg to 0
+                    int next_pos = 0;
+
+                    [[maybe_unused]] int sanity_check_num_paths = 0;
+
+                    for(int k = 0; k < g->d[vertex]; ++k) {
+                        const int neighbour     = g->e[g->v[vertex] + k];
+                        const int neighbour_col = c.vertex_to_col[neighbour];
+                        if(neighbour_col == relevant_neighbour_color) {
+                            const int pos = next_pos;
+                            path_list[pos] = neighbour;
+                            assert(g->d[neighbour] == 2);
+                            ++next_pos;
+                            ++sanity_check_num_paths;
+                        }
+                    }
+
+                    assert(num_paths == sanity_check_num_paths);
+
+                    for(int k = 0; k < num_paths; ++k) {
+                        const int path_start_vertex = path_list[k];
+                        assert(g->d[path_start_vertex] == 2);
+                        if(path_done.get(path_start_vertex)) {
+                            continue;
+                        }
+
+                        // get path and endpoint
+                        path.reset();
+                        const int other_endpoint = walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
+                        assert(path.cur_pos > 0);
+                        assert(vertex != other_endpoint);
+                        assert(other_endpoint != path_start_vertex);
+
+                        // mark path for deletion
+                        for(int l = 0; l < path.cur_pos; ++l) {
+                            const int del_v = path[l];
+                            assert(g->d[del_v] == 2);
+                            assert(!del.get(del_v));
+                            del.set(del_v);
+                            assert(!path_done.get(del_v));
+                            path_done.set(del_v);
+                        }
+
+                        // connect endpoints of path to hub vertex (the canonical vertex)
+                        // make sure not do double up on hub_vertex original path
+                        if(!is_adjacent(g, vertex, other_endpoint)) {
+                            add_edge_buff[other_endpoint].push_back(vertex);
+                            add_edge_buff_act.set(other_endpoint);
+                            add_edge_buff[vertex].push_back(other_endpoint);
+                            add_edge_buff_act.set(vertex);
+                        }
+
+                        // write path into recovery_strings
+                        std::vector<int> recovery;
+                        for (int l = 0; l < path.cur_pos; ++l) {
+                            assert(path[l] >= 0);
+                            assert(path[l] < g->v_size);
+                            const int path_v_orig = translate_back(path[l]);
+                            assert(path_v_orig >= 0);
+                            assert(path_v_orig < domain_size);
+                            recovery.push_back(path_v_orig);
+                            for(int f = 0; f < static_cast<int>(recovery_strings[path_v_orig].size()); ++f) {
+                                recovery.push_back(recovery_strings[path_v_orig][f]);
+                            }
+                        }
+
+                        recovery_attach_to_edge(translate_back(vertex), translate_back(other_endpoint), recovery);
+                    }
+                }
+            }
         }
 
         // color cycles according to their size
         // remove uniform colored cycles
-        static void red_deg2_color_cycles(dejavu::sgraph *g, int *colmap) {
-            coloring col;
-            g->initialize_coloring(&col, colmap);
+        bool red_deg2_color_cycles(dejavu::sgraph *g, int *colmap) {
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
             for(int i = 0; i < g->v_size; ++i) {
-                colmap[i] = col.vertex_to_col[i];
+                colmap[i] = c.vertex_to_col[i];
             }
 
-            dejavu::mark_set path_done(g->v_size);
-            dejavu::work_list cycle_length(g->v_size);
-            dejavu::work_list recolor_nodes(g->v_size);
-            dejavu::work_list path(g->v_size);
+            int cycles_recolored = 0;
+
+            dejavu::markset  path_done(g->v_size);
+            dejavu::worklist path(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -951,53 +1476,65 @@ namespace sassy {
                         continue;
 
                     path.reset();
-                    int cycle_length = walk_cycle(g, i, n1, &path_done, &path);
+                    const int cycle_length = walk_cycle(g, i, n1, &path_done, &path);
                     if(cycle_length == -1) {
                         continue;
                     } else {
+                        cycles_recolored += 1;
                         for(int j = 0; j < path.cur_pos; ++j) {
                             colmap[path[j]] = colmap[path[j]] + g->v_size * cycle_length; // maybe this should receive a more elegant solution
                         }
                     }
                 }
             }
+
+            if(cycles_recolored > 0) {
+                g->initialize_coloring(&c, colmap);
+                bool has_discrete = false;
+                for(int i = 0; i < g->v_size && !has_discrete; ) {
+                    const int col_sz = c.ptn[i] + 1;
+                    has_discrete = has_discrete || (col_sz == 1);
+                    i += col_sz;
+                }
+                for(int i = 0; i < g->v_size; ++i) {
+                    colmap[i] = c.vertex_to_col[i];
+                }
+                return has_discrete;
+            }
+            return false;
         }
 
         void red_deg2_trivial_connect(dejavu::sgraph *g, int *colmap) {
-            if (g->v_size <= 1 || CONFIG_PREP_DEACT_DEG2)
+            if (g->v_size <= 1 || h_deact_deg2)
                 return;
 
-            dejavu::ds::mark_set color_test(g->v_size);
+            dejavu::ds::markset color_test(g->v_size);
 
-            dejavu::ds::mark_set color_unique(g->v_size);
+            dejavu::ds::markset color_unique(g->v_size);
 
-            coloring col;
-            g->initialize_coloring(&col, colmap);
+            //coloring col;
+            g->initialize_coloring(&c, colmap);
 
             add_edge_buff_act.reset();
-            for (int i = 0; i < g->v_size; ++i) {
-                add_edge_buff[i].clear();
-            }
+            for (int i = 0; i < g->v_size; ++i) add_edge_buff[i].clear();
 
             del.reset();
 
             worklist_deg1.reset();
 
-            dejavu::ds::work_list endpoint_cnt(g->v_size);
-            for (int i = 0; i < g->v_size; ++i) {
-                endpoint_cnt.push_back(0);
-            }
+            dejavu::ds::worklist endpoint_cnt(g->v_size);
+            for (int i = 0; i < g->v_size; ++i) endpoint_cnt.push_back(0);
 
-            dejavu::ds::mark_set path_done(g->v_size);
-            dejavu::ds::work_list color_pos(g->v_size);
-            dejavu::ds::work_list not_unique(2*g->v_size);
-            dejavu::ds::work_list not_unique_analysis(g->v_size);
-            dejavu::ds::work_list path_list(g->v_size);
-            dejavu::ds::work_list path(g->v_size);
-            dejavu::ds::work_list connected_paths(g->e_size);
-            dejavu::ds::work_list connected_endpoints(g->e_size);
-            dejavu::ds::work_list neighbour_list(g->v_size);
-            dejavu::ds::work_list neighbour_to_endpoint(g->v_size);
+            dejavu::ds::markset path_done(g->v_size);
+            dejavu::ds::worklist color_pos(g->v_size);
+            dejavu::ds::worklist not_unique(2*g->v_size);
+            dejavu::ds::worklist not_unique_analysis(g->v_size);
+            dejavu::ds::worklist path_list(g->v_size);
+            dejavu::ds::worklist path(g->v_size);
+            dejavu::ds::worklist connected_paths(g->e_size);
+            dejavu::ds::worklist connected_endpoints(g->e_size);
+            dejavu::ds::worklist neighbour_list(g->v_size);
+            dejavu::ds::worklist neighbour_to_endpoint(g->v_size);
 
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
@@ -1013,7 +1550,8 @@ namespace sassy {
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
                         ++endpoint_cnt[n1];
-                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first]     + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n1);
@@ -1026,7 +1564,8 @@ namespace sassy {
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
                         ++endpoint_cnt[n2];
-                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = other_endpoint.second;
+                        connected_paths[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] =
+                                other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
                         assert(other_endpoint.first != n2);
@@ -1041,18 +1580,10 @@ namespace sassy {
             // iterate over color classes
             for(int i = 0; i < g->v_size;) {
                 const int color = i;
-                const int color_size = col.ptn[color] + 1;
+                const int color_size = c.ptn[color] + 1;
                 i += color_size;
-                const int test_vertex = col.lab[color];
+                const int test_vertex = c.lab[color];
                 const int endpoints = endpoint_cnt[test_vertex];
-
-                //if(endpoints != 1)
-                //    continue;
-
-                for (int j = 0; j < color_size; ++j) {
-                    const int other_from_color = col.lab[color + j];
-                    assert(endpoint_cnt[other_from_color] == endpoints);
-                }
 
                 if (endpoints == 0) {
                     continue;
@@ -1064,7 +1595,7 @@ namespace sassy {
                 // check which neighbouring paths have unique color
                 for (int j = 0; j < endpoints; ++j) {
                     const int neighbour = connected_paths[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     if (color_test.get(neighbour_col)) {
                         color_unique.set(neighbour_col); // means "not unique"
                     }
@@ -1075,7 +1606,7 @@ namespace sassy {
                 // filter to indices with unique colors
                 for (int j = 0; j < endpoints; ++j) {
                     const int neighbour = connected_paths[g->v[test_vertex] + j];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     if (color_unique.get(neighbour_col)) { // if not unique
                         not_unique.push_back(neighbour);
                         assert(connected_endpoints[g->v[test_vertex] + j] >= 0);
@@ -1090,36 +1621,37 @@ namespace sassy {
                 // remove trivial connections
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int endpoint = not_unique[kk + 1];
-                    const int endpoint_col = col.vertex_to_col[endpoint];
+                    const int endpoint_col = c.vertex_to_col[endpoint];
                     const int neighbour = not_unique[kk];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     not_unique_analysis[endpoint_col]  = 0;
                     not_unique_analysis[neighbour_col] = 0;
                 }
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int endpoint = not_unique[kk + 1];
-                    const int endpoint_col = col.vertex_to_col[endpoint];
+                    const int endpoint_col = c.vertex_to_col[endpoint];
                     const int neighbour = not_unique[kk];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     ++not_unique_analysis[endpoint_col];
                     ++not_unique_analysis[neighbour_col];
                 }
                 for (int kk = 0; kk < not_unique.cur_pos; kk += 2) {
                     const int neighbour = not_unique[kk];
-                    const int neighbour_col = col.vertex_to_col[neighbour];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
                     const int endpoint  = not_unique[kk + 1];
-                    const int endpoint_col    = col.vertex_to_col[endpoint];
-                    const int endpoint_col_sz = col.ptn[endpoint_col] + 1;
+                    const int endpoint_col    = c.vertex_to_col[endpoint];
+                    [[maybe_unused]] const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
                     path.reset();
                     if (!color_test.get(endpoint_col)) {
                         color_test.set(endpoint_col);
-                        if (not_unique_analysis[endpoint_col] == not_unique_analysis[neighbour_col] && not_unique_analysis[endpoint_col] == col.ptn[endpoint_col] + 1) {
+                        if (not_unique_analysis[endpoint_col] == not_unique_analysis[neighbour_col] &&
+                            not_unique_analysis[endpoint_col] == c.ptn[endpoint_col] + 1) {
                             // check that path endpoints dont contain duplicates
                             bool all_unique = true;
                             color_unique.reset();
                             for (int jj = 1; jj < not_unique.cur_pos; jj += 2) {
                                 const int _endpoint = not_unique[jj];
-                                const int _endpoint_col = col.vertex_to_col[endpoint];
+                                const int _endpoint_col = c.vertex_to_col[endpoint];
                                 if (_endpoint_col == endpoint_col) {
                                     if (color_unique.get(_endpoint)) {
                                         all_unique = false;
@@ -1130,10 +1662,10 @@ namespace sassy {
                             }
 
                             // test_vertex connects to all vertices of endpoint_col!
-                            if (all_unique && color < endpoint_col) { // col.ptn[endpoint_col] + 1 == 2 && color_size == 2 && only_once
-                                const int path_col = col.vertex_to_col[neighbour];
-                                const int path_col_sz = col.ptn[path_col] + 1;
-                                const int connects_to = not_unique_analysis[endpoint_col];
+                            if (all_unique && color < endpoint_col) {
+                                const int path_col = c.vertex_to_col[neighbour];
+                                [[maybe_unused]] const int path_col_sz = c.ptn[path_col] + 1;
+                                [[maybe_unused]] const int connects_to = not_unique_analysis[endpoint_col];
                                 assert(path_col_sz == (connects_to * color_size));
                                 assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
 
@@ -1141,21 +1673,22 @@ namespace sassy {
                                 int endpoint_neighbour_col = -1;
 
                                 for(int jjj = 0; jjj < color_size; ++jjj ) {
-                                    const int col1_vertj = col.lab[color + jjj];
+                                    const int col1_vertj = c.lab[color + jjj];
 
                                     // now go through and remove paths...
                                     neighbour_list.reset();
                                     for (int jj = 0; jj < g->d[col1_vertj]; ++jj) {
                                         const int _neighbour = g->e[g->v[col1_vertj] + jj];
-                                        const int _neighbour_col = col.vertex_to_col[_neighbour];
+                                        const int _neighbour_col = c.vertex_to_col[_neighbour];
                                         //const int _neighbour_col_sz = col.ptn[_neighbour_col] + 1;
 
                                         if (_neighbour_col == path_col) {
                                             neighbour_list.push_back(_neighbour);
-                                            const auto other_endpoint = walk_to_endpoint(g, _neighbour, col1_vertj, nullptr);
+                                            const auto other_endpoint =
+                                                    walk_to_endpoint(g, _neighbour, col1_vertj, nullptr);
                                             neighbour_to_endpoint[_neighbour] = other_endpoint.first;
                                             if(endpoint_neighbour_col == -1) {
-                                                endpoint_neighbour_col = col.vertex_to_col[other_endpoint.second];
+                                                endpoint_neighbour_col = c.vertex_to_col[other_endpoint.second];
                                             }
                                         }
                                     }
@@ -1183,6 +1716,8 @@ namespace sassy {
 
                                         const int vert_orig = translate_back(col1_vertj);
 
+                                        // TODO removed vertices must not contain negative values, need additional check
+                                        // TODO or think about how to lift these properly
                                         recovery_strings[vert_orig].reserve(
                                                 recovery_strings[vert_orig].size() +
                                                 path.cur_pos);
@@ -1194,7 +1729,8 @@ namespace sassy {
                                             assert(path_v_orig < domain_size);
                                             recovery_strings[vert_orig].push_back(path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
-                                                recovery_strings[vert_orig].push_back(recovery_strings[path_v_orig][rsi]);
+                                                recovery_strings[vert_orig].push_back(
+                                                        recovery_strings[path_v_orig][rsi]);
                                             }
                                         }
 
@@ -1212,11 +1748,12 @@ namespace sassy {
                                             assert(path_v_orig < domain_size);
                                             recovery_strings[endpoint_orig].push_back(-path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
-                                                recovery_strings[endpoint_orig].push_back(-abs(recovery_strings[path_v_orig][rsi]));
+                                                recovery_strings[endpoint_orig].push_back(
+                                                        -abs(recovery_strings[path_v_orig][rsi]));
                                             }
                                         }
 
-                                        assert(col.vertex_to_col[_endpoint] == endpoint_col);
+                                        assert(c.vertex_to_col[_endpoint] == endpoint_col);
                                     }
                                 }
                             }
@@ -1226,51 +1763,40 @@ namespace sassy {
             }
         }
 
-        void write_canonical_recovery_string_to_automorphism(const int from, const int to) {
-            assert(recovery_strings[from].size() == recovery_strings[to].size());
-            for (size_t i = 0; i < recovery_strings[to].size(); ++i) {
-                const int str_from = recovery_strings[from][i];
-                const int str_to = recovery_strings[to][i];
-                automorphism[str_to] = str_from;
-                automorphism[str_from] = str_to;
-                automorphism_supp.push_back(str_from);
-                automorphism_supp.push_back(str_to);
-            }
-        }
-
         // reduce vertices of degree 1 and 0, outputs corresponding automorphisms
-        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, dejavu_hook* consume) {
-            g->initialize_coloring(&c, colmap);
-            if (CONFIG_PREP_DEACT_DEG01)
-                return;
+        void red_deg10_assume_cref(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
+            if (h_deact_deg1) return;
+
+            g_old_v.clear();
+            g_old_v.reserve(g->v_size);
+            bool has_01 = false;
+            for (int i = 0; i < g->v_size; ++i) {
+                const int d = g->d[i];
+                has_01 = has_01 || (d == 0) || (d == 1);
+                g_old_v.push_back(d);
+            }
+            if(!has_01) return;
 
             worklist_deg0.reset();
             worklist_deg1.reset();
 
-            dejavu::mark_set is_parent(g->v_size);
-
-            g_old_v.clear();
-            g_old_v.reserve(g->v_size);
-            for (int i = 0; i < g->v_size; ++i) {
-                g_old_v.push_back(g->d[i]);
-            }
-
-            dejavu::work_list pair_match(g->v_size);
-            dejavu::work_list parentlist(g->v_size);
-            dejavu::work_list childcount(g->v_size);
+            dejavu::markset  is_parent(g->v_size);
+            dejavu::worklist pair_match(g->v_size);
+            dejavu::worklist parentlist(g->v_size);
+            dejavu::worklist childcount(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount.push_back(0);
 
-            dejavu::work_list childcount_prev(g->v_size);
+            dejavu::worklist childcount_prev(g->v_size);
             for (int i = 0; i < g->v_size; ++i)
                 childcount_prev.push_back(0);
 
-            dejavu::work_list_t<std::pair<int, int>> stack1(g->v_size);
-            dejavu::work_list map(g->v_size);
+            dejavu::worklist_t<std::pair<int, int>> stack1(g->v_size);
+            dejavu::worklist map(g->v_size);
 
             assert(_automorphism_supp.cur_pos == 0);
 
-
+            g->initialize_coloring(&c, colmap);
             for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
                 switch (g_old_v[v]) {
@@ -1307,9 +1833,6 @@ namespace sassy {
                     //int last_parent_child_count = -1;
                     for (int i = v_child_col; i < v_child_col + child_col_sz; ++i) {
                         int child = c.lab[i];
-                        //int next_child = -1;
-                        //if (i < v_child_col + child_col_sz - 1)
-                        //    next_child = c.lab[i + 1];
 
                         // search for parent
                         const int e_pos_child = g->v[child];
@@ -1367,7 +1890,7 @@ namespace sassy {
                 if (is_pairs) {
                     for (int j = 0; j < parentlist.cur_pos; ++j) {
                         const int first_pair_parent = parentlist[j];
-                        const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                        const int pair_from = first_pair_parent;
                         const int pair_to = pair_match[pair_from];
 
                         stack1.reset();
@@ -1400,8 +1923,6 @@ namespace sassy {
                         // descending shared_tree of child_to while writing automorphism
                         stack1.reset();
                         assert(map[pos] != pair_to);
-                        //const int to_1 = translate_back(pair_to);
-                        //const int from_1 = translate_back(map[pos]);
                         const int v_to_1   = pair_to;
                         const int v_from_1 = map[pos];
                         assert(automorphism[v_to_1] == v_to_1);
@@ -1412,11 +1933,6 @@ namespace sassy {
                         _automorphism_supp.push_back(v_from_1);
                         _automorphism_supp.push_back(v_to_1);
 
-                        /*automorphism[from_1] = to_1;
-                        automorphism[to_1] = from_1;
-                        automorphism_supp.push_back(from_1);
-                        automorphism_supp.push_back(to_1);
-                        write_canonical_recovery_string_to_automorphism(to_1, from_1);*/
                         ++pos;
                         // child_to and child_from could have canonical strings when translated back
                         assert(childcount[pair_to] == childcount[pair_from]);
@@ -1435,8 +1951,6 @@ namespace sassy {
                                 assert(next < g->v_size);
                                 assert(map[pos] != next);
 
-                                //const int to_2 = translate_back(next);
-                                //const int from_2 = translate_back(map[pos]);
                                 const int v_to_2 = next;
                                 const int v_from_2 = map[pos];
 
@@ -1447,13 +1961,6 @@ namespace sassy {
                                 _automorphism_supp.push_back(v_from_2);
                                 _automorphism_supp.push_back(v_to_2);
 
-                                /*assert(automorphism[to_2] == to_2);
-                                assert(automorphism[from_2] == from_2);
-                                automorphism[from_2] = to_2;
-                                automorphism[to_2] = from_2;
-                                automorphism_supp.push_back(from_2);
-                                automorphism_supp.push_back(to_2);
-                                write_canonical_recovery_string_to_automorphism(to_2, from_2);*/
                                 ++pos;
                                 if (from_next != to_next) // there was a semicolon here, should have been bug
                                     stack1.push_back(std::pair<int, int>(from_next, to_next));
@@ -1466,14 +1973,9 @@ namespace sassy {
                         assert(g_old_v[pair_from] == 1);
                         assert(del.get(pair_to));
                         assert(del.get(pair_from));
-                        /*(*consume)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos,
-                                automorphism_supp.get_array());
-                        reset_automorphism(automorphism.get_array(), automorphism_supp.cur_pos,
-                                           automorphism_supp.get_array());
-                        automorphism_supp.reset();*/
 
-                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array(),
-                                 consume);
+                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                 _automorphism_supp.get_array(), hook);
 
                         reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                            _automorphism_supp.get_array());
@@ -1482,7 +1984,7 @@ namespace sassy {
 
                     for (int j = 0; j < parentlist.cur_pos; ++j) {
                         const int first_pair_parent = parentlist[j];
-                        const int pair_from = first_pair_parent; // need to use both childlist and canonical recovery again
+                        const int pair_from = first_pair_parent;
                         const int pair_to = pair_match[pair_from];
 
                         const int original_parent = translate_back(first_pair_parent);
@@ -1546,7 +2048,7 @@ namespace sassy {
 
                     // descending shared_tree of child_from while writing map
                     stack1.reset();
-                    map.reset(); // TODO: could be automorphism_supp, then reset automorphism_supp only half-way
+                    map.reset();
                     map.push_back(child_from);
                     stack1.push_back(std::pair<int, int>(g->v[child_from], g->v[child_from] + childcount[child_from]));
                     while (!stack1.empty()) {
@@ -1594,15 +2096,6 @@ namespace sassy {
                         _automorphism_supp.push_back(v_from_1);
                         _automorphism_supp.push_back(v_to_1);
 
-                        /*const int to_1 = translate_back(child_to);
-                        const int from_1 = translate_back(map[pos]);
-                        assert(automorphism[to_1] == to_1);
-                        assert(automorphism[from_1] == from_1);
-                        automorphism[from_1] = to_1;
-                        automorphism[to_1] = from_1;
-                        automorphism_supp.push_back(from_1);
-                        automorphism_supp.push_back(to_1);
-                        write_canonical_recovery_string_to_automorphism(to_1, from_1);*/
                         ++pos;
                         // child_to and child_from could have canonical strings when translated back
                         assert(childcount[child_to] == childcount[child_from]);
@@ -1630,15 +2123,6 @@ namespace sassy {
                                 _automorphism_supp.push_back(v_from_2);
                                 _automorphism_supp.push_back(v_to_2);
 
-                                /*const int to_2 = translate_back(next);
-                                const int from_2 = translate_back(map[pos]);
-                                assert(automorphism[to_2] == to_2);
-                                assert(automorphism[from_2] == from_2);
-                                automorphism[from_2] = to_2;
-                                automorphism[to_2] = from_2;
-                                automorphism_supp.push_back(from_2);
-                                automorphism_supp.push_back(to_2);
-                                write_canonical_recovery_string_to_automorphism(to_2, from_2);*/
                                 ++pos;
                                 if (from_next != to_next) // there was a semicolon here, should have been bug
                                     stack1.push_back(std::pair<int, int>(from_next, to_next));
@@ -1646,18 +2130,13 @@ namespace sassy {
                         }
 
                         assert(pos == map.cur_pos);
-
                         assert(g_old_v[child_to] == 1);
                         assert(g_old_v[child_from] == 1);
                         assert(del.get(child_to));
                         assert(del.get(child_from));
-                        /*(*consume)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos,
-                                automorphism_supp.get_array());
-                        reset_automorphism(automorphism.get_array(), automorphism_supp.cur_pos,
-                                           automorphism_supp.get_array());
-                        automorphism_supp.reset();*/
-                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array(),
-                                 consume);
+
+                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                 _automorphism_supp.get_array(), hook);
 
                         reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                            _automorphism_supp.get_array());
@@ -1742,124 +2221,58 @@ namespace sassy {
                     _automorphism_supp.push_back(parent_to);
 
                     pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                             _automorphism_supp.get_array(), consume);
+                             _automorphism_supp.get_array(), hook);
 
                     reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
                                        _automorphism_supp.get_array());
                     _automorphism_supp.reset();
-
-                    /*const int orig_parent_from = translate_back(parent_from);
-                    const int orig_parent_to = translate_back(parent_to);
-
-                    assert(recovery_strings[orig_parent_to].size() ==
-                           recovery_strings[orig_parent_from].size());
-
-                    automorphism[orig_parent_to] = orig_parent_from;
-                    automorphism[orig_parent_from] = orig_parent_to;
-                    automorphism_supp.push_back(orig_parent_from);
-                    automorphism_supp.push_back(orig_parent_to);
-                    for (size_t k = 0; k < recovery_strings[orig_parent_to].size(); ++k) {
-                        const int str_from = recovery_strings[orig_parent_from][k];
-                        const int str_to = recovery_strings[orig_parent_to][k];
-                        automorphism[str_to] = str_from;
-                        automorphism[str_from] = str_to;
-                        automorphism_supp.push_back(str_from);
-                        automorphism_supp.push_back(str_to);
-                    }
-
-                    (*consume)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos,
-                            automorphism_supp.get_array());
-                    reset_automorphism(automorphism.get_array(), automorphism_supp.cur_pos,
-                                       automorphism_supp.get_array());
-                    automorphism_supp.reset();*/
                 }
             }
         }
 
         // perform edge flips according to quotient graph
         void red_quotient_edge_flip(dejavu::sgraph *g, int *colmap) { // TODO could still optimize further ...
-            if (g->v_size <= 1)
-                return;
+            if (g->v_size <= 1) return;
 
             del_e.reset();
+            worklist_deg0.reset(); // serves as the "test vector"
 
-            worklist_deg0.reset();
-            worklist_deg1.reset();
+            //coloring test_col;
+            g->initialize_coloring(&c, colmap);
 
-            dejavu::mark_set connected_col(g->v_size);
-            dejavu::mark_set is_not_matched(g->v_size);
-
-            // int v_has_matching_color = 0;
-
-            coloring test_col;
-            g->initialize_coloring(&test_col, colmap);
-
-            // int cnt = 0;
-            int edge_flip_pot = 0;
-            int edge_cnt = 0;
-
-            std::vector<int> test_vec;
-            for (int y = 0; y < g->v_size; ++y)
-                test_vec.push_back(0);
+            for (int y = 0; y < g->v_size; ++y) worklist_deg0[y] = 0;
 
             for (int i = 0; i < g->v_size;) {
-                connected_col.reset();
-                is_not_matched.reset();
-
-                int connected_cols = 0;
-                int connected_col_eq_sz = 0;
-                int v = test_col.lab[i];
+                int v = c.lab[i];
                 for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
                     const int v_neigh = g->e[f];
-                    if (!connected_col.get(test_col.vertex_to_col[v_neigh])) {
-                        assert(test_col.vertex_to_col[v_neigh] >= 0);
-                        assert(test_col.vertex_to_col[v_neigh] < g->v_size);
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] == 0);
-                        connected_col.set(test_col.vertex_to_col[v_neigh]);
-                        connected_cols += 1;
-                        if (test_col.ptn[test_col.vertex_to_col[v_neigh]] == test_col.ptn[i])
-                            connected_col_eq_sz += 1;
-                    } else {
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] > 0);
-                        is_not_matched.set(test_col.vertex_to_col[v_neigh]);
-                    }
-                    test_vec[test_col.vertex_to_col[v_neigh]] += 1;
+                    worklist_deg0[c.vertex_to_col[v_neigh]] += 1;
                 }
 
-                for (int ii = 0; ii < test_col.ptn[i] + 1; ++ii) {
-                    const int vx = test_col.lab[i + ii];
+                for (int ii = 0; ii < c.ptn[i] + 1; ++ii) {
+                    const int vx = c.lab[i + ii];
+                    bool skipped_none = true;
                     for (int f = g->v[vx]; f < g->v[vx] + g->d[vx]; ++f) {
                         const int v_neigh = g->e[f];
-
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] >= 0);
-                        assert(test_vec[test_col.vertex_to_col[v_neigh]] < g->v_size);
-                        if (test_vec[test_col.vertex_to_col[v_neigh]] ==
-                            test_col.ptn[test_col.vertex_to_col[v_neigh]] + 1) {
-                            edge_cnt += 1;
+                        if (worklist_deg0[c.vertex_to_col[v_neigh]] ==
+                                c.ptn[c.vertex_to_col[v_neigh]] + 1) {
                             del_e.set(f); // mark edge for deletion (reverse edge is handled later automatically)
-                        }
-
-                        if (ii == 0) {
-                            if (test_col.ptn[test_col.vertex_to_col[v_neigh]] == test_col.ptn[i] &&
-                                test_vec[test_col.vertex_to_col[v_neigh]] ==
-                                test_col.ptn[test_col.vertex_to_col[v_neigh]]) {
-                                edge_flip_pot += (test_vec[test_col.vertex_to_col[v_neigh]] * (test_col.ptn[i] + 1)) -
-                                                 (test_col.ptn[i] + 1);
-                            }
+                            skipped_none = false;
                         }
                     }
+                    if(skipped_none) break;
                 }
 
                 for (int f = g->v[v]; f < g->v[v] + g->d[v]; ++f) {
                     const int v_neigh = g->e[f];
-                    test_vec[test_col.vertex_to_col[v_neigh]] = 0;
+                    worklist_deg0[c.vertex_to_col[v_neigh]] = 0;
                 }
 
-                i += test_col.ptn[i] + 1;
+                i += c.ptn[i] + 1;
             }
         }
 
-        void copy_coloring_to_colmap(const coloring *c, int *colmap) {
+        static void copy_coloring_to_colmap(const coloring *c, int *colmap) {
             for (int i = 0; i < c->domain_size; ++i) {
                 colmap[i] = c->vertex_to_col[i];
             }
@@ -2144,6 +2557,142 @@ namespace sassy {
             del.reset();
         }
 
+        // deletes vertices marked in 'del'
+        // for vertices v where add_edge_buff_act[v] is set, in turn adds edges add_edge_buff_act[v]
+        // assumes that g->v points to g->e in ascending order
+        // assumes that degree of a vertex stays the same or gets smaller
+        void perform_del_add_edge_general(dejavu::sgraph *g, int *colmap) {
+            if (g->v_size <= 1)
+                return;
+
+            // copy some stuff
+            g_old_v.clear();
+            g_old_e.clear();
+            translate_layer_fwd.clear();
+            translate_layer_bwd.clear();
+
+            for (size_t i = 0; i < backward_translation_layers[backward_translation_layers.size() - 1].size(); ++i)
+                translate_layer_bwd.push_back(backward_translation_layers[backward_translation_layers.size() - 1][i]);
+
+            // create translation array from old graph to new graph vertices
+            int cnt = 0;
+            int new_vsize = 0;
+            for (int i = 0; i < g->v_size; ++i) {
+                worklist_deg0[i] = colmap[i];
+                if (!del.get(i)) {
+                    translate_layer_fwd.push_back(cnt);
+                    const int translate_back = translate_layer_bwd[translate_layer_fwd.size() - 1];
+                    backward_translation_layers[backward_translation_layers.size() - 1][cnt] = translate_back;
+                    ++cnt;
+                    ++new_vsize;
+                } else {
+                    //translation_layers[fwd_ind].push_back(-1);
+                    translate_layer_fwd.push_back(-1);
+                }
+            }
+
+            if (new_vsize == g->v_size)
+                return;
+
+            if (new_vsize == 0 || new_vsize == 1) {
+                g->v_size = 0;
+                g->e_size = 0;
+                return;
+            }
+
+            g_old_v.reserve(g->v_size);
+
+            for (int i = 0; i < g->v_size; ++i) {
+                g_old_v.push_back(g->v[i]);
+            }
+            for (int i = 0; i < g->e_size; ++i) {
+                g_old_e.push_back(g->e[i]);
+            }
+
+            backward_translation_layers[backward_translation_layers.size() - 1].resize(cnt);
+
+            // make graph smaller using the translation array
+            int epos = 0;
+            for (int i = 0; i < g->v_size; ++i) {
+                const int old_v = i;
+                const int new_v = translate_layer_fwd[old_v];
+
+                if (new_v >= 0) {
+                    int new_d = 0;
+                    g->v[new_v] = epos;
+                    for (int j = g_old_v[old_v]; j < g_old_v[old_v] + g->d[old_v]; ++j) {
+                        const int ve = g_old_e[j];
+                        const int new_ve = translate_layer_fwd[ve];
+                        if (new_ve >= 0) {
+                            assert(new_ve < new_vsize);
+                            assert(new_ve >= 0);
+                            ++new_d;
+                            g->e[epos] = new_ve;
+                            ++epos;
+                        }
+                    }
+                    if (add_edge_buff_act.get(old_v)) {
+                        while (!add_edge_buff[old_v].empty()) {
+                            const int edge_to_old = add_edge_buff[old_v].back();
+                            add_edge_buff[old_v].pop_back();
+                            //const int edge_to_old = add_edge_buff[old_v];
+                            assert(add_edge_buff_act.get(edge_to_old));
+                            //const int edge_to_new = translation_layers[fwd_ind][edge_to_old];
+                            const int edge_to_new = translate_layer_fwd[edge_to_old];
+                            assert(edge_to_old >= 0);
+                            assert(edge_to_old <= domain_size);
+                            assert(edge_to_new >= 0);
+                            assert(edge_to_new <= new_vsize);
+                            ++new_d;
+                            g->e[epos] = edge_to_new;
+                            ++epos;
+                        }
+                    }
+                    g_old_v[old_v] = new_d;
+                }
+            }
+
+            for (int i = 0; i < g->v_size; ++i) {
+                const int old_v = i;
+                const int new_v = translate_layer_fwd[i];
+                if (new_v >= 0) {
+                    g->d[new_v] = g_old_v[old_v];
+                }
+            }
+
+            g->e_size = epos;
+
+            // adapt colmap for remaining vertices
+            for (int i = 0; i < g->v_size; ++i) {
+                const int old_v = i;
+                //const int new_v = translation_layers[fwd_ind][i];
+                const int new_v = translate_layer_fwd[i];
+                assert(new_v < new_vsize);
+                if (new_v >= 0) {
+                    assert(colmap[old_v] >= 0);
+                    //assert(colmap[old_v] < domain_size);
+                    //colmap[new_v] = colmap[old_v];
+                    colmap[new_v] = worklist_deg0[old_v];
+                }
+            }
+
+            g->v_size = new_vsize;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
+                assert(g->d[i] > 0 ? g->v[i] >= 0 : true);
+                assert(g->d[i] >= 0);
+                assert(g->d[i] < g->v_size);
+            }
+            for (int i = 0; i < g->e_size; ++i) {
+                assert(g->e[i] < g->v_size);
+                assert(g->e[i] >= 0);
+            }
+
+            add_edge_buff_act.reset();
+            del.reset();
+        }
+
         // marks all discrete vertices in 'del'
         void mark_discrete_for_deletion(dejavu::sgraph *g, int *colmap) {
             //int discrete_cnt = 0;
@@ -2169,7 +2718,7 @@ namespace sassy {
 
             int discrete_cnt = 0;
             worklist_deg0.reset();
-            for (int i = 0; i < domain_size; ++i) { // TODO: this is shit
+            for (int i = 0; i < domain_size; ++i) {
                 worklist_deg0.push_back(0);
             }
             for (int i = 0; i < g->v_size; ++i) {
@@ -2275,429 +2824,6 @@ namespace sassy {
             del.reset();
         }
 
-        // select a color class in a quotient component
-        // assumes internal state of quotient component is up-to-date
-        std::pair<int, int>
-        select_color_component(coloring *c1, int component_start_pos, int component_end_pos, int hint) {
-            int cell = -1;
-            bool only_discrete_prev = true;
-            int _i = component_start_pos;
-            if (hint >= 0)
-                _i = hint;
-            for (; _i < component_end_pos; ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-
-                for (int i = col; i < col + col_sz + 1; ++i) {
-                    if (c1->vertex_to_col[c1->lab[i]] != i)
-                        continue; // not a color
-                    if (c1->ptn[i] > 0 && only_discrete_prev) {
-                        //start_search_here = i;
-                        only_discrete_prev = false;
-                    }
-                    if (c1->ptn[i] >= 1) {
-                        cell = i;
-                        break;
-                    }
-                }
-                if (cell != -1)
-                    break;
-            }
-            return {cell, _i};
-        }
-
-        // select a color class in a quotient component
-        // assumes internal state of quotient component is up-to-date
-        std::pair<int, int>
-        select_color_component_large(coloring *c1, int component_start_pos, int component_end_pos, int hint) {
-            int cell = -1;
-            bool only_discrete_prev = true;
-            int _i = component_start_pos;
-            if (hint >= 0)
-                _i = hint;
-            int continue_buffer = 2;
-            for (; _i < component_end_pos; ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-
-                for (int i = col; i < col + col_sz + 1; ++i) {
-                    int largest_cell_sz = INT32_MIN;
-                    if (c1->vertex_to_col[c1->lab[i]] != i)
-                        continue; // not a color
-                    if (c1->ptn[i] > 0 && only_discrete_prev) {
-                        hint = _i;
-                        only_discrete_prev = false;
-                    }
-                    if (c1->ptn[i] >= 1 && c1->ptn[i] > largest_cell_sz) {
-                        cell = i;
-                        largest_cell_sz = c1->ptn[i];
-                    }
-                }
-                if (cell != -1) {
-                    --continue_buffer;
-                    if (continue_buffer >= 0)
-                        break;
-                }
-            }
-            return {cell, _i};
-        }
-
-        // select a color class in a quotient component
-        // assumes internal state of quotient component is up-to-date
-        std::pair<int, int> select_color_component_large_touched(coloring *c1, int component_start_pos,
-                                                                 int component_end_pos, int hint,
-                                                                 dejavu::mark_set *touched_set) {
-            int cell = -1;
-            bool only_discrete_prev = true;
-            int _i = component_start_pos;
-            if (hint >= 0) {
-                _i = hint;
-            } else {
-                /*int largest_cell = -1;
-            int lookahead = 12;
-            for(int j = 0; j < touched_list->cur_pos; ++j) {
-                const int cand_col = (*touched_list)[j];
-                if(c1->ptn[cand_col] > 0 && c1->ptn[cand_col] > largest_cell) {
-                    cell = cand_col;
-                    largest_cell = c1->ptn[cand_col];
-                }
-                if(cell != -1) {
-                    --lookahead;
-                    if(lookahead <= 0)
-                        break;
-                }
-            }
-            if(cell != -1)
-                return {cell, -1};*/
-            }
-            int continue_buffer = 4;
-            for (; _i < component_end_pos; ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-
-                for (int i = col; i < col + col_sz + 1;) {
-                    int largest_cell_sz = INT32_MIN;
-                    /*if(c1->vertex_to_col[c1->lab[i]] != i)
-                    continue; // not a color*/
-                    if (c1->ptn[i] > 0 && only_discrete_prev) {
-                        hint = _i;
-                        only_discrete_prev = false;
-                    }
-                    if (c1->ptn[i] >= 1 && (c1->ptn[i] > largest_cell_sz ||
-                                            (touched_set->get(i) && (cell == -1 || !touched_set->get(cell))))) {
-                        cell = i;
-                        largest_cell_sz = c1->ptn[i];
-                    }
-                    i += c1->ptn[i] + 1;
-                }
-                if (cell != -1) {
-                    --continue_buffer;
-                    if (continue_buffer <= 0)
-                        break;
-                }
-            }
-            return {cell, hint};
-        }
-
-
-        unsigned long* invariant_acc = nullptr;
-        dejavu::mark_set*  internal_touched_color;
-        dejavu::work_list* internal_touched_color_list;
-        std::function<dejavu::ir::type_split_color_hook> my_split_hook;
-
-        bool split_hook(const int old_color, const int new_color, const int) {
-            // record colors that were changed
-            if (!internal_touched_color->get(new_color)) {
-                internal_touched_color->set(new_color);
-                internal_touched_color_list->push_back(new_color);
-            }
-
-            if (!internal_touched_color->get(old_color)) {
-                internal_touched_color->set(old_color);
-                internal_touched_color_list->push_back(old_color);
-            }
-
-            *invariant_acc = add_to_hash(*invariant_acc, new_color);
-
-            return true;
-        }
-
-        std::function<dejavu::ir::type_split_color_hook> self_split_hook() {
-            return [this](auto && PH1, auto && PH2, auto && PH3) { return
-                    split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
-                               std::forward<decltype(PH3)>(PH3)); };
-        }
-
-        void refine_coloring(dejavu::sgraph *g, coloring *c, unsigned long* invariant,
-                             int init_color_class, int cell_early, dejavu::mark_set *set_touched_color,
-                             dejavu::work_list *set_touched_color_list) {
-            invariant_acc = invariant;
-            internal_touched_color      = set_touched_color;
-            internal_touched_color_list = set_touched_color_list;
-
-            R1->refine_coloring(g, c, init_color_class, cell_early, my_split_hook);
-        }
-
-        // TODO: flat version that stays on first level of IR shared_tree? or deep version that goes as deep as possible while preserving an initial color?
-        // performs sparse probing for all color classes, but only for 1 individualization
-        void sparse_ir_probe(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, selector_type sel_type) {
-            if (g->v_size <= 1 || CONFIG_PREP_DEACT_PROBE)
-                return;
-
-            std::vector<int> individualize_later;
-
-            coloring c1;
-            g->initialize_coloring(&c1, colmap); // could re-order to reduce overhead when not applicable
-            for (int i = 0; i < g->v_size; ++i)
-                colmap[i] = c1.vertex_to_col[i];
-
-            coloring c2;
-            c2.copy_from_ir_ancestor(&c1);
-            c2.copy_ptn(&c1);
-
-            for (int i = 0; i < g->v_size; ++i) {
-                assert(c2.vertex_to_col[i] == c1.vertex_to_col[i]);
-                assert(c2.vertex_to_lab[i] == c1.vertex_to_lab[i]);
-                assert(c2.lab[i] == c1.lab[i]);
-                assert(c2.ptn[i] == c1.ptn[i]);
-            }
-
-            coloring original_c;
-            original_c.copy_any(&c1);
-
-            coloring color_cache;
-            color_cache.copy_any(&c1);
-
-            selector S;
-
-            //dejavu::mark_set  touched_color(g->v_size);
-            //dejavu::work_list touched_color_list(g->v_size);
-            touched_color.reset();
-            touched_color_list.reset();
-
-            unsigned long I1 = 0;
-            unsigned long I2 = 0;
-
-            bool certify = true;
-            S.empty_cache();
-
-            while (true) {
-                // select a color class
-                const int cell = S.select_color_dynamic(g, &c1, sel_type);
-                if (cell == -1)
-                    break;
-
-                const int cell_sz = c1.ptn[cell];
-                bool is_orig_color    = original_c.vertex_to_col[original_c.lab[cell]] == cell;
-                bool is_orig_color_sz = original_c.ptn[cell] == cell_sz;
-
-                orbit.reset();
-                touched_color.reset();
-                touched_color_list.reset();
-
-                for (int i = 0; i < g->v_size; ++i) {
-                    assert(c2.vertex_to_col[i] == c1.vertex_to_col[i]);
-                    assert(c2.vertex_to_lab[i] == c1.vertex_to_lab[i]);
-                    assert(c2.lab[i] == c1.lab[i]);
-                    assert(c2.ptn[i] == c1.ptn[i]);
-                }
-                assert(c1.cells == c2.cells);
-
-                const int ind_v1 = c1.lab[cell];
-                assert(c1.vertex_to_col[ind_v1] == cell);
-                assert(c1.ptn[cell] > 0);
-                const unsigned long acc_prev = I1;
-                I2 = acc_prev;
-                I1 = acc_prev;
-                const int init_c1 = dejavu::ir::refinement::individualize_vertex(&c1, ind_v1);
-
-                bool all_certified = true;
-
-                touched_color.set(cell);
-                touched_color.set(init_c1);
-                touched_color_list.push_back(cell);
-                touched_color_list.push_back(init_c1);
-
-                //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
-                refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color,
-                                &touched_color_list);
-
-                // color cache to reset c2 back "before" individualization
-                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                    const int _c = touched_color_list[j];
-                    int f = 0;
-                    while (f < c1.ptn[_c] + 1) {
-                        const int i = _c + f;
-                        ++f;
-                        color_cache.ptn[i] = c2.ptn[i];
-                        color_cache.lab[i] = c2.lab[i];
-                        color_cache.vertex_to_col[color_cache.lab[i]] = c2.vertex_to_col[c2.lab[i]];
-                        color_cache.vertex_to_lab[color_cache.lab[i]] = c2.vertex_to_lab[c2.lab[i]];
-                    }
-                }
-                color_cache.cells = c2.cells;
-
-                if (!is_orig_color || !is_orig_color_sz) {// no point in looking for automorphisms
-                    all_certified = false;
-                }
-
-                bool hard_reset = false;
-
-                // repeat for all in color class
-                for (int it_c = 1; (it_c < cell_sz + 1) && all_certified; ++it_c) {
-                    const int ind_v2 = c2.lab[cell + it_c];
-                    if (orbit.are_in_same_orbit(ind_v1, ind_v2)) {
-                        continue;
-                    }
-                    //assert(ind_v1 == ind_v2);
-                    assert(c2.lab[cell + it_c] == color_cache.lab[cell + it_c]);
-                    assert(c2.vertex_to_col[ind_v2] == cell);
-                    assert(c2.ptn[cell] > 0);
-                    assert(c2.ptn[cell] == cell_sz);
-                    I2 = acc_prev;
-                    const int init_c2 = dejavu::ir::refinement::individualize_vertex(&c2, ind_v2);
-                    assert(init_c1 == init_c2);
-                    //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
-                    refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,
-                                    &touched_color_list);
-
-                    if (I1 != I2) {
-                        if (cell_sz == 1) individualize_later.push_back(ind_v1);
-                        all_certified = false;
-                        hard_reset = true;
-                        break;
-                    }
-
-                    _automorphism_supp.reset();
-                    if (c1.cells != g->v_size) { // touched_colors doesn't work properly when early-out is used
-                        // read automorphism
-                        for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                            const int _c = touched_color_list[j];
-                            int f = 0;
-                            while (f < c1.ptn[_c] + 1) {
-                                const int i = _c + f;
-                                ++f;
-                                if (c1.lab[i] != c2.lab[i]) {
-                                    _automorphism[c1.lab[i]] = c2.lab[i];
-                                    _automorphism_supp.push_back(c1.lab[i]);
-                                }
-                            }
-                        }
-                    } else {
-                        for (int i = 0; i < g->v_size; ++i) {
-                            if (c1.lab[i] != c2.lab[i]) {
-                                _automorphism[c1.lab[i]] = c2.lab[i];
-                                _automorphism_supp.push_back(c1.lab[i]);
-                            }
-                        }
-                    }
-
-                    certify = R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                             _automorphism_supp.cur_pos,
-                                                             _automorphism_supp.get_array());
-                    assert(certify ? R1->certify_automorphism(g, _automorphism.get_array()) : true);
-                    all_certified = certify && all_certified;
-                    if (certify) {
-                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                 _automorphism_supp.get_array(),
-                                 consume);
-                        add_automorphism_to_orbit(&orbit, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                  _automorphism_supp.get_array());
-                        // reset c2 to color_cache
-                        c2.cells = color_cache.cells;
-                        if (c2.cells != g->v_size) {
-                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                const int _c = touched_color_list[j];
-                                int f = 0;
-                                while (f < c1.ptn[_c] + 1) {
-                                    const int i = _c + f;
-                                    ++f;
-                                    c2.ptn[i] = color_cache.ptn[i];
-                                    c2.lab[i] = color_cache.lab[i];
-                                    c2.vertex_to_col[c2.lab[i]] = color_cache.vertex_to_col[color_cache.lab[i]];
-                                    c2.vertex_to_lab[c2.lab[i]] = color_cache.vertex_to_lab[color_cache.lab[i]];
-                                }
-                            }
-                        } else {
-                            // can't happen?
-                        }
-                    } else {
-                        hard_reset = true;
-                    }
-
-                    reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                       _automorphism_supp.get_array());
-                    _automorphism_supp.reset();
-                }
-
-                // reset c2 to c1
-                const int pre_c2_cells = c2.cells;
-                c2.cells = c1.cells;
-                if (c1.cells != g->v_size && pre_c2_cells != g->v_size && !hard_reset) {
-                    for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                        const int _c = touched_color_list[j];
-                        int f = 0;
-                        while (f < c1.ptn[_c] + 1) {
-                            const int i = _c + f;
-                            ++f;
-                            c2.ptn[i] = c1.ptn[i];
-                            c2.lab[i] = c1.lab[i];
-                            c2.vertex_to_col[c2.lab[i]] = c1.vertex_to_col[c1.lab[i]];
-                            c2.vertex_to_lab[c2.lab[i]] = c1.vertex_to_lab[c1.lab[i]];
-                        }
-                    }
-
-                    for (int i = 0; i < g->v_size; ++i) {
-                        assert(c2.vertex_to_col[i] == c1.vertex_to_col[i]);
-                        assert(c2.vertex_to_lab[i] == c1.vertex_to_lab[i]);
-                        assert(c2.lab[i] == c1.lab[i]);
-                        assert(c2.ptn[i] == c1.ptn[i]);
-                    }
-                } else {
-                    c2.copy_any(&c1);
-                    c2.copy_ptn(&c1);
-
-                    for (int i = 0; i < g->v_size; ++i) {
-                        assert(c2.vertex_to_col[i] == c1.vertex_to_col[i]);
-                        assert(c2.vertex_to_lab[i] == c1.vertex_to_lab[i]);
-                        assert(c2.lab[i] == c1.lab[i]);
-                        assert(c2.ptn[i] == c1.ptn[i]);
-                    }
-                }
-
-                if (all_certified) {
-                    assert(cell_sz == original_c.ptn[cell]);
-                    multiply_to_group_size(cell_sz + 1);
-                    individualize_later.push_back(ind_v1);
-                }
-            }
-
-            if (!individualize_later.empty()) {
-                //PRINT("(prep-red) sparse-ir-flat completed: " << individualize_later.size());
-                for (size_t i = 0; i < individualize_later.size(); ++i) {
-                    const int ind_vert = individualize_later[i];
-                    const int init_c = R1->individualize_vertex(&original_c, ind_vert);
-                    //R1->refine_coloring(g, &original_c, &I1, init_c, -1, nullptr, nullptr);
-                    R1->refine_coloring(g, &original_c, init_c);
-                }
-                for (int i = 0; i < g->v_size; ++i) {
-                    colmap[i] = original_c.vertex_to_col[i];
-                }
-            }
-        }
-
         // given automorphism of reduced graph, reconstructs automorphism of the original graph
         // does not optimize for consecutive calls
         void pre_hook(int, const int *_automorphism, int _supp, const int *_automorphism_supp, dejavu_hook* hook) {
@@ -2720,15 +2846,27 @@ namespace sassy {
                 assert(orig_v_from >= 0);
                 assert(orig_v_to < domain_size);
                 assert(orig_v_to >= 0);
-                assert(automorphism[orig_v_from] == orig_v_from);
-                automorphism[orig_v_from] = orig_v_to;
-                automorphism_supp.push_back(orig_v_from);
+
+                const bool added_vertex = !recovery_strings[orig_v_from].empty() &&
+                                           recovery_strings[orig_v_from][0] == INT32_MAX;
+
+                assert(automorphism[orig_v_from] == orig_v_from || added_vertex);
+
+                if(!added_vertex) {
+                    automorphism[orig_v_from] = orig_v_to;
+                    automorphism_supp.push_back(orig_v_from);
+                } else {
+                    assert(recovery_strings[orig_v_to].size() == 1);
+                }
 
                 assert(recovery_strings[orig_v_to].size() == recovery_strings[orig_v_from].size());
 
                 for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
                     const int v_from_t = recovery_strings[orig_v_from][j];
                     const int v_to_t   = recovery_strings[orig_v_to][j];
+                    assert((v_from_t == INT32_MAX) == (v_to_t == INT32_MAX));
+                    if(v_from_t == INT32_MAX) continue;
+
                     assert(v_from_t >  0?v_to_t >= 0:true);
                     assert(v_to_t   >  0?v_from_t >= 0:true);
                     assert(v_from_t <  0?v_to_t <= 0:true);
@@ -2763,10 +2901,19 @@ namespace sassy {
                     assert(automorphism[v_from] != before_move[v_from]);
                     automorphism[v_from] = before_move[v_from];
                 }
-                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos, aux_automorphism_supp.get_array());
+                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos,
+                                   aux_automorphism_supp.get_array());
                 aux_automorphism_supp.reset();
             }
 
+            const int end_pos = automorphism_supp.cur_pos;
+
+            if(!recovery_edge_attached.empty()) {
+                for (int i = 0; i < end_pos; ++i) {
+                    recovery_attached_edges_to_automorphism(automorphism_supp[i], automorphism.get_array(),
+                                                            &automorphism_supp, &aux_automorphism, &before_move);
+                }
+            }
 
             if(hook != nullptr)
                 (*hook)(domain_size, automorphism.get_array(), automorphism_supp.cur_pos, automorphism_supp.get_array());
@@ -2783,16 +2930,20 @@ namespace sassy {
             }
 
             meld_translation_layers();
-            automorphism_supp.reset();
+            // TODO what this should really do is bake recovery_strings into a single string, and edge attachmenets to
+            // TODO a proper non-linked graph structure
 
+            automorphism_supp.reset();
             bool use_aux_auto = false;
 
             if(_supp >= 0) {
                 for (int i = 0; i < _supp; ++i) {
-                    const int v_from = _automorphism_supp[i];
+                    const int _v_from = _automorphism_supp[i];
+                    const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     assert(v_from >= 0 && v_from < domain_size);
                     const int orig_v_from = backward_translation[v_from];
-                    const int v_to = _automorphism[v_from];
+                    const int _v_to = _automorphism[_v_from];
+                    const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     assert(v_from != v_to);
                     const int orig_v_to = backward_translation[v_to];
                     assert((unsigned int)v_from < backward_translation.size());
@@ -2804,22 +2955,40 @@ namespace sassy {
                     assert(orig_v_to < domain_size);
                     assert(orig_v_to >= 0);
                     assert(automorphism[orig_v_from] == orig_v_from);
-                    automorphism[orig_v_from] = orig_v_to;
-                    automorphism_supp.push_back(orig_v_from);
+                    const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
+                    const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
+                    const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
+                    const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
+                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
+                    [[maybe_unused]] const int from_recovery_string_size =
+                            from_recovery_string_end_pt - from_recovery_string_start_pt;
+                    if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
+                        automorphism[orig_v_from] = orig_v_to;
+                        automorphism_supp.push_back(orig_v_from);
+                    }
 
-                    assert(orig_v_to   < (int)recovery_strings.size());
-                    assert(orig_v_from < (int)recovery_strings.size());
-                    assert(recovery_strings[orig_v_to].size() ==
-                           recovery_strings[orig_v_from].size());
+                    //assert(orig_v_to   < (int)recovery_strings.size());
+                    //assert(orig_v_from < (int)recovery_strings.size());
+                    //assert(recovery_strings[orig_v_to].size() ==
+                    //       recovery_strings[orig_v_from].size());
+                    assert(from_recovery_string_size == to_recovery_string_size);
 
-                    for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
-                        /*const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t = recovery_strings[orig_v_to][j];
-                        assert(automorphism[v_from_t] == v_from_t);
-                        automorphism[v_from_t] = v_to_t;
-                        automorphism_supp.push_back(v_from_t);*/
-                        const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t   = recovery_strings[orig_v_to][j];
+                    for (int j = 0; j < to_recovery_string_size; ++j) {
+                        //assert(j <= recovery_strings[orig_v_from].size());
+                        //assert(j <= recovery_strings[orig_v_to].size());
+                        //const int v_from_t = recovery_strings[orig_v_from][j];
+                        //const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
+                        const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
+
+                        if(v_from_t == INT32_MAX) continue;
+
+                        assert(abs(v_from_t) >= 0);
+                        assert(abs(v_from_t) <  domain_size);
+                        assert(abs(v_to_t) >= 0);
+                        assert(abs(v_to_t) <  domain_size);
+
                         assert(v_from_t >  0?v_to_t >= 0:true);
                         assert(v_to_t   >  0?v_from_t >= 0:true);
                         assert(v_from_t <  0?v_to_t <= 0:true);
@@ -2843,9 +3012,11 @@ namespace sassy {
                 }
             } else {
                 for (int i = 0; i < _n; ++i) {
-                    const int v_from = i;
+                    const int _v_from = i;
+                    const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     const int orig_v_from = backward_translation[v_from];
-                    const int v_to = _automorphism[v_from];
+                    const int _v_to = _automorphism[_v_from];
+                    const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     if(v_from == v_to)
                         continue;
                     const int orig_v_to = backward_translation[v_to];
@@ -2858,15 +3029,33 @@ namespace sassy {
                     assert(orig_v_to < domain_size);
                     assert(orig_v_to >= 0);
                     assert(automorphism[orig_v_from] == orig_v_from);
-                    automorphism[orig_v_from] = orig_v_to;
-                    automorphism_supp.push_back(orig_v_from);
 
-                    assert(recovery_strings[orig_v_to].size() ==
-                           recovery_strings[orig_v_from].size());
+                    const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
+                    const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
+                    const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
+                    const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
+                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
+                    [[maybe_unused]] const int from_recovery_string_size =
+                            from_recovery_string_end_pt - from_recovery_string_start_pt;
 
-                    for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
-                        const int v_from_t = recovery_strings[orig_v_from][j];
-                        const int v_to_t   = recovery_strings[orig_v_to][j];
+                    if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
+                        automorphism[orig_v_from] = orig_v_to;
+                        automorphism_supp.push_back(orig_v_from);
+                    }
+
+                    assert(from_recovery_string_size == to_recovery_string_size);
+
+                    for (int j = 0; j < to_recovery_string_size; ++j) {
+                        //assert(j <= recovery_strings[orig_v_from].size());
+                        //assert(j <= recovery_strings[orig_v_to].size());
+                        //const int v_from_t = recovery_strings[orig_v_from][j];
+                        //const int v_to_t   = recovery_strings[orig_v_to][j];
+
+                        const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
+                        const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
+
+                        if(v_from_t == INT32_MAX) continue;
+
                         assert(v_from_t >  0?v_to_t >= 0:true);
                         assert(v_to_t   >  0?v_from_t >= 0:true);
                         assert(v_from_t <  0?v_to_t <= 0:true);
@@ -2901,8 +3090,18 @@ namespace sassy {
                         automorphism_supp.push_back(v_from);
                     automorphism[v_from] = before_move[v_from];
                 }
-                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos, aux_automorphism_supp.get_array());
+                reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos,
+                                   aux_automorphism_supp.get_array());
                 aux_automorphism_supp.reset();
+            }
+
+            const int end_pos = automorphism_supp.cur_pos;
+
+            if(!recovery_edge_attached.empty()) {
+                for (int i = 0; i < end_pos; ++i) {
+                    recovery_attached_edges_to_automorphism(automorphism_supp[i], automorphism.get_array(),
+                                                            &automorphism_supp, &aux_automorphism, &before_move);
+                }
             }
 
             if(hook != nullptr) {
@@ -2913,1642 +3112,13 @@ namespace sassy {
         }
 
     private:
-        // compute or update quotient components
-        void compute_quotient_graph_components_update(dejavu::sgraph *g, coloring *c1) {
-            if (!init_quotient_arrays) {
-                seen_vertex.initialize(g->v_size);
-                seen_color.initialize(g->v_size);
-
-                worklist.reserve(g->v_size);
-
-                quotient_component_worklist_v.reserve(g->v_size + 32);
-                quotient_component_worklist_col.reserve(g->v_size + 32);
-                quotient_component_worklist_col_sz.reserve(g->v_size + 32);
-                init_quotient_arrays = true;
-
-                quotient_component_worklist_boundary.reserve(64);
-                quotient_component_worklist_boundary_swap.reserve(64);
-
-                quotient_component_touched.reserve(64);
-                quotient_component_touched_swap.reserve(64);
-            }
-
-            seen_vertex.reset();
-            seen_color.reset();
-
-            int touched_vertices = 0;
-            int finished_vertices = 0;
-
-            quotient_component_workspace.clear();
-            quotient_component_worklist_col.clear();
-            quotient_component_worklist_col_sz.clear();
-            quotient_component_worklist_boundary_swap.swap(quotient_component_worklist_boundary);
-            quotient_component_worklist_boundary.clear();
-            quotient_component_touched_swap.clear();
-            quotient_component_touched_swap.swap(quotient_component_touched);
-
-            if (quotient_component_touched_swap.empty()) { // || (quotient_component_touched_swap.size() == quotient_component_worklist_boundary_swap.size())
-                quotient_component_worklist_v.clear();
-                for (int vs = 0; vs < g->v_size; ++vs) {
-                    if (c1->ptn[c1->vertex_to_col[vs]] == 0) {// ignore discrete vertices
-                        ++finished_vertices;
-                        seen_vertex.set(vs);
-                    }
-                }
-
-                int component = 0;
-                int current_component_sz = 0;
-                for (int vs = 0; vs < g->v_size; ++vs) {
-                    /*if (c1->ptn[c1->vertex_to_col[vs]] == 0) {// ignore discrete vertices
-                    seen_vertex.set(vs);
-                    continue;
-                }*/
-                    if (finished_vertices == g->v_size) break;
-                    if (seen_vertex.get(vs))
-                        continue;
-                    worklist.push_back(vs);
-
-                    while (!worklist.empty()) {
-                        const int next_v = worklist.back();
-                        worklist.pop_back();
-                        if (seen_vertex.get(next_v))
-                            continue;
-                        /*if (c1->ptn[c1->vertex_to_col[next_v]] == 0) {// ignore discrete vertices
-                        seen_vertex.set(next_v);
-                        continue;
-                    }*/
-
-                        ++touched_vertices;
-                        ++finished_vertices;
-                        current_component_sz += 1;
-                        seen_vertex.set(next_v);
-                        quotient_component_worklist_v.push_back(next_v);
-                        for (int i = 0; i < g->d[next_v]; ++i) {
-                            if (!seen_vertex.get(g->e[g->v[next_v] + i]))
-                                worklist.push_back(g->e[g->v[next_v] + i]); // neighbours
-                        }
-                        const int col = c1->vertex_to_col[next_v];
-                        assert(next_v < g->v_size);
-                        assert(col < g->v_size);
-                        if (!seen_color.get(col)) {
-                            quotient_component_worklist_col.push_back(col);
-                            quotient_component_worklist_col_sz.push_back(c1->ptn[col]);
-                            seen_color.set(col);
-                            for (int i = 0; i < c1->ptn[col] + 1; ++i) {
-                                assert(col + i < g->v_size);
-                                assert(c1->vertex_to_col[c1->lab[col + i]] == c1->vertex_to_col[next_v]);
-                                if (c1->lab[col + i] != next_v) {
-                                    if (!seen_vertex.get(c1->lab[col + i]))
-                                        worklist.push_back(c1->lab[col + i]);
-                                }
-                            }
-                        }
-                    }
-                    quotient_component_worklist_boundary.emplace_back(
-                            std::pair<int, int>(quotient_component_worklist_col.size(),
-                                                quotient_component_worklist_v.size()));
-                    current_component_sz = 0;
-                    ++component;
-                }
-            } else {
-                // go component by component and only check old touched components
-                size_t old_component = 0;
-                size_t new_component = 0;
-                size_t touched_comp_i = 0;
-                quotient_component_worklist_col.clear();
-                quotient_component_worklist_col_sz.clear();
-
-                while (old_component < quotient_component_worklist_boundary_swap.size()) {
-                    int next_touched_old_component = -1;
-                    if (touched_comp_i < quotient_component_touched_swap.size()) {
-                        next_touched_old_component = quotient_component_touched_swap[touched_comp_i];
-                    }
-
-                    if ((int)old_component == next_touched_old_component) {
-                        ++touched_comp_i;
-
-                        size_t component_vstart = 0;
-                        //size_t component_cstart = 0;
-                        if (old_component > 0) {
-                            component_vstart = quotient_component_worklist_boundary_swap[old_component - 1].second;
-                            //component_cstart = quotient_component_worklist_boundary_swap[old_component - 1].first;
-                        }
-                        const int component_vend = quotient_component_worklist_boundary_swap[old_component].second;
-                        //const int component_cend = quotient_component_worklist_boundary_swap[old_component].first;
-
-                        int v_write_pos = component_vstart;
-                        quotient_component_workspace.clear();
-                        int discrete_vertices = 0;
-                        for (int vi = component_vstart; vi < component_vend; ++vi) {
-                            const int vs = quotient_component_worklist_v[vi]; // need to copy this
-                            if (c1->ptn[c1->vertex_to_col[vs]] ==
-                                0) { // set up dummy component for all discrete vertices
-                                assert(c1->vertex_to_col[vs] == c1->vertex_to_lab[vs]);
-                                seen_vertex.set(vs);
-                                ++v_write_pos;
-                                ++discrete_vertices;
-                            } else {
-                                quotient_component_workspace.push_back(vs);
-                            }
-                        }
-
-                        if (discrete_vertices > 0) {
-                            quotient_component_worklist_boundary.emplace_back( // discrete vertex component
-                                    std::pair<int, int>(quotient_component_worklist_col.size(),
-                                                        v_write_pos));
-                            ++new_component;
-                        }
-
-                        size_t current_component_sz = 0;
-                        for (size_t vi = 0; vi < quotient_component_workspace.size(); ++vi) {
-                            if (current_component_sz == quotient_component_workspace.size())
-                                break;
-                            const int vs = quotient_component_workspace[vi];
-                            if (seen_vertex.get(vs))
-                                continue;
-                            worklist.push_back(vs);
-
-                            while (!worklist.empty()) {
-                                const int next_v = worklist.back();
-                                worklist.pop_back();
-                                if (seen_vertex.get(next_v))
-                                    continue;
-                                if (c1->ptn[c1->vertex_to_col[next_v]] == 0) {// ignore discrete vertices
-                                    assert(c1->vertex_to_col[next_v] == c1->vertex_to_lab[next_v]);
-                                    seen_vertex.set(next_v);
-                                    continue;
-                                }
-
-                                ++touched_vertices;
-                                current_component_sz += 1;
-                                seen_vertex.set(next_v);
-                                quotient_component_worklist_v[v_write_pos] = next_v;
-                                ++v_write_pos;
-                                for (int i = 0; i < g->d[next_v]; ++i) {
-                                    if (!seen_vertex.get(g->e[g->v[next_v] + i]))
-                                        worklist.push_back(g->e[g->v[next_v] + i]); // neighbours
-                                }
-                                const int col = c1->vertex_to_col[next_v];
-                                assert(next_v < g->v_size);
-                                assert(col < g->v_size);
-                                if (!seen_color.get(col)) {
-                                    quotient_component_worklist_col.push_back(col);
-                                    quotient_component_worklist_col_sz.push_back(c1->ptn[col]);
-                                    seen_color.set(col);
-                                    for (int i = 0; i < c1->ptn[col] + 1; ++i) {
-                                        assert(col + i < g->v_size);
-                                        assert(c1->vertex_to_col[c1->lab[col + i]] == c1->vertex_to_col[next_v]);
-                                        //if (c1->lab[col + i] != next_v) {
-                                        if (!seen_vertex.get(c1->lab[col + i]))
-                                            worklist.push_back(c1->lab[col + i]);
-                                        //}
-                                    }
-                                }
-                            }
-                            quotient_component_touched.push_back(new_component);
-                            quotient_component_worklist_boundary.emplace_back(
-                                    std::pair<int, int>(quotient_component_worklist_col.size(),
-                                                        v_write_pos));
-                            current_component_sz = 0;
-                            ++new_component;
-                        }
-
-                        assert(v_write_pos == quotient_component_worklist_boundary_swap[old_component].second);
-                        ++old_component;
-                    } else {
-                        ++new_component;
-                        quotient_component_worklist_boundary.emplace_back(
-                                std::pair<int, int>(quotient_component_worklist_col.size(),
-                                                    quotient_component_worklist_boundary_swap[old_component].second));
-                        ++old_component; // ignore component, just push old boundaries
-                    }
-                }
-            }
-        }
 
         // initialize some data structures
         void assure_ir_quotient_init(dejavu::sgraph *g) {
             if (!ir_quotient_component_init) {
-                touched_color.initialize(g->v_size);
-                touched_color_list.allocate(g->v_size);
                 touched_color_cache.initialize(g->v_size);
-                touched_color_list_cache.allocate(g->v_size);
-                orbit.initialize(g->v_size);
                 ir_quotient_component_init = true;
             }
-        }
-
-        // perform sparse probing for color classes of size 2, num_paths number of times
-        int sparse_ir_probe_sz2_quotient_components(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, int num_paths) {
-            if (g->v_size <= 1 || CONFIG_PREP_DEACT_PROBE)
-                return 0;
-
-            quotient_component_touched.clear();
-            quotient_component_touched_swap.clear();
-
-            save_colmap_v_to_col.clear();
-            save_colmap_v_to_lab.clear();
-            save_colmap_ptn.clear();
-
-            save_colmap_v_to_col.reserve(g->v_size);
-            save_colmap_v_to_lab.reserve(g->v_size);
-            save_colmap_ptn.reserve(g->v_size);
-
-            coloring c1;
-            g->initialize_coloring(&c1, colmap);
-
-            for (int i = 0; i < g->v_size; ++i)
-                colmap[i] = c1.vertex_to_col[i];
-
-            int global_automorphisms_found = 0;
-            int save_cell_number = -1;
-
-            assure_ir_quotient_init(g);
-
-            coloring c2;
-            c2.copy_any(&c1);
-
-            coloring c3;
-            c3.copy_any(&c1);
-
-            int penalty = 0;
-
-            int touched_support = g->v_size;
-            for (int x = 0; x < num_paths - penalty; ++x) {
-                if (x > 0 && quotient_component_touched.empty()) {
-                    break;
-                }
-
-                compute_quotient_graph_components_update(g, &c1);
-                touched_support = 0;
-
-                int automorphisms_found = 0;
-
-                quotient_component_touched_swap.clear();
-                quotient_component_touched_swap.swap(quotient_component_touched);
-
-                if (x == 0) {
-                    for (size_t i = 0; i < quotient_component_worklist_boundary.size(); ++i)
-                        quotient_component_touched_swap.push_back(i);
-                }
-
-                if (quotient_component_touched_swap.size() < 2) {
-                    //break; // added this
-                    ++penalty;
-                }
-                if (quotient_component_touched_swap.size() < 3)
-                    ++penalty;
-
-                touched_color.reset();
-                touched_color_list.reset();
-
-                unsigned long I1 = 0, I2 = 0;//, Ivec_wr, Ivec_rd;
-
-                bool certify = true;
-                size_t quotient_component_start_pos = 0;
-                size_t quotient_component_start_pos_v = 0;
-
-                int component = 0;
-                size_t next_touched_component_i = 0;
-                size_t next_touched_component = -1;
-                if (next_touched_component_i < quotient_component_touched_swap.size()) {
-                    next_touched_component = quotient_component_touched_swap[next_touched_component_i];
-                } else {
-                    component = quotient_component_worklist_boundary.size() - 1;
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-                }
-                while (component < (int) next_touched_component) {
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-                    ++component;
-                }
-
-                assert(component < (int) quotient_component_worklist_boundary.size());
-
-                int quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                int quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-
-                assert(quotient_component_end_pos_v - 1 < (int) quotient_component_worklist_v.size());
-
-                while (quotient_component_start_pos < quotient_component_worklist_col.size()) {
-                    assert(quotient_component_start_pos_v < quotient_component_worklist_v.size());
-                    int start_search_here = quotient_component_start_pos;
-
-                    assert(quotient_component_worklist_col[quotient_component_start_pos] >= 0);
-                    assert(quotient_component_worklist_v[quotient_component_start_pos_v] >= 0);
-                    certify = true;
-                    bool touched_current_component = false;
-
-                    while (certify) {
-                        // select a color class of size 2
-                        bool only_discrete_prev = true;
-                        int cell = -1;
-                        for (int _i = start_search_here; _i < quotient_component_end_pos; ++_i) {
-                            const int col = quotient_component_worklist_col[_i];
-                            const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                            if (only_discrete_prev)
-                                start_search_here = _i;
-
-                            if (col == -1) {// reached end of component
-                                break;
-                            }
-                            for (int i = col; i < col + col_sz + 1; ++i) {
-                                if (c1.vertex_to_col[c1.lab[i]] != i)
-                                    continue; // not a color
-                                if (c1.ptn[i] > 0 && only_discrete_prev) {
-                                    only_discrete_prev = false;
-                                }
-                                if (c1.ptn[i] == 1) {
-                                    cell = i;
-                                    break;
-                                }
-                            }
-
-                            if (cell >= 0)
-                                break;
-                        }
-                        if (cell == -1) {
-                            break;
-                        }
-
-                        touched_color.reset();
-                        touched_color_list.reset();
-
-                        I1 = 0;
-                        I2 = 0;
-
-                        int ind_v1, ind_v2;
-
-                        if (c1.ptn[cell] == c2.ptn[cell]) {
-                            ind_v1 = c1.lab[cell];
-                            ind_v2 = c1.lab[cell + 1];
-                            const int init_c1 = R1->individualize_vertex(&c1, ind_v1);
-
-                            touched_color.set(cell);
-                            touched_color.set(init_c1);
-                            touched_color_list.push_back(cell);
-                            touched_color_list.push_back(init_c1);
-                            //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
-                            refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
-
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
-                            refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color,&touched_color_list);
-                            I1 = 0;
-                            I2 = 0;
-                        } else {
-                            I1 = 1;
-                        }
-                        if (I1 != I2) {
-                            // could only use component
-                            for (int i = 0; i < g->v_size; ++i) {
-                                colmap[i] = c1.vertex_to_col[i];
-                            }
-                            I2 = I1;
-                            c2.copy_from_ir_ancestor(&c1);
-                            continue;
-                        }
-
-                        bool dont_bother_certify = false;
-
-                        _automorphism_supp.reset();
-                        if (c1.cells != g->v_size) { // touched_colors doesn't work properly when early-out is used
-                            // read automorphism
-                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                const int _c = touched_color_list[j];
-                                int f = 0;
-                                if (c1.ptn[_c] == 0) {
-                                    while (f < c1.ptn[_c] + 1) {
-                                        const int i = _c + f;
-                                        ++f;
-                                        if (c1.lab[i] != c2.lab[i]) {
-                                            _automorphism[c1.lab[i]] = c2.lab[i];
-                                            _automorphism_supp.push_back(c1.lab[i]);
-                                        }
-                                    }
-                                } else {
-                                    dont_bother_certify = true;
-                                    break;
-                                }
-                            }
-                        } else {
-                            //for (int i = 0; i < g->v_size; ++i) {
-                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                const int v = quotient_component_worklist_v[_i];
-                                const int i = c2.vertex_to_lab[v];
-                                if (c1.lab[i] != c2.lab[i]) {
-                                    assert(i >= 0);
-                                    assert(i < g->v_size);
-                                    _automorphism[c1.lab[i]] = c2.lab[i];
-                                    _automorphism_supp.push_back(c1.lab[i]);
-                                }
-                            }
-                        }
-
-                        //touched_support += _automorphism_supp.cur_pos;
-                        touched_current_component = true;
-                        certify = !dont_bother_certify &&
-                                  R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                                 _automorphism_supp.cur_pos,
-                                                                 _automorphism_supp.get_array());
-
-                        assert(certify ? R1->certify_automorphism(g, _automorphism.get_array()) : true);
-                        if (certify) {
-                            ++automorphisms_found;
-                            pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                     _automorphism_supp.get_array(),
-                                     consume);
-                            multiply_to_group_size(2);
-                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                               _automorphism_supp.get_array());
-                            _automorphism_supp.reset();
-
-                            if(touched_color_list.cur_pos ==
-                               static_cast<int>(quotient_component_end_pos_v - quotient_component_start_pos_v)) {
-                                touched_current_component = false;
-                            } else {
-                                reset_coloring_to_coloring_touched(g, &c2, &c1,
-                                                                   static_cast<int>(quotient_component_start_pos_v),
-                                                                   quotient_component_end_pos_v);
-                            }
-                            if (c1.cells == g->v_size) {
-                                for (int _i = static_cast<int>(quotient_component_start_pos_v);
-                                     _i < quotient_component_end_pos_v; ++_i) {
-                                    const int v = quotient_component_worklist_v[_i];
-                                    colmap[v] = c1.vertex_to_col[v];
-                                }
-                                touched_current_component = false;
-                                break;
-                            }
-                        } else { // save entire coloring, including lab, ptn, v_to_lab
-                            // TODO: switch to c3 method?
-                            save_colmap_v_to_col.clear();
-                            save_colmap_v_to_lab.clear();
-                            save_colmap_ptn.clear();
-                            for (int _i = static_cast<int>(quotient_component_start_pos_v);
-                                 _i < quotient_component_end_pos_v; ++_i) {
-                                const int v = quotient_component_worklist_v[_i];
-                                save_colmap_v_to_col.push_back(c1.vertex_to_col[v]);
-                                const int lab_pos = c1.vertex_to_lab[v];
-                                save_colmap_v_to_lab.push_back(lab_pos);
-                                save_colmap_ptn.push_back(c1.ptn[lab_pos]);
-                                save_cell_number = c1.cells;
-                                assert(c1.lab[lab_pos] == v);
-                            }
-
-                            int col = -1;
-
-                            certify = false;
-                            int last_failure = -1;
-
-                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                               _automorphism_supp.get_array());
-                            _automorphism_supp.reset();
-
-                            int len = 0;
-
-                            int hint = -1;
-
-                            while (true) {
-                                // stay within component!
-                                int singleton_check_pos = 0;
-                                ind_cols.clear();
-                                cell_cnt.clear();
-
-                                //Ivec_wr.reset_compare_invariant();
-                                //Ivec_wr.reset();
-                                I1 = 0;
-
-                                while (true) {
-                                    ++len;
-                                    auto const ret = select_color_component_large_touched(&c1,
-                                                                                          quotient_component_start_pos,
-                                                                                          quotient_component_end_pos,
-                                                                                          hint, &touched_color);
-                                    col = ret.first;
-                                    hint = ret.second;
-                                    if (col == -1) break;
-                                    const int rpos = col;
-                                    const int v1 = c1.lab[rpos];
-                                    const int init_color_class1 = R1->individualize_vertex(&c1, v1);
-
-                                    if (!touched_color.get(init_color_class1)) {
-                                        touched_color.set(init_color_class1);
-                                        touched_color_list.push_back(init_color_class1);
-                                    }
-                                    if (!touched_color.get(col)) {
-                                        touched_color.set(col);
-                                        touched_color_list.push_back(col);
-                                    }
-
-                                    //R1->refine_coloring(g, &c1, &Ivec_wr, init_color_class1, -1, &touched_color,
-                                    //                    &touched_color_list);
-                                    refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
-                                                    &touched_color_list);
-                                    ind_cols.push_back(rpos);
-                                    cell_cnt.push_back(c1.cells);
-                                    int check;
-                                    for (check = singleton_check_pos; check < touched_color_list.cur_pos; ++check) {
-                                        if (c1.ptn[touched_color_list[check]] != 0) {
-                                            singleton_check_pos = check;
-                                            break;
-                                        }
-                                    }
-                                    if (check == touched_color_list.cur_pos)
-                                        break;
-                                }
-
-                                //Ivec_rd.reset_compare_invariant();
-                                //Ivec_rd.set_compare_invariant(&Ivec_wr);
-                                I2 = 0;
-                                bool comp = true;
-
-                                for (size_t j = 0; j < ind_cols.size(); ++j) {
-                                    const int rpos = ind_cols[j];
-                                    const int v2 = c2.lab[rpos];
-                                    const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                    refine_coloring(g, &c2, &I2, init_color_class2, cell_cnt[j],
-                                                              &touched_color, &touched_color_list);
-                                }
-                                comp = I1 == I2;
-
-                                if (!comp) {
-                                    break;
-                                }
-
-                                bool dont_bother_certify = false;
-                                for (int j = 0;
-                                     j < touched_color_list.cur_pos; ++j) { // check incremental singleton automorphisms
-                                    const int _c = touched_color_list[j];
-                                    int f = 0;
-                                    if (c1.ptn[_c] == 0) {
-                                        while (f < c1.ptn[_c] + 1) {
-                                            const int i = _c + f;
-                                            ++f;
-                                            if (c1.lab[i] != c2.lab[i]) {
-                                                _automorphism[c1.lab[i]] = c2.lab[i];
-                                                _automorphism_supp.push_back(c1.lab[i]);
-                                            }
-                                        }
-                                    } else {
-                                        dont_bother_certify = true;
-                                        //break;
-                                    }
-                                }
-
-                                //bool check_last_failure_again;
-
-                                certify = !dont_bother_certify;
-
-                                if (certify && last_failure >= 0) {
-                                    certify = R1->check_single_failure(g, colmap, _automorphism.get_array(),
-                                                                      last_failure);
-                                }
-
-                                if (certify) {
-                                    std::pair<bool, int> certify_fail = R1->certify_automorphism_sparse_report_fail(g,
-                                                                                                                   colmap,
-                                                                                                                   _automorphism.get_array(),
-                                                                                                                   _automorphism_supp.cur_pos,
-                                                                                                                   _automorphism_supp.get_array());
-                                    certify = certify_fail.first;
-                                    last_failure = certify_fail.second;
-                                }
-
-                                //reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array());
-                                //_automorphism_supp.reset();
-                                touched_color.reset();
-                                touched_color_list.reset();
-
-                                if (certify) break;
-                                if (col == -1) break;
-                            }
-
-                            if (!certify) {
-                                reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                   _automorphism_supp.get_array());
-                                _automorphism_supp.reset();
-
-                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                    const int i = quotient_component_worklist_v[_i];
-                                    const int lab_p = c1.vertex_to_lab[i];
-                                    assert(i >= 0);
-                                    assert(i < g->v_size);
-                                    if (c1.lab[lab_p] != c2.lab[lab_p]) {
-                                        _automorphism[c1.lab[lab_p]] = c2.lab[lab_p];
-                                        _automorphism_supp.push_back(c1.lab[lab_p]);
-                                    }
-                                }
-                            }
-
-                            certify = certify || R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                                                _automorphism_supp.cur_pos,
-                                                                                _automorphism_supp.get_array());
-                            if (certify) {
-                                assert(R1->certify_automorphism(g, _automorphism.get_array()));
-                                assert(_automorphism.get_array()[ind_v1] == ind_v2);
-                                touched_current_component = true;
-                                touched_support += _automorphism_supp.cur_pos;
-                                ++automorphisms_found;
-                                pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                         _automorphism_supp.get_array(),
-                                         consume);
-                                multiply_to_group_size(2);
-                                if (c1.cells == g->v_size) {
-                                    touched_current_component = false;
-                                }
-                            }
-                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                               _automorphism_supp.get_array());
-                            _automorphism_supp.reset();
-
-                            if (certify) {
-                                for (int _i = quotient_component_start_pos_v;
-                                     _i < quotient_component_end_pos_v; ++_i) { // could use touched?
-                                    const int v = quotient_component_worklist_v[_i];
-                                    colmap[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
-                                }
-                                for (int _i = quotient_component_start_pos_v;
-                                     _i < quotient_component_end_pos_v; ++_i) { // could use touched?
-                                    const int v = quotient_component_worklist_v[_i];
-                                    c1.vertex_to_col[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
-                                    const int lab_pos = save_colmap_v_to_lab[_i - quotient_component_start_pos_v];
-                                    const int ptn_at_lab_pos = save_colmap_ptn[_i - quotient_component_start_pos_v];
-                                    c1.vertex_to_lab[v] = lab_pos;
-                                    c1.lab[lab_pos] = v;
-                                    c1.ptn[lab_pos] = ptn_at_lab_pos;
-                                }
-                                c1.cells = save_cell_number;
-
-                                for (int _i = quotient_component_start_pos_v;
-                                     _i < quotient_component_end_pos_v; ++_i) { // could use touched?
-                                    const int v = quotient_component_worklist_v[_i];
-                                    const int lab_pos = save_colmap_v_to_lab[_i - quotient_component_start_pos_v];
-                                    const int ptn_at_lab_pos = save_colmap_ptn[_i - quotient_component_start_pos_v];
-                                    c2.vertex_to_col[v] = save_colmap_v_to_col[_i - quotient_component_start_pos_v];
-                                    c2.vertex_to_lab[v] = lab_pos;
-                                    c2.lab[lab_pos] = v;
-                                    c2.ptn[lab_pos] = ptn_at_lab_pos;
-                                }
-                                c2.cells = save_cell_number;
-                            } else {
-                                // c1/c2 are now 'done' for this component, never touch it again
-                                // can't reliably find automorphisms here
-                                touched_current_component = false;
-                            }
-
-                            break;
-                        }
-
-                        reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                           _automorphism_supp.get_array());
-                        _automorphism_supp.reset();
-
-                        if (certify) {
-                            if (c1.cells == g->v_size) {
-                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                    const int i = quotient_component_worklist_v[_i];
-                                    assert(i >= 0);
-                                    assert(i < g->v_size);
-                                    colmap[i] = c1.vertex_to_col[i];
-                                }
-                            } else {
-                                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                    const int _c = touched_color_list[j];
-                                    int f = 0;
-                                    while (f < c1.ptn[_c] + 1) {
-                                        assert(c1.vertex_to_col[c1.lab[_c + f]] == _c);
-                                        colmap[c1.lab[_c + f]] = c1.vertex_to_col[c1.lab[_c +
-                                                                                         f]]; // should be c1 or c2?
-                                        ++f;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (c1.cells == g->v_size)
-                        break;
-
-                    if (touched_current_component) {
-                        quotient_component_touched.push_back(component);
-                        //if(touched_support*1.0 >= (g->v_size*1.0)/10) {
-                        //del_discrete_edges_inplace_component(g, &c1, quotient_component_start_pos);
-                        //}
-                    }
-
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-
-                    ++component;
-
-                    quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-
-                    ++next_touched_component_i;
-                    if (next_touched_component_i < quotient_component_touched_swap.size()) {
-                        next_touched_component = quotient_component_touched_swap[next_touched_component_i];
-                    }
-
-                    while (component != (int) next_touched_component &&
-                           quotient_component_start_pos < quotient_component_worklist_col.size()) {
-                        quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                        quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-
-                        ++component;
-
-                        quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                        quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-                    }
-                }
-                global_automorphisms_found += automorphisms_found;
-
-                if (c1.cells == g->v_size)
-                    break;
-                if (automorphisms_found == 0)
-                    break;
-            }
-            //PRINT("(prep-red) sparse-ir-2 completed: " << global_automorphisms_found);
-            return global_automorphisms_found;
-        }
-
-        // adds a given automorphism to the orbit structure
-        void add_automorphism_to_orbit(dejavu::groups::orbit *orbit, int *automorphism, int nsupp, int *supp) {
-            for (int i = 0; i < nsupp; ++i) {
-                orbit->combine_orbits(automorphism[supp[i]], supp[i]);
-            }
-        }
-
-        // select a non-trivial color class within a given component
-        int select_color_component_min_cost(dejavu::sgraph *g, coloring *c1, int component_start_pos, int component_end_pos,
-                                            int max_cell_size) {
-            bool only_discrete_prev = true;
-            int cell = -1;
-            // int cell_d = 1;
-            for (int _i = component_start_pos; _i < component_end_pos; ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-                for (int i = col; i < col + col_sz + 1; ++i) {
-                    if (c1->vertex_to_col[c1->lab[i]] != i)
-                        continue; // not a color
-                    if (c1->ptn[i] > 0 && only_discrete_prev) {
-                        //start_search_here = i;
-                        only_discrete_prev = false;
-                    }
-                    const int i_d = g->d[c1->lab[i]];
-
-                    if (c1->ptn[i] >= 1 && (i_d == 0)) {
-                        cell = i;
-                        break;
-                    }
-                    if (c1->ptn[i] >= 1 && c1->ptn[i] + 1 <= max_cell_size && (i_d != 1)) { // && (i_d != 1)
-                        if (cell == -1 || c1->ptn[i] < c1->ptn[cell]) {
-                            cell = i;
-                            // cell_d = i_d;
-                        }
-                    }
-                }
-
-                if (cell != -1 && (g->d[c1->lab[cell]] == 0)) {
-                    cell = -1;
-                    break;
-                }
-
-                if (cell != -1 && c1->ptn[cell] < 3)
-                    break;
-            }
-
-            return cell;
-        }
-
-        void reset_coloring_to_coloring_touched(dejavu::sgraph *g, coloring *c_to, coloring *c_from,
-                                                int quotient_component_start_pos_v, int quotient_component_end_pos_v) {
-            worklist_deg0.reset();
-
-            if (g->v_size == c_to->cells || touched_color_list.cur_pos >=
-                                            (0.25 * (quotient_component_end_pos_v - quotient_component_start_pos_v))) {
-                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                    worklist_deg0.push_back(c_from->vertex_to_lab[quotient_component_worklist_v[_i]]);
-                }
-                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                    const int v = quotient_component_worklist_v[_i];
-                    const int lab_pos = worklist_deg0[_i - quotient_component_start_pos_v];
-                    c_to->vertex_to_lab[v] = lab_pos;
-                    c_to->lab[lab_pos] = v;
-                }
-                for (int _i = 0; _i < worklist_deg0.cur_pos; ++_i) {
-                    const int lab_pos = worklist_deg0[_i];
-                    c_to->ptn[lab_pos] = c_from->ptn[lab_pos];
-                }
-                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                    const int v = quotient_component_worklist_v[_i];
-                    c_to->vertex_to_col[v] = c_from->vertex_to_col[v];
-                }
-                c_to->cells = c_from->cells;
-            } else {
-                for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
-                    const int reset_col = touched_color_list[_i];
-                    if (c_from->vertex_to_col[c_from->lab[reset_col]] == reset_col) {
-                        for (int l = 0; l < c_from->ptn[reset_col] + 1; ++l) {
-                            const int v = c_from->lab[reset_col + l];
-                            const int lab_pos = c_from->vertex_to_lab[v];
-                            assert(lab_pos == reset_col + l);
-                            c_to->vertex_to_col[v] = c_from->vertex_to_col[v];
-                            c_to->vertex_to_lab[v] = lab_pos;
-                            c_to->lab[lab_pos] = v;
-                            c_to->ptn[lab_pos] = c_from->ptn[lab_pos];
-                        }
-                    }
-                }
-                c_to->cells = c_from->cells;
-            }
-        }
-
-        // perform sparse probing for color classes of bounded size, num_paths number of times
-        int sparse_ir_probe_quotient_components(dejavu::sgraph *g, int *colmap, dejavu_hook* consume, int max_col_size,
-                                                int num_paths) {
-            if (g->v_size <= 1 || num_paths <= 0 || CONFIG_PREP_DEACT_PROBE)
-                return 0;
-
-            avg_support_sparse_ir = 0;
-            avg_reached_end_of_component = 0;
-            int avg_support_sparse_ir_num = 0;
-            int avg_support_sparse_ir_num2 = 0;
-
-            quotient_component_touched.clear();
-            quotient_component_touched_swap.clear();
-
-            coloring c1;
-            g->initialize_coloring(&c1, colmap);
-
-            for (int i = 0; i < g->v_size; ++i)
-                colmap[i] = c1.vertex_to_col[i];
-
-            int global_automorphisms_found = 0;
-
-            assure_ir_quotient_init(g);
-
-            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos, _automorphism_supp.get_array());
-            _automorphism_supp.reset();
-
-            coloring c2;
-            c2.copy_any(&c1);
-
-            coloring c3;
-            c3.copy_any(&c1);
-
-            int penalty = 0;
-
-            for (int x = 0; x < num_paths - penalty; ++x) {
-                if (x > 0 && quotient_component_touched.empty()) {
-                    break;
-                }
-
-                compute_quotient_graph_components_update(g, &c1);
-
-                int automorphisms_found = 0;
-
-                quotient_component_touched_swap.clear();
-                quotient_component_touched_swap.swap(quotient_component_touched);
-
-                if (x == 0) {
-                    for (size_t i = 0; i < quotient_component_worklist_boundary.size(); ++i)
-                        quotient_component_touched_swap.push_back(i);
-                }
-
-                if (quotient_component_touched_swap.size() < 2) {
-                    break; // added this
-                    ++penalty;
-                }
-                if (quotient_component_touched_swap.size() < 3)
-                    ++penalty;
-
-
-                touched_color.reset();
-                touched_color_list.reset();
-
-                unsigned long I1 = 0, I2 = 0;
-
-                bool certify = true;
-                int quotient_component_start_pos = 0;
-                int quotient_component_start_pos_v = 0;
-
-                int component = 0;
-                int next_touched_component_i = 0;
-                int next_touched_component = -1;
-                if (next_touched_component_i < (int) quotient_component_touched_swap.size()) {
-                    next_touched_component = quotient_component_touched_swap[next_touched_component_i];
-                } else {
-                    component = quotient_component_worklist_boundary.size() - 1;
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-                }
-                while (component < next_touched_component) {
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-                    ++component;
-                }
-
-                int quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                int quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-
-                while (quotient_component_start_pos < (int) quotient_component_worklist_col.size()) {
-                    assert(quotient_component_start_pos_v < (int) quotient_component_worklist_v.size());
-                    // int start_search_here = quotient_component_start_pos;
-
-                    assert(quotient_component_worklist_col[quotient_component_start_pos] >= 0);
-                    assert(quotient_component_worklist_v[quotient_component_start_pos_v] >= 0);
-                    certify = true;
-                    bool touched_current_component = false;
-
-                    while (certify) { // (component == next_touched_component || quotient_component_touched_swap.empty())
-                        // select a color class of size 2
-                        int cell = select_color_component_min_cost(g, &c1, quotient_component_start_pos,
-                                                                   quotient_component_end_pos, max_col_size);
-                        orbit.reset();
-
-                        if (cell == -1) break;
-                        const int cell_sz = c1.ptn[cell];
-
-                        touched_color.reset();
-                        touched_color_list.reset();
-
-                        I1 = 0;
-                        I2 = 0;
-
-                        const int ind_v1 = c1.lab[cell];
-                        const int ind_v2 = c1.lab[cell + 1];
-                        const int init_c1 = R1->individualize_vertex(&c1, ind_v1);
-
-                        touched_color.set(cell);
-                        touched_color.set(init_c1);
-                        touched_color_list.push_back(cell);
-                        touched_color_list.push_back(init_c1);
-                        assert(cell != init_c1);
-
-                        //R1->refine_coloring(g, &c1, &I1, init_c1, -1, &touched_color, &touched_color_list);
-                        refine_coloring(g, &c1, &I1, init_c1, -1,
-                                        &touched_color, &touched_color_list);
-
-                        if (c2.ptn[cell] != 0) {
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
-                            refine_coloring(g, &c2, &I2, init_c2, -1,
-                                            &touched_color, &touched_color_list);
-                        } else {
-                            I2 = I1 + 1;
-                        }
-
-                        if (I1 != I2) {
-                            I2 = I1;
-                            // could use component!
-                            c1.copy_from_ir_ancestor(&c3);
-                            c2.copy_from_ir_ancestor(&c3);
-                            touched_current_component = false;
-                            break;
-                        }
-
-                        reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                           _automorphism_supp.get_array());
-                        _automorphism_supp.reset();
-                        if (g->v_size == c1.cells || touched_color_list.cur_pos >= (0.25 *
-                                                                                    (quotient_component_end_pos_v -
-                                                                                     quotient_component_start_pos_v))) {
-                            //for (int i = 0; i < g->v_size; ++i) {
-                            for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                assert(_i >= 0);
-                                assert(_i < g->v_size);
-                                const int v = quotient_component_worklist_v[_i];
-                                assert(v >= 0);
-                                assert(v < g->v_size);
-                                const int i = c2.vertex_to_lab[v];
-                                assert(i >= 0);
-                                assert(i < g->v_size);
-                                if (c1.lab[i] != c2.lab[i]) {
-                                    _automorphism[c1.lab[i]] = c2.lab[i];
-                                    _automorphism_supp.push_back(c1.lab[i]);
-                                }
-                            }
-                        } else {
-                            // read automorphism
-                            for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                const int _c = touched_color_list[j];
-                                int f = 0;
-                                //if(c1.ptn[_c] == 0) {
-                                while (f < c1.ptn[_c] + 1) {
-                                    const int i = _c + f;
-                                    ++f;
-                                    if (c1.lab[i] != c2.lab[i]) {
-                                        _automorphism[c1.lab[i]] = c2.lab[i];
-                                        _automorphism_supp.push_back(c1.lab[i]);
-                                    }
-                                }
-                                //}
-                            }
-                        }
-
-                        certify = R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                                 _automorphism_supp.cur_pos,
-                                                                 _automorphism_supp.get_array());
-                        assert(certify ? R1->certify_automorphism(g, _automorphism.get_array()) : true);
-                        bool all_certified = certify;
-                        if (certify) {
-                            avg_support_sparse_ir += _automorphism_supp.cur_pos;
-                            avg_support_sparse_ir_num += 1;
-                            pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                     _automorphism_supp.get_array(),
-                                     consume);
-                            assert(_automorphism[ind_v1] == ind_v2);
-                            add_automorphism_to_orbit(&orbit, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                      _automorphism_supp.get_array());
-
-                            for (int k = 2; (k < cell_sz + 1) && all_certified; ++k) {
-                                // reset c2 to before individualization
-                                assert(touched_color_list.cur_pos <=
-                                       quotient_component_end_pos_v - quotient_component_start_pos_v);
-                                const int ind_vk = c3.lab[cell + k];
-                                if (orbit.are_in_same_orbit(ind_v1, ind_vk)) {
-                                    continue;
-                                }
-
-                                reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
-                                                                   quotient_component_end_pos_v);
-
-                                // individualize and test cell + k
-                                const int init_ck = R1->individualize_vertex(&c2, ind_vk);
-                                I2 = 0;
-                                //R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
-                                refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
-                                reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                   _automorphism_supp.get_array());
-                                _automorphism_supp.reset();
-
-                                if (I1 == I2 && c1.cells == c2.cells) {
-                                    if (c1.cells !=
-                                        g->v_size) { // touched_colors doesn't work properly when early-out is used
-                                        // read automorphism
-                                        for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                            const int _c = touched_color_list[j];
-                                            int f = 0;
-                                            while (f < c1.ptn[_c] + 1) {
-                                                const int i = _c + f;
-                                                ++f;
-                                                if (c1.lab[i] != c2.lab[i]) {
-                                                    _automorphism[c1.lab[i]] = c2.lab[i];
-                                                    _automorphism_supp.push_back(c1.lab[i]);
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        //for (int i = 0; i < g->v_size; ++i) {
-                                        for (int _i = quotient_component_start_pos_v;
-                                             _i < quotient_component_end_pos_v; ++_i) {
-                                            const int v = quotient_component_worklist_v[_i];
-                                            const int i = c2.vertex_to_lab[v];
-                                            if (c1.lab[i] != c2.lab[i]) {
-                                                assert(i >= 0);
-                                                assert(i < g->v_size);
-                                                _automorphism[c1.lab[i]] = c2.lab[i];
-                                                _automorphism_supp.push_back(c1.lab[i]);
-                                            }
-                                        }
-                                    }
-                                    certify = R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                                             _automorphism_supp.cur_pos,
-                                                                             _automorphism_supp.get_array());
-                                    if (certify) {
-                                        avg_support_sparse_ir += _automorphism_supp.cur_pos;
-                                        avg_support_sparse_ir_num += 1;
-                                        pre_hook(g->v_size, _automorphism.get_array(),
-                                                 _automorphism_supp.cur_pos,
-                                                 _automorphism_supp.get_array(),
-                                                 consume);
-                                        assert(_automorphism[ind_v1] == ind_vk);
-                                        add_automorphism_to_orbit(&orbit, _automorphism.get_array(),
-                                                                  _automorphism_supp.cur_pos,
-                                                                  _automorphism_supp.get_array());
-                                        //reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                        //                   _automorphism_supp.get_array());
-                                        //_automorphism_supp.reset();
-                                    }
-                                    reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                       _automorphism_supp.get_array());
-                                    _automorphism_supp.reset();
-                                } else {
-                                    certify = false;
-                                }
-                                all_certified = certify && all_certified;
-                            }
-
-                            if (all_certified) {
-                                automorphisms_found += cell_sz;
-                                touched_current_component = true;
-                                avg_support_sparse_ir_num2 += 1;
-                                multiply_to_group_size(cell_sz + 1);
-                                // reset c2 and c3 to c1
-                                if (c1.cells != g->v_size) {
-                                    reset_coloring_to_coloring_touched(g, &c2, &c1, quotient_component_start_pos_v,
-                                                                       quotient_component_end_pos_v);
-                                    reset_coloring_to_coloring_touched(g, &c3, &c1, quotient_component_start_pos_v,
-                                                                       quotient_component_end_pos_v);
-                                }
-                            }
-                        }
-
-                        if (!all_certified) {
-                            int col = -1;
-                            certify = false;
-                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                               _automorphism_supp.get_array());
-                            _automorphism_supp.reset();
-
-                            // reset c2 to before individualization
-                            assert(touched_color_list.cur_pos <=
-                                   quotient_component_end_pos_v - quotient_component_start_pos_v);
-                            reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
-                                                               quotient_component_end_pos_v);
-
-                            I2 = 0;
-                            const int init_c2 = R1->individualize_vertex(&c2, ind_v2);
-                            //R1->refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
-                            refine_coloring(g, &c2, &I2, init_c2, -1, &touched_color, &touched_color_list);
-
-                            int num_inds = 0;
-                            // int touched_start_pos = 0;
-
-                            touched_color_cache.reset();
-                            touched_color_list_cache.reset();
-
-                            for (int k = 0; k < touched_color_list.cur_pos; ++k) {
-                                touched_color_cache.set(touched_color_list[k]);
-                                touched_color_list_cache[k] = touched_color_list[k];
-                            }
-                            touched_color_list_cache.cur_pos = touched_color_list.cur_pos;
-
-                            int last_failure = -1;
-                            int hint = -1;
-                            ind_cols.clear();
-                            cell_cnt.clear();
-                            while (true) {
-                                // stay within component!
-                                auto const ret = select_color_component(&c1, quotient_component_start_pos,
-                                                                        quotient_component_end_pos, hint);
-                                col = ret.first;
-                                hint = ret.second;
-                                if (col == -1) break;
-                                const int rpos = col + (0 % (c1.ptn[col] + 1));
-                                const int v1 = c1.lab[rpos];
-                                const int init_color_class1 = R1->individualize_vertex(&c1, v1);
-
-                                if (!touched_color_cache.get(init_color_class1)) {
-                                    touched_color_cache.set(init_color_class1);
-                                    touched_color_list_cache.push_back(init_color_class1);
-                                }
-                                if (!touched_color_cache.get(col)) {
-                                    touched_color_cache.set(col);
-                                    touched_color_list_cache.push_back(col);
-                                }
-
-                                //R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color_cache,
-                                //                    &touched_color_list_cache);
-                                refine_coloring(g, &c1, &I1, init_color_class1, -1,
-                                                &touched_color_cache,&touched_color_list_cache);
-
-
-                                ind_cols.push_back(col);
-                                cell_cnt.push_back(c1.cells);
-
-                                //const int rpos = col + (intRand(0, INT32_MAX, selector_seed) % (c2.ptn[col] + 1));
-                                const int v2 = c2.lab[rpos];
-                                if (c2.ptn[col] == 0) {
-                                    I2 = I1 + 1;
-                                    certify = false;
-                                    break;
-                                }
-                                const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                //R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
-                                //                    &touched_color_list_cache);
-                                refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color_cache,
-                                                &touched_color_list_cache);
-
-                                if (c1.cells == g->v_size) {
-                                    for (int _i = quotient_component_start_pos_v;
-                                         _i < quotient_component_end_pos_v; ++_i) {
-                                        const int v = quotient_component_worklist_v[_i];
-                                        const int v_col1 = c1.vertex_to_col[v];
-                                        if (!touched_color_cache.get(v_col1) && !touched_color.get(v_col1)) {
-                                            touched_color_cache.set(v_col1);
-                                            touched_color_list_cache.push_back(v_col1);
-                                        }
-                                    }
-                                }
-
-                                //assert(I1.acc == I2.acc);
-
-                                bool dont_bother_certify = false;
-                                for (int j = 0; j <
-                                                touched_color_list_cache.cur_pos; ++j) { // check incremental singleton automorphisms
-                                    const int _c = touched_color_list_cache[j];
-                                    if (!touched_color.get(_c)) {
-                                        touched_color.set(_c);
-                                        touched_color_list.push_back(_c);
-                                    }
-                                    int f = 0;
-                                    assert(c1.cells != g->v_size || (c1.ptn[_c] == 0));
-                                    if (c1.ptn[_c] == 0 && c2.ptn[_c] == 0) {
-                                        while (f < c1.ptn[_c] + 1) {
-                                            const int i = _c + f;
-                                            ++f;
-                                            if (c1.lab[i] != c2.lab[i] && _automorphism[c1.lab[i]] == c1.lab[i]) {
-                                                _automorphism[c1.lab[i]] = c2.lab[i];
-                                                _automorphism_supp.push_back(c1.lab[i]);
-                                            }
-                                        }
-                                    } else {
-                                        dont_bother_certify = true;
-                                    }
-                                }
-
-                                ++num_inds;
-
-                                certify = !dont_bother_certify;
-                                if (certify && last_failure >= 0) {
-                                    certify = R1->check_single_failure(g, colmap, _automorphism.get_array(),
-                                                                      last_failure);
-                                }
-
-                                if (certify) {
-                                    std::pair<bool, int> certify_fail =
-                                            R1->certify_automorphism_sparse_report_fail(g, colmap,
-                                                                                       _automorphism.get_array(),
-                                                                                       _automorphism_supp.cur_pos,
-                                                                                       _automorphism_supp.get_array());
-                                    certify = certify_fail.first;
-                                    last_failure = certify_fail.second;
-                                }
-
-                                touched_color_cache.reset();
-                                touched_color_list_cache.reset();
-
-                                if (certify) break;
-                            }
-
-                            if (!certify && (g->v_size == c1.cells)) {
-                                reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                   _automorphism_supp.get_array());
-                                _automorphism_supp.reset();
-                                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                    const int _c = touched_color_list[j];
-                                    int f = 0;
-                                    assert(c1.cells != g->v_size || (c1.ptn[_c] == 0));
-                                    if (c1.ptn[_c] == 0) {
-                                        while (f < c1.ptn[_c] + 1) {
-                                            const int i = _c + f;
-                                            ++f;
-                                            if (c1.lab[i] != c2.lab[i]) {
-                                                assert(_automorphism[c1.lab[i]] == c1.lab[i]);
-                                                _automorphism[c1.lab[i]] = c2.lab[i];
-                                                _automorphism_supp.push_back(c1.lab[i]);
-                                            }
-                                        }
-                                    }
-                                }
-                                certify = R1->certify_automorphism_sparse(g, colmap, _automorphism.get_array(),
-                                                                         _automorphism_supp.cur_pos,
-                                                                         _automorphism_supp.get_array());
-                            }
-
-                            // bool certify_before = certify;
-
-                            if (certify) {
-                                assert(R1->certify_automorphism(g, _automorphism.get_array()));
-                                avg_support_sparse_ir += _automorphism_supp.cur_pos;
-                                avg_support_sparse_ir_num += 1;
-                                pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                         _automorphism_supp.get_array(),
-                                         consume);
-                                add_automorphism_to_orbit(&orbit, _automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                          _automorphism_supp.get_array());
-                                // multiply_to_group_size(2);
-                                all_certified = true;
-
-                                reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                   _automorphism_supp.get_array());
-                                _automorphism_supp.reset();
-
-                                for (int k = 2; (k < cell_sz + 1) && all_certified; ++k) {
-                                    const int ind_vk = c3.lab[cell + k];
-                                    if (orbit.are_in_same_orbit(ind_v1, ind_vk)) {
-                                        continue;
-                                    }
-
-                                    // reset c2 to before individualization
-                                    assert(touched_color_list.cur_pos <=
-                                           quotient_component_end_pos_v - quotient_component_start_pos_v);
-                                    reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
-                                                                       quotient_component_end_pos_v);
-
-                                    // individualize and test cell + k
-                                    const int init_ck = R1->individualize_vertex(&c2, ind_vk);
-                                    if (!touched_color.get(cell)) {
-                                        touched_color.set(cell);
-                                        touched_color_list.push_back(cell);
-                                    }
-                                    if (!touched_color.get(init_ck)) {
-                                        touched_color.set(init_ck);
-                                        touched_color_list.push_back(init_ck);
-                                    }
-                                    I2 = 0;
-                                    //R1->refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
-                                    refine_coloring(g, &c2, &I2, init_ck, -1, &touched_color, &touched_color_list);
-                                    reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                       _automorphism_supp.get_array());
-                                    _automorphism_supp.reset();
-
-                                    for (int i = 0; i < g->v_size; ++i) {
-                                        assert(_automorphism[i] == i);
-                                    }
-
-                                    int repeat_num_inds = 0;
-
-                                    bool should_add_ind = false;
-                                    do {
-                                        hint = -1;
-                                        while (repeat_num_inds < num_inds) {
-                                            // stay within component!
-                                            /*auto ret = select_color_component(g, &c2, quotient_component_start_pos,
-                                                                            quotient_component_end_pos, hint);
-                                        col  = ret.first;
-                                        hint = ret.second;*/
-
-                                            col = ind_cols[repeat_num_inds];
-
-                                            assert(repeat_num_inds < (int) ind_cols.size());
-                                            assert(num_inds == (int) ind_cols.size());
-                                            assert(col == ind_cols[repeat_num_inds]);
-
-                                            if (col == -1) {
-                                                break;
-                                            }
-                                            const int rpos =
-                                                    col + (0 % (c2.ptn[col] + 1));
-                                            if (c2.ptn[col] == 0) {
-                                                I2 = I1 + 1;
-                                                break;
-                                            }
-                                            const int v2 = c2.lab[rpos];
-                                            const int init_color_class2 = R1->individualize_vertex(&c2, v2);
-                                            if (!touched_color.get(init_color_class2)) {
-                                                touched_color.set(init_color_class2);
-                                                touched_color_list.push_back(init_color_class2);
-                                            }
-                                            if (!touched_color.get(col)) {
-                                                touched_color.set(col);
-                                                touched_color_list.push_back(col);
-                                            }
-                                            //R1->refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color,
-                                            //                   &touched_color_list); // cell_cnt[repeat_num_inds]
-                                            refine_coloring(g, &c2, &I2, init_color_class2, -1, &touched_color,
-                                                            &touched_color_list);
-                                            ++repeat_num_inds;
-                                        }
-
-                                        should_add_ind = false;
-
-                                        if (I1 == I2 && c1.cells == c2.cells) {
-                                            for (int j = 0; j <
-                                                            touched_color_list.cur_pos; ++j) { // check the singleton automorphism
-                                                const int _c = touched_color_list[j];
-                                                int f = 0;
-                                                if (c1.ptn[_c] == 0) {
-                                                    while (f < c1.ptn[_c] + 1) {
-                                                        const int i = _c + f;
-                                                        ++f;
-                                                        if (c1.lab[i] != c2.lab[i]) {
-                                                            //assert(_automorphism[c1.lab[i]] == c1.lab[i]);
-                                                            _automorphism[c1.lab[i]] = c2.lab[i];
-                                                            _automorphism_supp.push_back(c1.lab[i]);
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            certify = R1->certify_automorphism_sparse(g, colmap,
-                                                                                     _automorphism.get_array(),
-                                                                                     _automorphism_supp.cur_pos,
-                                                                                     _automorphism_supp.get_array());
-                                            should_add_ind = !certify;
-                                        } else {
-                                            certify = false;
-                                        }
-
-                                        if (should_add_ind) {
-                                            auto ret = select_color_component(&c1, quotient_component_start_pos,
-                                                                              quotient_component_end_pos, -1);
-                                            col = ret.first;
-                                            if (col == -1) {
-                                                should_add_ind = false;
-                                                break;
-                                            }
-                                            const int rpos = col + (0 % (c1.ptn[col] + 1));
-                                            const int v1 = c1.lab[rpos];
-                                            const int init_color_class1 = R1->individualize_vertex(&c1, v1);
-                                            //R1->refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
-                                            //                    &touched_color_list);
-                                            refine_coloring(g, &c1, &I1, init_color_class1, -1, &touched_color,
-                                                            &touched_color_list);
-
-                                            ind_cols.push_back(col);
-                                            cell_cnt.push_back(c1.cells);
-                                            num_inds += 1;
-
-                                            reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                               _automorphism_supp.get_array());
-                                            _automorphism_supp.reset();
-                                        }
-                                    } while (should_add_ind);
-
-                                    all_certified = certify && all_certified;
-                                    if (certify) {
-                                        avg_support_sparse_ir += _automorphism_supp.cur_pos;
-                                        avg_support_sparse_ir_num += 1;
-                                        pre_hook(g->v_size, _automorphism.get_array(),
-                                                 _automorphism_supp.cur_pos,
-                                                 _automorphism_supp.get_array(),
-                                                 consume);
-                                        assert(_automorphism[ind_v1] == ind_vk);
-                                        add_automorphism_to_orbit(&orbit, _automorphism.get_array(),
-                                                                  _automorphism_supp.cur_pos,
-                                                                  _automorphism_supp.get_array());
-                                    }
-                                    reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                       _automorphism_supp.get_array());
-                                    _automorphism_supp.reset();
-                                }
-
-                                if (all_certified) {
-                                    automorphisms_found += cell_sz + 1;
-                                    multiply_to_group_size(cell_sz + 1);
-                                    touched_current_component = true;
-
-                                    avg_support_sparse_ir_num2 += 1;
-                                    auto const ret = select_color_component(&c1, quotient_component_start_pos,
-                                                                            quotient_component_end_pos, -1);
-                                    const int test_col = ret.first;
-                                    if (test_col == -1) {
-                                        avg_reached_end_of_component += 1;
-                                        touched_current_component = false;
-                                    }
-                                }
-                            } else {
-                                reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                                   _automorphism_supp.get_array());
-                                _automorphism_supp.reset();
-                            }
-
-                            certify = all_certified;
-
-                            if (certify) {
-                                // int f = 0;
-                                I1 = 0;
-                                assert(touched_color.get(c3.vertex_to_col[ind_v1]));
-                                const int init_c3 = R1->individualize_vertex(&c3, ind_v1);
-                                assert(touched_color.get(init_c3));
-                                [[maybe_unused]] const int touched_col_prev = touched_color_list.cur_pos;
-                                //R1->refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
-                                refine_coloring(g, &c3, &I1, init_c3, -1, &touched_color, &touched_color_list);
-                                assert(touched_col_prev == touched_color_list.cur_pos);
-
-                                assert(touched_color_list.cur_pos <=
-                                       quotient_component_end_pos_v - quotient_component_start_pos_v);
-                                if (g->v_size == c1.cells || touched_color_list.cur_pos >= (0.5 *
-                                                                                            (quotient_component_end_pos_v -
-                                                                                             quotient_component_start_pos_v))) {
-                                    for (int _i = quotient_component_start_pos_v;
-                                         _i < quotient_component_end_pos_v; ++_i) {
-                                        const int v = quotient_component_worklist_v[_i];
-                                        colmap[v] = c3.vertex_to_col[v];
-                                    }
-                                } else {
-                                    for (int _i = 0; _i < touched_color_list.cur_pos; ++_i) {
-                                        const int reset_col = touched_color_list[_i];
-                                        if (c3.vertex_to_col[c3.lab[reset_col]] == reset_col) {
-                                            for (int k = 0; k < c3.ptn[reset_col] + 1; ++k) {
-                                                const int v = c3.lab[reset_col + k];
-                                                colmap[v] = c3.vertex_to_col[v];
-                                            }
-                                        }
-                                    }
-                                }
-                                reset_coloring_to_coloring_touched(g, &c1, &c3, quotient_component_start_pos_v,
-                                                                   quotient_component_end_pos_v);
-                                reset_coloring_to_coloring_touched(g, &c2, &c3, quotient_component_start_pos_v,
-                                                                   quotient_component_end_pos_v);
-                            } else {
-                                // int f = 0;
-                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                    const int v = quotient_component_worklist_v[_i];
-
-                                    // reset c1 / c2
-                                    c1.vertex_to_col[v] = c3.vertex_to_col[v];
-                                    c1.vertex_to_lab[v] = c3.vertex_to_lab[v];
-                                    const int lab_pos = c3.vertex_to_lab[v];
-                                    c1.lab[lab_pos] = v;
-                                    c1.ptn[lab_pos] = c3.ptn[lab_pos];
-                                    c1.cells = c3.cells;
-
-                                    c2.vertex_to_col[v] = c3.vertex_to_col[v];
-                                    c2.vertex_to_lab[v] = c3.vertex_to_lab[v];
-                                    c2.lab[lab_pos] = v;
-                                    c2.ptn[lab_pos] = c3.ptn[lab_pos];
-                                    c2.cells = c3.cells;
-                                }
-                                // we did not find an automorphism
-                                // c1/c2 are now 'done' for this component, i.e., we can not find automorphisms here
-                                // so we just never touch it again
-                                touched_current_component = false;
-                            }
-
-                            break;
-                        }
-                        reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
-                                           _automorphism_supp.get_array());
-                        _automorphism_supp.reset();
-
-                        if (certify) {
-                            if (c1.cells == g->v_size) {
-                                for (int _i = quotient_component_start_pos_v; _i < quotient_component_end_pos_v; ++_i) {
-                                    const int i = quotient_component_worklist_v[_i];
-                                    assert(i >= 0);
-                                    assert(i < g->v_size);
-                                    colmap[i] = c1.vertex_to_col[i];
-                                }
-                            } else {
-                                for (int j = 0; j < touched_color_list.cur_pos; ++j) {
-                                    const int _c = touched_color_list[j];
-                                    int f = 0;
-                                    while (f < c1.ptn[_c] + 1) {
-                                        assert(c1.vertex_to_col[c1.lab[_c + f]] == _c);
-                                        colmap[c1.lab[_c + f]] = c1.vertex_to_col[c1.lab[_c +
-                                                                                         f]]; // should be c1 or c2?
-                                        ++f;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (touched_current_component) {
-                        quotient_component_touched.push_back(component);
-                        del_discrete_edges_inplace_component(g, &c1, quotient_component_start_pos);
-                    }
-
-                    quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-
-                    ++component;
-
-                    quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                    quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-
-                    ++next_touched_component_i;
-                    if (next_touched_component_i < (int) quotient_component_touched_swap.size()) {
-                        next_touched_component = quotient_component_touched_swap[next_touched_component_i];
-                    }
-
-                    while (component != next_touched_component &&
-                           quotient_component_start_pos < (int) quotient_component_worklist_col.size()) {
-                        quotient_component_start_pos = quotient_component_worklist_boundary[component].first;
-                        quotient_component_start_pos_v = quotient_component_worklist_boundary[component].second;
-
-                        ++component;
-
-                        quotient_component_end_pos = quotient_component_worklist_boundary[component].first;
-                        quotient_component_end_pos_v = quotient_component_worklist_boundary[component].second;
-                    }
-                }
-                global_automorphisms_found += automorphisms_found;
-                if (automorphisms_found == 0)
-                    break;
-            }
-
-            if (avg_support_sparse_ir > 0 && avg_support_sparse_ir_num > 0) {
-                avg_support_sparse_ir = avg_support_sparse_ir / avg_support_sparse_ir_num;
-            }
-            if (avg_support_sparse_ir_num2 > 0) {
-                avg_end_of_comp = (1.0 * avg_reached_end_of_component) / (avg_support_sparse_ir_num2 * 1.0);
-            } else {
-                avg_end_of_comp = 0;
-            }
-
-            //PRINT("(prep-red) sparse-ir-k completed: " << global_automorphisms_found);
-            return global_automorphisms_found;
         }
 
         // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later
@@ -4590,62 +3160,6 @@ namespace sassy {
             assert(rem_edges % 2 == 0);
         }
 
-        // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later, component-wise
-        void del_discrete_edges_inplace_component(dejavu::sgraph *g, coloring *c, int component_start_pos) {
-            int rem_edges = 0;
-            int discrete_vert = 0;
-            for (size_t _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-
-                for (int i = col; i < col + col_sz + 1;) {
-                    if (c->vertex_to_col[c->lab[i]] != i)
-                        continue; // not a color
-                    if (c->ptn[i] == 0) {
-                        ++discrete_vert;
-                        del.set(c->lab[i]);
-                    }
-                    i += c->ptn[i] + 1;
-                }
-            }
-
-            for (size_t _i = component_start_pos; _i < quotient_component_worklist_col.size(); ++_i) {
-                const int col = quotient_component_worklist_col[_i];
-                const int col_sz = quotient_component_worklist_col_sz[_i];
-
-                if (col == -1) {// reached end of component
-                    break;
-                }
-
-                for (int i = col; i < col + col_sz + 1; ++i) {
-                    const int v = c->lab[i];
-                    if (del.get(v)) {
-                        rem_edges += g->d[v];
-                        g->d[v] = 0;
-                        continue;
-                    }
-                    // int write_pt_front = g->v[v];
-                    // int write_pt_back = g->v[v] + g->d[v] - 1;
-                    for (int n = g->v[v]; n < g->v[v] + g->d[v];) {
-                        const int neigh = g->e[n];
-                        if (del.get(neigh)) {
-                            const int swap_neigh = g->e[g->v[v] + g->d[v] - 1];
-                            g->e[g->v[v] + g->d[v] - 1] = neigh;
-                            g->e[n] = swap_neigh;
-                            --g->d[v];
-                            ++rem_edges;
-                        } else {
-                            ++n;
-                        }
-                    }
-                }
-            }
-        }
-
         // counts vertices of degree 0, 1, 2 in g
         void count_graph_deg(dejavu::sgraph *g, int *deg0, int *deg1, int *deg2) {
             *deg0 = 0;
@@ -4666,22 +3180,19 @@ namespace sassy {
                         break;
                 }
             }
+            // std::cout << *deg0 << ", " << *deg1 << ", " << *deg2 << std::endl;
         }
 
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
             bool in_order = true;
-            for(int i = 0; i < g->v_size-1; ++i) {
-                in_order = in_order && (colmap[i] <= colmap[i+1]);
-                if(!in_order)
-                    break;
-            }
+            for(int i = 0; i < g->v_size-1 && in_order; ++i) in_order = in_order && (colmap[i] <= colmap[i+1]);
             if(in_order) {
+                order_edgelist(g);
                 return;
             }
 
             g->initialize_coloring(&c, colmap);
-
-            dejavu::work_list old_arr(g->v_size);
+            dejavu::worklist old_arr(g->v_size);
 
             std::memcpy(old_arr.get_array(), g->v, g->v_size*sizeof(int));
             for(int j = 0; j < g->v_size; ++j) {
@@ -4724,63 +3235,33 @@ namespace sassy {
 
     public:
 
+        /**
+         * Main routine of the preprocessor. Reduces the graph \p g using various techniques.
+         *
+         * @param g the graph
+         * @param hook user-provided function which is used to return the computed automorphisms
+         * @param schedule optional parameter which defines the order of applied techniques
+         */
         void reduce(dejavu::static_graph *g, dejavu_hook* hook, std::vector<preop> *schedule = nullptr) {
             reduce(g->get_sgraph(), g->get_coloring(), hook, schedule);
         }
 
-
-        // main routine of the preprocessor, reduces (g, colmap) -- returns automorphisms through hook
-        // optional parameter schedule defines the order of applied techniques
+        /**
+         * Main routine of the preprocessor. Reduces the graph \p g using various techniques.
+         *
+         * @param g the graph
+         * @param colmap vertex coloring of the graph \p g
+         * @param hook user-provided function which is used to return the computed automorphisms
+         * @param schedule optional parameter which defines the order of applied techniques
+         */
         void reduce(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, const std::vector<preop> *schedule = nullptr) {
             const std::vector<preop> default_schedule =
-                    {deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop};
+                    {deg01, qcedgeflip, deg01, twins, deg2ma, deg2ue, densify2}; // deg2ma, deg2ue, densify2
+            // deg01, qcedgeflip, deg2ma, deg2ue, redloop, densify2
+            //deg01, qcedgeflip, deg2ma, deg2ue, probe2qc, deg2ma, probeqc, deg2ma, redloop, densify2
 
-            if(schedule == nullptr) {
-                schedule = &default_schedule;
-            }
-
-            std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-
-            PRINT("____________________________________________________");
-            PRINT(std::setw(16) << std::left <<"T (ms)"                                  << std::setw(16) << "after_proc"  << std::setw(10) << "#N"        << std::setw(10)        << "#M");
-            PRINT("____________________________________________________");
-            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "start" << std::setw(10) << g->v_size << std::setw(10) << g->e_size );
-
-            if(CONFIG_TRANSLATE_ONLY) {
-                translate_layer_fwd.reserve(g->v_size);
-                backward_translation_layers.emplace_back(std::vector<int>());
-                const size_t back_ind = backward_translation_layers.size() - 1;
-                translation_layers.emplace_back(std::vector<int>());
-                // const int fwd_ind = translation_layers.size() - 1;
-                backward_translation_layers[back_ind].reserve(g->v_size);
-                for (int i = 0; i < g->v_size; ++i)
-                    backward_translation_layers[back_ind].push_back(i);
-
-                automorphism.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i) {
-                    automorphism.push_back(i);
-                }
-                automorphism_supp.allocate(g->v_size);
-                _automorphism.allocate(g->v_size);
-                _automorphism_supp.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i)
-                    _automorphism[i] = i;
-                aux_automorphism.allocate(g->v_size);
-                for (int i = 0; i < g->v_size; ++i) {
-                    aux_automorphism.push_back(i);
-                }
-                aux_automorphism_supp.allocate(g->v_size);
-
-                domain_size = g->v_size;
-
-                recovery_strings.reserve(g->v_size);
-                for (int i = 0; i < domain_size; ++i) {
-                    recovery_strings.emplace_back(std::vector<int>());
-                }
-                saved_hook = hook;
-                save_preprocessor = this;
-                return;
-            }
+            if(schedule == nullptr) schedule = &default_schedule;
+            if(print) print->print_header();
 
             domain_size = g->v_size;
             saved_hook = hook;
@@ -4789,32 +3270,31 @@ namespace sassy {
                 return;
             g->dense = !(g->e_size < g->v_size || g->e_size / g->v_size < g->v_size / (g->e_size / g->v_size));
 
-            //PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_setup" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-
             const int test_d = g->d[0];
             int k;
-            for (k = 0; k < g->v_size && g->d[k] == test_d; ++k);
+            for (k = 0; k < (g->v_size) && (g->d[k] == test_d); ++k);
 
-            if(k == g->v_size) {
+            int test_col = colmap[0];
+            int l;
+            for (l = 1; l < (g->v_size) && (colmap[l] == test_col); ++l);
+
+            if(k == g->v_size && l == g->v_size) {
                 // graph is regular
                 skipped_preprocessing = true;
-                PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "regular" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                if(print) print->timer_print("regular", g->v_size, g->e_size);
                 return;
             }
 
-            backward_translation_layers.emplace_back(std::vector<int>());
+            backward_translation_layers.emplace_back();
             const size_t back_ind = backward_translation_layers.size() - 1;
-            translation_layers.emplace_back(std::vector<int>());
-            // const int fwd_ind = translation_layers.size() - 1;
+            translation_layers.emplace_back();
             backward_translation_layers[back_ind].reserve(g->v_size);
-            for (int i = 0; i < g->v_size; ++i)
-                backward_translation_layers[back_ind].push_back(i);
-
+            for (int i = 0; i < g->v_size; ++i) backward_translation_layers[back_ind].push_back(i);
             edge_scratch.allocate(g->e_size);
 
-            order_according_to_color(g, colmap);
-            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "color_order" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-
+            if(g->v_size > 64)   order_according_to_color(g, colmap);
+            else                 order_edgelist(g);
+            if(print) print->timer_print("order", g->v_size, g->e_size);
             g->initialize_coloring(&c, colmap);
 
             const int pre_v_size = g->v_size;
@@ -4822,20 +3302,19 @@ namespace sassy {
             const int pre_cells  = c.cells;
 
             dejavu::ir::refinement R_stack = dejavu::ir::refinement();
-            R1 = &R_stack;
-            R1->refine_coloring_first(g, &c, -1);
+            if(R1 == nullptr) R1 = &R_stack;
 
+            R1->refine_coloring_first(g, &c, -1);
             const bool color_refinement_effective = pre_cells != c.cells;
 
             if (c.cells == g->v_size) {
-                PRINT("(prep-red) graph is discrete");
+                //PRINT("(prep-red) graph is discrete");
                 g->v_size = 0;
                 g->e_size = 0;
+                if(print) print->timer_print("discrete", g->v_size, g->e_size);
                 return;
             }
 
-            int deg0, deg1, deg2;
-            //add_edge_buff.allocate(domain_size);
             add_edge_buff.clear();
             add_edge_buff.reserve(domain_size);
             for (int i = 0; i < domain_size; ++i)
@@ -4867,7 +3346,7 @@ namespace sassy {
             domain_size = g->v_size;
 
             // assumes colmap is array of length g->v_size
-            del = dejavu::mark_set();
+            del = dejavu::markset();
             del.initialize(g->v_size);
 
             recovery_strings.reserve(g->v_size);
@@ -4875,40 +3354,49 @@ namespace sassy {
 
             // eliminate degree 1 + 0 and discrete vertices
             del_discrete_edges_inplace(g, &c);
+
             bool has_deg_0 = false;
             bool has_deg_1 = false;
             bool has_deg_2 = false;
             bool has_discrete = false;
             bool graph_changed = false;
+            int count_deg0 = 0;
+            int count_deg1 = 0;
+            int count_deg2 = 0;
+            int count_discrete = 0;
 
             for (int i = 0; i < c.domain_size;) {
                 const int v = c.lab[i];
-                switch (g->v[v]) {
+                const int col_sz = c.ptn[i] + 1;
+                switch (g->d[v]) {
                     case 0:
-                        has_deg_0 = true;
+                        count_deg0 += col_sz;
                         break;
                     case 1:
-                        has_deg_1 = true;
+                        count_deg1 += col_sz;
                         break;
                     case 2:
-                        has_deg_2 = true;
+                        count_deg2 += col_sz;
                         break;
                     default:
                         break;
                 }
-                const int col_sz = c.ptn[i] + 1;
-                has_discrete = has_discrete || col_sz == 1;
+                count_discrete += (col_sz == 1);
                 i += col_sz;
             }
             copy_coloring_to_colmap(&c, colmap);
-            PRINT(std::setw(16) << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "colorref" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+            if(print) print->timer_print("colorref", g->v_size, c.cells);
+
+            //if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
+            has_deg_0 = (count_deg0 > 4);
+            has_deg_1 = (count_deg1 > 8);
+            has_deg_2 = (count_deg2 > 16); /*< if there's only very few, there's really no point... */
+            has_discrete = (count_discrete > 4);
 
             if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
 
-            my_split_hook = self_split_hook();
-
             if (schedule != nullptr) {
-                del_e = dejavu::mark_set();
+                del_e = dejavu::markset();
                 del_e.initialize(g->e_size);
 
                 for (size_t pc = 0; pc < schedule->size(); ++pc) {
@@ -4923,17 +3411,11 @@ namespace sassy {
                             if(!has_deg_0 && !has_deg_1 && !has_discrete && !graph_changed) break;
                             red_deg10_assume_cref(g, colmap, hook);
                             perform_del(g, colmap);
-                            //PRINT("(prep-red) after 01 reduction (G, E) " << g->v_size << ", " << g->e_size);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg01" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                            if(print) print->timer_print("deg01", g->v_size, g->e_size);
 
                             if(!(g->v_size == pre_v_size && g->e_size == pre_e_size && !color_refinement_effective)) {
                                 order_according_to_color(g, colmap);
-                                PRINT(std::setw(16) << std::left <<
-                                                    (std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                                            std::chrono::high_resolution_clock::now() -
-                                                            timer).count()) / 1000000.0 << std::setw(16)
-                                                    << "color_order" << std::setw(10) << g->v_size << std::setw(10)
-                                                    << g->e_size);
+                                if(print) print->timer_print("order", g->v_size, g->e_size);
                             }
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
@@ -4942,118 +3424,68 @@ namespace sassy {
                             if(!has_deg_2 && !graph_changed) break;
                             red_deg2_path_size_1(g, colmap);
                             perform_del_add_edge(g, colmap);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "deg2ma" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                            if(print) print->timer_print("deg2ma", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
+
+                            break;
+                        }
+
+                        case preop::twins: {
+                            // check for twins and mark them for deletion
+                            int s_twins = remove_twins(g, colmap, hook);
+
+                            if(s_twins > 0) {
+                                // success! we found twins
+                                perform_del(g, colmap);
+
+                                // might distinguish vertices, so let's apply color refinement again
+                                g->initialize_coloring(&c, colmap);
+                                R_stack.refine_coloring_first(g, &c);
+                                copy_coloring_to_colmap(&c, colmap);
+
+                                if(print) print->timer_print("twins", g->v_size, g->e_size);
+                                assert(_automorphism_supp.cur_pos == 0);
+
+                                // twins can re-activate other routines, so let's start over...
+                                if(s_twins >= 16)  pc = 0;
+                            }
                             break;
                         }
                         case preop::deg2ue: {
                             if(!has_deg_2 && !graph_changed) break;
-                            red_deg2_unique_endpoint_new(g, colmap);
+
+                            has_discrete = red_deg2_color_cycles(g, colmap);
+
+                            red_deg2_unique_endpoint(g, colmap);
                             perform_del_add_edge(g, colmap);
 
                             red_deg2_trivial_connect(g, colmap);
                             perform_del_add_edge(g, colmap);
-
-                            red_deg2_color_cycles(g, colmap);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0 << std::setw(16) << "deg2ue" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-                            assert(_automorphism_supp.cur_pos == 0);
-                            break;
-                        }
-                        case preop::probe2qc: {
-                            const int auto_found = sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 8); //16
-                            if (auto_found > 0) {
+                            if(has_discrete) {
                                 perform_del_discrete(g, colmap);
                             }
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "probe2qc" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+
+                            if(print) print->timer_print("deg2ue", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
-                        case preop::probeqc: {
-                            const int auto_found = sparse_ir_probe_quotient_components(g, colmap, hook, 8, 1); // 16, 4
-                            if (auto_found > 0) {
-                                perform_del_discrete(g, colmap);
-                            }
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "probeqc" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+                        case preop::densify2: {
+                            if(!has_deg_2 && !graph_changed) break;
+                            red_deg2_densify(g, colmap);
+                            perform_del_add_edge_general(g, colmap);
+
+                            red_deg2_densifysc1(g, colmap);
+                            perform_del_add_edge_general(g, colmap);
+
+                            if(print) print->timer_print("densify2", g->v_size, g->e_size);
                             assert(_automorphism_supp.cur_pos == 0);
-                            break;
-                        }
-                        case preop::probeflat: {
-                            sparse_ir_probe(g, colmap, hook, SELECTOR_FIRST); // SELECTOR_LARGEST
-                            perform_del_discrete(g, colmap);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "probeflat" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-                            assert(_automorphism_supp.cur_pos == 0);
-                            break;
-                        }
-                        case preop::redloop: {
-                            int prev_size = g->v_size;
-                            if (g->v_size > 1) {
-                                count_graph_deg(g, &deg0, &deg1, &deg2);
-
-                                int back_off = 1;
-                                int add_on = 0;
-
-                                int count_iteration = 0;
-
-                                // continue reducing as long as we discover new degree 0 or degree 1 vertices
-                                while ((deg0 > 0 || deg1 > 0) && !CONFIG_PREP_DEACT_DEG01) {
-                                    // heuristics to activate / deactivate techniques
-                                    // this could be more sophisticated...
-                                    if (avg_end_of_comp > 0.5 &&
-                                        (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) > 0.1) {
-                                        back_off =
-                                                back_off * 16; // heuristic to stop using the more expensive techniques
-                                    }
-                                    if (avg_end_of_comp < 0.1 ||
-                                        (avg_support_sparse_ir * 1.0 / g->v_size * 1.0) < 0.01) {
-                                        add_on += 4; // heuristic to stop continue using some of the techniques
-                                    }
-
-                                    prev_size = g->v_size;
-
-                                    red_deg10_assume_cref(g, colmap, hook);
-                                    mark_discrete_for_deletion(g, colmap);
-                                    perform_del(g, colmap);
-
-                                    red_deg2_unique_endpoint_new(g, colmap);
-                                    perform_del_add_edge(g, colmap);
-
-                                    red_deg2_path_size_1(g, colmap);
-                                    perform_del_add_edge(g, colmap);
-
-                                    sparse_ir_probe_sz2_quotient_components(g, colmap, hook, 8);
-                                    perform_del_discrete(g, colmap);
-
-                                    sparse_ir_probe(g, colmap, hook, SELECTOR_LARGEST);
-                                    perform_del_discrete(g, colmap);
-
-                                    red_deg2_path_size_1(g, colmap);
-                                    perform_del_add_edge(g, colmap);
-
-                                    red_deg2_unique_endpoint_new(g, colmap);
-                                    perform_del_add_edge(g, colmap);
-
-                                    red_deg2_trivial_connect(g, colmap);
-                                    perform_del_add_edge(g, colmap);
-
-                                    red_deg2_color_cycles(g, colmap);
-                                    count_graph_deg(g, &deg0, &deg1, &deg2);
-
-
-                                    PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "loop" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
-                                    ++count_iteration;
-                                    if(g->v_size <= 1)
-                                        break;
-                                    if (((g->v_size * 1.0) / prev_size) > 0.75) {
-                                        break;
-                                    }
-                                }
-                            }
                             break;
                         }
                         case preop::qcedgeflip: {
                             red_quotient_edge_flip(g, colmap);
                             perform_del_edge(g);
-                            PRINT(std::setw(16) << std::left << (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count()) / 1000000.0  << std::setw(16) << "qcedgeflip" << std::setw(10) << g->v_size << std::setw(10) << g->e_size);
+
+                            if(print) print->timer_print("qcedgeflip", g->v_size, g->e_size);
                             break;
                         }
                     }
@@ -5061,11 +3493,7 @@ namespace sassy {
                 }
             }
 
-
-            //PRINT("(prep-red) after reduction (G, E) " << g->v_size << ", " << g->e_size);
-            //PRINT("(prep-red) after reduction grp_sz " << base << "*10^" << exp);
-            // g->sanity_check();
-            // could do multiple calls for now obviously independent components -- could use "buffer consumer" to translate domains
+            skipped_preprocessing = g->v_size == domain_size;
         }
 
         void save_my_hook(dejavu_hook *hook) {
@@ -5118,10 +3546,10 @@ namespace sassy {
             return true;
         }
 
-        // dejavu usage specific: (TODO!)
+        // dejavu usage specific
         [[maybe_unused]] static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
-            if(p->skipped_preprocessing) {
+            if(p->skipped_preprocessing && !p->decomposer) {
                 if(p->saved_hook != nullptr) {
                     (*p->saved_hook)(n, aut, nsupp, supp);
                 }
