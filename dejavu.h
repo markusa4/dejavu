@@ -184,11 +184,11 @@ namespace dejavu {
             termination_strategy s_term = t_prep;
             s_grp_sz.set(1.0, 0);
 
-            // want to print progress with a timer, initialize module
+            // we want to print with a timer, so let's initialize a timed printer
             timed_print m_printer;
             m_printer.h_silent = h_silent;
 
-            // no colmap provided? let's substitute a trivial vertex coloring
+            // no vertex coloring provided? let's substitute a trivial vertex coloring
             worklist colmap_substitute;
             if(colmap == nullptr) {
                 colmap_substitute.resize(g->v_size);
@@ -196,19 +196,18 @@ namespace dejavu {
                 for(int i = 0; i < g->v_size; ++i) colmap[i] = 0;
             }
 
-            // first, we try to preprocess
+            // first, we try to preprocess the graph
             preprocessor m_prep(&m_printer); /*< initializes the preprocessor */
 
-            // preprocess the graph using sassy
+            // preprocess the graph
             m_printer.print("preprocessing");
             m_prep.reduce(g, colmap, hook); /*< reduces the graph */
-            s_grp_sz.multiply(m_prep.grp_sz); /*< group size needed if the
-                                               *  early out below is used */
+            s_grp_sz.multiply(m_prep.grp_sz); /*< add group size detected during preprocessing */
 
             // early-out if preprocessor finished solving the graph
             if(g->v_size <= 1) return;
 
-            // if the preprocessor changed the vertex set of the graph, need to use reverse translation
+            // if the preprocessor changed the vertex set of the graph, we need to use reverse translation
             dejavu_hook dhook = preprocessor::_dejavu_hook;
             hook = &dhook; /*< change hook to sassy hook */
 
@@ -524,9 +523,6 @@ namespace dejavu {
                         if (s_cost > h_budget) next_routine = restart; /*< we exceeded our budget, restart */
 
                         // ...unless...
-                        //if (s_dfs_backtrack && s_regular && s_few_cells && s_restarts == 0 && s_path_fail1_avg > 0.01 &&
-                        //    sh_tree.get_finished_up_to() == 0)
-                        //    next_routine = bfs_ir; /*< surely BFS will help in this case, so let's fast-track */
                         // silly case in which the base is so long, that an unnecessary restart has fairly high
                         // cost attached -- so if BFS can be successful, let's do that first...
                         if (next_routine == restart && 2 * base_size > s_bfs_next_level_nodes
