@@ -17,10 +17,10 @@ add_executable(dejavu dejavu.cpp)
 if (${COMPILE_TEST_SUITE})
     message("Tests active...")
 
-    set(CMAKE_C_COMPILER /usr/bin/cc)
-    set(CMAKE_CXX_COMPILER /usr/bin/c++)
-    set(COMPILE_FLAGS "--coverage")
-    set(CMAKE_EXE_LINKER_FLAGS "--coverage")
+    # set(CMAKE_C_COMPILER /usr/bin/cc)
+    # set(CMAKE_CXX_COMPILER /usr/bin/c++)
+    # set(COMPILE_FLAGS "--coverage")
+    # set(CMAKE_EXE_LINKER_FLAGS "--coverage")
 
     remove_definitions(-DNDEBUG)
 
