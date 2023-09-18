@@ -1,4 +1,10 @@
+CMakeCache.txt
+CMakeFiles
+Makefile
+_deps/*
+bliss/
+cmake_install.cmake
+conauto/
+dejavu*
 nauty/
 saucy/
-conauto/
-bliss/
