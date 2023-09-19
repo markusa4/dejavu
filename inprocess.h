@@ -353,7 +353,6 @@ namespace dejavu::search_strategy {
                     const int ind_col_sz = local_state.c->ptn[ind_col] + 1;
                     const int orb_sz_det = i.second;
                     if(ind_col_sz > 1 && ind_col_sz == orb_sz_det) {
-                        std::cout << orb_sz_det << std::endl;
                         s_grp_sz.multiply(ind_col_sz);
                         local_state.move_to_child_no_trace(g, ind_v);
                         inproc_fixed_points.push_back(ind_v);

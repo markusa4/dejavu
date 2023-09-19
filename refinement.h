@@ -170,7 +170,6 @@ namespace dejavu {
                         cell_todo.add_cell(queue_pointer, i);
                         const int col_sz = c->ptn[i];
                         i += col_sz + 1;
-
                     }
                 } else {
                     assert(c->vertex_to_col[c->lab[init_color]] == init_color);
@@ -205,20 +204,8 @@ namespace dejavu {
                         refine_color_class_sparse(g, c, next_color_class, next_color_class_sz);
                     }
 
-                    if (g_early_out) {
-                        cell_todo.reset(queue_pointer);
-                        break;
-                    }
-
-                    // detection if coloring is discrete
-                    if (c->cells == g->v_size) {
-                        cell_todo.reset(queue_pointer);
-                        break;
-                    }
-
-                    // partition is at least as large as the one of target invariant, can skip to the end of the entire
-                    // refinement
-                    if (c->cells == color_limit) {
+                    // early out possible?
+                    if (g_early_out || c->cells == g->v_size || c->cells == color_limit) {
                         cell_todo.reset(queue_pointer);
                         break;
                     }

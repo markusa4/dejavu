@@ -2136,7 +2136,6 @@ namespace dejavu {
                     do {
                         if(next->get_parent() == nullptr || !next->get_parent()->get_prune()) {
                             tree_data_jump_map[level].push_back(next);
-                        } else {
                         }
                         next = next->get_next();
                     } while (next != first);
