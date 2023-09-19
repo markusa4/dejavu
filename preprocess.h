@@ -79,6 +79,7 @@ namespace dejavu {
         std::vector<int> translate_layer_fwd;
         std::vector<int> translate_layer_bwd;
 
+        int edge_attached_information = 0;
         std::vector<int>                                  recovery_edge_attached;
         std::vector<std::vector<std::tuple<int,int,int>>> recovery_edge_adjacent;
 
@@ -882,12 +883,18 @@ namespace dejavu {
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
             const int pos = static_cast<int>(recovery_edge_attached.size());
             assert(recovery.size() != 0);
-            for(int i = 0; i < static_cast<int>(recovery.size()); ++i) {
-                recovery_edge_attached.push_back(recovery[i]);
-            }
             const int len = static_cast<int>(recovery.size());
-            recovery_edge_adjacent[v1].emplace_back(v2,pos,len);
-            recovery_edge_adjacent[v2].emplace_back(v1,pos,len);
+            ++edge_attached_information;
+            if(len == 1) {
+                // special code for stored path of length 1 (does not use recovery_edge_attached)
+                recovery_edge_adjacent[v1].emplace_back(v2, recovery[0], len);
+                recovery_edge_adjacent[v2].emplace_back(v1, recovery[0], len);
+            } else {
+                // general-purpose code for longer paths
+                for (int i = 0; i < len; ++i) { recovery_edge_attached.push_back(recovery[i]); }
+                recovery_edge_adjacent[v1].emplace_back(v2, pos, len);
+                recovery_edge_adjacent[v2].emplace_back(v1, pos, len);
+            }
         }
 
         /**
@@ -912,46 +919,44 @@ namespace dejavu {
                 assert(other != v);
                 const int other_map = automorphism[other];
 
-                (*help_array1)[other_map] = id;
-                (*help_array2)[other_map] = other;
+                (*help_array2)[other_map] = id;
             }
 
             assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
 
-            for(int j = 0; j < static_cast<int>(recovery_edge_adjacent[v_map].size()); ++j) {
-                const int other_map = std::get<0>(recovery_edge_adjacent[v_map][j]);
-                const int id        = std::get<1>(recovery_edge_adjacent[v_map][j]);
-                const int len       = std::get<2>(recovery_edge_adjacent[v_map][j]);
+            for(auto & j : recovery_edge_adjacent[v_map]) {
+                const int other_map = std::get<0>(j);
+                const int id        = std::get<1>(j);
+                const int len       = std::get<2>(j);
 
                 assert(other_map != v_map);
-                const int orig_id = (*help_array1)[other_map];
-                (*help_array1)[other_map] = other_map;
-                const int other = (*help_array2)[other_map];
-
-                assert(v_map     == automorphism[v]);
-                assert(other_map == automorphism[other]);
-
-                if(v_map == v && other_map == other) continue;
-                if(v_map != v && other_map != other && v > other) continue;
+                const int orig_id = (*help_array2)[other_map];
+                if(id == orig_id) continue;
 
                 // endpoints of the mapped edges:
                 // e1: v     -> v_map
                 // e2: other -> other_map
                 // automorphism maps e1 -> e2
 
-                for(int k = 0; k < len; ++k) {
-                    const int v_from = recovery_edge_attached[orig_id + k];
-                    const int v_to   = recovery_edge_attached[id      + k];
-                    if(v_from != v_to) {
-                        if(automorphism[v_from] == v_from) { // I'm doing it from both sides right now...
+                if(len == 1) {
+                    // special code for stored path of length 1 (does not use recovery_edge_attached)
+                    const int v_from = orig_id;
+                    const int v_to   = id;
+                    if (v_from != v_to && automorphism[v_from] == v_from) {
+                        automorphism[v_from] = v_to;
+                        automorphism_supp->push_back(v_from);
+                    }
+                } else {
+                    // general-purpose code for longer paths
+                    for (int k = 0; k < len; ++k) {
+                        const int v_from = recovery_edge_attached[orig_id + k];
+                        const int v_to   = recovery_edge_attached[id + k];
+                        if (v_from != v_to && automorphism[v_from] == v_from) {
                             automorphism[v_from] = v_to;
                             automorphism_supp->push_back(v_from);
                         }
                     }
                 }
-
-
-
             }
         }
 
@@ -3103,7 +3108,7 @@ namespace dejavu {
 
             const int end_pos = automorphism_supp.cur_pos;
 
-            if(!recovery_edge_attached.empty()) {
+            if(edge_attached_information > 0) {
                 for (int i = 0; i < end_pos; ++i) {
                     recovery_attached_edges_to_automorphism(automorphism_supp[i], automorphism.get_array(),
                                                             &automorphism_supp, &aux_automorphism, &before_move);
