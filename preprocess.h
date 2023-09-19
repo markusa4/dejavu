@@ -904,8 +904,6 @@ namespace dejavu {
                                                      dejavu::ds::worklist* help_array2) {
             if(recovery_edge_adjacent[v].empty()) return;
             const int v_map    = automorphism[v];
-            const int test_map = automorphism[v_map];
-            if(test_map == v && v > v_map) return;
 
             for(auto & j : recovery_edge_adjacent[v]) {
                 const int other = std::get<0>(j);
@@ -936,6 +934,11 @@ namespace dejavu {
                 if(v_map == v && other_map == other) continue;
                 if(v_map != v && other_map != other && v > other) continue;
 
+                // endpoints of the mapped edges:
+                // e1: v     -> v_map
+                // e2: other -> other_map
+                // automorphism maps e1 -> e2
+
                 for(int k = 0; k < len; ++k) {
                     const int v_from = recovery_edge_attached[orig_id + k];
                     const int v_to   = recovery_edge_attached[id      + k];
@@ -946,6 +949,9 @@ namespace dejavu {
                         }
                     }
                 }
+
+
+
             }
         }
 

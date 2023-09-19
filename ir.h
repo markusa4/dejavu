@@ -951,7 +951,7 @@ namespace dejavu {
                 } else {
                     R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
                                        my_worklist_hook);
-                    if (T->trace_equal() && c->cells==(*compare_base)[s_base_pos - 1].cells) {
+                    if (T->trace_equal() && c->cells==(*compare_base)[s_base_pos - 1].cells && !h_use_split_limit) {
                         T->skip_to_individualization();
                     }
                 }
@@ -2136,6 +2136,7 @@ namespace dejavu {
                     do {
                         if(next->get_parent() == nullptr || !next->get_parent()->get_prune()) {
                             tree_data_jump_map[level].push_back(next);
+                        } else {
                         }
                         next = next->get_next();
                     } while (next != first);

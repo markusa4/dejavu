@@ -201,7 +201,8 @@ namespace dejavu {
                     auto new_save = new ir::limited_save();
                     local_state.save_reduced_state(*new_save);
                     ir_tree->add_node(local_state.s_base_pos, new_save, node, is_base);
-                    if(local_state.s_base_pos > 1) ir_tree->record_add_invariant(v, local_state.T->get_hash());
+                    if(local_state.s_base_pos > 1 && !h_use_deviation_pruning)
+                        ir_tree->record_add_invariant(v, local_state.T->get_hash());
                 } else {
                     assert(!is_base);
                     // deviation map
@@ -220,7 +221,7 @@ namespace dejavu {
                             }
                         }
                     } else {
-                        ir_tree->record_invariant(v, local_state.T->get_hash());
+                        ir_tree->record_add_invariant(v, local_state.T->get_hash());
                     }
                 }
 
