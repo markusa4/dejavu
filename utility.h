@@ -14,6 +14,7 @@
 #include <memory>
 #include <chrono>
 #include <iomanip>
+#include "graph.h"
 #include "ds.h"
 
 #ifndef DEJAVU_UTILITY_H

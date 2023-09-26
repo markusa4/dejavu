@@ -230,3 +230,55 @@ TEST(schreier_test, schreier_base_change) {
     ASSERT_EQ(s.get_fixed_orbit_size(5), 3);
     ASSERT_EQ(s.get_fixed_orbit_size(6), 2);
 }
+
+
+TEST(schreier_test, schreier_incremental_base) {
+    random_schreier s(9);
+    schreier_hook hook(s);
+
+    std::vector<int> test_base;
+    s.set_base(test_base);
+
+    dejavu::static_graph g1;
+    g1.initialize_graph(9, 9);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_vertex(0,2);
+    g1.add_edge(0, 1);
+    g1.add_edge(1, 2);
+    g1.add_edge(0, 2);
+
+    g1.add_edge(0+3, 1+3);
+    g1.add_edge(1+3, 2+3);
+    g1.add_edge(0+3, 2+3);
+
+    g1.add_edge(0+6, 1+6);
+    g1.add_edge(1+6, 2+6);
+    g1.add_edge(0+6, 2+6);
+
+    dejavu::solver d1;
+    d1.automorphisms(&g1, hook.get_hook());
+    orbit o(9);
+
+    bool stab_trivial = false;
+    while(!stab_trivial) {
+        s.get_stabilizer_orbit(static_cast<int>(test_base.size()), o);
+        stab_trivial = true;
+        for(int i = 0; i < 9; ++i) {
+            if(o.orbit_size(i) > 1) {
+                stab_trivial = false;
+                test_base.push_back(i);
+                break;
+            }
+        }
+        if(!stab_trivial) s.set_base(test_base);
+    }
+
+    assert(test_base.size() == 6);
+}

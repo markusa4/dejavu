@@ -5,10 +5,12 @@
 #ifndef DEJAVU_IR_H
 #define DEJAVU_IR_H
 
+#include <unordered_map>
 #include "refinement.h"
 #include "coloring.h"
 #include "graph.h"
 #include "trace.h"
+#include "groups.h"
 
 namespace dejavu {
 

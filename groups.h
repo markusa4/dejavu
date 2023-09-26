@@ -5,6 +5,8 @@
 #ifndef DEJAVU_GROUPS_H
 #define DEJAVU_GROUPS_H
 
+#include "ds.h"
+#include "utility.h"
 #include "coloring.h"
 #include "graph.h"
 #include "trace.h"
@@ -17,6 +19,8 @@ namespace dejavu {
      * Contains basic data structures to construct and deal with automorphisms, as well as a Schreier structure.
      */
     namespace groups {
+
+        using namespace dejavu::ds;
 
         /**
          * Reset an automorphism given in \p automorphism with support \p support to the identity.
@@ -1227,10 +1231,8 @@ namespace dejavu {
                 generators.clear();
                 transversals.reserve(stop);
                 transversals.clear();
-
                 finished_up_to = -1;
 
-                //transversals.set_size(stop);
                 for (int i = 0; i < stop && i < static_cast<int>(base.size()); ++i) {
                     transversals.emplace_back();
                     transversals[i].initialize(base[i], i, base_sizes[i]);
@@ -1239,7 +1241,7 @@ namespace dejavu {
             }
 
             void set_base(schreier_workspace &w, automorphism_workspace& automorphism, random_source& rng,
-                          std::vector<int> &new_base, int err = 10) {
+                          std::vector<int> &new_base, int err = 10, bool resift_generators = false) {
                 assert(init);
                 const int old_size = static_cast<int>(transversals.size());
                 const int new_size = static_cast<int>(new_base.size());
@@ -1250,15 +1252,13 @@ namespace dejavu {
                     if (transversals[keep_until].get_fixed_point() != new_base[keep_until]) break;
                 }
 
-                if(keep_until == new_size) return;
+                if (keep_until == new_size) return;
 
                 finished_up_to = -1;
                 transversals.resize(new_size);
 
 
-                for(int i = 0; i < keep_until; ++i) {
-                    transversals[i].set_size_upper_bound(INT32_MAX);
-                }
+                for (int i = 0; i < keep_until; ++i) { transversals[i].set_size_upper_bound(INT32_MAX); }
                 for (int i = keep_until; i < new_size; ++i) {
                     //if(i < old_size) delete transversals[i];
                     transversals[i] = shared_transversal();
@@ -1267,8 +1267,10 @@ namespace dejavu {
                 }
 
                 stabilized_generators.clear();
-
-                // TODO resift all generators once?
+                if(resift_generators) {
+                    int gen_prev = generators.size();
+                    for (int i = 0; i < gen_prev; ++i) sift_generator(w, automorphism, i, true);
+                }
                 sift_random(w, automorphism, rng, err);
             }
 
@@ -1277,7 +1279,7 @@ namespace dejavu {
                 int fail = err;
                 bool any_changed = false;
                 while(fail >= 0) {
-                    const bool sift_changed = sift_random(w, automorphism, rng);
+                    const bool sift_changed = sift_random(w, automorphism, rng, true);
                     any_changed = sift_changed || any_changed;
                     fail -= !sift_changed;
                 }
@@ -1514,12 +1516,22 @@ namespace dejavu {
              * @return Whether the generated automorphism was added to the Schreier structure or not.
              */
             bool sift_random(schreier_workspace &w, automorphism_workspace& automorphism,
-                             random_source& rng) {
+                             random_source& rng, bool keep_at_end = false) {
                 if(generators.size() <= 0) return false;
                 automorphism.reset();
                 automorphism.set_support01(true);
                 generate_random(w, automorphism, rng);
-                const bool added_generator = sift(w, automorphism, false);
+                const bool added_generator = sift(w, automorphism, false, keep_at_end);
+                return added_generator;
+            }
+
+            bool sift_generator(schreier_workspace &w, automorphism_workspace& automorphism, int generator,
+                                bool keep_at_end = false) {
+                if(generators.size() <= 0) return false;
+                automorphism.reset();
+                automorphism.set_support01(true);
+                load_generator(automorphism, generator);
+                const bool added_generator = sift(w, automorphism, false, keep_at_end);
                 return added_generator;
             }
 
@@ -1639,14 +1651,14 @@ namespace dejavu {
              *
              * @param new_base the base
              */
-            void set_base(std::vector<int> &new_base) {
+            void set_base(std::vector<int> &new_base, bool resift_generators = false) {
                 if(!init) {
                     std::vector<int> base_sizes;
                     base_sizes.reserve(new_base.size());
                     for(int i = 0; i < static_cast<int>(new_base.size()); ++i) base_sizes.push_back(INT32_MAX);
                     schreier.initialize(h_domain_size, new_base, base_sizes);
                     init = true;
-                } else schreier.set_base(ws_schreier, ws_auto, rng, new_base, h_error_bound);
+                } else schreier.set_base(ws_schreier, ws_auto, rng, new_base, h_error_bound, resift_generators);
                 sift_random();
             }
 

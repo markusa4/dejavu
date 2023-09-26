@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cassert>
+#include <cstdint>
 
 namespace dejavu {
     namespace ir {
