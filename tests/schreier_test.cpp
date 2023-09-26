@@ -280,5 +280,5 @@ TEST(schreier_test, schreier_incremental_base) {
         if(!stab_trivial) s.set_base(test_base);
     }
 
-    assert(test_base.size() == 6);
+    ASSERT_EQ(test_base.size(), 6);
 }

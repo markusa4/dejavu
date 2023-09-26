@@ -1260,16 +1260,17 @@ namespace dejavu {
 
                 for (int i = 0; i < keep_until; ++i) { transversals[i].set_size_upper_bound(INT32_MAX); }
                 for (int i = keep_until; i < new_size; ++i) {
-                    //if(i < old_size) delete transversals[i];
                     transversals[i] = shared_transversal();
                     assert(new_base[i] >= 0);
                     transversals[i].initialize(new_base[i], i, INT32_MAX);
                 }
 
+                std::vector<int> stabilized_generators_copy;
+                stabilized_generators_copy.swap(stabilized_generators);
                 stabilized_generators.clear();
+
                 if(resift_generators) {
-                    int gen_prev = generators.size();
-                    for (int i = 0; i < gen_prev; ++i) sift_generator(w, automorphism, i, true);
+                    for (int gen_id : stabilized_generators_copy) sift_generator(w, automorphism, gen_id, true);
                 }
                 sift_random(w, automorphism, rng, err);
             }

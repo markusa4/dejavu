@@ -160,7 +160,7 @@ namespace dejavu {
              */
             void refine_coloring(sgraph *g, coloring *c, int init_color = -1, int color_limit = -1,
                                  const std::function<type_split_color_hook>* split_hook = nullptr,
-                                 const std::function<type_worklist_color_hook> &worklist_hook = nullptr) {
+                                 const std::function<type_worklist_color_hook>* worklist_hook = nullptr) {
                 assure_initialized(g);
                 cell_todo.reset(queue_pointer);
 
@@ -183,7 +183,7 @@ namespace dejavu {
                     const int next_color_class    = cell_todo.next_cell(queue_pointer, c);
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
 
-                    if (worklist_hook && !worklist_hook(next_color_class, next_color_class_sz)) continue;
+                    if (worklist_hook && !(*worklist_hook)(next_color_class, next_color_class_sz)) continue;
 
                     // this scheme is reverse-engineered from the color refinement in Traces by Adolfo Piperno
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class

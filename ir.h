@@ -946,13 +946,11 @@ namespace dejavu {
                 // refine coloring
                 T->op_refine_start();
                 if (mode == IR_MODE_RECORD_TRACE) {
-                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
-                                       my_worklist_hook);
+                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook, &my_worklist_hook);
                     if (s_cell_active) T->op_refine_cell_end();
                     T->op_refine_end();
                 } else {
-                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook,
-                                       my_worklist_hook);
+                    R->refine_coloring(g, c, init_color_class, -1, &my_split_hook, &my_worklist_hook);
                     if (T->trace_equal() && c->cells==(*compare_base)[s_base_pos - 1].cells && !h_use_split_limit) {
                         T->skip_to_individualization();
                     }
