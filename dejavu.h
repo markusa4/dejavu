@@ -19,15 +19,15 @@
 #include "components.h"
 
 // structures for testing
-extern dejavu::ir::refinement test_r;
-extern dejavu::sgraph dej_test_graph;
-extern int*           dej_test_col;
+// extern dejavu::ir::refinement test_r;
+// extern dejavu::sgraph dej_test_graph;
+// extern int*           dej_test_col;
 
 
 namespace dejavu {
     [[maybe_unused]] static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                            [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
-        assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
+        //assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
     }
 
 

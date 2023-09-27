@@ -1,6 +1,7 @@
 #ifndef SASSY_GRAPH_BUILDER_H
 #define SASSY_GRAPH_BUILDER_H
 
+#include<unordered_map>
 #include <fstream>
 
 namespace dejavu {

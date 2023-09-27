@@ -9,6 +9,7 @@
 #include <iostream>
 #include <cstring>
 #include <functional>
+#include <algorithm>
 #include <cassert>
 #include "coloring.h"
 
