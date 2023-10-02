@@ -3,7 +3,7 @@
 Please refer to our [get started guide](https://automorphisms.org/). There is also a [full documentation](https://automorphisms.org/documentation/), which can be built from the code using [doxygen](https://www.doxygen.nl/).
 
 
-# Compilation
+## Compilation
 Using *cmake*, the project should compile without any further dependencies:
 ```text
 cmake .
@@ -11,7 +11,7 @@ make
 ```
 Compilation produces a binary *dejavu*. It accepts a DIMACS graph as input, and computes the automorphism group of the graph. For available options and more descriptions, please refer to our [guide](https://automorphisms.org/quick_start/standalone/).
 
-# Use dejavu as a library
+## Use dejavu as a library
 dejavu is a header-only library. You can simply add dejavu to your C++ project by including the respective header file: 
 ```cpp
 #include "dejavu.h"
@@ -19,7 +19,7 @@ dejavu is a header-only library. You can simply add dejavu to your C++ project b
 
 Note that currently, dejavu requires to be *compiled with C++ version 20*. For a more thorough description, please refer to our [guide](https://automorphisms.org/quick_start/cpp_api/).
 
-# Running the tests
+## Running the tests
 Using *cmake*, a test target can be produced by setting the following flag:
 ```text
 cmake . -DCOMPILE_TEST_SUITE=1
