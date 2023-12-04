@@ -17,7 +17,7 @@ dejavu is a header-only library. You can simply add dejavu to your C++ project b
 #include "dejavu.h"
 ```
 
-Note that currently, dejavu requires to be *compiled with C++ version 20*. For a more thorough description, please refer to our [guide](https://automorphisms.org/quick_start/cpp_api/).
+Note that currently, dejavu requires to be *compiled with C++ version 14*. For a more thorough description, please refer to our [guide](https://automorphisms.org/quick_start/cpp_api/).
 
 ## Running the tests
 Using *cmake*, a test target can be produced by setting the following flag:

@@ -2978,18 +2978,9 @@ namespace dejavu {
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    //assert(orig_v_to   < (int)recovery_strings.size());
-                    //assert(orig_v_from < (int)recovery_strings.size());
-                    //assert(recovery_strings[orig_v_to].size() ==
-                    //       recovery_strings[orig_v_from].size());
                     assert(from_recovery_string_size == to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
-                        //assert(j <= recovery_strings[orig_v_from].size());
-                        //assert(j <= recovery_strings[orig_v_to].size());
-                        //const int v_from_t = recovery_strings[orig_v_from][j];
-                        //const int v_to_t   = recovery_strings[orig_v_to][j];
-
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
                         const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
 
@@ -3011,8 +3002,6 @@ namespace dejavu {
                         } else {
                             const int abs_v_from_t = abs(v_from_t);
                             const int abs_v_to_t   = abs(v_to_t);
-                            //if(automorphism[abs_v_from_t] == abs_v_from_t)
-                            //    automorphism_supp.push_back(abs_v_from_t);
 
                             aux_automorphism[abs_v_from_t] = abs_v_to_t;
                             aux_automorphism_supp.push_back(abs_v_from_t);
@@ -3057,11 +3046,6 @@ namespace dejavu {
                     assert(from_recovery_string_size == to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
-                        //assert(j <= recovery_strings[orig_v_from].size());
-                        //assert(j <= recovery_strings[orig_v_to].size());
-                        //const int v_from_t = recovery_strings[orig_v_from][j];
-                        //const int v_to_t   = recovery_strings[orig_v_to][j];
-
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
                         const int v_to_t   = baked_recovery_string[to_recovery_string_start_pt + j];
 
@@ -3078,8 +3062,6 @@ namespace dejavu {
                         } else {
                             const int abs_v_from_t = abs(v_from_t);
                             const int abs_v_to_t   = abs(v_to_t);
-                            //if(automorphism[abs_v_from_t] == abs_v_from_t)
-                            //    automorphism_supp.push_back(abs_v_from_t);
 
                             aux_automorphism[abs_v_from_t] = abs_v_to_t;
                             aux_automorphism_supp.push_back(abs_v_from_t);

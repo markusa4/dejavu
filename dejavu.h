@@ -231,7 +231,8 @@ namespace dejavu {
         bool h_decompose = true; /**< use non-uniform component decomposition */
         int  h_base_max_diff     = 5; /**< only allow a base that is at most `h_base_max_diff` times larger than the
                                         *  previous base */
-        bool h_destructive = true; /**< the solver may alter the provided graph upon a call */
+        bool h_prefer_dfs  = false; /**< try to prefer depth-first search as much as reasonably possible */
+        bool h_destructive = true;  /**< the solver may alter the provided graph upon a call */
         bool h_strong_certification = false; /**< use strong certification */
 
         //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed */
@@ -275,6 +276,16 @@ namespace dejavu {
          */
         [[maybe_unused]] void set_true_random(bool use_true_random = true) {
             h_random_use_true_random = use_true_random;
+        }
+
+        /**
+         * Whether to try and use as much depth-first search as possible (potentially changes to structure of the found
+         * generators to a more desirable one).
+         *
+         * @param prefer_dfs (`=true`) whether to prefer depth-first search
+         */
+        [[maybe_unused]] void set_prefer_dfs(bool prefer_dfs = true) {
+            h_prefer_dfs = prefer_dfs;
         }
 
         /**
@@ -614,7 +625,7 @@ namespace dejavu {
 
                     // we first perform a depth-first search, starting from the computed leaf in local_state
                     m_dfs.h_recent_cost_snapshot_limit  = s_long_base ? 0.33 : 0.25; // set up DFS heuristic
-                    //m_dfs.h_recent_cost_snapshot_limit = 1.0;
+                    m_dfs.h_recent_cost_snapshot_limit  = h_prefer_dfs ? 1.0 : m_dfs.h_recent_cost_snapshot_limit;
                     dfs_level = s_last_base_eq ? dfs_level : m_dfs.do_paired_dfs(hook, g, local_state_left, local_state,
                                                                                  m_inprocess.inproc_maybe_individualize,
                                                                                  base_size > 1 || s_restarts > 0);

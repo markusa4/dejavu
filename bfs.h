@@ -100,8 +100,6 @@ namespace dejavu {
                               ir::tree_node* node, const int v, ir::limited_save* last_load) {
                 auto next_node_save = node->get_save();
 
-                // TODO consider base size 1 and top-level automorphisms
-
                 // node is already pruned
                 const bool is_pruned = node->get_prune();
                 if(is_pruned && h_use_deviation_pruning) {
@@ -130,8 +128,10 @@ namespace dejavu {
                     return;
                 }
 
+                constexpr int size_threshold = 1000;
+
                 // do efficient loading if parent is the same as previous load
-                if(next_node_save != last_load || g->v_size < 1000) { // TODO heuristic to check how much has changed
+                if(next_node_save != last_load || g->v_size < size_threshold) { // TODO heuristic to check how much has changed
                     local_state.use_reversible(false); // potentially loads more efficiently
                     local_state.load_reduced_state(*next_node_save);
                 } else {
@@ -146,7 +146,7 @@ namespace dejavu {
 
                 // do computation
                 local_state.reset_trace_equal();
-                local_state.use_reversible(g->v_size >= 1000);
+                local_state.use_reversible(g->v_size >= size_threshold);
                 //local_state.use_reversible(false);
                 local_state.use_trace_early_out(true);
                 local_state.move_to_child(g, v);

@@ -4,6 +4,7 @@
 
 #include "gtest/gtest.h"
 #include "../dejavu.h"
+#include "helper_functions_test.h"
 #include <filesystem>
 
 
@@ -12,13 +13,13 @@ dejavu::groups::orbit orbits2;
 
 [[maybe_unused]] static void orbit1_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                        [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
-    assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
+    assert(dgtest_test_r.certify_automorphism_sparse(&dgtest_graph, p, nsupp, supp));
     orbits1.add_automorphism_to_orbit(p, nsupp, supp);
 }
 
 [[maybe_unused]] static void orbit2_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                               [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
-    assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
+    assert(dgtest_test_r.certify_automorphism_sparse(&dgtest_graph, p, nsupp, supp));
     orbits2.add_automorphism_to_orbit(p, nsupp, supp);
 }
 
@@ -104,7 +105,7 @@ void test_graph_orbit_check(std::string filename) {
     int* colmap = nullptr;
     parse_dimacs(filename, g, &colmap);
 
-    dej_test_graph.copy_graph(g);
+    dgtest_graph.copy_graph(g);
     const int domain_size = g->v_size;
     orbits1.initialize(domain_size);
     orbits2.initialize(domain_size);

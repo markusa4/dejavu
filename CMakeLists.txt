@@ -1,28 +1,24 @@
 cmake_minimum_required(VERSION 3.5)
 project(dejavu)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options("-O3")
 add_compile_options("-Wall")
 add_compile_options("-march=native")
+
 add_definitions(-DNDEBUG)
 set(COMPILE_TEST_SUITE FALSE CACHE BOOL "Whether to compile the test suite")
-#add_definitions(-g)
-#set(COMPILE_TEST_SUITE FALSE)
+#set(COMPILE_TEST_SUITE TRUE)
 
 add_executable(dejavu dejavu.cpp)
 
 if (${COMPILE_TEST_SUITE})
     message("Tests active...")
 
-    # set(CMAKE_C_COMPILER /usr/bin/cc)
-    # set(CMAKE_CXX_COMPILER /usr/bin/c++)
-    # set(COMPILE_FLAGS "--coverage")
-    # set(CMAKE_EXE_LINKER_FLAGS "--coverage")
-
     remove_definitions(-DNDEBUG)
+    add_definitions(-g)
 
     include(FetchContent)
     FetchContent_Declare(

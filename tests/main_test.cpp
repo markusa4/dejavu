@@ -7,8 +7,8 @@
 
 thread_local bool bulk_domain_reset = false;
 
-dejavu::ir::refinement test_r;
-dejavu::sgraph dej_test_graph;
+dejavu::ir::refinement dgtest_test_r;
+dejavu::sgraph         dgtest_graph;
 int*   dej_test_col;
 
 int main(int argc, char **argv) {

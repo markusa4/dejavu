@@ -1715,7 +1715,11 @@ namespace dejavu {
             }
 
             bool check_deviation(unsigned long deviation) {
-                return !deviation_done || deviation_map.contains(deviation);
+                /*if (__cplusplus >= 202002L) {
+                    return !deviation_done || deviation_map.contains(deviation);
+                } else {*/
+                return !deviation_done || deviation_map.find(deviation) != deviation_map.end();
+                //}
             }
         };
 
@@ -1809,9 +1813,9 @@ namespace dejavu {
              * @param ptr
              */
             void add_leaf(unsigned long hash, coloring& c, std::vector<int>& base) {
-
                 // check whether hash already exists
-                if(leaf_store.contains(hash)) return;
+                //if(leaf_store.contains(hash)) return;
+                if(leaf_store.find(hash) != leaf_store.end()) return;
 
                 // if not, add the leaf
                 const bool full_save = s_leaves < h_full_save_limit;
