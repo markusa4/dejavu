@@ -1715,11 +1715,7 @@ namespace dejavu {
             }
 
             bool check_deviation(unsigned long deviation) {
-                /*if (__cplusplus >= 202002L) {
-                    return !deviation_done || deviation_map.contains(deviation);
-                } else {*/
                 return !deviation_done || deviation_map.find(deviation) != deviation_map.end();
-                //}
             }
         };
 

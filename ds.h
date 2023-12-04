@@ -236,7 +236,7 @@ namespace dejavu {
             /**
              * Sort the internal array up to position \a cur_pos.
              */
-            void __attribute__ ((noinline)) sort() {
+            void sort() {
                 sort_t<T>(arr, cur_pos);
             }
 
