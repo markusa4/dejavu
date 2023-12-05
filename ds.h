@@ -409,6 +409,21 @@ namespace dejavu {
         template<class T>
         class workset_t {
         public:
+            /**
+             * Default constructor, does not allocate any memory.
+             */
+            workset_t() = default;
+
+            /**
+             * Constructor that allocates the internal array with size \p size. The allocated memory is not
+             * initialized.
+             *
+             * @param size Size to allocate.
+             */
+            explicit workset_t(int size) {
+                initialize(size);
+            }
+
             void initialize(int size) {
                 s = new T[size];
                 reset_queue.allocate(size);

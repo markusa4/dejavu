@@ -39,7 +39,7 @@ namespace dejavu {
         //inline static preprocessor* save_preprocessor;
         dejavu_hook* saved_hook = nullptr;
 
-        dejavu::timed_print* print;
+        dejavu::timed_print* print = nullptr;
 
         coloring c;
         dejavu::worklist automorphism;
@@ -167,6 +167,177 @@ namespace dejavu {
                 baked_recovery_string_pt.emplace_back(pt_start, pt_end);
             }
             recovery_strings.clear();
+        }
+
+        int twins_partition_refinement(dejavu::sgraph *g, int *colmap, dejavu_hook* hook, bool false_twins) {
+            g->initialize_coloring(&c, colmap);
+            copy_coloring_to_colmap(&c, colmap);
+            del.reset();
+
+            dejavu::ds::worklist neighbour_colors(g->v_size);
+            dejavu::ds::markset  is_neighbour(g->v_size);
+            workset_t<int>       neighbours(g->v_size);
+            workspace            scratch(2*g->v_size);
+
+            int removed_twins = 0;
+
+            for(int refine_with_v = 0; refine_with_v < g->v_size; ++refine_with_v) {
+                const int start_pt = g->v[refine_with_v];
+                const int end_pt   = start_pt + g->d[refine_with_v];
+
+                neighbour_colors.reset();
+                neighbours.reset();
+
+                for(int j = start_pt; j < end_pt; ++j) {
+                    const int neighbour     = g->e[j];
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+
+                    // singletons can not be split, so let's just ignore them
+                    if (c.ptn[neighbour_col] == 0) continue;
+
+                    if(neighbours.get(neighbour_col) == -1) {
+                        neighbour_colors.push_back(neighbour_col);
+                        // neighbours acts as the write position for degree 1 vertices of col in the scratchpad
+                        neighbours.set(neighbour_col, 0);
+                    }
+
+                    // write vertex to scratchpad for later use
+                    assert(2*neighbour_col + neighbours.get(neighbour_col) < 2*g->v_size);
+                    scratch[2*neighbour_col + neighbours.get(neighbour_col)] = neighbour;
+                    neighbours.inc_nr(neighbour_col); // we reset neighbours later, use old_color_classes for reset
+                }
+
+                if(false_twins) {
+                    // do same as above, but for myself
+                    const int neighbour     = refine_with_v;
+                    const int neighbour_col = c.vertex_to_col[neighbour];
+
+                    // singletons can not be split, so let's just ignore them
+                    if (c.ptn[neighbour_col] > 0) {
+                        if (neighbours.get(neighbour_col) == -1) {
+                            neighbour_colors.push_back(neighbour_col);
+                            // neighbours acts as the write position for degree 1 vertices of col in the scratchpad
+                            neighbours.set(neighbour_col, 0);
+                        }
+                        // write vertex to scratchpad for later use
+                        assert(2 * neighbour_col + neighbours.get(neighbour_col) < 2 * g->v_size);
+                        scratch[2 * neighbour_col + neighbours.get(neighbour_col)] = neighbour;
+                        neighbours.inc_nr(neighbour_col);// we reset neighbours later, use old_color_classes for reset
+                    }
+                }
+
+                for(int j = 0; j < neighbour_colors.cur_pos; ++j) {
+                    const int deg0_col    = neighbour_colors[j];
+                    const int deg1_col_sz = neighbours.get(deg0_col); //  - deg0_col
+                    const int deg0_col_sz = (c.ptn[deg0_col] + 1) - deg1_col_sz;
+                    const int deg1_col = deg0_col + deg0_col_sz;
+
+                    // no split? done...
+                    if (deg0_col == deg1_col) {
+                        neighbours.set(deg0_col, -1);
+                        assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
+                        continue;
+                    }
+
+                    // there is a split
+                    ++c.cells;
+
+                    // set ptn
+                    c.ptn[deg0_col] = deg0_col_sz - 1;
+                    c.ptn[deg1_col] = deg1_col_sz - 1;
+                    c.ptn[deg1_col - 1] = 0;
+
+                    int deg1_write_pos = deg1_col;
+                    int deg1_read_pos = 2*deg0_col + neighbours.get(deg0_col) - 1;
+
+                    //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
+
+                    // rearrange vertices of deg1 to the back of deg0 color
+                    assert(deg1_read_pos >= 2*deg0_col);
+
+                    while (deg1_read_pos >= 2*deg0_col) {
+                        assert(deg1_read_pos < 2*g->v_size);
+                        const int v = scratch[deg1_read_pos];
+                        const int vertex_at_pos = c.lab[deg1_write_pos];
+                        const int lab_pos = c.vertex_to_lab[v];
+
+                        c.lab[deg1_write_pos] = v;
+                        c.vertex_to_lab[v] = deg1_write_pos;
+                        c.vertex_to_col[v] = deg1_col;
+
+                        c.lab[lab_pos] = vertex_at_pos;
+                        c.vertex_to_lab[vertex_at_pos] = lab_pos;
+
+                        deg1_write_pos++;
+                        deg1_read_pos--;
+                    }
+
+                    assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
+                    assert(c.vertex_to_col[c.lab[deg1_col]] == deg1_col);
+
+                    // reset neighbours count to -1
+                    neighbours.set(deg0_col, -1);
+                }
+
+                if(c.cells == g->v_size) return removed_twins;
+            }
+
+            for(int i = 0; i < g->v_size;) {
+                const int twin_class    = i;
+                const int twin_class_sz = c.ptn[twin_class] + 1;
+                i += twin_class_sz;
+
+                if(twin_class_sz > 1) {
+                    const int remaining_vertex = c.lab[twin_class];
+                    const int orig_remaining_vertex = translate_back(remaining_vertex);
+                    int group_size_calculation = 2;
+
+                    // remove all but one twin of this class and output transposition automorphisms
+                    for (int j = twin_class + 1; j < twin_class + twin_class_sz; ++j) {
+                        const int vertex = c.lab[j];
+
+                        // multiply group size
+                        multiply_to_group_size(group_size_calculation);
+                        ++group_size_calculation;
+
+                        // transposition of remaining_vertex and vertex
+                        _automorphism[vertex]           = remaining_vertex;
+                        _automorphism[remaining_vertex] = vertex;
+
+                        assert(colmap[vertex] == colmap[remaining_vertex]);
+
+                        _automorphism_supp.push_back(vertex);
+                        _automorphism_supp.push_back(remaining_vertex);
+
+                        pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
+                                 _automorphism_supp.get_array(), hook);
+
+                        reset_automorphism(_automorphism.get_array(), _automorphism_supp.cur_pos,
+                                           _automorphism_supp.get_array());
+                        _automorphism_supp.reset();
+                    }
+
+                    for (int j = twin_class + 1; j < twin_class + twin_class_sz; ++j) {
+                        const int vertex = c.lab[j];
+
+                        // add to recovery string of remaining vertex
+                        const int orig_other = translate_back(vertex);
+                        recovery_strings[orig_remaining_vertex].push_back(orig_other);
+                        for (int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
+                            recovery_strings[orig_remaining_vertex].push_back(recovery_strings[orig_other][k]);
+                        }
+
+                        // remove vertex later
+                        del.set(vertex);
+                        ++removed_twins;
+                    }
+
+                    // color the remaining vertex appropriately with the size of the twin class
+                    colmap[remaining_vertex] = colmap[remaining_vertex] + (twin_class_sz-1);
+                }
+            }
+
+            return removed_twins;
         }
 
         int remove_twins(dejavu::sgraph *g, int *colmap, dejavu_hook* hook) {
@@ -1003,7 +1174,7 @@ namespace dejavu {
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
                     hub_vertex_position[i] = -1;
-                    if(recovery_strings[translate_back(i)].size() > 0) {
+                    if(!recovery_strings[translate_back(i)].empty()) {
                         path_done.set(i); // not ideal...
                     }
                     if(path_done.get(i))
@@ -3153,29 +3324,6 @@ namespace dejavu {
             assert(rem_edges % 2 == 0);
         }
 
-        // counts vertices of degree 0, 1, 2 in g
-        void count_graph_deg(dejavu::sgraph *g, int *deg0, int *deg1, int *deg2) {
-            *deg0 = 0;
-            *deg1 = 0;
-            *deg2 = 0;
-            for (int i = 0; i < g->v_size; ++i) {
-                switch (g->d[i]) {
-                    case 0:
-                        ++*deg0;
-                        break;
-                    case 1:
-                        ++*deg1;
-                        break;
-                    case 2:
-                        ++*deg2;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            // std::cout << *deg0 << ", " << *deg1 << ", " << *deg2 << std::endl;
-        }
-
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
             bool in_order = true;
             for(int i = 0; i < g->v_size-1 && in_order; ++i) in_order = in_order && (colmap[i] <= colmap[i+1]);
@@ -3425,23 +3573,26 @@ namespace dejavu {
 
                         case preop::twins: {
                             // check for twins and mark them for deletion
-                            int s_twins = remove_twins(g, colmap, hook);
+                            //int s_twins = remove_twins(g, colmap, hook);
+                            const int s_twins_true  = twins_partition_refinement(g, colmap, hook, false);
+                            if(s_twins_true > 0) perform_del(g, colmap);
+                            const int s_twins_false = twins_partition_refinement(g, colmap, hook, true);
+                            if(s_twins_false > 0) perform_del(g, colmap);
+                            const int s_twins = s_twins_true + s_twins_false;
 
                             if(s_twins > 0) {
-                                // success! we found twins
-                                perform_del(g, colmap);
-
                                 // might distinguish vertices, so let's apply color refinement again
                                 g->initialize_coloring(&c, colmap);
                                 R_stack.refine_coloring_first(g, &c);
                                 copy_coloring_to_colmap(&c, colmap);
 
-                                if(print) print->timer_print("twins", g->v_size, g->e_size);
                                 assert(_automorphism_supp.cur_pos == 0);
 
                                 // twins can re-activate other routines, so let's start over...
                                 if(s_twins >= 16)  pc = 0;
                             }
+
+                            if(print) print->timer_print("twins", g->v_size, g->e_size);
                             break;
                         }
                         case preop::deg2ue: {

@@ -28,7 +28,7 @@ namespace dejavu {
                 bool comp = true;
                 for(int i = 0; i < n && comp; ++i) {
                     const int v = p[i];
-                    comp = comp && !scratch_set.get(v);
+                    comp = !scratch_set.get(v);
                     scratch_set.set(v);
                 }
                 return comp;
@@ -42,7 +42,7 @@ namespace dejavu {
                     if(scratch_set.get(v)) continue;
                     int v_next = p[v];
                     while(v_next != v && comp) {
-                        comp = comp && !scratch_set.get(v_next);
+                        comp = !scratch_set.get(v_next);
                         scratch_set.set(v_next);
                         v_next = p[v_next];
                     }
