@@ -202,7 +202,7 @@ namespace dejavu {
                     }
 
                     // write vertex to scratchpad for later use
-                    assert(2*neighbour_col + neighbours.get(neighbour_col) < 2*g->v_size);
+                    dej_assert(2*neighbour_col + neighbours.get(neighbour_col) < 2*g->v_size);
                     scratch[2*neighbour_col + neighbours.get(neighbour_col)] = neighbour;
                     neighbours.inc_nr(neighbour_col); // we reset neighbours later, use old_color_classes for reset
                 }
@@ -220,7 +220,7 @@ namespace dejavu {
                             neighbours.set(neighbour_col, 0);
                         }
                         // write vertex to scratchpad for later use
-                        assert(2 * neighbour_col + neighbours.get(neighbour_col) < 2 * g->v_size);
+                        dej_assert(2 * neighbour_col + neighbours.get(neighbour_col) < 2 * g->v_size);
                         scratch[2 * neighbour_col + neighbours.get(neighbour_col)] = neighbour;
                         neighbours.inc_nr(neighbour_col);// we reset neighbours later, use old_color_classes for reset
                     }
@@ -235,7 +235,7 @@ namespace dejavu {
                     // no split? done...
                     if (deg0_col == deg1_col) {
                         neighbours.set(deg0_col, -1);
-                        assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
+                        dej_assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
                         continue;
                     }
 
@@ -253,10 +253,10 @@ namespace dejavu {
                     //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
 
                     // rearrange vertices of deg1 to the back of deg0 color
-                    assert(deg1_read_pos >= 2*deg0_col);
+                    dej_assert(deg1_read_pos >= 2*deg0_col);
 
                     while (deg1_read_pos >= 2*deg0_col) {
-                        assert(deg1_read_pos < 2*g->v_size);
+                        dej_assert(deg1_read_pos < 2*g->v_size);
                         const int v = scratch[deg1_read_pos];
                         const int vertex_at_pos = c.lab[deg1_write_pos];
                         const int lab_pos = c.vertex_to_lab[v];
@@ -272,8 +272,8 @@ namespace dejavu {
                         deg1_read_pos--;
                     }
 
-                    assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
-                    assert(c.vertex_to_col[c.lab[deg1_col]] == deg1_col);
+                    dej_assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
+                    dej_assert(c.vertex_to_col[c.lab[deg1_col]] == deg1_col);
 
                     // reset neighbours count to -1
                     neighbours.set(deg0_col, -1);
@@ -304,7 +304,7 @@ namespace dejavu {
                         _automorphism[vertex]           = remaining_vertex;
                         _automorphism[remaining_vertex] = vertex;
 
-                        assert(colmap[vertex] == colmap[remaining_vertex]);
+                        dej_assert(colmap[vertex] == colmap[remaining_vertex]);
 
                         _automorphism_supp.push_back(vertex);
                         _automorphism_supp.push_back(remaining_vertex);
@@ -410,7 +410,7 @@ namespace dejavu {
                         if(potential_twin_counter[other_vertex] < g->d[vertex] - 1) continue;
                         if(vertex == other_vertex || del.get(other_vertex) ||
                                 c.vertex_to_col[other_vertex] != c.vertex_to_col[vertex]) continue;
-                        assert(g->d[vertex] == g->d[other_vertex]);
+                        dej_assert(g->d[vertex] == g->d[other_vertex]);
                         for(int k = 0; k < g->d[other_vertex]; ++k) {
                             const int neighbour = g->e[g->v[other_vertex] + k];
                             if(neighbour == vertex) continue;
@@ -423,7 +423,7 @@ namespace dejavu {
                         if(is_twin) {
                             ++s_twins;
                             ++twin_counter[vertex];
-                            assert(vertex != other_vertex);
+                            dej_assert(vertex != other_vertex);
                             ++twin_class_sz;
                             multiply_to_group_size(twin_class_sz);
                             del.set(other_vertex);
@@ -443,15 +443,15 @@ namespace dejavu {
                         }
                     }
 
-                    assert(!del.get(vertex));
-                    assert(twin_class_sz -1 == static_cast<int>(add_to_string.size()));
-                    assert(twin_counter[vertex] == static_cast<int>(add_to_string.size()));
+                    dej_assert(!del.get(vertex));
+                    dej_assert(twin_class_sz -1 == static_cast<int>(add_to_string.size()));
+                    dej_assert(twin_counter[vertex] == static_cast<int>(add_to_string.size()));
                     const int orig_vertex = translate_back(vertex);
                     [[maybe_unused]] int debug_sz = (int) recovery_strings[orig_vertex].size();
                     for(auto& other_vertex : add_to_string) {
-                        assert(del.get(other_vertex));
+                        dej_assert(del.get(other_vertex));
                         const int orig_other  = translate_back(other_vertex);
-                        assert(debug_sz == static_cast<int>(recovery_strings[orig_other].size()));
+                        dej_assert(debug_sz == static_cast<int>(recovery_strings[orig_other].size()));
                         recovery_strings[orig_vertex].push_back(orig_other);
                         for(int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
                             recovery_strings[orig_vertex].push_back(recovery_strings[orig_other][k]);
@@ -463,7 +463,7 @@ namespace dejavu {
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = c.lab[color + j];
                     if(!del.get(vertex)) {
-                        assert(colmap[vertex] + twin_counter[vertex] < color + color_size);
+                        dej_assert(colmap[vertex] + twin_counter[vertex] < color + color_size);
                         colmap[vertex] = color + twin_counter[vertex];
                         add_to_string.push_back(vertex);
                     }
@@ -635,13 +635,13 @@ namespace dejavu {
 
                         for (int f = 0; f < c.ptn[i] + 1; ++f) {
                             const int _test_v = c.lab[i + f];
-                            assert(g->d[_test_v] == 2);
+                            dej_assert(g->d[_test_v] == 2);
                             const int _n1 = g->e[g->v[_test_v] + 0];
                             const int _n2 = g->e[g->v[_test_v] + 1];
                             worklist_deg1[_n1] = _n2;
                             worklist_deg1[_n2] = _n1;
                             for (size_t t = 0; t < add_edge_buff[_n2].size(); ++t)
-                                assert(add_edge_buff[_n2][t] != _n1);
+                                dej_assert(add_edge_buff[_n2][t] != _n1);
                             add_edge_buff[_n2].push_back(_n1);
                             add_edge_buff_act.set(_n2);
                             add_edge_buff[_n1].push_back(_n2);
@@ -772,7 +772,7 @@ namespace dejavu {
                 current_vertex = next_vertex;
             }
 
-            assert(g->d[current_vertex] != 2);
+            dej_assert(g->d[current_vertex] != 2);
             return current_vertex;
         }
 
@@ -832,9 +832,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n1);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n1 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n1);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n1 != other_endpoint.first);
                         ++total_paths;
                     } else if(g->d[n2] != 2) {
                         const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
@@ -847,9 +847,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n2);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n2 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n2);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n2 != other_endpoint.first);
                         ++total_paths;
                     }
                 }
@@ -866,7 +866,7 @@ namespace dejavu {
                 const int endpoints   = endpoint_cnt[test_vertex];
 
                 for(int j = 0; j < color_size; ++j) {
-                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
+                    dej_assert(endpoint_cnt[c.lab[color + j]] == endpoints);
                 }
 
                 if(endpoints == 0) continue;
@@ -971,17 +971,17 @@ namespace dejavu {
                             const int pos = color_pos[neighbour_col];
                             path_list[pos] = neighbour;
                             ++sanity_check;
-                            assert(!color_test.get(neighbour_col));
+                            dej_assert(!color_test.get(neighbour_col));
                             color_test.set(neighbour_col);
                         }
                     }
 
-                    assert(sanity_check == num_paths);
+                    dej_assert(sanity_check == num_paths);
 
                     for(int k = 0; k < num_paths; ++k) {
                         reduced_verts = 0;
                         const int path_start_vertex = path_list[k];
-                        assert(g->d[path_start_vertex] == 2);
+                        dej_assert(g->d[path_start_vertex] == 2);
                         if(path_done.get(path_start_vertex)) {
                             continue;
                         }
@@ -990,23 +990,23 @@ namespace dejavu {
                         path.reset();
                         const int other_endpoint =
                                 walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
-                        assert(path.cur_pos > 0);
-                        assert(vertex != other_endpoint);
-                        assert(other_endpoint != path_start_vertex);
+                        dej_assert(path.cur_pos > 0);
+                        dej_assert(vertex != other_endpoint);
+                        dej_assert(other_endpoint != path_start_vertex);
 
                         // mark path for deletion
                         for(int l = 0; l < path.cur_pos; ++l) {
                             const int del_v = path[l];
-                            assert(g->d[del_v] == 2);
-                            assert(!del.get(del_v));
+                            dej_assert(g->d[del_v] == 2);
+                            dej_assert(!del.get(del_v));
                             del.set(del_v);
-                            assert(!path_done.get(del_v));
+                            dej_assert(!path_done.get(del_v));
                             path_done.set(del_v);
                             ++total_deleted_vertices;
                         }
 
                         // connect endpoints of path with new edge
-                        assert(!is_adjacent(g, vertex, other_endpoint));
+                        dej_assert(!is_adjacent(g, vertex, other_endpoint));
                         add_edge_buff[other_endpoint].push_back(vertex);
                         add_edge_buff_act.set(other_endpoint);
                         add_edge_buff[vertex].push_back(other_endpoint);
@@ -1019,11 +1019,11 @@ namespace dejavu {
                         recovery_strings[unique_endpoint_orig].reserve(
                                 2*(recovery_strings[unique_endpoint_orig].size() + path.cur_pos));
                         for (int l = 0; l < path.cur_pos; ++l) {
-                            assert(path[l] >= 0);
-                            assert(path[l] < g->v_size);
+                            dej_assert(path[l] >= 0);
+                            dej_assert(path[l] < g->v_size);
                             const int path_v_orig = translate_back(path[l]);
-                            assert(path_v_orig >= 0);
-                            assert(path_v_orig < domain_size);
+                            dej_assert(path_v_orig >= 0);
+                            dej_assert(path_v_orig < domain_size);
                             recovery_strings[unique_endpoint_orig].push_back(path_v_orig);
                             recovery_strings[unique_endpoint_orig].insert(
                                     recovery_strings[unique_endpoint_orig].end(),
@@ -1035,7 +1035,7 @@ namespace dejavu {
                     reduced_verts = static_cast<int>(recovery_strings[translate_back(vertex)].size());
 
                     if(j > 0) {
-                        assert(reduced_verts == reduced_verts_last);
+                        dej_assert(reduced_verts == reduced_verts_last);
                     }
                     reduced_verts_last = reduced_verts;
                 }
@@ -1053,7 +1053,7 @@ namespace dejavu {
          */
         void recovery_attach_to_edge(int v1, int v2, std::vector<int>& recovery) {
             const int pos = static_cast<int>(recovery_edge_attached.size());
-            assert(recovery.size() != 0);
+            dej_assert(recovery.size() != 0);
             const int len = static_cast<int>(recovery.size());
             ++edge_attached_information;
             if(len == 1) {
@@ -1087,20 +1087,20 @@ namespace dejavu {
                 const int other = std::get<0>(j);
                 const int id    = std::get<1>(j);
 
-                assert(other != v);
+                dej_assert(other != v);
                 const int other_map = automorphism[other];
 
                 (*help_array2)[other_map] = id;
             }
 
-            assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
+            dej_assert(recovery_edge_adjacent[v].size() == recovery_edge_adjacent[v_map].size());
 
             for(auto & j : recovery_edge_adjacent[v_map]) {
                 const int other_map = std::get<0>(j);
                 const int id        = std::get<1>(j);
                 const int len       = std::get<2>(j);
 
-                assert(other_map != v_map);
+                dej_assert(other_map != v_map);
                 const int orig_id = (*help_array2)[other_map];
                 if(id == orig_id) continue;
 
@@ -1193,9 +1193,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n1);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n1 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n1);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n1 != other_endpoint.first);
                         ++total_paths;
                     } else if(g->d[n2] != 2) {
                         const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
@@ -1208,9 +1208,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n2);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n2 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n2);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n2 != other_endpoint.first);
                         ++total_paths;
                     }
                 }
@@ -1232,7 +1232,7 @@ namespace dejavu {
                 const int endpoints   = endpoint_cnt[test_vertex];
 
                 for(int j = 0; j < color_size; ++j) {
-                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
+                    dej_assert(endpoint_cnt[c.lab[color + j]] == endpoints);
                 }
 
                 // only want to look at endpoints of paths
@@ -1246,7 +1246,7 @@ namespace dejavu {
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
 
-                    assert(g->d[neighbour] == 2);
+                    dej_assert(g->d[neighbour] == 2);
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     if(color_test.get(neighbour_col) && !path_done.get(neighbour)) {
                         ++color_deg[neighbour_col];
@@ -1264,7 +1264,7 @@ namespace dejavu {
                     const int endpt_test_vertex = c.lab[color + j];
                     duplicate_endpoints.reset();
                     duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
-                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    dej_assert(endpoint_cnt[endpt_test_vertex] == endpoints);
                     for (int k = 0; k < endpoints; ++k) {
                         const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
                         if(duplicate_endpoints.get(endpoint)) {
@@ -1283,10 +1283,10 @@ namespace dejavu {
                 // Filter to indices with non-unique colors
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
-                    assert(g->d[neighbour] == 2);
+                    dej_assert(g->d[neighbour] == 2);
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     const int endpoint     = connected_endpoints[g->v[test_vertex] + j];
-                    assert(g->d[endpoint] != 2);
+                    dej_assert(g->d[endpoint] != 2);
                     const int endpoint_col = c.vertex_to_col[endpoint];
                     const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
                     if(color_unique.get(neighbour_col) && color != endpoint_col &&
@@ -1331,18 +1331,18 @@ namespace dejavu {
                         if(color_unique.get(neighbour_col)) {
                             const int pos = color_pos[neighbour_col] + color_deg[neighbour_col];
                             path_list[pos] = neighbour;
-                            assert(g->d[neighbour] == 2);
+                            dej_assert(g->d[neighbour] == 2);
                             color_canonical_v[neighbour_col] = neighbour; // "hub vertex" used to emulate all the paths
                             ++color_deg[neighbour_col];
                             ++sanity_check_num_paths;
                         }
                     }
 
-                    assert(num_paths == sanity_check_num_paths);
+                    dej_assert(num_paths == sanity_check_num_paths);
 
                     for(int k = 0; k < num_paths; ++k) {
                         const int path_start_vertex = path_list[k];
-                        assert(g->d[path_start_vertex] == 2);
+                        dej_assert(g->d[path_start_vertex] == 2);
                         if(path_done.get(path_start_vertex)) {
                             continue;
                         }
@@ -1350,28 +1350,28 @@ namespace dejavu {
                         // get path and endpoint
                         path.reset();
                         const int other_endpoint = walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
-                        assert(path.cur_pos > 0);
-                        assert(vertex != other_endpoint);
-                        assert(other_endpoint != path_start_vertex);
+                        dej_assert(path.cur_pos > 0);
+                        dej_assert(vertex != other_endpoint);
+                        dej_assert(other_endpoint != path_start_vertex);
 
 
                         const int hub_vertex = color_canonical_v[c.vertex_to_col[path_start_vertex]];
-                        assert(hub_vertex >= 0);
-                        assert(!del.get(hub_vertex));
-                        assert(g->d[hub_vertex] == 2);
-                        assert(is_adjacent(g, hub_vertex, vertex));
+                        dej_assert(hub_vertex >= 0);
+                        dej_assert(!del.get(hub_vertex));
+                        dej_assert(g->d[hub_vertex] == 2);
+                        dej_assert(is_adjacent(g, hub_vertex, vertex));
 
                         // mark path for deletion
                         for(int l = 0; l < path.cur_pos; ++l) {
                             const int del_v = path[l];
-                            assert(g->d[del_v] == 2);
-                            assert(!del.get(del_v));
+                            dej_assert(g->d[del_v] == 2);
+                            dej_assert(!del.get(del_v));
                             del.set(del_v);
-                            assert(!path_done.get(del_v));
+                            dej_assert(!path_done.get(del_v));
                             path_done.set(del_v);
                         }
                         del.unset(hub_vertex); // don't delete canonical vertex
-                        assert(!del.get(hub_vertex));
+                        dej_assert(!del.get(hub_vertex));
 
                         // connect endpoints of path to hub vertex (the canonical vertex)
                         // make sure not do double up on hub_vertex original path
@@ -1393,14 +1393,14 @@ namespace dejavu {
 
                         std::vector<int> recovery;
                         for (int l = 0; l < path.cur_pos; ++l) {
-                            assert(path[l] >= 0);
-                            assert(path[l] < g->v_size);
+                            dej_assert(path[l] >= 0);
+                            dej_assert(path[l] < g->v_size);
                             const int path_v_orig = translate_back(path[l]);
                             //if(hub_vertex_orig == path_v_orig) continue;
-                            assert(path_v_orig >= 0);
-                            assert(path_v_orig < domain_size);
+                            dej_assert(path_v_orig >= 0);
+                            dej_assert(path_v_orig < domain_size);
                             recovery.push_back(path_v_orig);
-                            assert(path_v_orig != hub_vertex_orig? recovery_strings[path_v_orig].size() == 0: true);
+                            dej_assert(path_v_orig != hub_vertex_orig? recovery_strings[path_v_orig].size() == 0: true);
                         }
 
                         recovery_attach_to_edge(translate_back(vertex), translate_back(other_endpoint), recovery);
@@ -1452,9 +1452,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n1);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n1 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n1);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n1 != other_endpoint.first);
                         ++total_paths;
                     }
                 }
@@ -1476,7 +1476,7 @@ namespace dejavu {
                 const int endpoints   = endpoint_cnt[test_vertex];
 
                 for(int j = 0; j < color_size; ++j) {
-                    assert(endpoint_cnt[c.lab[color + j]] == endpoints);
+                    dej_assert(endpoint_cnt[c.lab[color + j]] == endpoints);
                 }
 
                 // only want to look at endpoints of paths
@@ -1490,8 +1490,8 @@ namespace dejavu {
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
                     const int endpoint      = connected_endpoints[g->v[test_vertex] + j];
-                    assert(g->d[endpoint] != 2);
-                    assert(g->d[neighbour] == 2);
+                    dej_assert(g->d[endpoint] != 2);
+                    dej_assert(g->d[neighbour] == 2);
                     const int endpoint_col = c.vertex_to_col[endpoint];
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     if(!path_done.get(neighbour) && endpoint_col == color) {
@@ -1521,14 +1521,14 @@ namespace dejavu {
                     const int endpt_test_vertex = c.lab[color + j];
                     duplicate_endpoints.reset();
                     duplicate_endpoints.set(endpt_test_vertex); // no self-loops! tricky case
-                    assert(endpoint_cnt[endpt_test_vertex] == endpoints);
+                    dej_assert(endpoint_cnt[endpt_test_vertex] == endpoints);
                     for (int k = 0; k < endpoints; ++k) {
                         const int neighbour = connected_paths[g->v[endpt_test_vertex] + k];
                         const int neighbour_col = c.vertex_to_col[neighbour];
                         if(neighbour_col != relevant_neighbour_color) continue;
-                        assert(g->d[neighbour] == 2);
+                        dej_assert(g->d[neighbour] == 2);
                         const int endpoint = connected_endpoints[g->v[endpt_test_vertex] + k];
-                        assert(c.vertex_to_col[endpoint] == color);
+                        dej_assert(c.vertex_to_col[endpoint] == color);
                         if(duplicate_endpoints.get(endpoint)) {
                             duplicate_endpoint_flag = true;
                             break;
@@ -1545,10 +1545,10 @@ namespace dejavu {
                 // Filter to indices with non-unique colors
                 for(int j = 0; j < endpoints; ++j) {
                     const int neighbour     = connected_paths[g->v[test_vertex] + j];
-                    assert(g->d[neighbour] == 2);
+                    dej_assert(g->d[neighbour] == 2);
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     if(neighbour_col == relevant_neighbour_color) { // if unique
-                        assert(neighbour_col == relevant_neighbour_color);
+                        dej_assert(neighbour_col == relevant_neighbour_color);
                         filter.push_back(j); // add index to filter
                     }
                 }
@@ -1572,17 +1572,17 @@ namespace dejavu {
                         if(neighbour_col == relevant_neighbour_color) {
                             const int pos = next_pos;
                             path_list[pos] = neighbour;
-                            assert(g->d[neighbour] == 2);
+                            dej_assert(g->d[neighbour] == 2);
                             ++next_pos;
                             ++sanity_check_num_paths;
                         }
                     }
 
-                    assert(num_paths == sanity_check_num_paths);
+                    dej_assert(num_paths == sanity_check_num_paths);
 
                     for(int k = 0; k < num_paths; ++k) {
                         const int path_start_vertex = path_list[k];
-                        assert(g->d[path_start_vertex] == 2);
+                        dej_assert(g->d[path_start_vertex] == 2);
                         if(path_done.get(path_start_vertex)) {
                             continue;
                         }
@@ -1590,17 +1590,17 @@ namespace dejavu {
                         // get path and endpoint
                         path.reset();
                         const int other_endpoint = walk_to_endpoint_collect_path(g, path_start_vertex, vertex, &path);
-                        assert(path.cur_pos > 0);
-                        assert(vertex != other_endpoint);
-                        assert(other_endpoint != path_start_vertex);
+                        dej_assert(path.cur_pos > 0);
+                        dej_assert(vertex != other_endpoint);
+                        dej_assert(other_endpoint != path_start_vertex);
 
                         // mark path for deletion
                         for(int l = 0; l < path.cur_pos; ++l) {
                             const int del_v = path[l];
-                            assert(g->d[del_v] == 2);
-                            assert(!del.get(del_v));
+                            dej_assert(g->d[del_v] == 2);
+                            dej_assert(!del.get(del_v));
                             del.set(del_v);
-                            assert(!path_done.get(del_v));
+                            dej_assert(!path_done.get(del_v));
                             path_done.set(del_v);
                         }
 
@@ -1616,11 +1616,11 @@ namespace dejavu {
                         // write path into recovery_strings
                         std::vector<int> recovery;
                         for (int l = 0; l < path.cur_pos; ++l) {
-                            assert(path[l] >= 0);
-                            assert(path[l] < g->v_size);
+                            dej_assert(path[l] >= 0);
+                            dej_assert(path[l] < g->v_size);
                             const int path_v_orig = translate_back(path[l]);
-                            assert(path_v_orig >= 0);
-                            assert(path_v_orig < domain_size);
+                            dej_assert(path_v_orig >= 0);
+                            dej_assert(path_v_orig < domain_size);
                             recovery.push_back(path_v_orig);
                             for(int f = 0; f < static_cast<int>(recovery_strings[path_v_orig].size()); ++f) {
                                 recovery.push_back(recovery_strings[path_v_orig][f]);
@@ -1736,9 +1736,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n1;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n1);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n1 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n1);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n1 != other_endpoint.first);
                     } else if(g->d[n2] != 2) {
                         const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
                         if(other_endpoint.first == n2) // big self-loop
@@ -1750,9 +1750,9 @@ namespace dejavu {
                                 other_endpoint.second;
                         connected_endpoints[g->v[other_endpoint.first] + endpoint_cnt[other_endpoint.first]] = n2;
                         ++endpoint_cnt[other_endpoint.first];
-                        assert(other_endpoint.first != n2);
-                        assert(g->d[other_endpoint.first] != 2);
-                        assert(n2 != other_endpoint.first);
+                        dej_assert(other_endpoint.first != n2);
+                        dej_assert(g->d[other_endpoint.first] != 2);
+                        dej_assert(n2 != other_endpoint.first);
                     }
                 }
             }
@@ -1791,8 +1791,8 @@ namespace dejavu {
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     if (color_unique.get(neighbour_col)) { // if not unique
                         not_unique.push_back(neighbour);
-                        assert(connected_endpoints[g->v[test_vertex] + j] >= 0);
-                        assert(connected_endpoints[g->v[test_vertex] + j] < g->v_size);
+                        dej_assert(connected_endpoints[g->v[test_vertex] + j] >= 0);
+                        dej_assert(connected_endpoints[g->v[test_vertex] + j] < g->v_size);
                         not_unique.push_back(connected_endpoints[g->v[test_vertex] + j]);
                     }
                 }
@@ -1848,8 +1848,8 @@ namespace dejavu {
                                 const int path_col = c.vertex_to_col[neighbour];
                                 [[maybe_unused]] const int path_col_sz = c.ptn[path_col] + 1;
                                 [[maybe_unused]] const int connects_to = not_unique_analysis[endpoint_col];
-                                assert(path_col_sz == (connects_to * color_size));
-                                assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
+                                dej_assert(path_col_sz == (connects_to * color_size));
+                                dej_assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
 
 
                                 int endpoint_neighbour_col = -1;
@@ -1889,10 +1889,10 @@ namespace dejavu {
                                         // mark path for deletion
                                         for (int l = 0; l < path.cur_pos; ++l) {
                                             const int del_v = path[l];
-                                            assert(g->d[del_v] == 2);
-                                            assert(!del.get(del_v));
+                                            dej_assert(g->d[del_v] == 2);
+                                            dej_assert(!del.get(del_v));
                                             del.set(del_v);
-                                            assert(!path_done.get(del_v));
+                                            dej_assert(!path_done.get(del_v));
                                             path_done.set(del_v);
                                         }
 
@@ -1904,11 +1904,11 @@ namespace dejavu {
                                                 recovery_strings[vert_orig].size() +
                                                 path.cur_pos);
                                         for (int l = 0; l < path.cur_pos; ++l) {
-                                            assert(path[l] >= 0);
-                                            assert(path[l] < g->v_size);
+                                            dej_assert(path[l] >= 0);
+                                            dej_assert(path[l] < g->v_size);
                                             const int path_v_orig = translate_back(path[l]);
-                                            assert(path_v_orig >= 0);
-                                            assert(path_v_orig < domain_size);
+                                            dej_assert(path_v_orig >= 0);
+                                            dej_assert(path_v_orig < domain_size);
                                             recovery_strings[vert_orig].push_back(path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
                                                 recovery_strings[vert_orig].push_back(
@@ -1923,11 +1923,11 @@ namespace dejavu {
                                                 recovery_strings[endpoint_orig].size() +
                                                 path.cur_pos);
                                         for (int l = 0; l < path.cur_pos; ++l) {
-                                            assert(path[l] >= 0);
-                                            assert(path[l] < g->v_size);
+                                            dej_assert(path[l] >= 0);
+                                            dej_assert(path[l] < g->v_size);
                                             const int path_v_orig = translate_back(path[l]);
-                                            assert(path_v_orig >= 0);
-                                            assert(path_v_orig < domain_size);
+                                            dej_assert(path_v_orig >= 0);
+                                            dej_assert(path_v_orig < domain_size);
                                             recovery_strings[endpoint_orig].push_back(-path_v_orig);
                                             for(size_t rsi = 0; rsi < recovery_strings[path_v_orig].size(); ++rsi) {
                                                 recovery_strings[endpoint_orig].push_back(
@@ -1935,7 +1935,7 @@ namespace dejavu {
                                             }
                                         }
 
-                                        assert(c.vertex_to_col[_endpoint] == endpoint_col);
+                                        dej_assert(c.vertex_to_col[_endpoint] == endpoint_col);
                                     }
                                 }
                             }
@@ -1976,7 +1976,7 @@ namespace dejavu {
             dejavu::worklist_t<std::pair<int, int>> stack1(g->v_size);
             dejavu::worklist map(g->v_size);
 
-            assert(_automorphism_supp.cur_pos == 0);
+            dej_assert(_automorphism_supp.cur_pos == 0);
 
             g->initialize_coloring(&c, colmap);
             for (int i = 0; i < c.domain_size;) {
@@ -2029,7 +2029,7 @@ namespace dejavu {
                             parent = g->e[e_pos_child + search_parent];
                         }
 
-                        assert(is_pairs ? c.vertex_to_col[parent] == c.vertex_to_col[child] : true);
+                        dej_assert(is_pairs ? c.vertex_to_col[parent] == c.vertex_to_col[child] : true);
                         if (c.vertex_to_col[parent] == c.vertex_to_col[child]) {
                             is_pairs = true;
                             del.set(child);
@@ -2065,7 +2065,7 @@ namespace dejavu {
                             worklist_deg0.push_back(parent);
                         }
 
-                        assert(g_old_v[parent] >= 0);
+                        dej_assert(g_old_v[parent] >= 0);
                     }
                 }
 
@@ -2089,7 +2089,7 @@ namespace dejavu {
                                 const int from_next = g->v[next];
                                 const int to_next = g->v[next] + childcount[next];
                                 map.push_back(next);
-                                assert(next != pair_to);
+                                dej_assert(next != pair_to);
                                 if (from_next != to_next)
                                     stack1.push_back(std::pair<int, int>(from_next, to_next));
                             }
@@ -2097,18 +2097,18 @@ namespace dejavu {
 
                         multiply_to_group_size(2);
 
-                        assert(c.vertex_to_col[pair_from] == c.vertex_to_col[pair_to]);
-                        assert(pair_from != pair_to);
+                        dej_assert(c.vertex_to_col[pair_from] == c.vertex_to_col[pair_to]);
+                        dej_assert(pair_from != pair_to);
                         int pos = 0;
 
                         //automorphism_supp.reset();
                         // descending shared_tree of child_to while writing automorphism
                         stack1.reset();
-                        assert(map[pos] != pair_to);
+                        dej_assert(map[pos] != pair_to);
                         const int v_to_1   = pair_to;
                         const int v_from_1 = map[pos];
-                        assert(automorphism[v_to_1] == v_to_1);
-                        assert(automorphism[v_from_1] == v_from_1);
+                        dej_assert(automorphism[v_to_1] == v_to_1);
+                        dej_assert(automorphism[v_from_1] == v_from_1);
 
                         _automorphism[v_from_1] = v_to_1;
                         _automorphism[v_to_1] = v_from_1;
@@ -2117,7 +2117,7 @@ namespace dejavu {
 
                         ++pos;
                         // child_to and child_from could have canonical strings when translated back
-                        assert(childcount[pair_to] == childcount[pair_from]);
+                        dej_assert(childcount[pair_to] == childcount[pair_from]);
                         stack1.push_back(std::pair<int, int>(g->v[pair_to], g->v[pair_to] + childcount[pair_to]));
                         while (!stack1.empty()) {
                             std::pair<int, int> from_to = stack1.pop_back();
@@ -2129,15 +2129,15 @@ namespace dejavu {
                                 const int from_next = g->v[next];
                                 const int to_next = g->v[next] + childcount[next];
                                 ++from;
-                                assert(next >= 0);
-                                assert(next < g->v_size);
-                                assert(map[pos] != next);
+                                dej_assert(next >= 0);
+                                dej_assert(next < g->v_size);
+                                dej_assert(map[pos] != next);
 
                                 const int v_to_2 = next;
                                 const int v_from_2 = map[pos];
 
-                                assert(_automorphism[v_to_2] == v_to_2);
-                                assert(_automorphism[v_from_2] == v_from_2);
+                                dej_assert(_automorphism[v_to_2] == v_to_2);
+                                dej_assert(_automorphism[v_from_2] == v_from_2);
                                 _automorphism[v_from_2] = v_to_2;
                                 _automorphism[v_to_2] = v_from_2;
                                 _automorphism_supp.push_back(v_from_2);
@@ -2149,12 +2149,12 @@ namespace dejavu {
                             }
                         }
 
-                        assert(pos == map.cur_pos);
+                        dej_assert(pos == map.cur_pos);
 
-                        assert(g_old_v[pair_to] == 1);
-                        assert(g_old_v[pair_from] == 1);
-                        assert(del.get(pair_to));
-                        assert(del.get(pair_from));
+                        dej_assert(g_old_v[pair_to] == 1);
+                        dej_assert(g_old_v[pair_from] == 1);
+                        dej_assert(del.get(pair_to));
+                        dej_assert(del.get(pair_from));
 
                         pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
                                  _automorphism_supp.get_array(), hook);
@@ -2215,7 +2215,7 @@ namespace dejavu {
                         childcount_to = parentlist.cur_pos;
                     }
                     // automorphism 1: long cycle (c1 ... cn)
-                    assert(childcount_to - childcount_from > 0);
+                    dej_assert(childcount_to - childcount_from > 0);
                     if (childcount_to - childcount_from == 1) {
                         if (permute_parents_instead)
                             break;
@@ -2243,7 +2243,7 @@ namespace dejavu {
                             const int from_next = g->v[next];
                             const int to_next = g->v[next] + childcount[next];
                             map.push_back(next);
-                            assert(next != parent);
+                            dej_assert(next != parent);
                             if (from_next != to_next)
                                 stack1.push_back(std::pair<int, int>(from_next, to_next));
                         }
@@ -2259,20 +2259,20 @@ namespace dejavu {
                         } else {
                             child_to = parentlist[i];
                         }
-                        assert(c.vertex_to_col[child_from] == c.vertex_to_col[child_to]);
-                        assert(child_from != child_to);
+                        dej_assert(c.vertex_to_col[child_from] == c.vertex_to_col[child_to]);
+                        dej_assert(child_from != child_to);
                         int pos = 0;
 
                         _automorphism_supp.reset();
 
                         // descending shared_tree of child_to while writing automorphism
                         stack1.reset();
-                        assert(map[pos] != child_to);
+                        dej_assert(map[pos] != child_to);
 
                         const int v_to_1 = child_to;
                         const int v_from_1 = map[pos];
-                        assert(_automorphism[v_to_1] == v_to_1);
-                        assert(_automorphism[v_from_1] == v_from_1);
+                        dej_assert(_automorphism[v_to_1] == v_to_1);
+                        dej_assert(_automorphism[v_from_1] == v_from_1);
                         _automorphism[v_from_1] = v_to_1;
                         _automorphism[v_to_1] = v_from_1;
                         _automorphism_supp.push_back(v_from_1);
@@ -2280,7 +2280,7 @@ namespace dejavu {
 
                         ++pos;
                         // child_to and child_from could have canonical strings when translated back
-                        assert(childcount[child_to] == childcount[child_from]);
+                        dej_assert(childcount[child_to] == childcount[child_from]);
                         stack1.push_back(std::pair<int, int>(g->v[child_to], g->v[child_to] + childcount[child_to]));
                         while (!stack1.empty()) {
                             std::pair<int, int> from_to = stack1.pop_back();
@@ -2292,14 +2292,14 @@ namespace dejavu {
                                 const int from_next = g->v[next];
                                 const int to_next = g->v[next] + childcount[next];
                                 ++from;
-                                assert(next >= 0);
-                                assert(next < g->v_size);
-                                assert(map[pos] != next);
+                                dej_assert(next >= 0);
+                                dej_assert(next < g->v_size);
+                                dej_assert(map[pos] != next);
 
                                 const int v_to_2 = next;
                                 const int v_from_2 = map[pos];
-                                assert(_automorphism[v_to_2] == v_to_2);
-                                assert(_automorphism[v_from_2] == v_from_2);
+                                dej_assert(_automorphism[v_to_2] == v_to_2);
+                                dej_assert(_automorphism[v_from_2] == v_from_2);
                                 _automorphism[v_from_2] = v_to_2;
                                 _automorphism[v_to_2] = v_from_2;
                                 _automorphism_supp.push_back(v_from_2);
@@ -2311,11 +2311,11 @@ namespace dejavu {
                             }
                         }
 
-                        assert(pos == map.cur_pos);
-                        assert(g_old_v[child_to] == 1);
-                        assert(g_old_v[child_from] == 1);
-                        assert(del.get(child_to));
-                        assert(del.get(child_from));
+                        dej_assert(pos == map.cur_pos);
+                        dej_assert(g_old_v[child_to] == 1);
+                        dej_assert(g_old_v[child_from] == 1);
+                        dej_assert(del.get(child_to));
+                        dej_assert(del.get(child_from));
 
                         pre_hook(g->v_size, _automorphism.get_array(), _automorphism_supp.cur_pos,
                                  _automorphism_supp.get_array(), hook);
@@ -2357,8 +2357,8 @@ namespace dejavu {
                                 recovery_strings[orig_i].push_back(orig_next);
                                 // write canonical recovery string of orig_next into orig_i, since it is now represented by
                                 // orig_i
-                                assert(next != _i);
-                                assert(orig_next != orig_i);
+                                dej_assert(next != _i);
+                                dej_assert(orig_next != orig_i);
                                 for (size_t j = 0; j < recovery_strings[orig_next].size(); ++j)
                                     recovery_strings[orig_i].push_back(
                                             recovery_strings[orig_next][j]);
@@ -2375,7 +2375,7 @@ namespace dejavu {
                 const int v_child = worklist_deg0.pop_back();
                 if (del.get(v_child))
                     continue;
-                assert(g_old_v[v_child] == 0);
+                dej_assert(g_old_v[v_child] == 0);
 
                 is_parent.reset();
                 const int v_child_col = c.vertex_to_col[v_child];
@@ -2390,12 +2390,12 @@ namespace dejavu {
                     multiply_to_group_size(j);
                     ++j;
                     const int parent_to = c.lab[i];
-                    assert(g_old_v[parent_to] == 0);
+                    dej_assert(g_old_v[parent_to] == 0);
                     del.set(parent_to);
 
-                    assert(parent_from != parent_to);
+                    dej_assert(parent_from != parent_to);
 
-                    assert(_automorphism_supp.cur_pos == 0);
+                    dej_assert(_automorphism_supp.cur_pos == 0);
 
                     _automorphism[parent_to] = parent_from;
                     _automorphism[parent_from] = parent_to;
@@ -2511,16 +2511,16 @@ namespace dejavu {
 
                 if (new_v >= 0) {
                     int new_d = 0;
-                    assert(new_v < new_vsize);
+                    dej_assert(new_v < new_vsize);
                     g->v[new_v] = epos;
                     for (int j = g_old_v[old_v]; j < g_old_v[old_v] + g->d[old_v]; ++j) {
                         const int ve = g->e[j];                          // assumes ascending order!
                         const int new_ve = translate_layer_fwd[ve];
                         if (new_ve >= 0) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
+                            dej_assert(new_ve < new_vsize);
+                            dej_assert(new_ve >= 0);
                             ++new_d;
-                            assert(j >= epos);
+                            dej_assert(j >= epos);
                             g->e[epos] = new_ve;                         // assumes ascending order!
                             ++epos;
                         }
@@ -2533,12 +2533,12 @@ namespace dejavu {
             for (int i = 0; i < g->v_size; ++i) {
                 const int old_v = i;
                 const int new_v = translate_layer_fwd[i];
-                assert(old_v >= new_v);
+                dej_assert(old_v >= new_v);
                 if (new_v >= 0) {
-                    assert(old_v >= 0);
-                    assert(new_v >= 0);
-                    assert(old_v < g->v_size);
-                    assert(new_v < new_vsize);
+                    dej_assert(old_v >= 0);
+                    dej_assert(new_v >= 0);
+                    dej_assert(old_v < g->v_size);
+                    dej_assert(new_v < new_vsize);
                     colmap[new_v] = colmap[old_v];
                 }
             }
@@ -2551,8 +2551,8 @@ namespace dejavu {
                 }
             }
 
-            assert(new_vsize <= g->v_size);
-            assert(epos <= g->e_size);
+            dej_assert(new_vsize <= g->v_size);
+            dej_assert(epos <= g->e_size);
 
             g->e_size = epos;
             g->v_size = new_vsize;
@@ -2591,8 +2591,8 @@ namespace dejavu {
                         const int ve = g->e[j];
                         const int new_ve = ve;
                         if (!del_e.get(j)) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
+                            dej_assert(new_ve < new_vsize);
+                            dej_assert(new_ve >= 0);
                             ++new_d;
                             g->e[epos] = new_ve;
                             ++epos;
@@ -2670,8 +2670,8 @@ namespace dejavu {
                         const int ve = g->e[j];
                         const int new_ve = translate_layer_fwd[ve];
                         if (new_ve >= 0) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
+                            dej_assert(new_ve < new_vsize);
+                            dej_assert(new_ve >= 0);
                             ++new_d;
                             g->e[epos] = new_ve;
                             ++epos;
@@ -2682,13 +2682,13 @@ namespace dejavu {
                             const int edge_to_old = add_edge_buff[old_v].back();
                             add_edge_buff[old_v].pop_back();
                             //const int edge_to_old = add_edge_buff[old_v];
-                            assert(add_edge_buff_act.get(edge_to_old));
+                            dej_assert(add_edge_buff_act.get(edge_to_old));
                             //const int edge_to_new = translation_layers[fwd_ind][edge_to_old];
                             const int edge_to_new = translate_layer_fwd[edge_to_old];
-                            assert(edge_to_old >= 0);
-                            assert(edge_to_old <= domain_size);
-                            assert(edge_to_new >= 0);
-                            assert(edge_to_new <= new_vsize);
+                            dej_assert(edge_to_old >= 0);
+                            dej_assert(edge_to_old <= domain_size);
+                            dej_assert(edge_to_new >= 0);
+                            dej_assert(edge_to_new <= new_vsize);
                             ++new_d;
                             g->e[epos] = edge_to_new;
                             ++epos;
@@ -2713,9 +2713,9 @@ namespace dejavu {
                 const int old_v = i;
                 //const int new_v = translation_layers[fwd_ind][i];
                 const int new_v = translate_layer_fwd[i];
-                assert(new_v < new_vsize);
+                dej_assert(new_v < new_vsize);
                 if (new_v >= 0) {
-                    assert(colmap[old_v] >= 0);
+                    dej_assert(colmap[old_v] >= 0);
                     //assert(colmap[old_v] < domain_size);
                     //colmap[new_v] = colmap[old_v];
                     colmap[new_v] = worklist_deg0[old_v];
@@ -2725,14 +2725,14 @@ namespace dejavu {
             g->v_size = new_vsize;
 
             for (int i = 0; i < g->v_size; ++i) {
-                assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
-                assert(g->d[i] > 0 ? g->v[i] >= 0 : true);
-                assert(g->d[i] >= 0);
-                assert(g->d[i] < g->v_size);
+                dej_assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
+                dej_assert(g->d[i] > 0 ? g->v[i] >= 0 : true);
+                dej_assert(g->d[i] >= 0);
+                dej_assert(g->d[i] < g->v_size);
             }
             for (int i = 0; i < g->e_size; ++i) {
-                assert(g->e[i] < g->v_size);
-                assert(g->e[i] >= 0);
+                dej_assert(g->e[i] < g->v_size);
+                dej_assert(g->e[i] >= 0);
             }
 
             add_edge_buff_act.reset();
@@ -2806,8 +2806,8 @@ namespace dejavu {
                         const int ve = g_old_e[j];
                         const int new_ve = translate_layer_fwd[ve];
                         if (new_ve >= 0) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
+                            dej_assert(new_ve < new_vsize);
+                            dej_assert(new_ve >= 0);
                             ++new_d;
                             g->e[epos] = new_ve;
                             ++epos;
@@ -2818,13 +2818,13 @@ namespace dejavu {
                             const int edge_to_old = add_edge_buff[old_v].back();
                             add_edge_buff[old_v].pop_back();
                             //const int edge_to_old = add_edge_buff[old_v];
-                            assert(add_edge_buff_act.get(edge_to_old));
+                            dej_assert(add_edge_buff_act.get(edge_to_old));
                             //const int edge_to_new = translation_layers[fwd_ind][edge_to_old];
                             const int edge_to_new = translate_layer_fwd[edge_to_old];
-                            assert(edge_to_old >= 0);
-                            assert(edge_to_old <= domain_size);
-                            assert(edge_to_new >= 0);
-                            assert(edge_to_new <= new_vsize);
+                            dej_assert(edge_to_old >= 0);
+                            dej_assert(edge_to_old <= domain_size);
+                            dej_assert(edge_to_new >= 0);
+                            dej_assert(edge_to_new <= new_vsize);
                             ++new_d;
                             g->e[epos] = edge_to_new;
                             ++epos;
@@ -2849,9 +2849,9 @@ namespace dejavu {
                 const int old_v = i;
                 //const int new_v = translation_layers[fwd_ind][i];
                 const int new_v = translate_layer_fwd[i];
-                assert(new_v < new_vsize);
+                dej_assert(new_v < new_vsize);
                 if (new_v >= 0) {
-                    assert(colmap[old_v] >= 0);
+                    dej_assert(colmap[old_v] >= 0);
                     //assert(colmap[old_v] < domain_size);
                     //colmap[new_v] = colmap[old_v];
                     colmap[new_v] = worklist_deg0[old_v];
@@ -2861,14 +2861,14 @@ namespace dejavu {
             g->v_size = new_vsize;
 
             for (int i = 0; i < g->v_size; ++i) {
-                assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
-                assert(g->d[i] > 0 ? g->v[i] >= 0 : true);
-                assert(g->d[i] >= 0);
-                assert(g->d[i] < g->v_size);
+                dej_assert(g->d[i] > 0 ? g->v[i] < g->e_size : true);
+                dej_assert(g->d[i] > 0 ? g->v[i] >= 0 : true);
+                dej_assert(g->d[i] >= 0);
+                dej_assert(g->d[i] < g->v_size);
             }
             for (int i = 0; i < g->e_size; ++i) {
-                assert(g->e[i] < g->v_size);
-                assert(g->e[i] >= 0);
+                dej_assert(g->e[i] < g->v_size);
+                dej_assert(g->e[i] >= 0);
             }
 
             add_edge_buff_act.reset();
@@ -2883,7 +2883,7 @@ namespace dejavu {
                 worklist_deg0.push_back(0);
             }
             for (int i = 0; i < g->v_size; ++i) {
-                assert(colmap[i] < domain_size);
+                dej_assert(colmap[i] < domain_size);
                 worklist_deg0[colmap[i]]++;
             }
             for (int i = 0; i < g->v_size; ++i) {
@@ -2904,7 +2904,7 @@ namespace dejavu {
                 worklist_deg0.push_back(0);
             }
             for (int i = 0; i < g->v_size; ++i) {
-                assert(colmap[i] < domain_size);
+                dej_assert(colmap[i] < domain_size);
                 worklist_deg0[colmap[i]]++;
             }
             for (int i = 0; i < g->v_size; ++i) {
@@ -2958,16 +2958,16 @@ namespace dejavu {
 
                 if (new_v >= 0) {
                     int new_d = 0;
-                    assert(new_v < new_vsize);
+                    dej_assert(new_v < new_vsize);
                     g->v[new_v] = epos;
                     for (int j = g_old_v[old_v]; j < g_old_v[old_v] + g->d[old_v]; ++j) {
                         const int ve = g->e[j];                          // assumes ascending order!
                         const int new_ve = ve>=0?translate_layer_fwd[ve]:-1;
                         if (new_ve >= 0) {
-                            assert(new_ve < new_vsize);
-                            assert(new_ve >= 0);
+                            dej_assert(new_ve < new_vsize);
+                            dej_assert(new_ve >= 0);
                             ++new_d;
-                            assert(j >= epos);
+                            dej_assert(j >= epos);
                             g->e[epos] = new_ve;                         // assumes ascending order!
                             ++epos;
                         }
@@ -2980,12 +2980,12 @@ namespace dejavu {
             for (int i = 0; i < g->v_size; ++i) {
                 const int old_v = i;
                 const int new_v = translate_layer_fwd[i];
-                assert(old_v >= new_v);
+                dej_assert(old_v >= new_v);
                 if (new_v >= 0) {
-                    assert(old_v >= 0);
-                    assert(new_v >= 0);
-                    assert(old_v < g->v_size);
-                    assert(new_v < new_vsize);
+                    dej_assert(old_v >= 0);
+                    dej_assert(new_v >= 0);
+                    dej_assert(old_v < g->v_size);
+                    dej_assert(new_v < new_vsize);
                     colmap[new_v] = colmap[old_v];
                 }
             }
@@ -2998,8 +2998,8 @@ namespace dejavu {
                 }
             }
 
-            assert(new_vsize <= g->v_size);
-            assert(epos <= g->e_size);
+            dej_assert(new_vsize <= g->v_size);
+            dej_assert(epos <= g->e_size);
 
             g->e_size = epos;
             g->v_size = new_vsize;
@@ -3020,48 +3020,48 @@ namespace dejavu {
                 const int v_from = _automorphism_supp[i];
                 const int orig_v_from = translate_back(v_from);
                 const int v_to = _automorphism[v_from];
-                assert(v_from != v_to);
+                dej_assert(v_from != v_to);
                 const int orig_v_to = translate_back(v_to);
-                assert(v_from >= 0);
-                assert(v_to >= 0);
-                assert(orig_v_from < domain_size);
-                assert(orig_v_from >= 0);
-                assert(orig_v_to < domain_size);
-                assert(orig_v_to >= 0);
+                dej_assert(v_from >= 0);
+                dej_assert(v_to >= 0);
+                dej_assert(orig_v_from < domain_size);
+                dej_assert(orig_v_from >= 0);
+                dej_assert(orig_v_to < domain_size);
+                dej_assert(orig_v_to >= 0);
 
                 const bool added_vertex = !recovery_strings[orig_v_from].empty() &&
                                            recovery_strings[orig_v_from][0] == INT32_MAX;
 
-                assert(automorphism[orig_v_from] == orig_v_from || added_vertex);
+                dej_assert(automorphism[orig_v_from] == orig_v_from || added_vertex);
 
                 if(!added_vertex) {
                     automorphism[orig_v_from] = orig_v_to;
                     automorphism_supp.push_back(orig_v_from);
                 } else {
-                    assert(recovery_strings[orig_v_to].size() == 1);
+                    dej_assert(recovery_strings[orig_v_to].size() == 1);
                 }
 
-                assert(recovery_strings[orig_v_to].size() == recovery_strings[orig_v_from].size());
+                dej_assert(recovery_strings[orig_v_to].size() == recovery_strings[orig_v_from].size());
 
                 for (size_t j = 0; j < recovery_strings[orig_v_to].size(); ++j) {
                     const int v_from_t = recovery_strings[orig_v_from][j];
                     const int v_to_t   = recovery_strings[orig_v_to][j];
-                    assert((v_from_t == INT32_MAX) == (v_to_t == INT32_MAX));
+                    dej_assert((v_from_t == INT32_MAX) == (v_to_t == INT32_MAX));
                     if(v_from_t == INT32_MAX) continue;
 
-                    assert(v_from_t >  0?v_to_t >= 0:true);
-                    assert(v_to_t   >  0?v_from_t >= 0:true);
-                    assert(v_from_t <  0?v_to_t <= 0:true);
-                    assert(v_to_t   <  0?v_from_t <= 0:true);
+                    dej_assert(v_from_t >  0?v_to_t >= 0:true);
+                    dej_assert(v_to_t   >  0?v_from_t >= 0:true);
+                    dej_assert(v_from_t <  0?v_to_t <= 0:true);
+                    dej_assert(v_to_t   <  0?v_from_t <= 0:true);
                     if(v_from_t >= 0 && v_to_t >= 0) {
-                        assert(automorphism[v_from_t] == v_from_t);
+                        dej_assert(automorphism[v_from_t] == v_from_t);
                         automorphism[v_from_t] = v_to_t;
                         automorphism_supp.push_back(v_from_t);
                     } else {
                         const int abs_v_from_t = abs(v_from_t);
                         const int abs_v_to_t   = abs(v_to_t);
 
-                        assert(aux_automorphism[abs_v_from_t] == abs_v_from_t);
+                        dej_assert(aux_automorphism[abs_v_from_t] == abs_v_from_t);
                         aux_automorphism[abs_v_from_t] = abs_v_to_t;
                         aux_automorphism_supp.push_back(abs_v_from_t);
 
@@ -3080,7 +3080,7 @@ namespace dejavu {
                     if(automorphism[v_from] == v_from) {
                         automorphism_supp.push_back(v_from);
                     }
-                    assert(automorphism[v_from] != before_move[v_from]);
+                    dej_assert(automorphism[v_from] != before_move[v_from]);
                     automorphism[v_from] = before_move[v_from];
                 }
                 reset_automorphism(aux_automorphism.get_array(), aux_automorphism_supp.cur_pos,
@@ -3122,21 +3122,21 @@ namespace dejavu {
                 for (int i = 0; i < _supp; ++i) {
                     const int _v_from = _automorphism_supp[i];
                     const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
-                    assert(v_from >= 0 && v_from < domain_size);
+                    dej_assert(v_from >= 0 && v_from < domain_size);
                     const int orig_v_from = backward_translation[v_from];
                     const int _v_to = _automorphism[_v_from];
                     const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
-                    assert(v_from != v_to);
+                    dej_assert(v_from != v_to);
                     const int orig_v_to = backward_translation[v_to];
-                    assert((unsigned int)v_from < backward_translation.size());
-                    assert(v_from >= 0);
-                    assert((unsigned int)v_to < backward_translation.size());
-                    assert(v_to >= 0);
-                    assert(orig_v_from < domain_size);
-                    assert(orig_v_from >= 0);
-                    assert(orig_v_to < domain_size);
-                    assert(orig_v_to >= 0);
-                    assert(automorphism[orig_v_from] == orig_v_from);
+                    dej_assert((unsigned int)v_from < backward_translation.size());
+                    dej_assert(v_from >= 0);
+                    dej_assert((unsigned int)v_to < backward_translation.size());
+                    dej_assert(v_to >= 0);
+                    dej_assert(orig_v_from < domain_size);
+                    dej_assert(orig_v_from >= 0);
+                    dej_assert(orig_v_to < domain_size);
+                    dej_assert(orig_v_to >= 0);
+                    dej_assert(automorphism[orig_v_from] == orig_v_from);
                     const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
                     const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
                     const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
@@ -3149,7 +3149,7 @@ namespace dejavu {
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    assert(from_recovery_string_size == to_recovery_string_size);
+                    dej_assert(from_recovery_string_size == to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
@@ -3157,17 +3157,17 @@ namespace dejavu {
 
                         if(v_from_t == INT32_MAX) continue;
 
-                        assert(abs(v_from_t) >= 0);
-                        assert(abs(v_from_t) <  domain_size);
-                        assert(abs(v_to_t) >= 0);
-                        assert(abs(v_to_t) <  domain_size);
+                        dej_assert(abs(v_from_t) >= 0);
+                        dej_assert(abs(v_from_t) <  domain_size);
+                        dej_assert(abs(v_to_t) >= 0);
+                        dej_assert(abs(v_to_t) <  domain_size);
 
-                        assert(v_from_t >  0?v_to_t >= 0:true);
-                        assert(v_to_t   >  0?v_from_t >= 0:true);
-                        assert(v_from_t <  0?v_to_t <= 0:true);
-                        assert(v_to_t   <  0?v_from_t <= 0:true);
+                        dej_assert(v_from_t >  0?v_to_t >= 0:true);
+                        dej_assert(v_to_t   >  0?v_from_t >= 0:true);
+                        dej_assert(v_from_t <  0?v_to_t <= 0:true);
+                        dej_assert(v_to_t   <  0?v_from_t <= 0:true);
                         if(v_from_t >= 0 && v_to_t >= 0) {
-                            assert(automorphism[v_from_t] == v_from_t);
+                            dej_assert(automorphism[v_from_t] == v_from_t);
                             automorphism[v_from_t] = v_to_t;
                             automorphism_supp.push_back(v_from_t);
                         } else {
@@ -3191,15 +3191,15 @@ namespace dejavu {
                     if(v_from == v_to)
                         continue;
                     const int orig_v_to = backward_translation[v_to];
-                    assert((unsigned int)v_from < backward_translation.size());
-                    assert(v_from >= 0);
-                    assert((unsigned int)v_to < backward_translation.size());
-                    assert(v_to >= 0);
-                    assert(orig_v_from < domain_size);
-                    assert(orig_v_from >= 0);
-                    assert(orig_v_to < domain_size);
-                    assert(orig_v_to >= 0);
-                    assert(automorphism[orig_v_from] == orig_v_from);
+                    dej_assert((unsigned int)v_from < backward_translation.size());
+                    dej_assert(v_from >= 0);
+                    dej_assert((unsigned int)v_to < backward_translation.size());
+                    dej_assert(v_to >= 0);
+                    dej_assert(orig_v_from < domain_size);
+                    dej_assert(orig_v_from >= 0);
+                    dej_assert(orig_v_to < domain_size);
+                    dej_assert(orig_v_to >= 0);
+                    dej_assert(automorphism[orig_v_from] == orig_v_from);
 
                     const int to_recovery_string_start_pt = baked_recovery_string_pt[v_to].first;
                     const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
@@ -3214,7 +3214,7 @@ namespace dejavu {
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    assert(from_recovery_string_size == to_recovery_string_size);
+                    dej_assert(from_recovery_string_size == to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
@@ -3222,12 +3222,12 @@ namespace dejavu {
 
                         if(v_from_t == INT32_MAX) continue;
 
-                        assert(v_from_t >  0?v_to_t >= 0:true);
-                        assert(v_to_t   >  0?v_from_t >= 0:true);
-                        assert(v_from_t <  0?v_to_t <= 0:true);
-                        assert(v_to_t   <  0?v_from_t <= 0:true);
+                        dej_assert(v_from_t >  0?v_to_t >= 0:true);
+                        dej_assert(v_to_t   >  0?v_from_t >= 0:true);
+                        dej_assert(v_from_t <  0?v_to_t <= 0:true);
+                        dej_assert(v_to_t   <  0?v_from_t <= 0:true);
                         if(v_from_t >= 0 && v_to_t >= 0) {
-                            assert(automorphism[v_from_t] == v_from_t);
+                            dej_assert(automorphism[v_from_t] == v_from_t);
                             automorphism[v_from_t] = v_to_t;
                             automorphism_supp.push_back(v_from_t);
                         } else {
@@ -3301,7 +3301,7 @@ namespace dejavu {
 
             for (int v = 0; v < g->v_size; ++v) {
                 if (del.get(v)) {
-                    assert(c->ptn[c->vertex_to_col[v]] == 0);
+                    dej_assert(c->ptn[c->vertex_to_col[v]] == 0);
                     rem_edges += g->d[v];
                     g->d[v] = 0;
                     continue;
@@ -3309,7 +3309,7 @@ namespace dejavu {
 
                 for (int n = g->v[v]; n < g->v[v] + g->d[v];) {
                     const int neigh = g->e[n];
-                    assert(neigh >= 0 && neigh < g->v_size);
+                    dej_assert(neigh >= 0 && neigh < g->v_size);
                     if (del.get(neigh)) { // neigh == -1
                         const int swap_neigh = g->e[g->v[v] + g->d[v] - 1];
                         //g->e[g->v[v] + g->d[v] - 1] = neigh; // removed this operation because unnecessary?
@@ -3321,7 +3321,7 @@ namespace dejavu {
                     }
                 }
             }
-            assert(rem_edges % 2 == 0);
+            dej_assert(rem_edges % 2 == 0);
         }
 
         void order_according_to_color(dejavu::sgraph *g, int* colmap) {
@@ -3362,7 +3362,7 @@ namespace dejavu {
                 g->e[j] = old_arr[g->e[j]];
             }
 
-            assert((int)backward_translation_layers[backward_translation_layers.size() - 1].size() == g->v_size);
+            dej_assert((int)backward_translation_layers[backward_translation_layers.size() - 1].size() == g->v_size);
             for(int i = 0; i < g->v_size; ++i) {
                 old_arr[i] = backward_translation_layers[backward_translation_layers.size() - 1][i];
             }
@@ -3531,7 +3531,7 @@ namespace dejavu {
             //if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
             has_deg_0 = (count_deg0 > 4);
             has_deg_1 = (count_deg1 > 8);
-            has_deg_2 = (count_deg2 > 16); /*< if there's only very few, there's really no point... */
+            has_deg_2 = (count_deg2 > 128); /*< if there's only very few, there's really no point... */
             has_discrete = (count_discrete > 4);
 
             if(!has_deg_0 && !has_deg_1 && !has_deg_2 && !has_discrete) return;
@@ -3558,7 +3558,7 @@ namespace dejavu {
                                 order_according_to_color(g, colmap);
                                 if(print) print->timer_print("order", g->v_size, g->e_size);
                             }
-                            assert(_automorphism_supp.cur_pos == 0);
+                            dej_assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
                         case preop::deg2ma: {
@@ -3566,7 +3566,7 @@ namespace dejavu {
                             red_deg2_path_size_1(g, colmap);
                             perform_del_add_edge(g, colmap);
                             if(print) print->timer_print("deg2ma", g->v_size, g->e_size);
-                            assert(_automorphism_supp.cur_pos == 0);
+                            dej_assert(_automorphism_supp.cur_pos == 0);
 
                             break;
                         }
@@ -3586,7 +3586,7 @@ namespace dejavu {
                                 R_stack.refine_coloring_first(g, &c);
                                 copy_coloring_to_colmap(&c, colmap);
 
-                                assert(_automorphism_supp.cur_pos == 0);
+                                dej_assert(_automorphism_supp.cur_pos == 0);
 
                                 // twins can re-activate other routines, so let's start over...
                                 if(s_twins >= 16)  pc = 0;
@@ -3610,7 +3610,7 @@ namespace dejavu {
                             }
 
                             if(print) print->timer_print("deg2ue", g->v_size, g->e_size);
-                            assert(_automorphism_supp.cur_pos == 0);
+                            dej_assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
                         case preop::densify2: {
@@ -3622,7 +3622,7 @@ namespace dejavu {
                             perform_del_add_edge_general(g, colmap);
 
                             if(print) print->timer_print("densify2", g->v_size, g->e_size);
-                            assert(_automorphism_supp.cur_pos == 0);
+                            dej_assert(_automorphism_supp.cur_pos == 0);
                             break;
                         }
                         case preop::qcedgeflip: {

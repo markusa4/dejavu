@@ -3,6 +3,8 @@
 
 #include<unordered_map>
 #include <fstream>
+#include "utility.h"
+#include "coloring.h"
 
 namespace dejavu {
     /**
@@ -80,7 +82,7 @@ namespace dejavu {
                         c->ptn[i] = 0;
                         break;
                     }
-                    assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
+                    dej_assert(this->d[c->lab[i]] <= this->d[c->lab[i + 1]]);
                     if (this->d[c->lab[i]] != this->d[c->lab[i + 1]]) {
                         c->ptn[i] = 0;
                         cells += 1;
@@ -112,12 +114,12 @@ namespace dejavu {
                         if (it == colors.end()) {
                             colors.insert(std::pair<int, int>(vertex_to_col[i], col));
                             colsize.push_back(1);
-                            assert(col < this->v_size);
+                            dej_assert(col < this->v_size);
                             vertex_to_col[i] = col;
                             ++col;
                         } else {
                             const int found_col = it->second;
-                            assert(found_col < this->v_size);
+                            dej_assert(found_col < this->v_size);
                             vertex_to_col[i] = found_col;
                             ++colsize[found_col];
                         }
@@ -131,12 +133,12 @@ namespace dejavu {
                         if (colors[vertex_to_col[i]] == -1) {
                             colors[vertex_to_col[i]] = col;
                             colsize.push_back(1);
-                            assert(col < this->v_size);
+                            dej_assert(col < this->v_size);
                             vertex_to_col[i] = col;
                             ++col;
                         } else {
                             const int found_col = colors[vertex_to_col[i]];
-                            assert(found_col < this->v_size);
+                            dej_assert(found_col < this->v_size);
                             vertex_to_col[i] = found_col;
                             ++colsize[found_col];
                         }
@@ -149,7 +151,7 @@ namespace dejavu {
                     i += increment;
                     increment += col_sz;
                 }
-                assert(increment == v_size);
+                dej_assert(increment == v_size);
 
                 for (int i = 0; i < v_size; i++) {
                     const int v_col = vertex_to_col[i];
@@ -190,14 +192,14 @@ namespace dejavu {
         [[maybe_unused]] void sanity_check() {
 #ifndef NDEBUG
             for(int i = 0; i < v_size; ++i) {
-                assert(d[i]>0?v[i] < e_size:true);
-                assert(d[i]>0?v[i] >= 0:true);
-                assert(d[i] >= 0);
-                assert(d[i] < v_size);
+                dej_assert(d[i]>0?v[i] < e_size:true);
+                dej_assert(d[i]>0?v[i] >= 0:true);
+                dej_assert(d[i] >= 0);
+                dej_assert(d[i] < v_size);
             }
             for(int i = 0; i < e_size; ++i) {
-                assert(e[i] < v_size);
-                assert(e[i] >= 0);
+                dej_assert(e[i] < v_size);
+                dej_assert(e[i] >= 0);
             }
 
             // multiedge test
@@ -207,7 +209,7 @@ namespace dejavu {
                 multiedge_test.reset();
                 for(int j = 0; j < d[i]; ++j) {
                     const int neigh = e[v[i] + j];
-                    assert(!multiedge_test.get(neigh));
+                    dej_assert(!multiedge_test.get(neigh));
                     multiedge_test.set(neigh);
                 }
             }
@@ -218,8 +220,8 @@ namespace dejavu {
                 multiedge_test.reset();
                 for(int j = 0; j < d[i]; ++j) {
                     const int neigh = e[v[i] + j];
-                    assert(neigh >= 0);
-                    assert(neigh < v_size);
+                    dej_assert(neigh >= 0);
+                    dej_assert(neigh < v_size);
                     bool found = false;
                     for(int k = 0; k < d[neigh]; ++k) {
                         const int neigh_neigh = e[v[neigh] + k];
@@ -228,7 +230,7 @@ namespace dejavu {
                             break;
                         }
                     }
-                    assert(found);
+                    dej_assert(found);
                 }
             }
 #endif
@@ -429,6 +431,120 @@ namespace dejavu {
             return c;
         };
     };
+}
+
+static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
+                         int seed_permute=0) {
+    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
+    std::ifstream infile(filename);
+
+    std::vector<int> reshuffle;
+
+    std::vector<std::vector<int>> incidence_list;
+    std::set<int> degrees;
+    std::set<int> colors;
+    std::string line;
+    std::string nv_str, ne_str;
+    std::string nv1_string, nv2_string;
+    int nv1, nv2;
+    size_t i;
+    int nv = 0;
+    int ne = 0;
+    while (std::getline(infile, line)) {
+        char m = line[0];
+        int average_d;
+        switch (m) {
+            case 'p':
+                for(i = 7; i < line.size() && line[i] != ' '; ++i) {
+                    nv_str += line[i];
+                }
+
+                ++i;
+                for(; i < line.size() && line[i] != ' '; ++i) {
+                    ne_str += line[i];
+                }
+                nv = std::stoi(nv_str);
+                ne = std::stoi(ne_str);
+                average_d = (ne / nv) + 3;
+                g->initialize(nv, ne * 2);
+
+                reshuffle.reserve(nv);
+                for(int j = 0; j < nv; ++j) reshuffle.push_back(j + 1);
+                if(seed_permute != 0) {
+                    std::mt19937 eng(seed_permute);
+                    std::shuffle(std::begin(reshuffle), std::end(reshuffle), eng);
+                }
+
+                incidence_list.reserve(nv);
+                for(int j = 0; j < nv; ++j) {
+                    incidence_list.emplace_back();
+                    incidence_list[incidence_list.size() - 1].reserve(average_d);
+                }
+                break;
+            case 'e':
+                nv1_string = "";
+                nv2_string = "";
+                for(i = 2; i < line.size() && line[i] != ' '; ++i) {
+                    nv1_string += line[i];
+                }
+                ++i;
+                for(; i < line.size() && line[i] != ' '; ++i) {
+                    nv2_string += line[i];
+                }
+
+                nv1 = reshuffle[std::stoi(nv1_string)-1];
+                nv2 = reshuffle[std::stoi(nv2_string)-1];
+
+                incidence_list[nv1 - 1].push_back(nv2 - 1);
+                incidence_list[nv2 - 1].push_back(nv1 - 1);
+                break;
+            case 'n':
+                if(*colmap == nullptr)
+                    *colmap = (int *) calloc(nv, sizeof(int));
+                nv1_string = "";
+                nv2_string = "";
+                for(i = 2; i < line.size() && line[i] != ' '; ++i) {
+                    nv1_string += line[i];
+                }
+                ++i;
+                for(; i < line.size() && line[i] != ' '; ++i) {
+                    nv2_string += line[i];
+                }
+
+                nv1 = reshuffle[std::stoi(nv1_string)-1];
+                nv2 = std::stoi(nv2_string);
+                (*colmap)[nv1 - 1] = nv2;
+                break;
+            default:
+                break;
+        }
+    }
+
+    int epos = 0;
+    int vpos = 0;
+
+    int maxd = 0;
+
+    for(auto & i : incidence_list) {
+        g->v[vpos] = epos;
+        g->d[vpos] = (int) i.size();
+        //degrees.insert(g->d[vpos]);
+        if(g->d[vpos] > maxd)
+            maxd = g->d[vpos];
+        vpos += 1;
+        for(int j : i) {
+            g->e[epos] = j;
+            epos += 1;
+        }
+    }
+
+    g->v_size = nv;
+    g->e_size = 2 * ne;
+
+    dej_assert(nv == g->v_size);
+    dej_assert(2 * ne == g->e_size);
+    const double parse_time = (double) (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
+    if(!silent) std::cout << std::setprecision(2) << "parse_time=" << parse_time / 1000000.0 << "ms";
 }
 
 #endif //SASSY_GRAPH_BUILDER_H

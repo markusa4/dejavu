@@ -10,7 +10,8 @@
 #include "rand.h"
 #include "components.h"
 
-namespace dejavu::search_strategy {
+namespace dejavu { namespace search_strategy {
+    // (need to nest namespaces due to C++ 14)
 
     /**
      * \brief Inprocessing for symmetry detection
@@ -39,10 +40,12 @@ namespace dejavu::search_strategy {
         static void shallow_bfs_invariant(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv,
                                           groups::orbit& orbit_partition,
                                           int depth = 8, bool lower_depth = true) {
+            constexpr int test_frac = 100; // (1 / test_frac) elements used to find a better depth
+
             local_state.use_reversible(true);
             local_state.use_trace_early_out(lower_depth); // TODO bad for groups128, otherwise seems fine
             local_state.use_increase_deviation(false);
-            local_state.use_split_limit(true, depth); // 20
+            local_state.use_split_limit(true, depth);
 
             bool repeat = true;
             int best_depth = depth;
@@ -61,11 +64,11 @@ namespace dejavu::search_strategy {
                         inv[i] = local_state.T->get_hash();
                         const int splits = local_state.get_number_of_splits();
                         local_state.move_to_parent();
-                        if(100 * i < g->v_size && lower_depth && splits < best_depth &&
+                        if(test_frac * i < g->v_size && lower_depth && splits < best_depth &&
                            col == (*local_state.compare_base)[0].color) {
                             best_depth = splits;
                         }
-                        if(100 * i >= g->v_size && lower_depth && best_depth < depth) {
+                        if(test_frac * i >= g->v_size && lower_depth && best_depth < depth) {
                             depth = best_depth;
                             lower_depth = false;
                             repeat = true;
@@ -168,6 +171,9 @@ namespace dejavu::search_strategy {
          * @param inv place to store the invariant
          */
         static void shallow_bfs_invariant2(sgraph* g, ir::controller &local_state, worklist_t<unsigned long>& inv) {
+            constexpr int col_sz_upper_bound = 16;
+            constexpr int fixed_split_limit  = 8;
+
             local_state.use_reversible(true);
             local_state.use_trace_early_out(false);
             local_state.use_increase_deviation(false);
@@ -180,7 +186,7 @@ namespace dejavu::search_strategy {
             }
 
             std::vector<int> col_buffer;
-            col_buffer.reserve(16);
+            col_buffer.reserve(col_sz_upper_bound);
 
             // we write an invariant for every vertex
             for(int i = 0; i < g->v_size; ++i) {
@@ -192,20 +198,20 @@ namespace dejavu::search_strategy {
                 // if vertex has non-trivial color, let's individualize
                 if(col_sz >= 2) {
                     // use split limiter
-                    local_state.use_split_limit(true, 8);
+                    local_state.use_split_limit(true, fixed_split_limit);
                     local_state.move_to_child(g, i);
                     inv[i] = local_state.T->get_hash();
                     // write an invariant with one further level of bfs
                     for(int _col = 0; _col < g->v_size;) {
                         const int _col_sz = local_state.c->ptn[_col] + 1;
                         // only for small colors that were newly produced by the previous individualization
-                        if (_col_sz >= 2 && _col_sz <= 16 && !original_colors.get(_col)) {
+                        if (_col_sz >= 2 && _col_sz <= col_sz_upper_bound && !original_colors.get(_col)) {
                             // need to cache contents of color, since order changes through individualization
                             col_buffer.clear();
                             for (int jj = _col; jj < _col + _col_sz; ++jj) col_buffer.push_back(local_state.c->lab[jj]);
                             // now let's go through the color...
                             for (int j : col_buffer) {
-                                local_state.use_split_limit(true, 8);
+                                local_state.use_split_limit(true, fixed_split_limit);
                                 local_state.move_to_child(g, j);
                                 inv[i] += local_state.T->get_hash();
                                 local_state.move_to_parent();
@@ -230,6 +236,22 @@ namespace dejavu::search_strategy {
          */
         void set_splits_hint(int splits_hint) {
             h_splits_hint = splits_hint;
+        }
+
+
+        int check_individualizations(ir::limited_save &root_save) {
+
+            int success = 0;
+            for (auto &i: inproc_maybe_individualize) {
+                const int ind_v      = i.first;
+                const int ind_col    = root_save.get_coloring()->vertex_to_col[ind_v];
+                const int ind_col_sz = root_save.get_coloring()->ptn[ind_col] + 1;
+                const int orb_sz_det = i.second;
+                if(ind_col_sz > 1 && ind_col_sz == orb_sz_det) {
+                    ++success;
+                }
+            }
+            return success;
         }
 
         /**
@@ -341,7 +363,7 @@ namespace dejavu::search_strategy {
                 for (auto &i: inproc_can_individualize) {
                     const int ind_v = i.first;
                     const int ind_col = local_state.c->vertex_to_col[ind_v];
-                    assert(i.second == local_state.c->ptn[ind_col] + 1);
+                    dej_assert(i.second == local_state.c->ptn[ind_col] + 1);
                     s_grp_sz.multiply(local_state.c->ptn[ind_col] + 1);
                     local_state.move_to_child_no_trace(g, ind_v);
                     inproc_fixed_points.push_back(ind_v);
@@ -374,6 +396,6 @@ namespace dejavu::search_strategy {
             return touched_coloring;
         }
     };
-}
+} }
 
 #endif //DEJAVU_INPROCESS_H

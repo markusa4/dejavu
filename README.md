@@ -19,6 +19,8 @@ dejavu is a header-only library. You can simply add dejavu to your C++ project b
 
 Note that currently, dejavu requires to be *compiled with C++ version 14*. For a more thorough description, please refer to our [guide](https://automorphisms.org/quick_start/cpp_api/).
 
+By default, dejavu is compiled without assertions. We recommend activating assertions for debugging purposes (by adding the definition `DEJDEBUG`). Assertions do however slow the code considerably.
+
 ## Running the tests
 Using *cmake*, a test target can be produced by setting the following flag:
 ```text

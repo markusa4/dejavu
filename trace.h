@@ -57,9 +57,9 @@ namespace dejavu {
 
             void write_compare(int d) {
                 d = std::min(INT32_MAX-10,d);
-                assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
+                dej_assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 write_compare_no_limit(d);
-                assert(record?static_cast<int>(data.size())==position:true);
+                dej_assert(record?static_cast<int>(data.size())==position:true);
             }
 
             void write_compare_no_limit(int d) {
@@ -72,7 +72,7 @@ namespace dejavu {
 
             /*void write_skip_compare(int d) {
                 d = std::min(INT32_MAX-10,d);
-                assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
+                dej_assert(d != TRACE_MARKER_INDIVIDUALIZE && d != TRACE_MARKER_REFINE_START);
                 if (record) data.push_back(d);
                 ++position;
             }*/
@@ -88,7 +88,7 @@ namespace dejavu {
              * @param color The color being individualized.
              */
             void op_individualize(const int ind_color) {
-                assert(ind_color >= 0);
+                dej_assert(ind_color >= 0);
                 write_compare_no_limit(TRACE_MARKER_INDIVIDUALIZE);
                 write_compare(ind_color);
             }
@@ -97,7 +97,7 @@ namespace dejavu {
              * Records the start of a refinement.
              */
             void op_refine_start() {
-                assert(!comp || !assert_refine_act);
+                dej_assert(!comp || !assert_refine_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_START);
                 assert_refine_act = true;
             }
@@ -107,7 +107,7 @@ namespace dejavu {
              * @param color The color in respect to which the coloring is refined.
              */
             void op_refine_cell_start([[maybe_unused]] int color) {
-                assert(!comp || !assert_cell_act);
+                dej_assert(!comp || !assert_cell_act);
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_START);
                 //write_compare(color);
                 // cell_old_color = color;
@@ -121,7 +121,7 @@ namespace dejavu {
              * @param new_color The new color that was refined.
              */
             void op_refine_cell_record(int new_color) {
-                assert(!comp || assert_cell_act);
+                dej_assert(!comp || assert_cell_act);
                 write_compare(new_color);
                 //if (new_color != cell_old_color && record) data[cell_act_spot] = true;
             }
@@ -134,7 +134,7 @@ namespace dejavu {
              * Records the end of a refinement with respect to a color.
              */
             void op_refine_cell_end() {
-                assert(!comp || assert_cell_act);
+                dej_assert(!comp || assert_cell_act);
                 assert_cell_act = false;
                 //
                 write_compare_no_limit(TRACE_MARKER_REFINE_CELL_END);
@@ -144,8 +144,8 @@ namespace dejavu {
              * Records the end of a refinement.
              */
             void op_refine_end() {
-                assert(!comp || !assert_cell_act);
-                assert(assert_refine_act);
+                dej_assert(!comp || !assert_cell_act);
+                dej_assert(assert_refine_act);
                 assert_refine_act = false;
                 write_compare_no_limit(TRACE_MARKER_REFINE_END);
             }
@@ -159,15 +159,15 @@ namespace dejavu {
             [[maybe_unused]] bool blueprint_is_next_cell_active() {
                 if (!compare || !comp || position > static_cast<int>(compare_trace->data.size())) return true;
 
-                assert(compare_trace);
+                dej_assert(compare_trace);
                 size_t read_pt = position;
-                assert(compare_trace->data.size() > read_pt);
+                dej_assert(compare_trace->data.size() > read_pt);
                 for(; read_pt > 0 && compare_trace->data[read_pt] != TRACE_MARKER_REFINE_CELL_START; --read_pt);
-                assert(compare_trace->data[read_pt] == TRACE_MARKER_REFINE_CELL_START);
+                dej_assert(compare_trace->data[read_pt] == TRACE_MARKER_REFINE_CELL_START);
                 ++read_pt;
 
-                assert(compare_trace->data.size() > read_pt);
-                assert((compare_trace->data[read_pt] == false) || (compare_trace->data[read_pt] == true));
+                dej_assert(compare_trace->data.size() > read_pt);
+                dej_assert((compare_trace->data[read_pt] == false) || (compare_trace->data[read_pt] == true));
                 return compare_trace->data[read_pt];
             }
 
@@ -180,7 +180,7 @@ namespace dejavu {
             [[maybe_unused]] void blueprint_skip_to_next_cell() {
                 while (position < static_cast<int>(compare_trace->data.size()) &&
                        compare_trace->data[position] != TRACE_MARKER_REFINE_CELL_END) {
-                    assert(compare_trace->data.size() > (size_t) position);
+                    dej_assert(compare_trace->data.size() > (size_t) position);
                     ++position;
                 }
                 ++position;
@@ -287,7 +287,7 @@ namespace dejavu {
                 compare_trace = nullptr;
                 position = 0;
                 hash = 0;
-                assert(record?static_cast<int>(data.size())==position:true);
+                dej_assert(record?static_cast<int>(data.size())==position:true);
                 reset_trace_equal();
             }
 
@@ -306,7 +306,7 @@ namespace dejavu {
                 assert_refine_act = false;
                 this->position = new_position;
                 if(record) data.resize(position);
-                assert(record?static_cast<int>(data.size())==position:true);
+                dej_assert(record?static_cast<int>(data.size())==position:true);
             }
 
             [[nodiscard]] int get_position() const {

@@ -11,6 +11,7 @@
 #include <functional>
 #include <algorithm>
 #include <cassert>
+#include "utility.h"
 #include "coloring.h"
 
 namespace dejavu {
@@ -22,8 +23,7 @@ namespace dejavu {
     namespace ds {
 
         /**
-         * Sorting utilizing minimal sorting networks for arrays of size `sz <= 6`, falling back to `std::sort` for
-         * `sz > 0`.
+         * Sorting.
          *
          * @tparam T Template parameter for the type of array elements.
          * @param arr Array of elements of type \p T.
@@ -119,7 +119,7 @@ namespace dejavu {
              * @param size Size to allocate.
              */
             explicit worklist_t(int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 allocate(size);
             }
 
@@ -139,7 +139,7 @@ namespace dejavu {
              * @param size Size to allocate.
              */
             void allocate(int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 alloc(size);
                 cur_pos = 0;
             }
@@ -150,7 +150,7 @@ namespace dejavu {
              * @param value Element to push back.
              */
             inline void push_back(T value) {
-                assert(cur_pos >= 0 && cur_pos < arr_sz);
+                dej_assert(cur_pos >= 0 && cur_pos < arr_sz);
                 arr[cur_pos] = value;
                 cur_pos += 1;
             }
@@ -164,7 +164,7 @@ namespace dejavu {
              * \sa The function empty() tests whether `cur_pos == 0`.
              */
             inline T pop_back() {
-                assert(cur_pos > 0);
+                dej_assert(cur_pos > 0);
                 return arr[--cur_pos];
             }
 
@@ -205,6 +205,15 @@ namespace dejavu {
                 cur_pos = 0;
             }
 
+            int max() {
+                int max_val = arr[0];
+                for(int i = 1; i < cur_pos; ++i) {
+                    const int val = arr[i];
+                    if(val > max_val) max_val = val;
+                }
+                return max_val;
+            }
+
             /**
              * Resizes the internal array to `size`. Copies the contents of the old array into the new one. If the new
              * size is larger than the old one, the new space is only allocated and not initialized.
@@ -212,7 +221,7 @@ namespace dejavu {
              * @param size New size to allocate the array to.
              */
             void resize(const int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 T *old_arr = nullptr;
                 int old_arr_sz = arr_sz;
@@ -254,8 +263,8 @@ namespace dejavu {
              * @return The element `arr[index]`.
              */
             inline T &operator[](int index) const {
-                assert(index >= 0);
-                assert(index < arr_sz);
+                dej_assert(index >= 0);
+                dej_assert(index < arr_sz);
                 return arr[index];
             }
 
@@ -296,7 +305,7 @@ namespace dejavu {
              * @param size Space to allocate.
              */
             void alloc(const int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 dealloc();
                 arr = (int*) calloc(size, sizeof(int));
                 arr_sz = size;
@@ -356,7 +365,7 @@ namespace dejavu {
              * @param size New size to allocate the array to.
              */
             void resize(const int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 if (arr && size <= arr_sz) return;
                 int *old_arr = arr;
                 arr = nullptr;
@@ -390,8 +399,8 @@ namespace dejavu {
              * @return The element `arr[index]`.
              */
             inline int &operator[](int index) const {
-                assert(index >= 0);
-                assert(index < arr_sz);
+                dej_assert(index >= 0);
+                dej_assert(index < arr_sz);
                 return arr[index];
             }
 
@@ -399,6 +408,7 @@ namespace dejavu {
             int arr_sz = 0;     /**< size to which \a arr is currently allocated*/
             int *arr = nullptr; /**< internal array */
         };
+
 
         /**
          * \brief Set with counting
@@ -435,14 +445,14 @@ namespace dejavu {
             }
 
             void set(int index, T value) {
-                assert(index >= 0);
-                assert(index < sz);
+                dej_assert(index >= 0);
+                dej_assert(index < sz);
                 s[index] = value;
             }
 
             T get(int index) {
-                assert(index >= 0);
-                assert(index < sz);
+                dej_assert(index >= 0);
+                dej_assert(index < sz);
                 return s[index];
             }
 
@@ -456,15 +466,15 @@ namespace dejavu {
             }
 
             T inc(int index) {
-                assert(index >= 0);
-                assert(index < sz);
+                dej_assert(index >= 0);
+                dej_assert(index < sz);
                 if (s[index]++ == -1)
                     reset_queue.push_back(index);
                 return s[index];
             }
 
             void inline inc_nr(int index) {
-                assert(index >= 0 && index < sz);
+                dej_assert(index >= 0 && index < sz);
                 ++s[index];
             }
 
@@ -516,13 +526,13 @@ namespace dejavu {
              * @param size new size of this set
              */
             void initialize(int size) {
-                assert(size >= 0);
+                dej_assert(size >= 0);
                 if(s && sz == size) {
                     reset();
                     return;
                 }
                 if(s) free(s);
-                s = (int*) calloc(size, sizeof(int));
+                s = (int*) calloc((unsigned int) size, sizeof(int));
                 sz   = size;
                 mark = 0;
                 reset();
@@ -533,8 +543,8 @@ namespace dejavu {
              * @return Is element \p pos in set?
              */
             inline bool get(int pos) {
-                assert(pos >= 0);
-                assert(pos < sz);
+                dej_assert(pos >= 0);
+                dej_assert(pos < sz);
                 return s[pos] == mark;
             }
 
@@ -544,8 +554,8 @@ namespace dejavu {
              * @param pos element to set
              */
             inline void set(int pos) {
-                assert(pos >= 0);
-                assert(pos < sz);
+                dej_assert(pos >= 0);
+                dej_assert(pos < sz);
                 s[pos] = mark;
             }
 
@@ -554,8 +564,8 @@ namespace dejavu {
              * @param pos element to remove
              */
             inline void unset(int pos) {
-                assert(pos >= 0);
-                assert(pos < sz);
+                dej_assert(pos >= 0);
+                dej_assert(pos < sz);
                 s[pos] = mark - 1;
             }
             /**
@@ -579,6 +589,14 @@ namespace dejavu {
                 if(s) free(s);
             }
         };
+
+        [[maybe_unused]] static void bucket_sort(worklist& list,  markset& buckets, int limit) {
+            buckets.reset();
+            for(int i = 0; i < list.size(); ++i) buckets.set(list[i]);
+            list.reset();
+            for(int i = 0; i <= limit; ++i) if(buckets.get(i)) list.push_back(i);
+            buckets.reset();
+        }
     }
 }
 

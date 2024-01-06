@@ -316,7 +316,7 @@ namespace dejavu {
                 //assert(trace || (diff_vertices.get(v)));
                 if(diff_vertices.get(v)) {
                     const int pt      = diff_vertices_list_pt[v];
-                    assert(diff_vertices_list[pt] == v);
+                    dej_assert(diff_vertices_list[pt] == v);
 
                     // which element is in the back?
                     const int back_pt  = diff_vertices_list.cur_pos-1;
@@ -324,8 +324,8 @@ namespace dejavu {
 
                     // now swap back_col to col
                     diff_vertices_list[pt] = back_v;
-                    assert(diff_vertices.get(back_v));
-                    assert(diff_vertices_list_pt[back_v] == back_pt);
+                    dej_assert(diff_vertices.get(back_v));
+                    dej_assert(diff_vertices_list_pt[back_v] == back_pt);
                     diff_vertices_list_pt[back_v] = pt;
                     diff_vertices_list_pt[v] = -1; // I don't trust myself
 
@@ -522,7 +522,7 @@ namespace dejavu {
              * @return
              */
             std::pair<int, int> diff_pair(const controller& state) {
-                assert(diff_vertices_list.cur_pos > 0);
+                dej_assert(diff_vertices_list.cur_pos > 0);
 
                 // pick a vertex from the difference list
                 const int right = diff_vertices_list[0];
@@ -603,7 +603,7 @@ namespace dejavu {
                     const int old_color = prev_color_list[i];
                     const int new_color = touched_color_list[i];
 
-                    assert(old_color != new_color);
+                    dej_assert(old_color != new_color);
 
                     const int old_color_sz = c->ptn[old_color] + 1;
                     const int new_color_sz = c->ptn[new_color] + 1;
@@ -631,7 +631,7 @@ namespace dejavu {
              *
              * @param state the other state which is copied
              */
-            void __attribute__((noinline)) link_compare(controller* state) {
+            void link_compare(controller* state) {
                 this->c->copy_any(state->c);
 
                 T->set_compare(true);
@@ -668,7 +668,7 @@ namespace dejavu {
              *
              * @param state the other state which is copied
              */
-            void __attribute__((noinline)) link(controller* state) {
+            void link(controller* state) {
                 this->c->copy_any(state->c);
 
                 T->set_compare(true);
@@ -707,7 +707,7 @@ namespace dejavu {
              * (i.e., such as calling \a mode_compare_base).
              */
             void compare_to_this() {
-                assert(mode == ir::IR_MODE_RECORD_TRACE);
+                dej_assert(mode == ir::IR_MODE_RECORD_TRACE);
 
                 cT->set_compare(true);
                 cT->set_record(false);
@@ -821,7 +821,7 @@ namespace dejavu {
              *
              * @param state A reference to the limited_save from which the state will be loaded.
              */
-            void __attribute__((noinline)) load_reduced_state(limited_save &state) {
+            void load_reduced_state(limited_save &state) {
                 c->copy_any(state.get_coloring());
 
                 T->set_hash(state.get_invariant_hash());
@@ -838,8 +838,6 @@ namespace dejavu {
                 if(mode == IR_MODE_COMPARE_TRACE_REVERSIBLE) reset_touched();
             }
 
-            // TODO: hopefully can be deprecated
-            // TODO: problem this fixes: trace state is not reverted properly when moving to parent!
             void load_reduced_state_without_coloring(limited_save &state) {
                 T->set_hash(state.get_invariant_hash());
                 T->set_position(state.get_trace_position());
@@ -925,7 +923,7 @@ namespace dejavu {
                 s_splits = 0;
                 base_vertex.push_back(v);
 
-                assert(!s_cell_active);
+                dej_assert(!s_cell_active);
 
                 // some info maybe needed later
                 const int singleton_pt     = (int) singletons.size();
@@ -988,8 +986,8 @@ namespace dejavu {
              * Move IR node kept in this controller back to its parent.
              */
             void move_to_parent() {
-                assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
-                assert(base.size() > 0);
+                dej_assert(mode != IR_MODE_COMPARE_TRACE_IRREVERSIBLE);
+                dej_assert(base.size() > 0);
 
                 // unwind invariant
                 T->set_position(base.back().trace_pos);
@@ -1010,7 +1008,7 @@ namespace dejavu {
                     for (int j = 0; j < new_color_sz; ++j) {
                         const int v = c->lab[new_color + j];
                         c->vertex_to_col[v] = old_color;
-                        assert(c->vertex_to_lab[v] == new_color + j);
+                        dej_assert(c->vertex_to_lab[v] == new_color + j);
                     }
 
                     --c->cells;
@@ -1054,6 +1052,7 @@ namespace dejavu {
              * @return Whether \p automorphism is an automorphism of \p g.
              */
             bool certify(sgraph* g, groups::automorphism_workspace& automorphism) {
+                if(automorphism.nsupp() == 0) return true;
                 if(automorphism.nsupp() > g->v_size / 4) {
                     return R->certify_automorphism(g, automorphism.p());
                 } else {
@@ -1083,10 +1082,11 @@ namespace dejavu {
                 test_set.reset();
                 const int v = state->get_coloring()->lab[color];
                 const int d = g->d[v];
-                const int ept = g->v[v];
+                const int ept_st  = g->v[v];
+                const int ept_end = ept_st + d;
                 int non_triv_col_d = 1;
-                for (int i = 0; i < d; ++i) {
-                    const int test_col = state->get_coloring()->vertex_to_col[g->e[ept + i]];
+                for (int i = ept_st; i < ept_end; ++i) {
+                    const int test_col = state->get_coloring()->vertex_to_col[g->e[i]];
                     if (!test_set.get(test_col)) {
                         non_triv_col_d += 1;
                         test_set.set(test_col);
@@ -1213,22 +1213,26 @@ namespace dejavu {
              * @param state The IR state from which a base is created.
              */
             void find_sparse_optimized_base(sgraph *g, controller *state) {
+                // some settings for heuristics
+                constexpr int base_lim = 1000;
+                constexpr int test_lim_pre  = 512;
+                constexpr int test_lim_post = 1;
+
                 state->mode_write_base();
 
                 int prev_color = -1;
-                assert(state->s_base_pos == 0);
+                dej_assert(state->s_base_pos == 0);
                 test_set.initialize(g->v_size);
 
                 int start_test_from = 0;
                 int start_test_from_inside = 0;
-                int base_lim = 1000;
 
                 int buffered_col       = -1;
                 int buffered_col_score = -1;
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
-                    int test_lim   = state->s_base_pos <= base_lim?512:1;
+                    int test_lim   = state->s_base_pos <= base_lim?test_lim_pre:test_lim_post;
 
                     // pick previous color if possible
                     if (prev_color >= 0 && state->get_coloring()->ptn[prev_color] > 0) {
@@ -1251,7 +1255,7 @@ namespace dejavu {
 
                     start_test_from_inside = 0;
 
-
+                    // use buffered color if possible
                     if(best_color == -1 && buffered_col >= 0 && state->get_coloring()->ptn[buffered_col] > 0 &&
                        color_score(g, state, buffered_col) >= buffered_col_score) {
                         best_color = buffered_col;
@@ -1259,7 +1263,7 @@ namespace dejavu {
                         buffered_col_score = -1;
                     }
 
-                    // heuristic, try to pick "good" color
+                    // same color, neighbour of color and buffer failed, so now we try to pick a "good" color
                     if (best_color == -1) {
                         int best_score = -1;
 
@@ -1285,8 +1289,8 @@ namespace dejavu {
                         }
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     prev_color = best_color;
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
@@ -1294,7 +1298,7 @@ namespace dejavu {
 
             void find_first_base(sgraph *g, controller *state) {
                 state->mode_write_base();
-                assert(state->s_base_pos == 0);
+                dej_assert(state->s_base_pos == 0);
 
                 test_set.initialize(g->v_size);
 
@@ -1317,8 +1321,8 @@ namespace dejavu {
                         i += col_sz + 1;
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
             }
@@ -1338,7 +1342,7 @@ namespace dejavu {
                 int prev_color    = -1;
                 int prev_color_sz = 0;
 
-                assert(state->s_base_pos == 0);
+                dej_assert(state->s_base_pos == 0);
 
                 while (state->get_coloring()->cells != g->v_size) {
                     int best_color = -1;
@@ -1384,8 +1388,8 @@ namespace dejavu {
                         }
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     prev_color    = best_color;
                     prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
                     state->move_to_child(g, state->get_coloring()->lab[(best_color +
@@ -1424,8 +1428,8 @@ namespace dejavu {
                         i += state->get_coloring()->ptn[i] + 1;
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[(best_color +
                                                                     (perturbe%state->get_coloring()->ptn[best_color]))]);
                 }
@@ -1467,8 +1471,8 @@ namespace dejavu {
                         }
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     state->move_to_child(g, state->get_coloring()->lab[best_color]);
                 }
             }
@@ -1509,7 +1513,7 @@ namespace dejavu {
                     }
 
                     if(best_color == -1) {
-                        // heuristic, try to pick "good" color
+                        // heuristic, pick first largest color
                         for (int i = 0; i < state->get_coloring()->domain_size;) {
                             const int col_sz = state->get_coloring()->ptn[i];
                             int test_score = color_score_size(state, i);
@@ -1522,8 +1526,8 @@ namespace dejavu {
                         }
                     }
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
                     prev_color    = best_color;
                     prev_color_sz = state->get_coloring()->ptn[best_color] + 1;
                     state->move_to_child(g, state->get_coloring()->lab[(best_color + (perturbe% prev_color_sz))]);
@@ -1576,13 +1580,13 @@ namespace dejavu {
                         for (int i = 0; i < static_cast<int>(candidates.size()); ++i) {
                             const int col = candidates[i];
                             const int col_sz = state->c->ptn[col] + 1;
-                            assert(col_sz >= 2);
+                            dej_assert(col_sz >= 2);
                             const int probe_lim_col = std::min(probe_limit, col_sz);
 
                             const int v_base = state->get_coloring()->lab[(col + (perturbe % col_sz))];
-                            assert(state->s_base_pos == state_probe->s_base_pos);
-                            assert(state->T->get_position() == state_probe->T->get_position());
-                            assert(state->c->cells == state_probe->c->cells);
+                            dej_assert(state->s_base_pos == state_probe->s_base_pos);
+                            dej_assert(state->T->get_position() == state_probe->T->get_position());
+                            dej_assert(state->c->cells == state_probe->c->cells);
 
                             [[maybe_unused]] int cells_pre = state->c->cells;
                             [[maybe_unused]] int previous_pos = state->T->get_position();
@@ -1598,22 +1602,22 @@ namespace dejavu {
                                 // individualize in state_probe
                                 state_probe->reset_trace_equal();
                                 state_probe->use_trace_early_out(true);
-                                assert(state_probe->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v_base]);
+                                dej_assert(state_probe->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v_base]);
                                 state_probe->move_to_child(g, v);
                                 deviated += !state_probe->T->trace_equal();
-                                assert(v == v_base ? state_probe->T->trace_equal() : true);
+                                dej_assert(v == v_base ? state_probe->T->trace_equal() : true);
                                 state_probe->move_to_parent();
-                                assert(state_probe->c->cells == cells_pre);
-                                assert(state_probe->T->get_position() == previous_pos);
+                                dej_assert(state_probe->c->cells == cells_pre);
+                                dej_assert(state_probe->T->get_position() == previous_pos);
                             }
 
                             state->move_to_parent();
-                            assert(state->T->get_position() == previous_pos);
+                            dej_assert(state->T->get_position() == previous_pos);
 
-                            assert(cells_pre == state->c->cells);
-                            assert(state->s_base_pos == state_probe->s_base_pos);
-                            assert(state->T->get_position() == state_probe->T->get_position());
-                            assert(state->c->cells == state_probe->c->cells);
+                            dej_assert(cells_pre == state->c->cells);
+                            dej_assert(state->s_base_pos == state_probe->s_base_pos);
+                            dej_assert(state->T->get_position() == state_probe->T->get_position());
+                            dej_assert(state->c->cells == state_probe->c->cells);
 
                             if (deviated > best_score_deviate ||
                                ((deviated == best_score_deviate) && (cells > best_score_cells)) ||
@@ -1653,26 +1657,26 @@ namespace dejavu {
 
                     if(probe_limit_candidates < 2 || state->s_base_pos > 5) use_probing = false;
 
-                    assert(best_color >= 0);
-                    assert(best_color < g->v_size);
-                    assert(!use_probing || state->s_base_pos == state_probe->s_base_pos);
-                    assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
+                    dej_assert(best_color >= 0);
+                    dej_assert(best_color < g->v_size);
+                    dej_assert(!use_probing || state->s_base_pos == state_probe->s_base_pos);
+                    dej_assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
                     //assert(state->T->get_hash() == state_probe->T->get_hash());
-                    assert(!use_probing || state->c->cells == state_probe->c->cells);
+                    dej_assert(!use_probing || state->c->cells == state_probe->c->cells);
                     const int col_sz = state->get_coloring()->ptn[best_color] + 1;
                     int v = best_test_v;
                     if(v == -1) v = state->get_coloring()->lab[(best_color + (perturbe% col_sz))];
 
-                    assert(!use_probing || state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
+                    dej_assert(!use_probing || state->c->vertex_to_col[v] == state_probe->c->vertex_to_col[v]);
 
                     state_probe->reset_trace_equal();
                     state->move_to_child(g, v);
                     if(use_probing) state_probe->move_to_child(g, v);
 
-                    assert(!use_probing || state->s_base_pos        == state_probe->s_base_pos);
-                    assert(!use_probing || state_probe->T->trace_equal());
-                    assert(!use_probing || state->c->cells == state_probe->c->cells);
-                    assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
+                    dej_assert(!use_probing || state->s_base_pos        == state_probe->s_base_pos);
+                    dej_assert(!use_probing || state_probe->T->trace_equal());
+                    dej_assert(!use_probing || state->c->cells == state_probe->c->cells);
+                    dej_assert(!use_probing || state->T->get_position() == state_probe->T->get_position());
                 }
             }
         };
@@ -1689,7 +1693,7 @@ namespace dejavu {
 
             void check_finished() {
                 if(computed_for_base == expected_for_base) deviation_done = true;
-                assert(computed_for_base <= expected_for_base);
+                dej_assert(computed_for_base <= expected_for_base);
             }
 
         public:
@@ -1704,13 +1708,13 @@ namespace dejavu {
             void record_deviation(unsigned long deviation) {
                 deviation_map.insert(deviation);
                 ++computed_for_base;
-                assert(computed_for_base <= expected_for_base);
+                dej_assert(computed_for_base <= expected_for_base);
                 check_finished();
             }
 
             void record_no_deviation() {
                 ++computed_for_base;
-                assert(computed_for_base <= expected_for_base);
+                dej_assert(computed_for_base <= expected_for_base);
                 check_finished();
             }
 
@@ -2062,7 +2066,7 @@ namespace dejavu {
                     tree_data[0] = nullptr;
                     add_node(0, root, nullptr, true);
                 }
-                assert(missing_nodes.empty());
+                dej_assert(missing_nodes.empty());
 
                 current_base = new_base;
 
@@ -2108,7 +2112,7 @@ namespace dejavu {
             }
 
             void add_node(int level, limited_save* data, tree_node* parent, bool is_base = false) {
-                assert(data != nullptr);
+                dej_assert(data != nullptr);
                 if(tree_data[level] == nullptr) {
                     tree_level_size[level] = 0;
                     tree_data[level] = new tree_node(data, nullptr, parent, level != 0);
@@ -2140,7 +2144,7 @@ namespace dejavu {
                         next = next->get_next();
                     } while (next != first);
                     tree_level_size[level] = tree_data_jump_map[level].size();
-                    assert(static_cast<int>(tree_data_jump_map[level].size()) == tree_level_size[level]);
+                    dej_assert(static_cast<int>(tree_data_jump_map[level].size()) == tree_level_size[level]);
                 }
             }
 

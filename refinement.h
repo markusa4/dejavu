@@ -172,7 +172,7 @@ namespace dejavu {
                         i += col_sz + 1;
                     }
                 } else {
-                    assert(c->vertex_to_col[c->lab[init_color]] == init_color);
+                    dej_assert(c->vertex_to_col[c->lab[init_color]] == init_color);
                     cell_todo.add_cell(queue_pointer, init_color);
                 }
 
@@ -189,16 +189,17 @@ namespace dejavu {
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
                     const int  test_deg   = g->d[c->lab[next_color_class]];
                     const bool very_dense = test_deg > (g->v_size / (next_color_class_sz + 1));
-                    const bool cell_dense = test_deg > (c->cells);
+                    //const bool cell_dense = test_deg > (c->cells);
 
                     if (next_color_class_sz == 1 && !(g->dense && very_dense)) { // singleton
                         refine_color_class_singleton(g, c, next_color_class);
                     } else if (g->dense) {
                         if (very_dense) { // dense-dense
                             refine_color_class_dense_dense(g, c, next_color_class,next_color_class_sz);
-                        } else if(cell_dense) { // dense-cell
-                            refine_color_class_dense_cell(g, c, next_color_class, next_color_class_sz);
-                        } else { // dense-sparse
+                        } //else if(cell_dense) { // dense-cell
+                            //refine_color_class_dense_cell(g, c, next_color_class, next_color_class_sz);
+                        //}
+                        else { // dense-sparse
                             refine_color_class_dense(g, c, next_color_class, next_color_class_sz);
                         }
                     } else { // sparse
@@ -216,7 +217,7 @@ namespace dejavu {
             void report_split_color_class(coloring* c, const int old_class, const int new_class, const int new_class_sz,
                                           const bool is_largest) {
                 c->cells += (old_class != new_class);
-                assert(c->ptn[new_class] + 1 == new_class_sz);
+                dej_assert(c->ptn[new_class] + 1 == new_class_sz);
 
                 if ((g_split_hook != nullptr) && !(*g_split_hook)(old_class, new_class, new_class_sz)) {
                     g_early_out = true;
@@ -247,7 +248,7 @@ namespace dejavu {
 
                 int color_class_size = c->ptn[color];
 
-                assert(color_class_size > 0);
+                dej_assert(color_class_size > 0);
 
                 const int vertex_at_pos = c->lab[color + color_class_size];
                 c->lab[pos] = vertex_at_pos;
@@ -328,7 +329,7 @@ namespace dejavu {
             void report_split_color_class_first(coloring* c, int old_class, int new_class, int new_class_sz,
                                                 bool is_largest) {
                 c->cells += (old_class != new_class);
-                assert(c->ptn[new_class] + 1 == new_class_sz);
+                dej_assert(c->ptn[new_class] + 1 == new_class_sz);
 
                 if (!is_largest && old_class != new_class) {
                     cell_todo.add_cell(queue_pointer, new_class);
@@ -358,7 +359,7 @@ namespace dejavu {
              * @param p the mapping to be certified
              * @return whether \a p is an automorphism of g
              */
-            bool certify_automorphism(sgraph *g, const int *p) {
+            bool  certify_automorphism(sgraph *g, const int *p) {
                 assure_initialized(g);
                 return certification::certify_automorphism(scratch_set, g, p);
             }
@@ -396,8 +397,8 @@ namespace dejavu {
                 }
 
                 int add_cell(work_set_int& _queue_pointer, int col) {
-                    assert(init);
-                    assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
+                    dej_assert(init);
+                    dej_assert(cur_pos >= 0 && cur_pos < arr_sz - 1);
                     _queue_pointer.set(col, cur_pos);
                     arr[cur_pos] = col;
                     cur_pos++;
@@ -457,7 +458,7 @@ namespace dejavu {
                 void replace_cell(work_set_int& _queue_pointer, int col_old, int col) {
                     const int pos = _queue_pointer.get(col_old);
                     arr[pos] = col;
-                    assert(_queue_pointer.get(col_old) != -1);
+                    dej_assert(_queue_pointer.get(col_old) != -1);
                     _queue_pointer.set(col_old, -1);
                     _queue_pointer.set(col, pos);
                 }
@@ -547,7 +548,7 @@ namespace dejavu {
                         neighbours.inc_nr(v);
                         if (neighbours.get(v) == 0) {
                             color_vertices_considered.inc_nr(col);
-                            assert(col + color_vertices_considered.get(col) < g->v_size);
+                            dej_assert(col + color_vertices_considered.get(col) < g->v_size);
                             scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
                             if (color_vertices_considered.get(col) == 0) {
                                 old_color_classes.push_back(col);
@@ -558,7 +559,6 @@ namespace dejavu {
                 }
 
                 // remove color classes from list if they don't split
-                // (does not really seem to speed up the algorithm)
                 for(j = 0; j < old_color_classes.size(); ++j) {
                     const int _col = old_color_classes[j];
                     const int _col_sz = ptn[_col] + 1;
@@ -671,15 +671,15 @@ namespace dejavu {
                     largest_color_class_size = -1;
                     int largest_color_class = -1;
                     for (i = _col; i < _col + _col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (ptn[i] + 1);
                         largest_color_class_size = new_largest? (ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
                         i += ptn[i] + 1;
                     }
-                    assert(largest_color_class >= _col);
-                    assert(largest_color_class < _col + _col_sz);
+                    dej_assert(largest_color_class >= _col);
+                    dej_assert(largest_color_class < _col + _col_sz);
 
                     for (i = _col; i < _col + _col_sz;) {
                         const int i_sz = ptn[i] + 1;
@@ -723,6 +723,27 @@ namespace dejavu {
                     cc += 1;
                 }
 
+                // remove color classes from list if they don't split
+                for(int j = 0; j < old_color_classes.size(); ++j) {
+                    const int _col = old_color_classes[j];
+                    const int _col_sz = c->ptn[_col] + 1;
+
+                    const int v_first     = c->lab[_col];
+                    const int index_first = neighbours.get(v_first);
+                    bool splits = false;
+
+                    for (i = 1; i < _col_sz && !splits; ++i) {
+                        const int v     = c->lab[_col + i];
+                        const int index = neighbours.get(v);
+                        splits = index != index_first;
+                    }
+
+                    if(splits) continue;
+
+                    old_color_classes[j] = old_color_classes[old_color_classes.size() - 1];
+                    old_color_classes.pop_back();
+                }
+
                 old_color_classes.sort();
 
                 // for every cell to be split...
@@ -749,11 +770,12 @@ namespace dejavu {
                     neighbour_sizes.inc(first_index);
                     neighbour_sizes.set(first_index, col_sz - total - 1);
 
-                    //comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
-
                     if (vertex_worklist.cur_pos == 1) continue;
 
+                    //if(vertex_worklist.cur_pos < 8)
                     vertex_worklist.sort();
+                    //else bucket_sort(vertex_worklist, scratch_set, vertex_worklist.max());
+
                     // enrich neighbour_sizes to accumulative counting array
                     acc = 0;
                     while (!vertex_worklist.empty()) {
@@ -779,8 +801,8 @@ namespace dejavu {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
                         // i could immediately determine size of v_new_color here and write invariant before rearrange?
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -792,16 +814,16 @@ namespace dejavu {
                     int largest_color_class  = 0;
                     // determine largest class to throw away
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
                         if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
-                    assert(largest_color_class >= col);
-                    assert(largest_color_class < col + col_sz);
+                    dej_assert(largest_color_class >= col);
+                    dej_assert(largest_color_class < col + col_sz);
 
                     // report splits
                     for (i = col; i < col + col_sz;) {
@@ -865,8 +887,6 @@ namespace dejavu {
                     neighbour_sizes.inc(first_index);
                     neighbour_sizes.set(first_index, col_sz - total - 1);
 
-                    //comp = I->write_top_and_compare(vertex_worklist.cur_pos) && comp;
-
                     if (vertex_worklist.cur_pos == 1) continue;
 
                     vertex_worklist.sort();
@@ -894,8 +914,8 @@ namespace dejavu {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
                         // i could immediately determine size of v_new_color here and write invariant before rearrange?
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -907,16 +927,16 @@ namespace dejavu {
                     int largest_color_class  = 0;
                     // determine largest class to throw away
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
                         if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
-                    assert(largest_color_class >= col);
-                    assert(largest_color_class < col + col_sz);
+                    dej_assert(largest_color_class >= col);
+                    dej_assert(largest_color_class < col + col_sz);
 
                     // report splits
                     for (i = col; i < col + col_sz;) {
@@ -1008,8 +1028,8 @@ namespace dejavu {
                         //const int v = vertex_worklist[i];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
                         // i could immediately determine size of v_new_color here and write invariant before rearrange?
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -1022,16 +1042,16 @@ namespace dejavu {
 
                     // determine largest class to throw away and finish
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
                         if (i != 0) c->ptn[i - 1] = 0;
                         i += c->ptn[i] + 1;
                     }
-                    assert(largest_color_class >= col);
-                    assert(largest_color_class < col + col_sz);
+                    dej_assert(largest_color_class >= col);
+                    dej_assert(largest_color_class < col + col_sz);
 
                     // report splits
                     for (i = col; i < col + col_sz;) {
@@ -1076,7 +1096,6 @@ namespace dejavu {
 
                 /*
                 // remove color classes from list if they don't split
-                // (does not really seem to speed up the algorithm)
                 const int pre_size = old_color_classes.size();
                 for(int j = 0; j < old_color_classes.size();) {
                     const int deg0_col    = old_color_classes[j];
@@ -1102,16 +1121,16 @@ namespace dejavu {
                     const int deg0_col_sz = (c->ptn[deg0_col] + 1) - deg1_col_sz;
                     const int deg1_col = deg0_col + deg0_col_sz;
 
-                    assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+                    dej_assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
 
                     // no split? done...
                     if (deg0_col == deg1_col) {
                         neighbours.set(deg1_col, -1);
-                        assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+                        dej_assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
                         continue;
                     }
 
-                    assert(deg0_col_sz + deg1_col_sz - 1 == c->ptn[deg0_col]);
+                    dej_assert(deg0_col_sz + deg1_col_sz - 1 == c->ptn[deg0_col]);
 
                     // set ptn
                     c->ptn[deg0_col] = deg0_col_sz - 1;
@@ -1124,7 +1143,7 @@ namespace dejavu {
                     //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
 
                     // rearrange vertices of deg1 to the back of deg0 color
-                    assert(deg1_read_pos >= deg0_col);
+                    dej_assert(deg1_read_pos >= deg0_col);
 
                     while (deg1_read_pos >= deg0_col) {
                         const int v = scratch[deg1_read_pos];
@@ -1142,8 +1161,8 @@ namespace dejavu {
                         deg1_read_pos--;
                     }
 
-                    assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
-                    assert(c->vertex_to_col[c->lab[deg1_col]] == deg1_col);
+                    dej_assert(c->vertex_to_col[c->lab[deg0_col]] == deg0_col);
+                    dej_assert(c->vertex_to_col[c->lab[deg1_col]] == deg1_col);
 
                     // add new classes to report_splits
                     const bool leq = deg1_col_sz > deg0_col_sz;
@@ -1324,8 +1343,8 @@ namespace dejavu {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
                         // i could immediately determine size of v_new_color here and write invariant before rearrange?
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -1338,8 +1357,8 @@ namespace dejavu {
 
                     // determine largest class to throw away
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
@@ -1431,8 +1450,8 @@ namespace dejavu {
                     while (pos > 0) {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - (neighbour_sizes.get(neighbours.get(v) + 1));
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -1445,8 +1464,8 @@ namespace dejavu {
 
                     // determine largest class to throw away and finish
                     for (i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
@@ -1512,7 +1531,7 @@ namespace dejavu {
 
                 for(int j = 0; j < g->v_size; j += 1) {
                     neighbours.set(j, abs(neighbours.get(j)) % g->v_size);
-                    assert(neighbours.get(j) >= 0);
+                    dej_assert(neighbours.get(j) >= 0);
                 }
 
                 // iterate all cells
@@ -1565,8 +1584,8 @@ namespace dejavu {
                     while (pos > 0) {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - neighbour_sizes.get(neighbours.get(v));
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -1579,8 +1598,8 @@ namespace dejavu {
 
                     // determine largest class to throw away and finish
                     for (int i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
@@ -1647,7 +1666,7 @@ namespace dejavu {
 
                 for(int j = 0; j < g->v_size; j += 1) {
                     neighbours.set(j, abs(neighbours.get(j)) % g->v_size);
-                    assert(neighbours.get(j) >= 0);
+                    dej_assert(neighbours.get(j) >= 0);
                 }
 
                 // iterate all cells
@@ -1700,8 +1719,8 @@ namespace dejavu {
                     while (pos > 0) {
                         const int v = scratch[--pos];
                         const int v_new_color = col + col_sz - neighbour_sizes.get(neighbours.get(v));
-                        assert(v_new_color >= col);
-                        assert(v_new_color < col + col_sz);
+                        dej_assert(v_new_color >= col);
+                        dej_assert(v_new_color < col + col_sz);
 
                         c->lab[v_new_color + c->ptn[v_new_color] + 1] = v;
                         c->vertex_to_col[v] = v_new_color;
@@ -1714,8 +1733,8 @@ namespace dejavu {
 
                     // determine largest class to throw away and finish
                     for (int i = col; i < col + col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;
@@ -1759,7 +1778,7 @@ namespace dejavu {
                         neighbours.inc_nr(v);
                         if (neighbours.get(v) == 0) {
                             color_vertices_considered.inc_nr(col);
-                            assert(col + color_vertices_considered.get(col) < g->v_size);
+                            dej_assert(col + color_vertices_considered.get(col) < g->v_size);
                             scratch[col + color_vertices_considered.get(col)] = v; // hit vertices
                             if (!scratch_set.get(col)) {
                                 old_color_classes.push_back(col);
@@ -1803,9 +1822,9 @@ namespace dejavu {
                         const int v = scratch[_col + i];
                         if (neighbours.get(v) == -1) {
                             v_new_color = _col;
-                            assert(false);
+                            dej_assert(false);
                         } else {
-                            assert((neighbours.get(v) + 1) > 0);
+                            dej_assert((neighbours.get(v) + 1) > 0);
                             v_new_color = _col + _col_sz - neighbour_sizes.get(neighbours.get(v) + 1);
                         }
                         if (v_new_color != _col) {
@@ -1834,10 +1853,10 @@ namespace dejavu {
                         c->ptn[v_new_color2] += 1;
 
                         if (_col != v_new_color2) {
-                            assert(v_new_color2 > _col);
+                            dej_assert(v_new_color2 > _col);
                             c->ptn[_col] -= 1;
                         } else
-                            assert(false);
+                            dej_assert(false);
                     }
 
                     // add new colors to worklist
@@ -1845,8 +1864,8 @@ namespace dejavu {
                     int largest_color_class      = -1;
                     int i;
                     for (i = _col; i < _col + _col_sz;) {
-                        assert(i >= 0 && i < c->domain_size);
-                        assert(c->ptn[i] + 1 > 0);
+                        dej_assert(i >= 0 && i < c->domain_size);
+                        dej_assert(c->ptn[i] + 1 > 0);
                         const bool new_largest = largest_color_class_size < (c->ptn[i] + 1);
                         largest_color_class_size = new_largest? (c->ptn[i] + 1) : largest_color_class_size;
                         largest_color_class = new_largest? i : largest_color_class;

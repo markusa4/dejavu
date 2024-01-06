@@ -420,7 +420,7 @@ namespace dejavu {
                 colmap_substitute.resize(g->v_size);
                 colmap = colmap_substitute.get_array();
                 for (int i = 0; i < g->v_size; ++i) colmap[i] = 0;
-            } else if(colmap == nullptr && !h_destructive) {
+            } else if(!h_destructive) {
                 int* orig_colmap = colmap;
                 colmap_substitute.resize(g->v_size);
                 colmap = colmap_substitute.get_array();
@@ -639,9 +639,7 @@ namespace dejavu {
                         s_term = t_dfs;
                         break;
                     }
-                    //const bool s_dfs_backtrack =
-                    //        m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail;
-                    /*< did dfs terminate because it needed to backtrack? */
+                    const int s_dfs_potential_ind = m_inprocess.check_individualizations(root_save);
 
                     // next, we go into the random path + BFS algorithm, so we set up a Schreier structure and IR tree
                     // for the given base_vertex
@@ -783,6 +781,12 @@ namespace dejavu {
                         if (sh_tree.get_finished_up_to() == 1 && dfs_level > 1 && s_last_bfs_pruned)
                             next_routine = restart;
                         if (sh_tree.get_finished_up_to() > 1 && sh_tree.get_current_level_size() < base_sizes[0])
+                            next_routine = restart;
+
+                        // inprocess if depth-first search stopped because of failure, but we can inprocess a large
+                        // number of automorphisms found by depth-first search
+                        if(s_restarts == 0 && m_dfs.s_termination == search_strategy::dfs_ir::termination_reason::r_fail
+                            && s_dfs_potential_ind > 8 && s_dfs_potential_ind > base_size - dfs_level - 2)
                             next_routine = restart;
 
                         // now we've finally made up our mind of what to do next

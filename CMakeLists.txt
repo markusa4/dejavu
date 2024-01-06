@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options("-O3")
 add_compile_options("-Wall")
 add_compile_options("-march=native")
+#add_definitions(-g)
 
 add_definitions(-DNDEBUG)
 set(COMPILE_TEST_SUITE FALSE CACHE BOOL "Whether to compile the test suite")
@@ -18,6 +19,7 @@ if (${COMPILE_TEST_SUITE})
     message("Tests active...")
 
     remove_definitions(-DNDEBUG)
+    add_definitions(-DDEJDEBUG)
     add_definitions(-g)
 
     include(FetchContent)

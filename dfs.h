@@ -64,22 +64,22 @@ namespace dejavu {
 
                     const int col = state_left.c->vertex_to_col[ind_v_left];
 
-                    assert(col >= 0);
-                    assert(col < g->v_size);
+                    dej_assert(col >= 0);
+                    dej_assert(col < g->v_size);
                     const int col_sz_right = state_right.c->ptn[col] + 1;
                     const int col_sz_left  = state_left.c->ptn[col]  + 1;
 
-                    assert(col_sz_right > 1);
-                    assert(col_sz_left  > 1);
+                    dej_assert(col_sz_right > 1);
+                    dej_assert(col_sz_left  > 1);
 
                     if (col_sz_right < 2 || col_sz_left != col_sz_right) return 0;
 
-                    assert(ind_v_left >= -1);
-                    assert(ind_v_right >= -1);
+                    dej_assert(ind_v_left >= -1);
+                    dej_assert(ind_v_right >= -1);
 
-                    assert(state_left.c->vertex_to_col[ind_v_left] == col);
-                    assert(state_right.c->vertex_to_col[ind_v_right] == col);
-                    assert(state_left.c->vertex_to_col[ind_v_right] != col);
+                    dej_assert(state_left.c->vertex_to_col[ind_v_left] == col);
+                    dej_assert(state_right.c->vertex_to_col[ind_v_right] == col);
+                    dej_assert(state_left.c->vertex_to_col[ind_v_right] != col);
 
                     state_right.use_trace_early_out(false);
                     state_left.use_trace_early_out(false);
@@ -106,11 +106,11 @@ namespace dejavu {
                         return found_auto;
                     }
 
-                    assert(state_right.c->cells < g->v_size); // there can not be diff on a leaf
+                    dej_assert(state_right.c->cells < g->v_size); // there can not be diff on a leaf
                 }
 
                 // unreachable
-                assert(false);
+                dej_assert(false);
                 return false;
             }
 
@@ -118,6 +118,8 @@ namespace dejavu {
 
             int do_paired_dfs(dejavu_hook* hook, sgraph *g, ir::controller &state_left, ir::controller& state_right,
                               std::vector<std::pair<int, int>>& computed_orbits, bool prune = true) {
+                if(state_right.s_base_pos == 1) return do_simple_dfs(hook, g, state_right, computed_orbits, prune);
+
                 if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
                 s_grp_sz.mantissa = 1.0;
                 s_grp_sz.exponent = 0;
@@ -152,6 +154,7 @@ namespace dejavu {
                 //while (state_right.s_base_pos > 0) {
                     // backtrack one level
                     state_right.move_to_parent();
+
                     if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
                         ws_printer.progress_current_method("dfs", "base_pos",
                                                            static_cast<double>(state_right.compare_base->size())
@@ -160,8 +163,8 @@ namespace dejavu {
                     const int col         = state_right.base[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;
                     const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
-                              assert(col_sz >= 2);
-                    assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
+                              dej_assert(col_sz >= 2);
+                    dej_assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
 
                     int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
                     orbit_handled.reset();
@@ -169,7 +172,7 @@ namespace dejavu {
                     // iterate over current color class
                     for (int i = 0; i < col_sz; ++i) {
                         int ind_v = state_right.leaf_color.lab[col + i];
-                        assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
+                        dej_assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
 
                         // only consider every orbit once
                         if(orbs.are_in_same_orbit(ind_v, base_vertex)) continue;
@@ -185,9 +188,9 @@ namespace dejavu {
                         // put the "left" state in the correct base position
                         while (state_left.s_base_pos > state_right.s_base_pos) state_left.move_to_parent();
                         state_left.T->set_position(state_right.T->get_position());
-                        assert(state_left.c->vertex_to_col[base_vertex] == state_left.c->vertex_to_col[ind_v]);
-                        assert(state_left.s_base_pos == state_right.s_base_pos);
-                        assert(state_left.T->get_position() == state_right.T->get_position());
+                        dej_assert(state_left.c->vertex_to_col[base_vertex] == state_left.c->vertex_to_col[ind_v]);
+                        dej_assert(state_left.s_base_pos == state_right.s_base_pos);
+                        dej_assert(state_left.T->get_position() == state_right.T->get_position());
 
                         // reset difference, since state_left and state_right are in the same node of the tree
                         // now -- so there is no difference
@@ -196,7 +199,7 @@ namespace dejavu {
                         // perform individualization-refinement in state_right
                         //TODO make a mode for this in the IR controller module
                         const int prev_base_pos = state_right.s_base_pos;
-                        trace_pos_reset = state_right.T->get_position(); // TODO is there an elegant solution to this?
+                        trace_pos_reset = state_right.T->get_position();
                         state_right.T->reset_trace_equal();
                         state_right.use_trace_early_out(true);
                         state_right.move_to_child(g, ind_v);
@@ -204,7 +207,7 @@ namespace dejavu {
                         bool pruned = !state_right.T->trace_equal();
                         bool found_auto = false;
 
-                        assert(state_right.c->vertex_to_col[ind_v] ==
+                        dej_assert(state_right.c->vertex_to_col[ind_v] ==
                                state_right.leaf_color.vertex_to_col[base_vertex]);
 
                         if(!pruned) {
@@ -221,7 +224,7 @@ namespace dejavu {
 
                             found_auto = state_right.certify(g, ws_automorphism);
 
-                            assert(ws_automorphism.p()[base_vertex] == ind_v);
+                            dej_assert(ws_automorphism.p()[base_vertex] == ind_v);
                             // if no luck with sparse automorphism, try more proper walk to leaf node
                             if (!found_auto) {
                                 ws_automorphism.reset();
@@ -231,8 +234,8 @@ namespace dejavu {
                                 state_left.use_trace_early_out(true);
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
 
-                                assert(state_left.T->trace_equal());
-                                assert(state_left.T->get_position() == state_right.T->get_position());
+                                dej_assert(state_left.T->trace_equal());
+                                dej_assert(state_left.T->get_position() == state_right.T->get_position());
 
                                 auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
                                 found_auto = (return_code == 1);
@@ -248,12 +251,149 @@ namespace dejavu {
 
                         // if we found automorphism, add to orbit and call hook
                         if (found_auto) {
-                            assert(ws_automorphism.nsupp() > 0);
-                            assert(ws_automorphism.p()[ind_v] == base_vertex ||
+                            dej_assert(ws_automorphism.nsupp() > 0);
+                            dej_assert(ws_automorphism.p()[ind_v] == base_vertex ||
                                            ws_automorphism.p()[base_vertex] == ind_v);
                             orbs.add_automorphism_to_orbit(ws_automorphism);
                             if(hook) (*hook)(g->v_size, ws_automorphism.p(), ws_automorphism.nsupp(),
                                              ws_automorphism.supp());
+                        }
+                        ws_automorphism.reset();
+
+                        // move state back up where we started in this iteration
+                        while (prev_base_pos < state_right.s_base_pos) {
+                            state_right.move_to_parent();
+                        }
+                        state_right.T->set_position(trace_pos_reset);
+
+                        // if no automorphism could be determined we would have to backtrack -- so stop!
+
+                        if ((!found_auto && !pruned) ||
+                            ((4*prune_cost_snapshot > cost_snapshot) && (prev_base_pos > 0)) ||
+                            (pruned && !prune)) {
+                            fail = true;
+                            if(failed_first_level == -1)
+                                failed_first_level = state_right.s_base_pos;
+                            break;
+                        }
+                        // if orbit size equals color size now, we are done on this DFS level
+                        if (orbs.orbit_size(base_vertex) == col_sz) break;
+                    }
+
+                    // if we did not fail, accumulate size of current level to group size
+                    if (!fail) {
+                        computed_orbits.emplace_back(state_right.base_vertex[state_right.s_base_pos],
+                                                     orbs.orbit_size(base_vertex));
+                        s_grp_sz.multiply(orbs.orbit_size(base_vertex));
+                    }
+                }
+
+                // set reason for termination
+                s_termination = fail? r_fail : r_cost;
+
+                // if DFS failed on current level, we did not finish the current level -- has to be accounted for
+                return fail?failed_first_level + (fail):state_right.s_base_pos;
+            }
+
+            int do_simple_dfs(dejavu_hook* hook, sgraph *g, ir::controller& state_right,
+                              std::vector<std::pair<int, int>>& computed_orbits, bool prune = true) {
+                if(h_recent_cost_snapshot_limit < 0) return state_right.s_base_pos;
+                s_grp_sz.mantissa = 1.0;
+                s_grp_sz.exponent = 0;
+
+                // orbit algorithm structure
+                orbs.initialize(g->v_size);
+
+                // automorphism workspace
+                ws_automorphism.reset();
+
+                // we want to terminate if things become to costly, we save the current trace position to track cost
+                cost_snapshot = state_right.T->get_position();
+
+                // tell the controller we are performing DFS now
+                state_right.mode_compare_base();
+
+                int failed_first_level = -1;
+
+                // abort criteria
+                double recent_cost_snapshot = 0;
+                bool   fail = false;
+                int    trace_pos_reset = 0;
+
+                // loop that serves to optimize Tinhofer graphs
+                while ((recent_cost_snapshot < h_recent_cost_snapshot_limit || state_right.s_base_pos <= 1) &&
+                       state_right.s_base_pos > 0 && !fail) {
+                    // backtrack one level
+                    state_right.move_to_parent();
+
+                    if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
+                        ws_printer.progress_current_method("dfs", "base_pos",
+                                                           static_cast<double>(state_right.compare_base->size())
+                                                                   -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
+                    // remember which color we are individualizing
+                    const int col         = state_right.base[state_right.s_base_pos].color;
+                    const int col_sz      = state_right.c->ptn[col] + 1;
+                    const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
+                    dej_assert(col_sz >= 2);
+
+                    int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
+
+                    // iterate over current color class
+                    for (int i = 0; i < col_sz; ++i) {
+                        int ind_v = state_right.leaf_color.lab[col + i];
+                        dej_assert(state_right.c->vertex_to_col[base_vertex] == state_right.c->vertex_to_col[ind_v]);
+
+                        // only consider every orbit once
+                        if(orbs.are_in_same_orbit(ind_v, base_vertex)) continue;
+                        if(!orbs.represents_orbit(ind_v)) continue;
+
+                        // track cost of this refinement for whatever is to come
+                        const int cost_start = state_right.T->get_position();
+
+                        // perform individualization-refinement in state_right
+                        const int prev_base_pos = state_right.s_base_pos;
+                        trace_pos_reset = state_right.T->get_position();
+                        state_right.T->reset_trace_equal();
+                        state_right.use_trace_early_out(true);
+                        state_right.move_to_child(g, ind_v);
+
+                        bool pruned = !state_right.T->trace_equal();
+                        bool found_auto = false;
+
+                        dej_assert(state_right.c->vertex_to_col[ind_v] ==
+                               state_right.leaf_color.vertex_to_col[base_vertex]);
+
+                        if(!pruned) {
+                            // write singleton diff into automorphism...
+                            const int wr_pos_st  = state_right.base[state_right.base.size() - 1].singleton_pt;
+                            const int wr_pos_end = (int) state_right.singletons.size();
+
+                            ws_automorphism.reset();
+                            // ... and then check whether this implies a (sparse) automorphism
+                            ws_automorphism.write_singleton(state_right.compare_singletons,
+                                                            &state_right.singletons, wr_pos_st,
+                                                            wr_pos_end);
+
+                            found_auto = state_right.certify(g, ws_automorphism);
+
+                            dej_assert(ws_automorphism.p()[base_vertex] == ind_v);
+                            // if no luck with sparse automorphism, try more proper walk to leaf node
+                        }
+
+                        // track cost-based abort criterion
+                        const int cost_end   = state_right.T->get_position();
+                        double cost_partial  = (cost_end - cost_start) / (cost_snapshot*1.0);
+                        recent_cost_snapshot = (cost_partial + recent_cost_snapshot * 3) / 4;
+                        prune_cost_snapshot += pruned?(cost_end - cost_start):0;
+
+                        // if we found automorphism, add to orbit and call hook
+                        if (found_auto) {
+                            dej_assert(ws_automorphism.nsupp() > 0);
+                            dej_assert(ws_automorphism.p()[ind_v] == base_vertex ||
+                                   ws_automorphism.p()[base_vertex] == ind_v);
+                            orbs.add_automorphism_to_orbit(ws_automorphism);
+                            if(hook) (*hook)(g->v_size, ws_automorphism.p(), ws_automorphism.nsupp(),
+                                              ws_automorphism.supp());
                         }
                         ws_automorphism.reset();
 

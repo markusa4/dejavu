@@ -49,6 +49,7 @@ namespace dejavu {
          */
         static void color_diff_automorphism(int domain_size, const int *vertex_to_col, const int *col_to_vertex,
                                             int *automorphism, worklist *support) {
+            support->reset();
             for (int v1 = 0; v1 < domain_size; ++v1) {
                 const int col = vertex_to_col[v1];
                 const int v2  = col_to_vertex[col];
@@ -109,6 +110,11 @@ namespace dejavu {
                 this->domain_size = domain_size;
             }
 
+            /**
+             * Resizes the datastructure.
+             *
+             * @param new_domain_size allocate and initialize space for a domain of this size
+             */
             void resize(int new_domain_size) {
                 automorphism.resize(new_domain_size);
                 for (int i = 0; i < new_domain_size; ++i) {
@@ -300,7 +306,7 @@ namespace dejavu {
                         case 1:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[i];
                                 automorphism[inv_i] = p_i;
@@ -311,7 +317,7 @@ namespace dejavu {
                         case 2:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[p[i]];
                                 automorphism[inv_i] = p_i;
@@ -322,7 +328,7 @@ namespace dejavu {
                         case 3:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[p[p[i]]];
                                 automorphism[inv_i] = p_i;
@@ -333,7 +339,7 @@ namespace dejavu {
                         case 4:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[p[p[p[i]]]];
                                 automorphism[inv_i] = p_i;
@@ -344,7 +350,7 @@ namespace dejavu {
                         case 5:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[p[p[p[p[i]]]]];
                                 automorphism[inv_i] = p_i;
@@ -355,7 +361,7 @@ namespace dejavu {
                         case 6:
                             for (int k = 0; k < nsupport; ++k) {
                                 const int i = support[k];
-                                assert(automorphism[inverse_automorphism[i]] == i);
+                                dej_assert(automorphism[inverse_automorphism[i]] == i);
                                 const int inv_i = inverse_automorphism[i];
                                 const int p_i = p[p[p[p[p[p[i]]]]]];
                                 automorphism[inv_i] = p_i;
@@ -364,7 +370,7 @@ namespace dejavu {
                             }
                             break;
                         default:
-                            assert(false); // unreachable
+                            dej_assert(false); // unreachable
                             break;
                     }
 
@@ -399,7 +405,7 @@ namespace dejavu {
                 for (int i = pos_start; i < pos_end; ++i) {
                     const int from = (*singletons1)[i];
                     const int to   = (*singletons2)[i];
-                    assert(automorphism[from] == from);
+                    dej_assert(automorphism[from] == from);
                     if (from != to) {
                         automorphism_supp.push_back(from);
                         automorphism[from] = to;
@@ -438,7 +444,7 @@ namespace dejavu {
              * @param to
              */
             void write_single_map(const int from, const int to) {
-                assert(automorphism[from] == from);
+                dej_assert(automorphism[from] == from);
                 if (from != to) {
                     automorphism_supp.push_back(from);
                     automorphism[from] = to;
@@ -494,8 +500,8 @@ namespace dejavu {
              * @return The orbit of \p v.
              */
             int find_orbit(const int v) {
-                assert(v >= 0);
-                assert(v < sz);
+                dej_assert(v >= 0);
+                dej_assert(v < sz);
                 int last_map;
                 int next_map = v;
                 do {
@@ -513,8 +519,8 @@ namespace dejavu {
              * @return Size of the orbit of \p v.
              */
             int orbit_size(const int v) {
-                assert(v >= 0);
-                assert(v < sz);
+                dej_assert(v >= 0);
+                dej_assert(v < sz);
                 return orb_sz[find_orbit(v)];
             }
 
@@ -535,10 +541,10 @@ namespace dejavu {
              * @param v2  The second vertex.
              */
             void combine_orbits(const int v1, const int v2) {
-                assert(v1 >= 0);
-                assert(v2 >= 0);
-                assert(v1 < sz);
-                assert(v2 < sz);
+                dej_assert(v1 >= 0);
+                dej_assert(v2 >= 0);
+                dej_assert(v1 < sz);
+                dej_assert(v2 < sz);
                 if(v1 == v2) return;
                 const int orbit1 = find_orbit(v1);
                 const int orbit2 = find_orbit(v2);
@@ -561,16 +567,20 @@ namespace dejavu {
              * @return Whether \p v1 and \p v2 are in the same orbit.
              */
             bool are_in_same_orbit(const int v1, const int v2) {
-                assert(v1 >= 0);
-                assert(v2 >= 0);
-                assert(v1 < sz);
-                assert(v2 < sz);
+                dej_assert(v1 >= 0);
+                dej_assert(v2 >= 0);
+                dej_assert(v1 < sz);
+                dej_assert(v2 < sz);
                 if(v1 == v2) return true;
                 const int orbit1 = find_orbit(v1);
                 const int orbit2 = find_orbit(v2);
                 return (orbit1 == orbit2);
             }
 
+            /**
+             * Resets the datastructure to the trivial orbit partition. Takes time O(n) where n is the current domain
+             * size.
+             */
             void reset() {
                 for(int v = 0; v < sz; ++v) {
                     map_arr[v] = v;
@@ -694,12 +704,12 @@ namespace dejavu {
                     for (int i = 0; i < data.size(); ++i) {
                         const int j = abs(data[i]) - 1;
                         const bool is_last = data[i] < 0;
-                        assert(i == data.size() - 1 ? is_last : true);
+                        dej_assert(i == data.size() - 1 ? is_last : true);
                         if (is_last) {
                             space.write_single_map(j, abs(data[first_of_cycle]) - 1);
                             first_of_cycle = i + 1;
                         } else {
-                            assert(i + 1 < data.size());
+                            dej_assert(i + 1 < data.size());
                             space.write_single_map(j, abs(data[i + 1]) - 1);
                         }
                     }
@@ -717,12 +727,12 @@ namespace dejavu {
                     for (int i = 0; i < data.size(); ++i) {
                         const int j = abs(data[i]) - 1;
                         const bool is_last = data[i] < 0;
-                        assert(i == data.size() - 1 ? is_last : true);
+                        dej_assert(i == data.size() - 1 ? is_last : true);
                         if (is_last) {
                             automorphism.write_single_map(j, abs(data[first_of_cycle]) - 1);
                             first_of_cycle = i + 1;
                         } else {
-                            assert(i + 1 < data.size());
+                            dej_assert(i + 1 < data.size());
                             automorphism.write_single_map(j, abs(data[i + 1]) - 1);
                         }
                     }
@@ -743,7 +753,7 @@ namespace dejavu {
              */
             void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
                 domain_size = new_domain_size;
-                assert(data.empty());
+                dej_assert(data.empty());
 
                 int support = 0;
                 for (int i = 0; i < domain_size; ++i) support += (automorphism.p()[i] != i);
@@ -760,23 +770,23 @@ namespace dejavu {
                         if (helper.get(j)) continue;
                         helper.set(j);
                         int map_j = automorphism.p()[j];
-                        assert(map_j != j);
+                        dej_assert(map_j != j);
                         while (!helper.get(map_j)) {
                             data.push_back(map_j + 1);
                             helper.set(map_j);
                             map_j = automorphism.p()[map_j];
                         }
-                        assert(map_j == j);
+                        dej_assert(map_j == j);
                         data.push_back(-(j + 1));
                     }
                     helper.reset();
-                    assert(data.size() == support);
+                    dej_assert(data.size() == support);
                 } else {
                     store_type = STORE_DENSE;
                     data.allocate(domain_size);
                     data.set_size(domain_size);
                     memcpy(data.get_array(), automorphism.p(), domain_size * sizeof(int));
-                    assert(data.size() == domain_size);
+                    dej_assert(data.size() == domain_size);
                 }
             }
         };
@@ -853,8 +863,8 @@ namespace dejavu {
             }
 
             void remove_generator(size_t num) {
-                assert(num >= 0);
-                assert(num < generators.size());
+                dej_assert(num >= 0);
+                dej_assert(num < generators.size());
                 delete generators[num];
                 generators[num] = nullptr;
             }
@@ -988,7 +998,7 @@ namespace dejavu {
                 auto generator = generators[gen_num];
 
                 // apply generator
-                assert(pwr >= 0);
+                dej_assert(pwr >= 0);
                 if (pwr > 0) { // use generator
                     generator->load(w.loader, w.scratch_auto);
                     // multiply
@@ -1085,8 +1095,8 @@ namespace dejavu {
              * @param sz_upb Upper bound for the size of transversal (e.g., color class size in combinatorial base).
              */
             void initialize(const int fixed_vertex, const int new_level, const int new_sz_upb) {
-                assert(fixed_vertex >= 0);
-                assert(new_level >= 0);
+                dej_assert(fixed_vertex >= 0);
+                dej_assert(new_level >= 0);
                 fixed = fixed_vertex;
                 this->level  = new_level;
                 this->sz_upb = new_sz_upb;
@@ -1113,7 +1123,7 @@ namespace dejavu {
                 for (int i = 0; i < static_cast<int>(fixed_orbit.size()); ++i) {
                     const int p = fixed_orbit[i];
                     int j = automorphism.p()[p];
-                    assert(j >= 0);
+                    dej_assert(j >= 0);
                     if (j == p || w.scratch1.get(j)) continue;
 
                     int pwr = 0; // power we save in Schreier vector
@@ -1143,7 +1153,7 @@ namespace dejavu {
                     finished = true;
                 }
 
-                assert(sz_upb >= (int) fixed_orbit.size());
+                dej_assert(sz_upb >= (int) fixed_orbit.size());
 
                 // reset our workspace
                 w.scratch1.reset();
@@ -1165,13 +1175,13 @@ namespace dejavu {
                 // the Schreier vector
                 while (fixed != fixed_map) {
                     const int pos = find_point(fixed_map); // Where are we storing the information for `fixed_map`?
-                    assert(pos >= 0);
+                    dej_assert(pos >= 0);
                     const int perm = fixed_orbit_to_perm[pos]; // generator to apply for `fixed_map`
                     const int pwr  = fixed_orbit_to_pwr[pos];  // power to use for `fixed_map`
                     apply_perm(w, automorphism, generators, perm, pwr);
                     fixed_map = automorphism.p()[fixed]; // Fixed now? Or we need to go again?
                 }
-                assert(automorphism.p()[fixed] == fixed);
+                dej_assert(automorphism.p()[fixed] == fixed);
                 return automorphism.nsupp() == 0;
             }
         };
@@ -1224,9 +1234,9 @@ namespace dejavu {
             void initialize(const int new_domain_size, std::vector<int> &base, std::vector<int> &base_sizes,
                             int stop = INT32_MAX) {
                 stop = std::min(static_cast<int>(base.size()), stop);
-                assert(static_cast<int>(base.size()) >= stop);
+                dej_assert(static_cast<int>(base.size()) >= stop);
                 domain_size = new_domain_size;
-                assert(this->domain_size > 0);
+                dej_assert(this->domain_size > 0);
                 generators.initialize(domain_size);
                 generators.clear();
                 transversals.reserve(stop);
@@ -1242,7 +1252,7 @@ namespace dejavu {
 
             void set_base(schreier_workspace &w, automorphism_workspace& automorphism, random_source& rng,
                           std::vector<int> &new_base, int err = 10, bool resift_generators = false) {
-                assert(init);
+                dej_assert(init);
                 const int old_size = static_cast<int>(transversals.size());
                 const int new_size = static_cast<int>(new_base.size());
 
@@ -1261,7 +1271,7 @@ namespace dejavu {
                 for (int i = 0; i < keep_until; ++i) { transversals[i].set_size_upper_bound(INT32_MAX); }
                 for (int i = keep_until; i < new_size; ++i) {
                     transversals[i] = shared_transversal();
-                    assert(new_base[i] >= 0);
+                    dej_assert(new_base[i] >= 0);
                     transversals[i].initialize(new_base[i], i, INT32_MAX);
                 }
 
@@ -1295,7 +1305,7 @@ namespace dejavu {
              * @param keep_old If true, attempt to keep parts of the base that is already stored.
              */
             bool reset(int new_domain_size, schreier_workspace& w, std::vector<int> &new_base,
-                       std::vector<int> &new_base_sizes, const int stop, bool keep_old,
+                       std::vector<int> &new_base_sizes, const int stop, bool keep_old, bool remove_generators,
                        std::vector<int> &global_fixed_points) {
                 const int old_size = static_cast<int>(transversals.size());
                 if(!init || new_domain_size != domain_size) {
@@ -1306,6 +1316,7 @@ namespace dejavu {
 
                 // compare with stored base, keep whatever is possible
                 int keep_until = 0;
+                if(remove_generators) generators.clear();
                 if(keep_old) {
                     for (; keep_until < old_size && keep_until < new_size; ++keep_until) {
                         if (transversals[keep_until].get_fixed_point() != new_base[keep_until]) break;
@@ -1329,7 +1340,7 @@ namespace dejavu {
                 for (int i = keep_until; i < stop; ++i) {
                     //if(i < old_size) delete transversals[i];
                     transversals[i] = shared_transversal();
-                    assert(new_base[i] >= 0);
+                    dej_assert(new_base[i] >= 0);
                     transversals[i].initialize(new_base[i], i, new_base_sizes[i]);
                 }
 
@@ -1381,21 +1392,21 @@ namespace dejavu {
             bool is_in_fixed_orbit(const int base_pos, const int v) {
                 if (base_pos >= base_size()) return false;
                 if(v < 0) return false;
-                assert(base_pos >= 0);
-                assert(base_pos < base_size());
+                dej_assert(base_pos >= 0);
+                dej_assert(base_pos < base_size());
                 const int search = transversals[base_pos].find_point(v);
                 return search != -1;
             }
 
             const std::vector<int>& get_fixed_orbit(const int base_pos) {
-                assert(base_pos >= 0);
-                assert(base_pos < base_size());
+                dej_assert(base_pos >= 0);
+                dej_assert(base_pos < base_size());
                 return transversals[base_pos].get_fixed_orbit();
             }
 
             const std::vector<int>& get_stabilizer_generators(const int base_pos) {
-                assert(base_pos >= 0);
-                assert(base_pos < base_size());
+                dej_assert(base_pos >= 0);
+                dej_assert(base_pos < base_size());
                 return transversals[base_pos].get_generators();
             }
 
@@ -1492,10 +1503,10 @@ namespace dejavu {
                 for(int i = 0; i < num_mult; ++i) {
                     // load generator
                     const int next_gen_num = static_cast<int>(rng() % generators.size());
-                    assert(next_gen_num >= 0);
-                    assert(next_gen_num < generators.size());
+                    dej_assert(next_gen_num >= 0);
+                    dej_assert(next_gen_num < generators.size());
                     auto next_gen = generators[next_gen_num];
-                    assert(next_gen != nullptr);
+                    dej_assert(next_gen != nullptr);
                     next_gen->load(w.loader, w.scratch_auto);
 
                     // multiply
@@ -1728,7 +1739,7 @@ namespace dejavu {
                     const std::vector<int> &generators = schreier.get_stabilizer_generators(j);
                     for (auto i: generators) {
                         if (i < 0) continue;
-                        assert(i < get_number_of_generators());
+                        dej_assert(i < get_number_of_generators());
                         if (auxiliary_set.get(i)) continue;
                         auxiliary_set.set(i);
                         schreier.load_generator(ws_auto, i);
@@ -1765,7 +1776,7 @@ namespace dejavu {
              */
             bool sift(int, const int *p, int nsupp, const int *supp, bool known_in_group = false) {
                 ws_auto.reset();
-                for(int i = 0; i < h_domain_size; ++i) assert(ws_auto.p()[i] == i);
+                for(int i = 0; i < h_domain_size; ++i) dej_assert(ws_auto.p()[i] == i);
 
                 for(int i = 0; i < nsupp; ++i) {
                     const int v_from = supp[i];
@@ -1775,7 +1786,7 @@ namespace dejavu {
 
                 /*markset debug(h_domain_size);
                 for(int i = 0; i < h_domain_size; ++i) {
-                    assert(!debug.get(ws_auto.perm()[i]));
+                    dej_assert(!debug.get(ws_auto.perm()[i]));
                     debug.set(ws_auto.perm()[i]);
                 }*/
 
@@ -1939,11 +1950,15 @@ namespace dejavu {
             bool reset(domain_compressor* new_compressor, int new_domain_size, schreier_workspace& w,
                        std::vector<int> &new_base, std::vector<int> &new_base_sizes, const int stop, bool keep_old,
                        std::vector<int> &global_fixed_points) {
+                bool remove_generators = (compressor != nullptr);
+
                 compressor = new_compressor;
                 // do not use compression at all if ration too bad (to save on translation cost, and such that keep_old
                 // works for difficult graphs)
                 if(compressor != nullptr &&
-                   compressor->s_compression_ratio > h_min_compression_ratio) compressor = nullptr;
+                    compressor->s_compression_ratio > h_min_compression_ratio) compressor = nullptr;
+
+                remove_generators = remove_generators || (compressor != nullptr);
 
                 if(compressor != nullptr) {
                     // need more management if we are using compression
@@ -1958,13 +1973,13 @@ namespace dejavu {
 
                     s_compression_ratio = compressor->s_compression_ratio;
                     return internal_schreier.reset(new_compressor->compressed_domain_size(), w, new_basec,
-                                                    new_base_sizes, stop, keep_old,
+                                                    new_base_sizes, stop, keep_old, remove_generators,
                                                     global_fixed_points);
                 } else {
                     // we are not using compression, so simply use the Schreier structure normally
                     s_compression_ratio = 1.0;
                     return internal_schreier.reset(new_domain_size, w, new_base,
-                                                    new_base_sizes, stop, keep_old,
+                                                    new_base_sizes, stop, keep_old, remove_generators,
                                                     global_fixed_points);
                 }
             }
@@ -2033,7 +2048,7 @@ namespace dejavu {
             void reduce_to_unfinished(schreier_workspace &w, std::vector<int> &selection, int base_pos) {
                 if(compressor != nullptr) {
                     for(int i = 0; i < static_cast<int>(selection.size()); ++i) {
-                        assert(compressor->compress(selection[i]) >= 0);
+                        dej_assert(compressor->compress(selection[i]) >= 0);
                         selection[i] = compressor->compress(selection[i]);
                     }
                 }
@@ -2041,7 +2056,7 @@ namespace dejavu {
                 if(compressor != nullptr) {
                     for(int i = 0; i < static_cast<int>(selection.size()); ++i) {
                         selection[i] = compressor->decompress(selection[i]);
-                        assert(selection[i] >= 0);
+                        dej_assert(selection[i] >= 0);
                     }
                 }
 
@@ -2057,7 +2072,7 @@ namespace dejavu {
                     const int vmapsto = automorphism.p()[vsupport];
                     const int vmapstoc = compressor->compress(vmapsto);
                     if(vsupportc >= 0) {
-                        assert(vmapstoc >= 0);
+                        dej_assert(vmapstoc >= 0);
                         automorphism_compress.write_single_map(vsupportc, vmapstoc);
                     }
                 }

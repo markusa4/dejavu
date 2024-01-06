@@ -43,7 +43,7 @@ namespace dejavu {
                 s_total_automorphism_prune = 0;
                 s_total_leaves = 0;
 
-                assert(ir_tree.get_current_level_size() > 0);
+                dej_assert(ir_tree.get_current_level_size() > 0);
 
                 queue_up_level(selector, ir_tree, current_level);
                 work_on_todo(g, hook, &ir_tree, local_state);
@@ -53,7 +53,7 @@ namespace dejavu {
             static int next_level_estimate(ir::shared_tree& ir_tree, std::function<ir::type_selector_hook> *selector) {
                 const int base_pos = ir_tree.get_finished_up_to();
                 const auto start_node = ir_tree.get_level(base_pos);
-                assert(start_node != nullptr);
+                dej_assert(start_node != nullptr);
                 const auto level_size = ir_tree.get_level_size(base_pos);
                 auto next_node_save = start_node->get_save();
                 auto c = next_node_save->get_coloring();
@@ -65,7 +65,7 @@ namespace dejavu {
             static void queue_up_level(std::function<ir::type_selector_hook> *selector, ir::shared_tree& ir_tree,
                                        int base_pos) {
                 auto start_node = ir_tree.get_level(base_pos);
-                assert(start_node != nullptr);
+                dej_assert(start_node != nullptr);
                 while(!start_node->get_base()) {
                     start_node = start_node->get_next();
                 }
@@ -105,7 +105,7 @@ namespace dejavu {
                 if(is_pruned && h_use_deviation_pruning) {
                     ++s_total_prune;
                     ++s_deviation_prune;
-                    assert(!node->get_base());
+                    dej_assert(!node->get_base());
                     return;
                 }
 
@@ -136,13 +136,13 @@ namespace dejavu {
                     local_state.load_reduced_state(*next_node_save);
                 } else {
                     local_state.move_to_parent();
-                    local_state.load_reduced_state_without_coloring(*next_node_save); // TODO <- this should be unecessary, right?
+                    local_state.load_reduced_state_without_coloring(*next_node_save);
                 }
 
                 if(local_state.s_base_pos > 0) local_state.use_increase_deviation(true);
 
 
-                assert(node->get_base()?!local_state.there_is_difference_to_base_including_singles(g->v_size):true);
+                dej_assert(node->get_base()?!local_state.there_is_difference_to_base_including_singles(g->v_size):true);
 
                 // do computation
                 local_state.reset_trace_equal();
@@ -155,7 +155,7 @@ namespace dejavu {
                 const bool parent_is_base = node->get_base();
                 const bool is_base = parent_is_base && (v == (*local_state.compare_base_vertex)[local_state.s_base_pos - 1]);
 
-                assert(is_base?!local_state.there_is_difference_to_base_including_singles(g->v_size):true);
+                dej_assert(is_base?!local_state.there_is_difference_to_base_including_singles(g->v_size):true);
 
                 bool cert = true;
                 if(g->v_size == local_state.c->cells && local_state.T->trace_equal()) {
@@ -204,7 +204,7 @@ namespace dejavu {
                     if(local_state.s_base_pos > 1 && !h_use_deviation_pruning)
                         ir_tree->record_add_invariant(v, local_state.T->get_hash());
                 } else {
-                    assert(!is_base);
+                    dej_assert(!is_base);
                     // deviation map
                     if(local_state.s_base_pos > 1) {
                         if(!h_use_deviation_pruning) {
@@ -216,7 +216,7 @@ namespace dejavu {
                         if (parent_is_base) ir_tree->stored_deviation.record_deviation(local_state.T->get_hash());
                         else {
                             if (!ir_tree->stored_deviation.check_deviation(local_state.T->get_hash())) {
-                                assert(!parent_is_base);
+                                dej_assert(!parent_is_base);
                                 node->prune();
                             }
                         }

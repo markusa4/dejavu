@@ -27,11 +27,12 @@ namespace dejavu::ir {
 
         ds::markset  handled(g->v_size);
         ds::markset  col_handled(g->v_size);
-        ds::worklist  wl(g->v_size);
+        ds::worklist wl(g->v_size);
 
         int current_component      = 0;
         int total_size             = 0;
         int in_handle              = 0;
+        bool one_component = false;
 
         for(int i = 0; i < g->v_size; ++i) {
             if(handled.get(i)) continue;
@@ -42,6 +43,11 @@ namespace dejavu::ir {
             int current_component_size = 0;
 
             while(!wl.empty()) {
+                if(current_component_size + wl.size() == g->v_size) {
+                    one_component = true;
+                    break;
+                }
+
                 const int k = wl.pop_back();
 
                 const int col    = c.vertex_to_col[k];
@@ -86,7 +92,11 @@ namespace dejavu::ir {
                 ++current_component;
             }
 
-            if(total_size == g->v_size) break;
+            if(total_size == g->v_size || one_component) break;
+        }
+
+        if(one_component) {
+            for(int i = 0; i < g->v_size; ++i) (*vertex_to_component)[i] = 0;
         }
 
         return current_component;
@@ -111,9 +121,9 @@ namespace dejavu::ir {
          * @return vertex of the original graph
          */
         int map_back(int component, int vertex) {
-            assert(component >= 0);
-            assert(component < num_components);
-            assert(component_to_backward_translation[component] + vertex <
+            dej_assert(component >= 0);
+            dej_assert(component < num_components);
+            dej_assert(component_to_backward_translation[component] + vertex <
                    static_cast<int>(backward_translation.size()));
             return (num_components <= 1? vertex :
                     backward_translation[component_to_backward_translation[component] + vertex]);
@@ -167,8 +177,8 @@ namespace dejavu::ir {
                 const int component = vertex_to_component[v];
                 if(component  < 0) continue;
                 const int v_in_component = forward_translation[v];
-                assert(v_in_component >= 0);
-                assert(v_in_component < vertices_in_component[component]);
+                dej_assert(v_in_component >= 0);
+                dej_assert(v_in_component < vertices_in_component[component]);
                 backward_translation[component_to_backward_translation[component] + v_in_component] = v;
             }
 
@@ -181,7 +191,7 @@ namespace dejavu::ir {
                     const int fwd_neighbour = forward_translation[neighbour];
                     if(fwd_neighbour >= 0) {
                         g->e[ept] = fwd_neighbour;
-                        assert(vertex_to_component[v] == vertex_to_component[neighbour]);
+                        dej_assert(vertex_to_component[v] == vertex_to_component[neighbour]);
                         //assert(g->e[ept] >= 0 && g->e[ept] < vertices_in_component[vertex_to_component[ept]]);
                         ++ept;
                     }

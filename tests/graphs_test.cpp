@@ -94,6 +94,9 @@ void test_graph(std::string filename) {
     auto test_hook_ = dejavu_hook(dejavu::test_hook);
 
     dejavu::solver d;
+    d.set_error_bound(20); // in theory, due to the probabilistic nature of the algorithm, some tests could fail without
+                           // there being a bug -- but this "almost ensures" that it will be a bug...
+    d.set_print(false);
     d.automorphisms(g, colmap);
 }
 
@@ -114,6 +117,8 @@ void test_graph_orbit_check(std::string filename) {
 
     std::cout << "Running dejavu " << filename << "..." << std::endl;
     dejavu::solver d;
+    d.set_error_bound(20); // in theory, due to the probabilistic nature of the algorithm, some tests could fail without
+                          // there being a bug -- but this "almost ensures" that it will be a bug...
     d.set_print(false);
     d.automorphisms(g, colmap, &test_hook_dejavu);
 

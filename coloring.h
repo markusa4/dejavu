@@ -8,8 +8,11 @@
 #include <vector>
 #include <cassert>
 #include <cstring>
+#include "utility.h"
 
-namespace dejavu::ds {
+namespace dejavu { namespace ds {
+    // (need to nest namespaces due to C++ 14)
+
     /**
      * \brief Vertex coloring for a graph
      *
@@ -37,11 +40,11 @@ namespace dejavu::ds {
          * @param sz Domain size.
          */
         void alloc(int sz) {
-            assert(sz >= 0);
+            dej_assert(sz >= 0);
 
             if (alloc_pt) dealloc();
             alloc_pt = (int *) malloc(sz * 4 * sizeof(int));
-            assert(alloc_pt != nullptr);
+            dej_assert(alloc_pt != nullptr);
 
             lab = alloc_pt;
             ptn = lab + sz;
@@ -78,9 +81,9 @@ namespace dejavu::ds {
          * @param c The coloring to copy from.
          */
         void copy_ptn(coloring *c) const {
-            assert(alloc_pt);
-            assert(c->alloc_pt);
-            assert(domain_size == c->domain_size);
+            dej_assert(alloc_pt);
+            dej_assert(c->alloc_pt);
+            dej_assert(domain_size == c->domain_size);
             memcpy(ptn, c->ptn, c->domain_size * sizeof(int));
         }
 
@@ -162,17 +165,17 @@ namespace dejavu::ds {
                 if (counter == 0) {
                     counter = ptn[i] + 1;
                     last_col = i;
-                    assert(ptn[i] >= 0 && ptn[i] < domain_size);
+                    dej_assert(ptn[i] >= 0 && ptn[i] < domain_size);
                 }
             }
 
             for (int i = 0; i < domain_size;) {
-                assert(vertex_to_col[lab[i]] == i);
+                dej_assert(vertex_to_col[lab[i]] == i);
                 i += ptn[i] + 1;
             }
-            assert(comp);
+            dej_assert(comp);
         }
     };
-}
+}}
 
 #endif //DEJAVU_COLORING_H

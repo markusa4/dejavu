@@ -14,8 +14,6 @@
 #include <memory>
 #include <chrono>
 #include <iomanip>
-#include "graph.h"
-#include "ds.h"
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
@@ -34,7 +32,12 @@
 
 #define PRINT_NO_NEWLINE(str) std::cout << str << std::flush;
 #define PRINT(str) std::cout << str << std::endl;
-//#define PRINT(str) {};
+
+#ifdef DEJDEBUG
+#define dej_assert(expr) (assert(expr))
+#else
+#define dej_assert(expr) (void)0
+#endif
 
 /**
  * Hash function for unsigned integers.
@@ -76,120 +79,6 @@ static inline bool file_exists(const std::string& name) {
     return f.good();
 }
 
-static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
-                                   int seed_permute=0) {
-    std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
-    std::ifstream infile(filename);
-
-    std::vector<int> reshuffle;
-
-    std::vector<std::vector<int>> incidence_list;
-    std::set<int> degrees;
-    std::set<int> colors;
-    std::string line;
-    std::string nv_str, ne_str;
-    std::string nv1_string, nv2_string;
-    int nv1, nv2;
-    size_t i;
-    int nv = 0;
-    int ne = 0;
-    while (std::getline(infile, line)) {
-        char m = line[0];
-        int average_d;
-        switch (m) {
-            case 'p':
-                for(i = 7; i < line.size() && line[i] != ' '; ++i) {
-                    nv_str += line[i];
-                }
-
-                ++i;
-                for(; i < line.size() && line[i] != ' '; ++i) {
-                    ne_str += line[i];
-                }
-                nv = std::stoi(nv_str);
-                ne = std::stoi(ne_str);
-                average_d = (ne / nv) + 3;
-                g->initialize(nv, ne * 2);
-
-                reshuffle.reserve(nv);
-                for(int j = 0; j < nv; ++j) reshuffle.push_back(j + 1);
-                if(seed_permute != 0) {
-                    std::mt19937 eng(seed_permute);
-                    std::shuffle(std::begin(reshuffle), std::end(reshuffle), eng);
-                }
-
-                incidence_list.reserve(nv);
-                for(int j = 0; j < nv; ++j) {
-                    incidence_list.emplace_back();
-                    incidence_list[incidence_list.size() - 1].reserve(average_d);
-                }
-                break;
-            case 'e':
-                nv1_string = "";
-                nv2_string = "";
-                for(i = 2; i < line.size() && line[i] != ' '; ++i) {
-                    nv1_string += line[i];
-                }
-                ++i;
-                for(; i < line.size() && line[i] != ' '; ++i) {
-                    nv2_string += line[i];
-                }
-
-                nv1 = reshuffle[std::stoi(nv1_string)-1];
-                nv2 = reshuffle[std::stoi(nv2_string)-1];
-
-                incidence_list[nv1 - 1].push_back(nv2 - 1);
-                incidence_list[nv2 - 1].push_back(nv1 - 1);
-                break;
-            case 'n':
-                if(*colmap == nullptr)
-                    *colmap = (int *) calloc(nv, sizeof(int));
-                nv1_string = "";
-                nv2_string = "";
-                for(i = 2; i < line.size() && line[i] != ' '; ++i) {
-                    nv1_string += line[i];
-                }
-                ++i;
-                for(; i < line.size() && line[i] != ' '; ++i) {
-                    nv2_string += line[i];
-                }
-
-                nv1 = reshuffle[std::stoi(nv1_string)-1];
-                nv2 = std::stoi(nv2_string);
-                (*colmap)[nv1 - 1] = nv2;
-                break;
-            default:
-                break;
-        }
-    }
-
-    int epos = 0;
-    int vpos = 0;
-
-    int maxd = 0;
-
-    for(auto & i : incidence_list) {
-        g->v[vpos] = epos;
-        g->d[vpos] = (int) i.size();
-        //degrees.insert(g->d[vpos]);
-        if(g->d[vpos] > maxd)
-            maxd = g->d[vpos];
-        vpos += 1;
-        for(int j : i) {
-            g->e[epos] = j;
-            epos += 1;
-        }
-    }
-
-    g->v_size = nv;
-    g->e_size = 2 * ne;
-
-    assert(nv == g->v_size);
-    assert(2 * ne == g->e_size);
-    const double parse_time = (double) (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - timer).count());
-    if(!silent) std::cout << std::setprecision(2) << "parse_time=" << parse_time / 1000000.0 << "ms";
-}
-
 typedef void type_dejavu_hook(int, const int*, int, const int*);
 typedef std::function<void(int, const int*, int, const int*)> dejavu_hook;
 
@@ -203,7 +92,6 @@ namespace dejavu {
     class random_source {
         bool true_random = false;
         std::mt19937 pseudo_random_device;
-        //std::default_random_engine pseudo_random_device;
         std::random_device true_random_device;
     public:
         /**
@@ -312,10 +200,16 @@ namespace dejavu {
         return out << number.mantissa << "*10^" << number.exponent;
     }
 
+    /**
+     * Used to make the output look a bit more structured.
+     */
     static void progress_print_split() {
         PRINT("\r______________________________________________________________");
     }
 
+    /**
+     * Prints heading of table in the output.
+     */
     static void progress_print_header() {
         progress_print_split();
         PRINT(std::setw(11) << std::left <<"T (ms)" << std::setw(11) << "delta(ms)" << std::setw(12) << "proc"
@@ -324,7 +218,9 @@ namespace dejavu {
     }
 
     /**
-     * \brief Prints stuff to the console
+     * \brief Prints information to the console.
+     *
+     * Contains additional facilities to measure elapsed time in-between prints.
      */
     class timed_print {
         std::chrono::high_resolution_clock::time_point first;
@@ -343,9 +239,9 @@ namespace dejavu {
             progress_print_header();
         }
 
-        void print_split() {
+        void print_split() const {
             if(h_silent) return;
-            PRINT("\r______________________________________________________________");
+            progress_print_split();
         }
 
         void print(const std::string& str) const {
