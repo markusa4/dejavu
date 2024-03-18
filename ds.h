@@ -511,6 +511,9 @@ namespace dejavu {
              * Initializes a set of size 0
              */
             markset() = default;
+            markset(const markset& other)  {
+                copy(&other);
+            }
 
             /**
              * Initialize this set with the given \p size.
@@ -576,7 +579,7 @@ namespace dejavu {
                 ++mark;
             }
 
-            void copy(markset* other) {
+            void copy(const markset* other) {
                 initialize(other->sz);
                 for(int i = 0; i < other->sz; ++i) {
                     s[i] = other->s[i];

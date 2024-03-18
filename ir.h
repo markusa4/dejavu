@@ -143,6 +143,10 @@ namespace dejavu {
 
             coloring leaf_color; /** comparison leaf coloring */
 
+            markset  touched_color; /**< were changes in this color already tracked? */
+            worklist touched_color_list; /**< color touched_color_list[i] was changed... */
+            worklist prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
+
             // statistics
             int   s_base_pos = 0; /**< how large the base of the current IR node is*/
         private:
@@ -154,10 +158,6 @@ namespace dejavu {
             std::vector<int>       internal_compare_singletons;  /** singletons of the comparison trace */
             std::vector<int>       internal_compare_base_vertex; /** comparison base */
             std::vector<base_info> internal_compare_base;        /** additional info of the comparison base */
-
-            markset  touched_color; /**< were changes in this color already tracked? */
-            worklist  touched_color_list; /**< color touched_color_list[i] was changed... */
-            worklist  prev_color_list; /**< ...and its vertices were previously of color prev_color_list[i]  */
 
             // the following workspaces are only used for the paired color dfs (AKA the saucy-style dfs) -- not needed
             // for normal bfs, dfs, or random search operation

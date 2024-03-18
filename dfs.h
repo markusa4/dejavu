@@ -151,19 +151,19 @@ namespace dejavu {
                 // loop that serves to optimize Tinhofer graphs
                 while ((recent_cost_snapshot < h_recent_cost_snapshot_limit || state_right.s_base_pos <= 1) &&
                         state_right.s_base_pos > 0 && !fail) {
-                //while (state_right.s_base_pos > 0) {
                     // backtrack one level
                     state_right.move_to_parent();
+
+                    // remember which color we are individualizing
+                    const int col         = (*state_right.compare_base)[state_right.s_base_pos].color;
+                    const int base_vertex = (*state_right.compare_base_vertex)[state_right.s_base_pos]; // base vertex
+                    const int col_sz      = state_right.c->ptn[col] + 1;
 
                     if((state_right.s_base_pos & 0x00000FFF) == 0x00000FFD)
                         ws_printer.progress_current_method("dfs", "base_pos",
                                                            static_cast<double>(state_right.compare_base->size())
                                                         -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
-                    // remember which color we are individualizing
-                    const int col         = state_right.base[state_right.s_base_pos].color;
-                    const int col_sz      = state_right.c->ptn[col] + 1;
-                    const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
-                              dej_assert(col_sz >= 2);
+                    dej_assert(col_sz >= 2);
                     dej_assert(!state_right.there_is_difference_to_base_including_singles(g->v_size));
 
                     int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
@@ -282,7 +282,7 @@ namespace dejavu {
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
-                        computed_orbits.emplace_back(state_right.base_vertex[state_right.s_base_pos],
+                        computed_orbits.emplace_back((*state_right.compare_base_vertex)[state_right.s_base_pos],
                                                      orbs.orbit_size(base_vertex));
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }
@@ -331,9 +331,9 @@ namespace dejavu {
                                                            static_cast<double>(state_right.compare_base->size())
                                                                    -state_right.s_base_pos, "cost_snapshot", recent_cost_snapshot);
                     // remember which color we are individualizing
-                    const int col         = state_right.base[state_right.s_base_pos].color;
+                    const int col         = (*state_right.compare_base)[state_right.s_base_pos].color;
                     const int col_sz      = state_right.c->ptn[col] + 1;
-                    const int base_vertex = state_right.base_vertex[state_right.s_base_pos]; // base vertex
+                    const int base_vertex = (*state_right.compare_base_vertex)[state_right.s_base_pos]; // base vertex
                     dej_assert(col_sz >= 2);
 
                     int prune_cost_snapshot = 0; /*< if we prune, keep track of how costly it is */
@@ -419,7 +419,7 @@ namespace dejavu {
 
                     // if we did not fail, accumulate size of current level to group size
                     if (!fail) {
-                        computed_orbits.emplace_back(state_right.base_vertex[state_right.s_base_pos],
+                        computed_orbits.emplace_back((*state_right.compare_base_vertex)[state_right.s_base_pos],
                                                      orbs.orbit_size(base_vertex));
                         s_grp_sz.multiply(orbs.orbit_size(base_vertex));
                     }

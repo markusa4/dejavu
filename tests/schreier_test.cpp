@@ -105,7 +105,7 @@ TEST(schreier_test, schreier_orbit_at_level1) {
     ASSERT_EQ(s.get_fixed_orbit_size(4), 1);
 
     std::vector<int> test_orbit = s.get_fixed_orbit(2);
-    for(int i = 0; i < test_orbit.size(); ++i) {
+    for(int i = 0; i < static_cast<int>(test_orbit.size()); ++i) {
         const int v = test_orbit[i];
         ASSERT_TRUE(v == 2 || v == 3 || v ==4);
         ASSERT_FALSE(v == 0);
@@ -157,7 +157,7 @@ TEST(schreier_test, schreier_orbit_at_level2) {
     ASSERT_EQ(s.get_fixed_orbit_size(4), 1);
 
     std::vector<int> test_orbit = s.get_fixed_orbit(2);
-    for(int i = 0; i < test_orbit.size(); ++i) {
+    for(int i = 0; i < static_cast<int>(test_orbit.size()); ++i) {
         const int v = test_orbit[i];
         ASSERT_TRUE(v == 2 || v == 3 || v ==4);
         ASSERT_FALSE(v == 0);

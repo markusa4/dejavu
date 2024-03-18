@@ -433,7 +433,7 @@ namespace dejavu {
     };
 }
 
-static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
+[[maybe_unused]] static void parse_dimacs(const std::string& filename, dejavu::sgraph* g, int** colmap, bool silent=true,
                          int seed_permute=0) {
     std::chrono::high_resolution_clock::time_point timer = std::chrono::high_resolution_clock::now();
     std::ifstream infile(filename);

@@ -232,6 +232,9 @@ namespace dejavu {
                     const int deg0_col_sz = (c.ptn[deg0_col] + 1) - deg1_col_sz;
                     const int deg1_col = deg0_col + deg0_col_sz;
 
+
+                    dej_assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
+
                     // no split? done...
                     if (deg0_col == deg1_col) {
                         neighbours.set(deg0_col, -1);
@@ -249,8 +252,6 @@ namespace dejavu {
 
                     int deg1_write_pos = deg1_col;
                     int deg1_read_pos = 2*deg0_col + neighbours.get(deg0_col) - 1;
-
-                    //c->vertex_to_col[c->lab[deg1_col]] = deg1_col;
 
                     // rearrange vertices of deg1 to the back of deg0 color
                     dej_assert(deg1_read_pos >= 2*deg0_col);
@@ -272,6 +273,7 @@ namespace dejavu {
                         deg1_read_pos--;
                     }
 
+                    dej_assert(deg1_write_pos == deg1_col + deg1_col_sz);
                     dej_assert(c.vertex_to_col[c.lab[deg0_col]] == deg0_col);
                     dej_assert(c.vertex_to_col[c.lab[deg1_col]] == deg1_col);
 
@@ -3442,7 +3444,7 @@ namespace dejavu {
             const int pre_e_size = g->e_size;
             const int pre_cells  = c.cells;
 
-            dejavu::ir::refinement R_stack = dejavu::ir::refinement();
+            dejavu::ir::refinement R_stack;
             if(R1 == nullptr) R1 = &R_stack;
 
             R1->refine_coloring_first(g, &c, -1);
