@@ -37,6 +37,9 @@ if (${COMPILE_TEST_SUITE})
     add_executable(
             dejavu_test
             tests/markset_test.cpp
+            tests/worklist_test.cpp
+            tests/workspace_test.cpp
+            tests/automorphism_test.cpp
             tests/simple_graphs_test.cpp
             tests/main_test.cpp
             tests/refinement_test.cpp

@@ -74,6 +74,28 @@ TEST(markset_test, copy) {
     EXPECT_EQ(m2.get(48), false);
 }
 
+TEST(markset_test, assignment) {
+    markset m1;
+    m1.initialize(128);
+    EXPECT_EQ(m1.get(47), false);
+    m1.set(47);
+    EXPECT_EQ(m1.get(47), true);
+
+    markset m2(12);
+    m2.set(5);
+    EXPECT_EQ(m2.get(5), true);
+
+    m2 = m1;
+    EXPECT_EQ(m2.get(47), true);
+    EXPECT_EQ(m2.get(48), false);
+    EXPECT_EQ(m2.get(5), false);
+    m1.reset();
+    EXPECT_EQ(m1.get(47), false);
+    EXPECT_EQ(m1.get(48), false);
+    EXPECT_EQ(m2.get(47), true);
+    EXPECT_EQ(m2.get(48), false);
+}
+
 TEST(markset_test, many_resets) {
     markset m;
     m.initialize(4);

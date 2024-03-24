@@ -8,7 +8,7 @@
 using dejavu::groups::orbit;
 using dejavu::hooks::orbit_hook;
 
-TEST(orbit_test, orbit_construction_test) {
+TEST(orbit_test, construction_test) {
     orbit o;
     o.initialize(16);
     ASSERT_FALSE(o.are_in_same_orbit(1, 7));
@@ -32,7 +32,63 @@ TEST(orbit_test, orbit_construction_test) {
     ASSERT_FALSE(o.are_in_same_orbit(1, 8));
 }
 
-TEST(orbit_test, orbit_combine_test) {
+TEST(orbit_test, compare_test) {
+    orbit o1;
+    o1.initialize(16);
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+    o1.combine_orbits(1, 7);
+    ASSERT_TRUE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+
+    orbit o2;
+    o2.initialize(16);
+    ASSERT_FALSE(o2.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o2.are_in_same_orbit(1, 8));
+    o2.combine_orbits(7, 1);
+    ASSERT_TRUE(o2.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o2.are_in_same_orbit(1, 8));
+
+    ASSERT_TRUE(o1 == o2);
+
+    o2.combine_orbits(1, 9);
+    ASSERT_FALSE(o1 == o2);
+}
+
+TEST(orbit_test, copy_test) {
+    orbit o1;
+    o1.initialize(16);
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+    o1.combine_orbits(1, 7);
+    ASSERT_TRUE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+
+    orbit o2 = o1;
+    ASSERT_TRUE(o1 == o2);
+
+    o1.combine_orbits(1, 9);
+    ASSERT_FALSE(o1 == o2);
+}
+
+TEST(orbit_test, assignment_test) {
+    orbit o1;
+    o1.initialize(16);
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+    o1.combine_orbits(1, 7);
+    ASSERT_TRUE(o1.are_in_same_orbit(1, 7));
+    ASSERT_FALSE(o1.are_in_same_orbit(1, 8));
+
+    orbit o2(3);
+    o2 = o1;
+    ASSERT_TRUE(o1 == o2);
+
+    o1.combine_orbits(1, 9);
+    ASSERT_FALSE(o1 == o2);
+}
+
+TEST(orbit_test, combine_test) {
     orbit o;
     o.initialize(127);
     ASSERT_FALSE(o.are_in_same_orbit(1, 7));
@@ -62,7 +118,7 @@ TEST(orbit_test, orbit_combine_test) {
     ASSERT_TRUE(o.are_in_same_orbit(28, 28));
 }
 
-TEST(orbit_test, orbit_hook_test) {
+TEST(orbit_test, hook_test) {
     orbit o(8);
     orbit_hook hook(o);
 

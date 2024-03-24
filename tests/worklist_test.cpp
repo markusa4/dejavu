@@ -30,6 +30,25 @@ TEST(worklist_test, basic_reset) {
     EXPECT_EQ(m.size(), 0);
 }
 
+TEST(worklist_test, copy) {
+    worklist m1;
+    m1.allocate(128);
+    m1.push_back(0);
+    m1.push_back(1);
+    m1.push_back(2);
+    m1.push_back(3);
+    worklist m2 = m1;
+    EXPECT_EQ(m1.size(), m2.size());
+    for(int i = 0; i < m1.size(); ++i) EXPECT_EQ(m1[i], m2[i]);
+    m1.reset();
+    EXPECT_EQ(m2.size(), 4);
+    EXPECT_EQ(m1.size(), 0);
+    m1.push_back(1);
+    EXPECT_EQ(m2[0], 0);
+    EXPECT_EQ(m1[0], 1);
+}
+
+
 TEST(worklist_test, pop) {
     worklist m;
     m.allocate(128);
