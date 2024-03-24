@@ -1071,26 +1071,26 @@ namespace dejavu {
         }
 
         /**
-         * Adds the canonical recovery information attached to neighbors of \p v to the given \p automorphism with
-         * support \p automorphism_supp.
+         * Adds the canonical recovery information attached to neighbors of \p v to the given \p aut with
+         * support \p aut_supp.
          *
          * @param v vertex to consider
-         * @param automorphism given automorphism to be extended with canonical recovery information
-         * @param automorphism_supp support worklist of \p automorphism
+         * @param aut given aut to be extended with canonical recovery information
+         * @param aut_supp support worklist of \p aut
          * @param help_array an array of `domain_size` required for auxiliary data
          */
-        void recovery_attached_edges_to_automorphism(int v, int* automorphism, dejavu::ds::worklist* automorphism_supp,
+        void recovery_attached_edges_to_automorphism(int v, int* aut, dejavu::ds::worklist* aut_supp,
                                                      dejavu::ds::worklist* help_array1,
                                                      dejavu::ds::worklist* help_array2) {
             if(recovery_edge_adjacent[v].empty()) return;
-            const int v_map    = automorphism[v];
+            const int v_map    = aut[v];
 
             for(auto & j : recovery_edge_adjacent[v]) {
                 const int other = std::get<0>(j);
                 const int id    = std::get<1>(j);
 
                 dej_assert(other != v);
-                const int other_map = automorphism[other];
+                const int other_map = aut[other];
 
                 (*help_array2)[other_map] = id;
             }
@@ -1109,24 +1109,24 @@ namespace dejavu {
                 // endpoints of the mapped edges:
                 // e1: v     -> v_map
                 // e2: other -> other_map
-                // automorphism maps e1 -> e2
+                // aut maps e1 -> e2
 
                 if(len == 1) {
                     // special code for stored path of length 1 (does not use recovery_edge_attached)
                     const int v_from = orig_id;
                     const int v_to   = id;
-                    if (v_from != v_to && automorphism[v_from] == v_from) {
-                        automorphism[v_from] = v_to;
-                        automorphism_supp->push_back(v_from);
+                    if (v_from != v_to && aut[v_from] == v_from) {
+                        aut[v_from] = v_to;
+                        aut_supp->push_back(v_from);
                     }
                 } else {
                     // general-purpose code for longer paths
                     for (int k = 0; k < len; ++k) {
                         const int v_from = recovery_edge_attached[orig_id + k];
                         const int v_to   = recovery_edge_attached[id + k];
-                        if (v_from != v_to && automorphism[v_from] == v_from) {
-                            automorphism[v_from] = v_to;
-                            automorphism_supp->push_back(v_from);
+                        if (v_from != v_to && aut[v_from] == v_from) {
+                            aut[v_from] = v_to;
+                            aut_supp->push_back(v_from);
                         }
                     }
                 }
@@ -3010,7 +3010,7 @@ namespace dejavu {
 
         // given automorphism of reduced graph, reconstructs automorphism of the original graph
         // does not optimize for consecutive calls
-        void pre_hook(int, const int *_automorphism, int _supp, const int *_automorphism_supp, dejavu_hook* hook) {
+        void pre_hook(int, const int *_aut, int _supp, const int *_aut_supp, dejavu_hook* hook) {
             if(hook == nullptr)
                 return;
 
@@ -3019,9 +3019,9 @@ namespace dejavu {
             bool use_aux_auto = false;
 
             for (int i = 0; i < _supp; ++i) {
-                const int v_from = _automorphism_supp[i];
+                const int v_from = _aut_supp[i];
                 const int orig_v_from = translate_back(v_from);
-                const int v_to = _automorphism[v_from];
+                const int v_to = _aut[v_from];
                 dej_assert(v_from != v_to);
                 const int orig_v_to = translate_back(v_to);
                 dej_assert(v_from >= 0);
@@ -3108,7 +3108,7 @@ namespace dejavu {
     public:
         // given automorphism of reduced graph, reconstructs automorphism of the original graph
         void
-        pre_hook_buffered(int _n, const int *_automorphism, int _supp, const int *_automorphism_supp, dejavu_hook* hook) {
+        pre_hook_buffered(int _n, const int *_aut, int _supp, const int *_aut_supp, dejavu_hook* hook) {
             if(hook == nullptr) {
                 return;
             }
@@ -3122,11 +3122,11 @@ namespace dejavu {
 
             if(_supp >= 0) {
                 for (int i = 0; i < _supp; ++i) {
-                    const int _v_from = _automorphism_supp[i];
+                    const int _v_from = _aut_supp[i];
                     const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     dej_assert(v_from >= 0 && v_from < domain_size);
                     const int orig_v_from = backward_translation[v_from];
-                    const int _v_to = _automorphism[_v_from];
+                    const int _v_to = _aut[_v_from];
                     const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     dej_assert(v_from != v_to);
                     const int orig_v_to = backward_translation[v_to];
@@ -3188,7 +3188,7 @@ namespace dejavu {
                     const int _v_from = i;
                     const int v_from  = decomposer==nullptr?_v_from:decomposer->map_back(current_component, _v_from);
                     const int orig_v_from = backward_translation[v_from];
-                    const int _v_to = _automorphism[_v_from];
+                    const int _v_to = _aut[_v_from];
                     const int v_to  = decomposer==nullptr?_v_to:decomposer->map_back(current_component, _v_to);
                     if(v_from == v_to)
                         continue;
@@ -3288,22 +3288,22 @@ namespace dejavu {
         }
 
         // deletes edges connected to discrete vertices, and marks discrete vertices for deletion later
-        void del_discrete_edges_inplace(dejavu::sgraph *g, coloring *c) {
+        void del_discrete_edges_inplace(dejavu::sgraph *g, coloring *col) {
             int rem_edges = 0;
             int discrete_vert = 0;
             del.reset();
-            for (int i = 0; i < c->domain_size;) {
-                const int col_sz = c->ptn[i];
+            for (int i = 0; i < col->domain_size;) {
+                const int col_sz = col->ptn[i];
                 if (col_sz == 0) {
                     ++discrete_vert;
-                    del.set(c->lab[i]);
+                    del.set(col->lab[i]);
                 }
                 i += col_sz + 1;
             }
 
             for (int v = 0; v < g->v_size; ++v) {
                 if (del.get(v)) {
-                    dej_assert(c->ptn[c->vertex_to_col[v]] == 0);
+                    dej_assert(col->ptn[col->vertex_to_col[v]] == 0);
                     rem_edges += g->d[v];
                     g->d[v] = 0;
                     continue;

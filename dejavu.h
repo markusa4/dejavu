@@ -39,6 +39,7 @@ namespace dejavu {
         class hook_interface {
         public:
             virtual dejavu_hook* get_hook() = 0;
+            virtual ~hook_interface() = default;
         };
 
         /**

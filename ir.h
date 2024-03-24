@@ -112,9 +112,9 @@ namespace dejavu {
             int  trace_pos; /**< position of the trace */
             unsigned long trace_hash; /**< hash of the trace */
 
-            base_info(int color, int colorSz, int cells, int touchedColorListPt, int singletonPt, int tracePos,
+            base_info(int selColor, int colorSz, int cellNum, int touchedColorListPt, int singletonPt, int tracePos,
                       unsigned long traceHash) :
-                      color(color), color_sz(colorSz), cells(cells), touched_color_list_pt(touchedColorListPt),
+                      color(selColor), color_sz(colorSz), cells(cellNum), touched_color_list_pt(touchedColorListPt),
                       singleton_pt(singletonPt), trace_pos(tracePos), trace_hash(traceHash) {}
         };
 
@@ -133,13 +133,13 @@ namespace dejavu {
             trace         *T  = nullptr; /**< trace of current root-to-node path */
 
             std::vector<int>       singletons;         /** singletons of the current trace */
-            std::vector<int>*      compare_singletons; /** singletons of the comparison trace */
+            std::vector<int>*      compare_singletons = nullptr; /** singletons of the comparison trace */
 
             std::vector<int>       base_vertex; /** current base (i.e., root-to-node path) */
             std::vector<base_info> base;        /** additional info for the current base   */
 
-            std::vector<int>*      compare_base_vertex; /** comparison base */
-            std::vector<base_info>*compare_base;        /** additional info of the comparison base */
+            std::vector<int>*      compare_base_vertex = nullptr; /** comparison base */
+            std::vector<base_info>*compare_base = nullptr;        /** additional info of the comparison base */
 
             coloring leaf_color; /** comparison leaf coloring */
 
@@ -367,34 +367,34 @@ namespace dejavu {
             /**
              * Initialize this controller using a refinement and a graph coloring for the initial state.
              *
-             * @param R The refinement workspace to use.
-             * @param c The initial coloring.
+             * @param ref The refinement workspace to use.
+             * @param col The initial coloring.
              */
-            controller(refinement* R, coloring *c) {
-                this->c = c;
-                this->R = R;
+            controller(refinement* ref, coloring *col) {
+                this->c = col;
+                this->R = ref;
 
                 T  = &internal_T1;
                 cT = &internal_T2;
 
-                touched_color.initialize(c->domain_size);
-                touched_color_list.allocate(c->domain_size);
-                prev_color_list.allocate(c->domain_size);
+                touched_color.initialize(col->domain_size);
+                touched_color_list.allocate(col->domain_size);
+                prev_color_list.allocate(col->domain_size);
 
                 touch_initial_colors();
 
                 my_split_hook = self_split_hook();
                 my_worklist_hook = self_worklist_hook();
 
-                diff_tester.initialize(c->domain_size);
+                diff_tester.initialize(col->domain_size);
 
-                diff_vertices.initialize(c->domain_size);
-                diff_vertices_list.resize(c->domain_size);
-                diff_vertices_list_pt.resize(c->domain_size);
-                diff_is_singleton.initialize(c->domain_size);
+                diff_vertices.initialize(col->domain_size);
+                diff_vertices_list.resize(col->domain_size);
+                diff_vertices_list_pt.resize(col->domain_size);
+                diff_is_singleton.initialize(col->domain_size);
 
                 singleton_pt_start = 0;
-                singletons.reserve(c->domain_size);
+                singletons.reserve(col->domain_size);
             }
 
             int get_number_of_splits() {
@@ -1735,13 +1735,13 @@ namespace dejavu {
                                     STORE_BASE ///< stores only base of the leaf
             };
 
-            stored_leaf(int* arr, int arr_sz, stored_leaf_type store_type) : store_type(store_type) {
+            stored_leaf(int* arr, int arr_sz, stored_leaf_type storetype) : store_type(storetype) {
                 lab_or_base.allocate(arr_sz);
                 memcpy(lab_or_base.get_array(), arr, arr_sz * sizeof(int));
                 lab_or_base.set_size(arr_sz);
             }
 
-            stored_leaf(std::vector<int>& arr, stored_leaf_type store_type) : store_type(store_type) {
+            stored_leaf(std::vector<int>& arr, stored_leaf_type storetype) : store_type(storetype) {
                 lab_or_base.allocate((int) arr.size());
                 std::copy(arr.begin(), arr.end(), lab_or_base.get_array());
                 lab_or_base.set_size((int) arr.size());
@@ -1854,14 +1854,14 @@ namespace dejavu {
             int           nodes_below  = 0;
             int           pruned_below = 0;
 
-            tree_node(limited_save* data, tree_node* next, tree_node* parent, bool owns_data) {
-                this->data = data;
-                this->next = next;
-                this->owns_data = owns_data;
-                if(next == nullptr) {
-                    next = this; // TODO supposed to be this->next?
+            tree_node(limited_save* _data, tree_node* _next, tree_node* _parent, bool ownsdata) {
+                this->data = _data;
+                this->next = _next;
+                this->owns_data = ownsdata;
+                if(_next == nullptr) {
+                    _next = this; // TODO supposed to be this->next?
                 }
-                this->parent = parent;
+                this->parent = _parent;
             }
 
             tree_node* get_next() {

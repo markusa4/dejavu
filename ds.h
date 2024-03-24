@@ -272,8 +272,8 @@ namespace dejavu {
                 struct comparator_map {
                     T *map;
 
-                    explicit comparator_map(T *map) {
-                        this->map = map;
+                    explicit comparator_map(T *m) {
+                        this->map = m;
                     }
 
                     bool operator()(const T &a, const T &b) {

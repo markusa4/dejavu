@@ -97,17 +97,17 @@ namespace dejavu {
             /**
              * Initializes the stored automorphism to the identity.
              *
-             * @param domain_size Size of the domain on which automorphisms operate
+             * @param domain_sz Size of the domain on which automorphisms operate
              */
-            explicit automorphism_workspace(int domain_size = 0) {
-                automorphism.allocate(domain_size);
-                for (int i = 0; i < domain_size; ++i) {
+            explicit automorphism_workspace(int domain_sz = 0) {
+                automorphism.allocate(domain_sz);
+                for (int i = 0; i < domain_sz; ++i) {
                     automorphism[i] = i;
                 }
-                automorphism_supp.allocate(domain_size);
-                inverse_automorphism.allocate(domain_size);
+                automorphism_supp.allocate(domain_sz);
+                inverse_automorphism.allocate(domain_sz);
                 invalidate_inverse_automorphism();
-                this->domain_size = domain_size;
+                this->domain_size = domain_sz;
             }
 
             /**

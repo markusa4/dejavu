@@ -14,19 +14,19 @@ namespace dejavu {
      */
     class sgraph {
         struct vertexComparator {
-            vertexComparator(const sgraph &g) : g(g) {}
+            explicit vertexComparator(const sgraph &g) : graph(g) {}
 
-            const sgraph &g;
+            const sgraph &graph;
 
             bool operator()(const int &v1, const int &v2) const {
-                return g.d[v1] < g.d[v2];
+                return graph.d[v1] < graph.d[v2];
             }
         };
 
         struct vertexComparatorColor {
-            vertexComparatorColor(const sgraph &g, const int *vertex_to_col) : g(g), vertex_to_col(vertex_to_col) {}
+            vertexComparatorColor(const sgraph &g, const int *vtocol) : graph(g), vertex_to_col(vtocol) {}
 
-            const sgraph &g;
+            const sgraph &graph;
             const int *vertex_to_col;
 
             bool operator()(const int &v1, const int &v2) const {
@@ -525,14 +525,14 @@ namespace dejavu {
 
     int maxd = 0;
 
-    for(auto & i : incidence_list) {
+    for(auto & incident : incidence_list) {
         g->v[vpos] = epos;
-        g->d[vpos] = (int) i.size();
+        g->d[vpos] = (int) incident.size();
         //degrees.insert(g->d[vpos]);
         if(g->d[vpos] > maxd)
             maxd = g->d[vpos];
         vpos += 1;
-        for(int j : i) {
+        for(int j : incident) {
             g->e[epos] = j;
             epos += 1;
         }

@@ -46,7 +46,7 @@
  * @param x the unsigned integer
  * @return hashed integer
  */
-static unsigned int hash(unsigned int x) {
+[[maybe_unused]] static unsigned int hash(unsigned int x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = (x >> 16) ^ x;
@@ -60,7 +60,7 @@ static unsigned int hash(unsigned int x) {
  * @param d integer to accumulate to \p hash
  * @return the new hash
  */
-static unsigned long add_to_hash(unsigned long hash, const int d) {
+[[maybe_unused]] static unsigned long add_to_hash(unsigned long hash, const int d) {
     const unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
     hash    = hash << 8;                    // shift hash left by 5 bits
     hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order

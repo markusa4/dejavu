@@ -98,9 +98,9 @@ namespace dejavu { namespace search_strategy {
                 std::vector<unsigned long> *map;
                 int* colmap;
 
-                explicit comparator_map(std::vector<unsigned long> *map, int* colmap) {
-                    this->map = map;
-                    this->colmap = colmap;
+                explicit comparator_map(std::vector<unsigned long> *m, int* vertex_to_col) {
+                    this->map = m;
+                    this->colmap = vertex_to_col;
                 }
 
                 bool operator()(const int &a, const int &b) const {
@@ -150,9 +150,9 @@ namespace dejavu { namespace search_strategy {
                 unsigned long *map;
                 int* colmap;
 
-                explicit comparator_map(unsigned long *map, int* colmap) {
-                    this->map = map;
-                    this->colmap = colmap;
+                explicit comparator_map(unsigned long *m, int* vertex_to_col) {
+                    this->map = m;
+                    this->colmap = vertex_to_col;
                 }
 
                 bool operator()(const int &a, const int &b) const {
