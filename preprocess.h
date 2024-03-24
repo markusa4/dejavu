@@ -449,11 +449,11 @@ namespace dejavu {
                     dej_assert(twin_class_sz -1 == static_cast<int>(add_to_string.size()));
                     dej_assert(twin_counter[vertex] == static_cast<int>(add_to_string.size()));
                     const int orig_vertex = translate_back(vertex);
-                    [[maybe_unused]] int debug_sz = (int) recovery_strings[orig_vertex].size();
                     for(auto& other_vertex : add_to_string) {
                         dej_assert(del.get(other_vertex));
                         const int orig_other  = translate_back(other_vertex);
-                        dej_assert(debug_sz == static_cast<int>(recovery_strings[orig_other].size()));
+                        dej_assert(static_cast<int>(recovery_strings[orig_vertex].size()) ==
+                                   static_cast<int>(recovery_strings[orig_other].size()));
                         recovery_strings[orig_vertex].push_back(orig_other);
                         for(int k = 0; k < static_cast<int>(recovery_strings[orig_other].size()); ++k) {
                             recovery_strings[orig_vertex].push_back(recovery_strings[orig_other][k]);
@@ -811,11 +811,6 @@ namespace dejavu {
             dejavu::worklist connected_paths(g->e_size);
             dejavu::worklist connected_endpoints(g->e_size);
 
-            // collect and count endpoints
-            [[maybe_unused]] int total_paths = 0;
-            [[maybe_unused]] int total_deleted_vertices = 0;
-            [[maybe_unused]] int total_paths_excluded_not_unique = 0;
-
             for (int i = 0; i < g->v_size; ++i) {
                 if(g->d[i] == 2) {
                     if(path_done.get(i))
@@ -837,7 +832,6 @@ namespace dejavu {
                         dej_assert(other_endpoint.first != n1);
                         dej_assert(g->d[other_endpoint.first] != 2);
                         dej_assert(n1 != other_endpoint.first);
-                        ++total_paths;
                     } else if(g->d[n2] != 2) {
                         const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
                         if(other_endpoint.first == n2) // big self-loop
@@ -852,7 +846,6 @@ namespace dejavu {
                         dej_assert(other_endpoint.first != n2);
                         dej_assert(g->d[other_endpoint.first] != 2);
                         dej_assert(n2 != other_endpoint.first);
-                        ++total_paths;
                     }
                 }
             }
@@ -883,7 +876,6 @@ namespace dejavu {
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     if(color_test.get(neighbour_col)) {
                         color_unique.set(neighbour_col); // means "not unique"
-                        total_paths_excluded_not_unique += color_size;
                     }
                     color_test.set(neighbour_col);
                 }
@@ -917,7 +909,6 @@ namespace dejavu {
                     const int neighbour_endpoint = connected_endpoints[g->v[test_vertex] + j];
                     const int neighbour_col      = c.vertex_to_col[neighbour_endpoint];
                     if(color_test.get(neighbour_col)) {
-                        total_paths_excluded_not_unique += color_size;
                         color_unique.set(neighbour_col);
                     }
                     color_test.set(neighbour_col);
@@ -956,14 +947,16 @@ namespace dejavu {
 
                 const int num_paths = filter.cur_pos;
 
-                // do next steps for all vertices in color classes...
+                #if defined(DEJDEBUG) &&  !defined(NDEBUG)
                 int reduced_verts = 0;
-                [[maybe_unused]] int reduced_verts_last = 0;
+                int reduced_verts_last = 0;
+                #endif
 
+                // do next steps for all vertices in color classes...
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = c.lab[color + j];
 
-                    [[maybe_unused]] int sanity_check = 0;
+                    int sanity_check = 0;
                     // paths left in filter (color_unique) are now collected for reduction
                     color_test.reset();
                     for(int k = 0; k < g->d[vertex]; ++k) {
@@ -981,7 +974,6 @@ namespace dejavu {
                     dej_assert(sanity_check == num_paths);
 
                     for(int k = 0; k < num_paths; ++k) {
-                        reduced_verts = 0;
                         const int path_start_vertex = path_list[k];
                         dej_assert(g->d[path_start_vertex] == 2);
                         if(path_done.get(path_start_vertex)) {
@@ -1004,7 +996,6 @@ namespace dejavu {
                             del.set(del_v);
                             dej_assert(!path_done.get(del_v));
                             path_done.set(del_v);
-                            ++total_deleted_vertices;
                         }
 
                         // connect endpoints of path with new edge
@@ -1034,12 +1025,13 @@ namespace dejavu {
                         }
                     }
 
+                    #if defined(DEJDEBUG) &&  !defined(NDEBUG)
                     reduced_verts = static_cast<int>(recovery_strings[translate_back(vertex)].size());
-
                     if(j > 0) {
                         dej_assert(reduced_verts == reduced_verts_last);
                     }
                     reduced_verts_last = reduced_verts;
+                    #endif
                 }
             }
         }
@@ -1315,7 +1307,6 @@ namespace dejavu {
                 const int num_paths = filter.cur_pos;
 
                 // do next steps for all vertices in color classes...
-                [[maybe_unused]] int reduced_verts_last = 0;
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = c.lab[color + j];
 
@@ -1325,7 +1316,7 @@ namespace dejavu {
                         color_deg[filter_col] = 0;
                     }
 
-                    [[maybe_unused]] int sanity_check_num_paths = 0;
+                    int sanity_check_num_paths = 0;
 
                     for(int k = 0; k < g->d[vertex]; ++k) {
                         const int neighbour     = g->e[g->v[vertex] + k];
@@ -1559,14 +1550,12 @@ namespace dejavu {
                 const int num_paths = filter.cur_pos;
 
                 // do next steps for all vertices in color classes...
-                [[maybe_unused]] int reduced_verts_last = 0;
                 for(int j = 0; j < color_size; ++j) {
                     const int vertex = c.lab[color + j];
 
                     // reset color_deg to 0
                     int next_pos = 0;
-
-                    [[maybe_unused]] int sanity_check_num_paths = 0;
+                    int sanity_check_num_paths = 0;
 
                     for(int k = 0; k < g->d[vertex]; ++k) {
                         const int neighbour     = g->e[g->v[vertex] + k];
@@ -1824,7 +1813,6 @@ namespace dejavu {
                     const int neighbour_col = c.vertex_to_col[neighbour];
                     const int endpoint  = not_unique[kk + 1];
                     const int endpoint_col    = c.vertex_to_col[endpoint];
-                    [[maybe_unused]] const int endpoint_col_sz = c.ptn[endpoint_col] + 1;
                     path.reset();
                     if (!color_test.get(endpoint_col)) {
                         color_test.set(endpoint_col);
@@ -1848,10 +1836,8 @@ namespace dejavu {
                             // test_vertex connects to all vertices of endpoint_col!
                             if (all_unique && color < endpoint_col) {
                                 const int path_col = c.vertex_to_col[neighbour];
-                                [[maybe_unused]] const int path_col_sz = c.ptn[path_col] + 1;
-                                [[maybe_unused]] const int connects_to = not_unique_analysis[endpoint_col];
-                                dej_assert(path_col_sz == (connects_to * color_size));
-                                dej_assert(endpoint_col_sz == not_unique_analysis[endpoint_col]);
+                                dej_assert(c.ptn[path_col] + 1 == (not_unique_analysis[endpoint_col] * color_size));
+                                dej_assert(c.ptn[endpoint_col] + 1 == not_unique_analysis[endpoint_col]);
 
 
                                 int endpoint_neighbour_col = -1;
@@ -3143,15 +3129,13 @@ namespace dejavu {
                     const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
                     const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
                     const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
-                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
-                    [[maybe_unused]] const int from_recovery_string_size =
-                            from_recovery_string_end_pt - from_recovery_string_start_pt;
                     if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
                         automorphism[orig_v_from] = orig_v_to;
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    dej_assert(from_recovery_string_size == to_recovery_string_size);
+                    dej_assert((baked_recovery_string_pt[v_from].second - from_recovery_string_start_pt) ==
+                               to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
@@ -3207,16 +3191,14 @@ namespace dejavu {
                     const int to_recovery_string_end_pt   = baked_recovery_string_pt[v_to].second;
                     const int to_recovery_string_size     = to_recovery_string_end_pt - to_recovery_string_start_pt;
                     const int from_recovery_string_start_pt = baked_recovery_string_pt[v_from].first;
-                    const int from_recovery_string_end_pt   = baked_recovery_string_pt[v_from].second;
-                    [[maybe_unused]] const int from_recovery_string_size =
-                            from_recovery_string_end_pt - from_recovery_string_start_pt;
 
                     if(to_recovery_string_size == 0 || baked_recovery_string[to_recovery_string_start_pt] != INT32_MAX) {
                         automorphism[orig_v_from] = orig_v_to;
                         automorphism_supp.push_back(orig_v_from);
                     }
 
-                    dej_assert(from_recovery_string_size == to_recovery_string_size);
+                    dej_assert((baked_recovery_string_pt[v_from].second - from_recovery_string_start_pt) ==
+                                to_recovery_string_size);
 
                     for (int j = 0; j < to_recovery_string_size; ++j) {
                         const int v_from_t = baked_recovery_string[from_recovery_string_start_pt + j];
@@ -3660,40 +3642,40 @@ namespace dejavu {
                 }
 #endif
 #else
-        [[maybe_unused]] static inline void bliss_hook(void *user_param, unsigned int n, const unsigned int *aut) {
+        static inline void bliss_hook(void *user_param, unsigned int n, const unsigned int *aut) {
                 auto p = (preprocessor *) user_param;
                 p->pre_hook_buffered(n, (const int *) aut, -1, nullptr, p->saved_hook);
             }
 #endif
         // Traces usage specific:
-        [[maybe_unused]] static inline void traces_hook(int, int* aut, int n) {
+        static inline void traces_hook(int, int* aut, int n) {
             auto p = save_preprocessor;
             p->pre_hook_buffered(n, (const int *) aut, -1, nullptr, p->saved_hook);
         }
 
-        [[maybe_unused]] void traces_save_my_preprocessor() {
+        void traces_save_my_preprocessor() {
             save_preprocessor = this;
         }
 
         // nauty usage specific:
-        [[maybe_unused]] static inline void nauty_hook(int, int* aut, int*, int, int, int n) {
+        static inline void nauty_hook(int, int* aut, int*, int, int, int n) {
             auto p = save_preprocessor;
             p->pre_hook_buffered(n, (const int *) aut, -1, nullptr, p->saved_hook);
         }
 
-        [[maybe_unused]] void nauty_save_my_preprocessor() {
+        void nauty_save_my_preprocessor() {
             save_preprocessor = this;
         }
 
         // saucy usage specific:
-        [[maybe_unused]] static inline int saucy_hook(int n, const int* aut, int nsupp, int* supp, void* user_param) {
+        static inline int saucy_hook(int n, const int* aut, int nsupp, int* supp, void* user_param) {
             auto p = (preprocessor *) user_param;
             p->pre_hook_buffered(n, (const int *) aut, nsupp, supp, p->saved_hook);
             return true;
         }
 
         // dejavu usage specific
-        [[maybe_unused]] static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
+        static inline void _dejavu_hook(int n, const int* aut, int nsupp, const int* supp) {
             auto p = save_preprocessor;
             if(p->skipped_preprocessing && !p->decomposer) {
                 if(p->saved_hook != nullptr) {

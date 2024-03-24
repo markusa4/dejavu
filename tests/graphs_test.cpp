@@ -11,14 +11,12 @@
 dejavu::groups::orbit orbits1;
 dejavu::groups::orbit orbits2;
 
-[[maybe_unused]] static void orbit1_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
-                                       [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
+static void orbit1_test_hook(int n, const int *p, int nsupp, const int *supp) {
     assert(dgtest_test_r.certify_automorphism_sparse(&dgtest_graph, p, nsupp, supp));
     orbits1.add_automorphism_to_orbit(p, nsupp, supp);
 }
 
-[[maybe_unused]] static void orbit2_test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
-                                              [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
+static void orbit2_test_hook(int n, const int *p, int nsupp, const int *supp) {
     assert(dgtest_test_r.certify_automorphism_sparse(&dgtest_graph, p, nsupp, supp));
     orbits2.add_automorphism_to_orbit(p, nsupp, supp);
 }

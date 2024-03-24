@@ -73,21 +73,21 @@ namespace dejavu {
             /**
              * @return hash of invariant of this IR node
              */
-            [[nodiscard]] unsigned long get_invariant_hash() const {
+            dej_nodiscard unsigned long get_invariant_hash() const {
                 return invariant;
             }
 
             /**
              * @return position of trace of this IR node
              */
-            [[nodiscard]] int get_trace_position() const {
+            dej_nodiscard int get_trace_position() const {
                 return trace_position;
             }
 
             /**
              * @return length of base of this IR node
              */
-            [[nodiscard]] int get_base_position() const {
+            dej_nodiscard int get_base_position() const {
                 return base_position;
             }
 
@@ -434,7 +434,7 @@ namespace dejavu {
              *
              * @return whether the colorings match
              */
-            [[maybe_unused]] bool there_is_difference_to_base() {
+            bool there_is_difference_to_base() {
                 for(int i = 0; i < c->domain_size;) {
                     const int col    = i;
                     const int col_sz = c->ptn[col] + 1;
@@ -460,7 +460,7 @@ namespace dejavu {
              *
              * @param automorphism workspace to write the automorphism to
              */
-            [[maybe_unused]] void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
+            void singleton_automorphism_base(groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
 
                 for(int i = 0; i < c->domain_size;) {
@@ -473,7 +473,7 @@ namespace dejavu {
                 }
             }
 
-            [[maybe_unused]] void color_diff_automorphism_base(groups::automorphism_workspace*  automorphism) {
+            void color_diff_automorphism_base(groups::automorphism_workspace*  automorphism) {
                 automorphism->reset();
 
                 for(int i = 0; i < c->domain_size; ++i) {
@@ -495,7 +495,7 @@ namespace dejavu {
              *
              * @return whether the colorings are equal
              */
-            [[maybe_unused]] bool there_is_difference_to_base_including_singles(int domain_size) {
+            bool there_is_difference_to_base_including_singles(int domain_size) {
                 for(int i = 0; i < domain_size;) {
                     const int col    = i;
                     const int col_sz = c->ptn[col] + 1;
@@ -579,7 +579,7 @@ namespace dejavu {
              *
              * @return whether states are diverging
              */
-            [[nodiscard]] int get_diff_diverge() const {
+            dej_nodiscard int get_diff_diverge() const {
                 return diff_diverge;
             }
 
@@ -853,11 +853,11 @@ namespace dejavu {
                 mode = IR_MODE_COMPARE_TRACE_IRREVERSIBLE;
             }
 
-            [[nodiscard]] coloring *get_coloring() const {
+            dej_nodiscard coloring *get_coloring() const {
                 return c;
             }
 
-            [[nodiscard]] int get_base_pos() const {
+            dej_nodiscard int get_base_pos() const {
                 return s_base_pos;
             }
 
@@ -1587,12 +1587,12 @@ namespace dejavu {
                             dej_assert(state->s_base_pos == state_probe->s_base_pos);
                             dej_assert(state->T->get_position() == state_probe->T->get_position());
                             dej_assert(state->c->cells == state_probe->c->cells);
-
-                            [[maybe_unused]] int cells_pre = state->c->cells;
-                            [[maybe_unused]] int previous_pos = state->T->get_position();
+                            #if defined(DEJDEBUG) &&  !defined(NDEBUG)
+                            const int cells_pre = state->c->cells;
+                            const int previous_pos = state->T->get_position();
+                            #endif
 
                             state->move_to_child(g, v_base);
-
                             const int cells = state->c->cells;
 
                             int deviated = 0;
@@ -1613,7 +1613,6 @@ namespace dejavu {
 
                             state->move_to_parent();
                             dej_assert(state->T->get_position() == previous_pos);
-
                             dej_assert(cells_pre == state->c->cells);
                             dej_assert(state->s_base_pos == state_probe->s_base_pos);
                             dej_assert(state->T->get_position() == state_probe->T->get_position());
@@ -1755,7 +1754,7 @@ namespace dejavu {
                 return lab_or_base.size();
             }
 
-            [[nodiscard]] stored_leaf_type get_store_type() const {
+            dej_nodiscard stored_leaf_type get_store_type() const {
                 return store_type;
             }
 
@@ -1867,7 +1866,7 @@ namespace dejavu {
             tree_node* get_next() {
                 return next;
             }
-            [[maybe_unused]] tree_node* get_parent() {
+            tree_node* get_parent() {
                 return parent;
             }
             void set_next(tree_node* new_next) {
@@ -1880,14 +1879,14 @@ namespace dejavu {
             void prune() {
                 is_pruned = true;
             }
-            [[nodiscard]] bool get_prune() const {
+            dej_nodiscard bool get_prune() const {
                 return is_pruned;
             }
             void add_hash(unsigned long add) {
                 this->hash += add;
             }
 
-            [[nodiscard]] unsigned long get_hash() const {
+            dej_nodiscard unsigned long get_hash() const {
                 return hash;
             }
 
@@ -1895,7 +1894,7 @@ namespace dejavu {
                 is_base = true;
             }
 
-            [[nodiscard]] bool get_base() const {
+            dej_nodiscard bool get_base() const {
                 return is_base;
             }
 

@@ -40,13 +40,20 @@
 #define dej_assert(expr) (void)0
 #endif
 
+#if ((defined(_MSVC_LANG) && _MSVC_LANG > 201402L) || __cplusplus > 201402L)
+#define dej_nodiscard [[nodiscard]]
+#else
+#define dej_nodiscard
+#endif
+
+
 /**
  * Hash function for unsigned integers.
  *
  * @param x the unsigned integer
  * @return hashed integer
  */
-[[maybe_unused]] static unsigned int hash(unsigned int x) {
+static inline unsigned int hash(unsigned int x) {
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = ((x >> 16) ^ x) * 0x45d9f3b;
     x = (x >> 16) ^ x;
@@ -60,7 +67,7 @@
  * @param d integer to accumulate to \p hash
  * @return the new hash
  */
-[[maybe_unused]] static unsigned long add_to_hash(unsigned long hash, const int d) {
+static inline unsigned long add_to_hash(unsigned long hash, const int d) {
     const unsigned long ho = hash & 0xff00000000000000; // extract high-order 8 bits from hash
     hash    = hash << 8;                    // shift hash left by 5 bits
     hash    = hash ^ (ho >> 56);            // move the highorder 5 bits to the low-order
