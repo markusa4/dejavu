@@ -84,22 +84,6 @@ dejavu::big_number read_grp_sz_file(const std::string& filename) {
     return result;
 }
 
-
-void test_graph(std::string filename) {
-    dejavu::sgraph *g = new dejavu::sgraph();
-    std::cout << "Parsing " << filename << "..." << std::endl;
-    int* colmap = nullptr;
-    parse_dimacs(filename, g, &colmap);
-
-    auto test_hook_ = dejavu_hook(dejavu::test_hook);
-
-    dejavu::solver d;
-    d.set_error_bound(20); // in theory, due to the probabilistic nature of the algorithm, some tests could fail without
-                           // there being a bug -- but this "almost ensures" that it will be a bug...
-    d.set_print(false);
-    d.automorphisms(g, colmap);
-}
-
 void test_graph_orbit_check(std::string filename) {
     std::string sym_filename = filename + ".sym";
     std::string grp_sz_filename = filename + ".grp_sz";

@@ -18,18 +18,27 @@
 #include "inprocess.h"
 #include "components.h"
 
-// structures for testing
-// extern dejavu::ir::refinement test_r;
-// extern dejavu::sgraph dej_test_graph;
-// extern int*           dej_test_col;
+#if ((defined(_MSVC_LANG) && _MSVC_LANG < 201402L) || __cplusplus < 201402L)
+#  error "dejavu requires to be compiled with C++ 2014 or newer"
+#endif
 
+// structures for testing
+#ifndef NDEBUG
+#ifdef DEJDEBUG
+extern dejavu::ir::refinement test_r;
+extern dejavu::sgraph dej_test_graph;
+#endif
+#endif
 
 namespace dejavu {
+    #ifndef NDEBUG
+    #ifdef DEJDEBUG
     [[maybe_unused]] static void test_hook([[maybe_unused]] int n, [[maybe_unused]] const int *p,
                                            [[maybe_unused]] int nsupp, [[maybe_unused]] const int *supp) {
-        //assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
+        assert(test_r.certify_automorphism_sparse(&dej_test_graph, p, nsupp, supp));
     }
-
+    #endif
+    #endif
 
     /**
      * \brief A collection of dejavu hooks

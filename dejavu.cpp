@@ -202,9 +202,11 @@ int commandline_mode(int argc, char **argv) {
 
     // debug hook
 #ifndef NDEBUG
+#ifdef DEJDEBUG
     auto test_hook_func = dejavu_hook(dejavu::test_hook);
     dej_test_graph.copy_graph(&g);
     hooks.add_hook(&test_hook_func);
+#endif
 #endif
 
     // use multi-hook or empty hook
