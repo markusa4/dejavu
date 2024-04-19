@@ -137,7 +137,7 @@ namespace dejavu {
         class strong_certification_hook : public hook_interface {
         private:
             dejavu_hook  my_hook;
-            dejavu_hook* my_call_hook;
+            dejavu_hook* my_call_hook = nullptr;
             markset scratch_set;
 
             sgraph my_g;
@@ -149,12 +149,16 @@ namespace dejavu {
             }
         public:
             explicit strong_certification_hook(static_graph& g, dejavu_hook* call_hook) {
-                my_g.copy_graph(g.get_sgraph());
-                my_call_hook = call_hook;
-                scratch_set.initialize(g.get_sgraph()->v_size);
+                initialize(*g.get_sgraph(), call_hook);
             }
 
             explicit strong_certification_hook(sgraph& g, dejavu_hook* call_hook) {
+                initialize(g, call_hook);
+            }
+
+            strong_certification_hook() = default;
+
+            void initialize(sgraph& g, dejavu_hook* call_hook) {
                 my_g.copy_graph(&g);
                 my_call_hook = call_hook;
                 scratch_set.initialize(g.v_size);
@@ -413,8 +417,9 @@ namespace dejavu {
             m_printer.h_silent = h_silent;
 
             // use strong certification?
-            hooks::strong_certification_hook certification_hook(*g, hook);
+            hooks::strong_certification_hook certification_hook;
             if(h_strong_certification) {
+                certification_hook.initialize(*g, hook);
                 hook = certification_hook.get_hook();
                 h_destructive = false;
             }
