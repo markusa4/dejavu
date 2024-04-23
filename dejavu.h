@@ -934,10 +934,10 @@ namespace dejavu {
 
                 // let's add up the total group size from all the different modules.
                 s_grp_sz.multiply(m_inprocess.s_grp_sz);
-                s_grp_sz.multiply(m_dfs.s_grp_sz);
+                if(s_term != t_inproc) s_grp_sz.multiply(m_dfs.s_grp_sz);
 
                 // if we finished with BFS, group size in Schreier is redundant since we also found them with BFS
-                if(s_term != t_bfs) s_grp_sz.multiply(sh_schreier.get_group_size());
+                if(s_term != t_bfs && s_term != t_inproc) s_grp_sz.multiply(sh_schreier.get_group_size());
             } // end of loop for non-uniform components
             m_printer.h_silent = h_silent;
             m_printer.timer_print("done", s_deterministic_termination, s_term);
