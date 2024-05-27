@@ -194,9 +194,15 @@ namespace dejavu {
              * @param pwr Power with which \p other is applied to this automorphism.
              */
             void apply(automorphism_workspace& other, int pwr = 1) {
+                #ifndef dej_nothreadlocal
                 thread_local worklist scratch_apply1;
                 thread_local worklist scratch_apply2;
                 thread_local markset  scratch_apply3;
+                #else
+                static worklist scratch_apply1;
+                static worklist scratch_apply2;
+                static markset  scratch_apply3;
+                #endif
                 scratch_apply1.allocate(domain_size);
                 scratch_apply2.allocate(domain_size);
                 scratch_apply3.initialize(domain_size);
