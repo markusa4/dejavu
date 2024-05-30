@@ -76,7 +76,7 @@ namespace dejavu {
             dejavu_hook* get_hook() override {
                 #ifndef dej_nolambda
                 my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                { return this->hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                      std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
                 };
                 #else
@@ -123,7 +123,7 @@ namespace dejavu {
             dejavu_hook* get_hook() override {
                 #ifndef dej_nolambda
                 my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                { return this->hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                      std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
                 };
                 #else
@@ -177,7 +177,7 @@ namespace dejavu {
             dejavu_hook* get_hook() override {
                 #ifndef dej_nolambda
                 my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                { return this->hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                      std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
                 };
                 #else
@@ -206,7 +206,7 @@ namespace dejavu {
             dejavu_hook* get_hook() override {
                 #ifndef dej_nolambda
                 my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                { return this->hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                      std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
                 };
                 #else
@@ -235,7 +235,7 @@ namespace dejavu {
             dejavu_hook* get_hook() override {
                 #ifndef dej_nolambda
                 my_hook = [this](auto && PH1, auto && PH2, auto && PH3, auto && PH4)
-                { return hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                { return this->hook_func(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                      std::forward<decltype(PH3)>(PH3), std::forward<decltype(PH4)>(PH4));
                 };
                 #else

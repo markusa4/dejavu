@@ -263,7 +263,7 @@ namespace dejavu {
             std::function<type_split_color_hook> self_split_hook() {
                 #ifndef dej_nolambda
                 return [this](auto && PH1, auto && PH2, auto && PH3) { return
-                        split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
+                            this->split_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2),
                                 std::forward<decltype(PH3)>(PH3));
                 };
                 #else
@@ -299,8 +299,7 @@ namespace dejavu {
             std::function<type_worklist_color_hook> self_worklist_hook() {
                 #ifndef dej_nolambda
                 return [this](auto && PH1, auto && PH2) {
-                    return worklist_hook(std::forward<decltype(PH1)>(PH1),
-                                       std::forward<decltype(PH2)>(PH2));
+                    return this->worklist_hook(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2));
                 };
                 #else
                 return std::bind(&controller::worklist_hook, this, std::placeholders::_1, std::placeholders::_2);
