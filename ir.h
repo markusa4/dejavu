@@ -1754,7 +1754,7 @@ namespace dejavu {
          */
         class deviation_map {
         private:
-            std::unordered_set<unsigned long> deviation_map;
+            std::unordered_set<unsigned long> deviation_map_;
             int computed_for_base = 0;
             int expected_for_base = 0;
             bool deviation_done = false;
@@ -1769,12 +1769,12 @@ namespace dejavu {
                 computed_for_base = 0;
                 expected_for_base = h_expected_for_base;
 
-                deviation_map.clear();
+                deviation_map_.clear();
                 deviation_done = false;
             }
 
             void record_deviation(unsigned long deviation) {
-                deviation_map.insert(deviation);
+                deviation_map_.insert(deviation);
                 ++computed_for_base;
                 dej_assert(computed_for_base <= expected_for_base);
                 check_finished();
@@ -1787,7 +1787,7 @@ namespace dejavu {
             }
 
             bool check_deviation(unsigned long deviation) {
-                return !deviation_done || deviation_map.find(deviation) != deviation_map.end();
+                return !deviation_done || deviation_map_.find(deviation) != deviation_map_.end();
             }
         };
 
