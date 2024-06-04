@@ -22,7 +22,7 @@ Note that currently, dejavu requires to be *compiled with C++ version 14*. For a
 By default, dejavu is compiled without assertions. We recommend activating assertions for debugging purposes (by adding the definition `DEJDEBUG`). Assertions do however slow the code considerably.
 
 ## Running the tests
-Using *cmake*, a test target can be produced by setting the following flag:
+Using *cmake*, a test target `dejavu_test` can be produced by setting the following flag:
 ```text
 cmake . -DCOMPILE_TEST_SUITE=1
 ```
