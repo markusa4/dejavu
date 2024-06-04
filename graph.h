@@ -1,3 +1,7 @@
+// Copyright 2024 Markus Anders
+// This file is part of dejavu 2.0.
+// See LICENSE for extended copyright information.
+
 #ifndef SASSY_GRAPH_BUILDER_H
 #define SASSY_GRAPH_BUILDER_H
 
