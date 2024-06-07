@@ -1635,22 +1635,24 @@ namespace dejavu {
          * \brief API for the dejavu Schreier structure
          *
          * Enables sifting of automorphisms into a Schreier structure with given base. The Schreier structure does not
-         * compute proper random elements of the group, hence no guarantees regarding the error bound are given.
+         * compute proper random elements of the group, hence no guarantees regarding the error bound are given. The
+         * group described by the Schreier structure is always guaranteed to be a subgroup of the actual group generated
+         * by the contained elements.
          *
          */
         class random_schreier {
         private:
-            int h_domain_size    = -1;
-            random_schreier_internal schreier;
+            int h_domain_size    = -1;          /**< size of the underlying domain */
+            random_schreier_internal schreier;  /**< Schreier structure */
 
-            automorphism_workspace ws_auto;
-            schreier_workspace     ws_schreier;
-            random_source rng;
+            automorphism_workspace ws_auto;     /**< a workspace to store automorphisms */
+            schreier_workspace     ws_schreier; /**< a workspace for Schreier-Sims computations */
+            random_source rng;                  /**< source of randomness */
 
-            markset auxiliary_set;
+            markset auxiliary_set;              /**< auxiliary workspace used by some methods */
 
             int h_error_bound = 10; /**< higher value reduces likelihood of error (AKA missing generators) */
-            bool init = false;
+            bool init = false;      /**< whether the structure has been initialized */
 
         public:
             /**
@@ -1702,6 +1704,9 @@ namespace dejavu {
                 sift_random();
             }
 
+            /**
+             * Generate random elements to complete the Schreier structure.
+             */
             void sift_random() {
                 schreier.sift_random(ws_schreier, ws_auto, rng, h_error_bound);
             }
@@ -1782,15 +1787,50 @@ namespace dejavu {
             }
 
             /**
-             * Sift automorphism into the Schreier structure.
+             * Computes a list of generators for the pointwise stabilizer fixing the first \p base_pos points of the
+             * current base. The returned vector contains a list of generator ID's as stored in the Schreier structure.
+             * The generators can then be loaded using `get_generator`.
+             *
+             * @param base_pos position of base to consider
+             * @returns a list of generator numbers
+             */
+            std::vector<int> get_stabilizer_generators(int base_pos) {
+                auxiliary_set.initialize(get_number_of_generators());
+                auxiliary_set.reset();
+                std::vector<int> all_generators;
+
+                // TODO this can be done much more efficiently...
+                for(int j = base_pos; j < schreier.base_size(); ++j) {
+                    const std::vector<int> &generators = schreier.get_stabilizer_generators(j);
+                    for (auto i: generators) {
+                        if (i < 0) continue;
+                        dej_assert(i < get_number_of_generators());
+                        if (auxiliary_set.get(i)) continue;
+                        auxiliary_set.set(i);
+                        all_generators.push_back(i);
+                    }
+                }
+
+                for(auto i : schreier.get_stabilized_generators()) {
+                    if (auxiliary_set.get(i)) continue;
+                    auxiliary_set.set(i);
+                    all_generators.push_back(i);
+                }
+
+                return all_generators;
+            }
+
+            /**
+             * Sift automorphism into the Schreier structure. If the automorphism is not yet represented in the Schreier
+             * structure, the structure is extended using the automorphism. I.e., the routine will add the given
+             * automorphism to the structure, if necessary.
              *
              * @param w Auxiliary workspace used for procedures.
              * @param automorphism Automorphism to be sifted. Will be manipulated by the method.
              * @return Whether automorphism was added to the Schreier structure or not.
              */
             bool sift(automorphism_workspace &automorphism, bool known_in_group = false) {
-                return sift(h_domain_size, automorphism.p(), automorphism.nsupp(), automorphism.supp(),
-                            known_in_group);
+                return sift(h_domain_size, automorphism.p(), automorphism.nsupp(), automorphism.supp(), known_in_group);
             }
 
             /**
@@ -1818,7 +1858,8 @@ namespace dejavu {
             }
 
             /**
-             * @return Size of group described by this Schreier structure.
+             * @return Order of group described by this Schreier structure. Note that if the base is incomplete, the
+             * group order will not match the actual order the group.
              */
             big_number group_size() {
                 sift_random();

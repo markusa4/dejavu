@@ -176,6 +176,84 @@ TEST(schreier_test, schreier_orbit_at_level2) {
     ASSERT_TRUE(o.are_in_same_orbit(5, 7));
 }
 
+TEST(schreier_test, schreier_generator_at_level2) {
+    random_schreier s(8);
+    schreier_hook hook(s);
+
+    std::vector<int> test_base;
+    test_base.push_back(0);
+    test_base.push_back(1);
+    test_base.push_back(2);
+    test_base.push_back(3);
+    test_base.push_back(4);
+    s.set_base(test_base);
+
+    dejavu::static_graph g1;
+    g1.initialize_graph(8, 0);
+    g1.add_vertex(0,0);
+    g1.add_vertex(0,0);
+    g1.add_vertex(0,0);
+    g1.add_vertex(0,0);
+    g1.add_vertex(0,0);
+    g1.add_vertex(1,0);
+    g1.add_vertex(1,0);
+    g1.add_vertex(1,0);
+
+    dejavu::solver d1;
+    d1.automorphisms(&g1, hook.get_hook());
+
+    dejavu::big_number grp_sz = s.group_size();
+    ASSERT_EQ(grp_sz.exponent, 2);
+    ASSERT_NEAR(grp_sz.mantissa, 1.2, 0.01);
+
+    ASSERT_EQ(s.get_fixed_orbit_size(0), 5);
+    ASSERT_EQ(s.get_fixed_orbit_size(1), 4);
+    ASSERT_EQ(s.get_fixed_orbit_size(2), 3);
+    ASSERT_EQ(s.get_fixed_orbit_size(3), 2);
+    ASSERT_EQ(s.get_fixed_orbit_size(4), 1);
+
+    std::vector<int> test_orbit = s.get_fixed_orbit(2);
+    for(int i = 0; i < static_cast<int>(test_orbit.size()); ++i) {
+        const int v = test_orbit[i];
+        ASSERT_TRUE(v == 2 || v == 3 || v ==4);
+        ASSERT_FALSE(v == 0);
+        ASSERT_FALSE(v == 1);
+        ASSERT_FALSE(v > 4);
+    }
+
+    orbit o(8);
+    s.get_stabilizer_orbit(2, o);
+    ASSERT_TRUE(o.are_in_same_orbit(2, 3));
+    ASSERT_TRUE(o.are_in_same_orbit(3, 4));
+    ASSERT_FALSE(o.are_in_same_orbit(0, 2));
+    ASSERT_FALSE(o.are_in_same_orbit(0, 1));
+    ASSERT_FALSE(o.are_in_same_orbit(2, 5));
+    ASSERT_TRUE(o.are_in_same_orbit(5, 6));
+    ASSERT_TRUE(o.are_in_same_orbit(5, 7));
+
+
+    std::vector<int> gens0 = s.get_stabilizer_generators(0);
+    std::vector<int> gens1 = s.get_stabilizer_generators(1);
+    std::vector<int> gens2 = s.get_stabilizer_generators(2);
+
+    ASSERT_EQ(gens0.size(), s.get_number_of_generators());
+    ASSERT_TRUE(gens1.size() > 0);
+    ASSERT_TRUE(gens2.size() > 0);
+
+    dejavu::groups::automorphism_workspace auto_ws(8);
+    for(auto g : gens1) {
+        s.get_generator(g, auto_ws);
+        ASSERT_EQ(auto_ws[0], 0);
+        auto_ws.reset();
+    }
+    for(auto g : gens2) {
+        s.get_generator(g, auto_ws);
+        ASSERT_EQ(auto_ws[0], 0);
+        ASSERT_EQ(auto_ws[1], 1);
+        auto_ws.reset();
+    }
+}
+
 TEST(schreier_test, schreier_base_change) {
     random_schreier s(8);
     schreier_hook hook(s);
