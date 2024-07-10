@@ -192,7 +192,6 @@ TEST(static_graph_test, edge_case_test1) {
 
 TEST(static_graph_test, edge_case_test2) {
     dejavu::static_graph g1;
-            std::cout << "in copy" << std::endl;
     g1.initialize_graph(2, 3);
     g1.add_vertex(0, 1);
     g1.add_vertex(0, 2);
