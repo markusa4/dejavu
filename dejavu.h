@@ -7,7 +7,7 @@
 
 #define DEJAVU_VERSION_MAJOR 2
 #define DEJAVU_VERSION_MINOR 0
-#define DEJAVU_VERSION_IS_PREVIEW true
+#define DEJAVU_VERSION_IS_PREVIEW false
 
 #include <utility>
 #include <string>

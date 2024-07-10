@@ -182,7 +182,8 @@ int commandline_mode(int argc, char **argv) {
         if(print) std::cout << (true_random?"true_random=true, ":"") << (true_random_seed?"true_random_seed=true":"");
         if(print) std::cout << "permutation_seed=" << permute_seed << ", ";
     }
-    parse_dimacs(filename, &g, &colmap, !print, permute_seed);
+    const bool parse_success = parse_dimacs(filename, &g, &colmap, !print, permute_seed);
+    if(!parse_success) return 1;
     if(print) std::cout << ", n=" << g.v_size << ", " << "m=" << g.e_size/2 << std::endl << std::endl;
 
     // manage hooks
