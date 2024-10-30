@@ -3621,7 +3621,7 @@ namespace dejavu {
                 }
             }
 
-            skipped_preprocessing = g->v_size == domain_size;
+            //skipped_preprocessing = g->v_size == domain_size;
         }
 
         void save_my_hook(dejavu_hook *hook) {
