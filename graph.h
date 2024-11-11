@@ -391,6 +391,8 @@ namespace dejavu {
             g.d[vertex] = deg;
             g.v[vertex] = (int) num_deg_edges_defined;
             num_deg_edges_defined += deg;
+            if(num_deg_edges_defined > (unsigned int) g.e_size)
+                throw std::out_of_range("edges out-of-range, define more edges initially");
             return vertex;
         };
 
