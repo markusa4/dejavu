@@ -93,6 +93,28 @@ namespace dejavu {
             void invalidate_inverse_automorphism() {
                 have_inverse_automorphism = false;
             }
+
+            /**
+             * Updates the support using the internal dense notation.
+             */
+            void update_support() {
+                // rewrite support
+                if (!support01) {
+                    automorphism_supp.reset();
+                    for (int i = 0; i < domain_size; ++i) {
+                        if (i != automorphism[i])
+                            automorphism_supp.push_back(i);
+                    }
+                } else {
+                    automorphism_supp.reset();
+                    int i;
+                    for (i = 0; i < domain_size; ++i) {
+                        if (i != automorphism[i]) break;
+                    }
+                    automorphism_supp.cur_pos = (i != domain_size);
+                }
+            }
+
         public:
             /**
              * Initializes the stored automorphism to the identity.
@@ -146,7 +168,13 @@ namespace dejavu {
              * @param new_support01 Flag of whether to use 0/1 support, or not.
              */
             void set_support01(const bool new_support01) {
+                bool update_support_necessary = support01 && !new_support01;
                 this->support01 = new_support01;
+                if(update_support_necessary) update_support();
+            }
+
+            bool get_support01() {
+                return support01;
             }
 
             /**
@@ -164,23 +192,16 @@ namespace dejavu {
             }
 
             /**
-             * Updates the support using the internal dense notation.
+             * @return Size of the support, independent of support01. Runs in O(n) if support01 is set, and in O(1)
+             * otherwise.
              */
-            void update_support() {
-                // rewrite support
-                if (!support01) {
-                    automorphism_supp.reset();
-                    for (int i = 0; i < domain_size; ++i) {
-                        if (i != automorphism[i])
-                            automorphism_supp.push_back(i);
-                    }
+            int compute_support() {
+                if(support01) {
+                    int supp = 0;
+                    for (int i = 0; i < domain_size; ++i) supp += (i != automorphism[i]);
+                    return supp;
                 } else {
-                    automorphism_supp.reset();
-                    int i;
-                    for (i = 0; i < domain_size; ++i) {
-                        if (i != automorphism[i]) break;
-                    }
-                    automorphism_supp.cur_pos = (i != domain_size);
+                    return nsupp();
                 }
             }
 
@@ -492,7 +513,9 @@ namespace dejavu {
             }
 
             /**
-             * @return Size of the support.
+             *
+             * @return Size of the support. If support01 is set, only returns 0 or 1 depending on whether support is
+             * trivial.
              */
             dej_nodiscard int nsupp() const {
                 return automorphism_supp.cur_pos;
@@ -770,12 +793,7 @@ namespace dejavu {
                 }
             }
 
-            /**
-             * Store the given automorphism workspace.
-             *
-             * @param automorphism The automorphism to be stored.
-             */
-            void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
+            /*void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
                 domain_size = new_domain_size;
                 dej_assert(data.empty());
 
@@ -806,6 +824,62 @@ namespace dejavu {
                     helper.reset();
                     dej_assert(data.size() == support);
                 } else {
+                    store_type = STORE_DENSE;
+                    data.allocate(domain_size);
+                    data.set_size(domain_size);
+                    memcpy(data.get_array(), automorphism.p(), domain_size * sizeof(int));
+                    dej_assert(data.size() == domain_size);
+                }
+            }*/
+
+            /**
+             * Store the given automorphism workspace. Depending on the support of the automorphism, it is either stored
+             * using a dense encoding, or a sparse encoding based on cycle notation. Overall, uses O(|support|) space.
+             *
+             * @param new_domain_size The domain size of the automorphism to be stored.
+             * @param automorphism The automorphism to be stored.
+             * @param helper A `markset` which is used as auxiliary space for the algorithm.
+             */
+            void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
+                domain_size = new_domain_size;
+                dej_assert(data.empty());
+
+                // automorphism may be encoded with support01, hence we compute the support if necessary
+                int support = automorphism.compute_support();
+
+                // decide whether to store dense or sparse representation
+                if (support < domain_size / 4) {
+                    store_type = STORE_SPARSE;
+                    helper.reset();
+
+                    // for sparse encoding, we need access to the support, so we deactivate support01 encoding
+                    automorphism.set_support01(false);
+
+                    // store cycle notation of the automorphism
+                    data.allocate(support);
+                    for (int i = 0; i < automorphism.nsupp(); ++i) {
+                        const int j = automorphism.supp()[i];
+                        if (automorphism.p()[j] == j) continue; // no need to consider trivially mapped vertices
+                        if (helper.get(j)) continue; // we have already considered cycle of this vertex
+                        helper.set(j); // mark that we have already considered the vertex
+
+                        // move along the cycle of j, until we come back to j
+                        int map_j = automorphism.p()[j];
+                        dej_assert(map_j != j);
+                        while (!helper.get(map_j)) {
+                            data.push_back(map_j + 1); // offset +1 because we use negation in the encoding, see below
+                            helper.set(map_j); // mark that we have already considered the vertex
+                            map_j = automorphism.p()[map_j];
+                        }
+
+                        // finally we store j, the vertex we started with
+                        dej_assert(map_j == j);
+                        data.push_back(-(j + 1)); // `-` marks the end of the cycle
+                    }
+                    helper.reset();
+                    dej_assert(data.size() == support);
+                } else {
+                    // we simply store the dense portion of the automorphism_workspace
                     store_type = STORE_DENSE;
                     data.allocate(domain_size);
                     data.set_size(domain_size);
@@ -1507,7 +1581,6 @@ namespace dejavu {
 
                     // reset the automorphism_workspace
                 automorphism.set_support01(false);
-                automorphism.update_support();
                 automorphism.reset();
 
                 if(uniform) record_sift_result(changed); // uniform automorphisms count towards abort criterion
