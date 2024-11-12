@@ -201,9 +201,7 @@ TEST(static_graph_test, edge_case_test2) {
 TEST(static_graph_test, edge_case_test3) {
     dejavu::static_graph g1;
     g1.initialize_graph(2, 0);
-    g1.add_vertex(0, 1);
-    g1.add_vertex(0, 1);
-    EXPECT_ANY_THROW(g1.add_edge(0, 1));
+    EXPECT_ANY_THROW(g1.add_vertex(0, 1));
 }
 
 TEST(static_graph_test, edge_case_test4) {
