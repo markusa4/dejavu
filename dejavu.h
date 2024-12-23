@@ -53,7 +53,6 @@ namespace dejavu {
          * A hook that is used to call several other hooks.
          */
         class multi_hook : public hook_interface {
-        private:
             std::vector<dejavu_hook*> hooks;
             dejavu_hook my_hook;
             void hook_func(int n, const int *p, int nsupp, const int *supp) {
@@ -94,7 +93,6 @@ namespace dejavu {
          * Hook that writes all the given symmetries to the given output stream (e.g., cout or an output file).
          */
         class ostream_hook : public hook_interface {
-        private:
             dejavu_hook   my_hook;
             std::ostream& my_ostream;
             dejavu::ds::markset  test_set;
@@ -146,7 +144,6 @@ namespace dejavu {
          * original graph before calling other hooks.
          */
         class strong_certification_hook : public hook_interface {
-        private:
             dejavu_hook  my_hook;
             dejavu_hook* my_call_hook = nullptr;
             markset scratch_set;
@@ -195,7 +192,6 @@ namespace dejavu {
          * Hook that can be used to feed generators into a `random_schreier` structure.
          */
         class schreier_hook : public hook_interface {
-        private:
             dejavu_hook my_hook;
             groups::random_schreier& my_schreier;
             void hook_func(int n, const int *p, int nsupp, const int *supp) {
@@ -224,7 +220,6 @@ namespace dejavu {
          * Can be used to compute the orbit partition of a graph.
          */
         class orbit_hook : public hook_interface {
-        private:
             dejavu_hook my_hook;
             groups::orbit& my_orbit;
             void hook_func(int n, const int *p, int nsupp, const int *supp) {
@@ -255,7 +250,6 @@ namespace dejavu {
      * of the solver.
      */
     class solver {
-    private:
         int h_error_bound       = 10; /**< assuming uniform random numbers, error probability is below
                                         * `1/2^h_error_bound`, default value of 10 thus misses a generator
                                         *  with probabiltiy at most 1/2^10 < 0.098% */
@@ -270,14 +264,17 @@ namespace dejavu {
         bool h_destructive = true;  /**< the solver may alter the provided graph upon a call */
         bool h_strong_certification = false; /**< use strong certification */
 
-        //int h_limit_fail        = 0; /**< limit for the amount of backtracking allowed */
-
         // std::function<selector_hook>* h_user_selector  = nullptr; /**< user-provided cell selector */
         // std::function<selector_hook>* h_user_invariant = nullptr; /**< user-provided invariant to be applied during
         //                                                             inprocessing */
 
-        bool s_deterministic_termination = true; /**< did the last run terminate deterministically? */
-        big_number s_grp_sz; /**< order of the automorphism group computed in last run */
+        bool s_deterministic_termination = true;  /**< did the last run terminate deterministically? */
+        bool s_limit_reached             = false; /**< did the last run reach the resource limits? */
+        big_number s_grp_sz;                      /**< order of the automorphism group computed in last run */
+
+        int  h_limit_budget           = -1; /**< limit backtracking not due to symmetry */
+        long h_limit_schreier_support = -1; /**< limit total support of Schreier table  */
+
     public:
         /**
          * Assuming uniform random numbers, error probability is below `1/2^error_bound`, default value is 10. Thus, the
@@ -335,6 +332,26 @@ namespace dejavu {
          */
         void set_seed(int seed = 0) {
             h_random_seed = seed;
+        }
+
+        /**
+         * Limit for the internal budget used by the solver. This essentially limits the amount of backtracking (not due
+         * to symmetry) the solver will perform. Once the limit is reached, the solver terminates with potentially
+         * incomplete results.
+         *
+         * @param limit_budget the budget limit (-1 means no limit)
+         */
+        void set_limit_budget(int limit_budget = -1) {
+            h_limit_budget = limit_budget;
+        }
+
+        /**
+         * Limit for the total support size of the generators found by the solver. Once the limit is reached, the solver
+         * terminates with potentially incomplete results.
+         * @param limit_support the budget limit (-1 means no limit)
+         */
+        void set_limit_schreier_support(int limit_support = -1) {
+            h_limit_schreier_support = limit_support;
         }
 
         /**
@@ -430,7 +447,7 @@ namespace dejavu {
          * Computes automorphisms, accepts an sgraph and integer array for vertex colors.
          */
         void automorphisms(sgraph* g, int* colmap = nullptr, dejavu_hook* hook = nullptr) {
-            enum termination_strategy { t_prep, t_inproc, t_dfs, t_bfs, t_det_schreier, t_rand_schreier };
+            enum termination_strategy { t_prep, t_inproc, t_dfs, t_bfs, t_det_schreier, t_rand_schreier, t_limit };
             termination_strategy s_term = t_prep;
             s_grp_sz.set(1.0, 0);
 
@@ -605,6 +622,14 @@ namespace dejavu {
                         if (s_inprocessed) h_budget = 1; /*< if we inprocessed, we hope that the graph is easy again */
                         h_budget *= s_inc_fac; /*< increase the budget */
                         s_cost    = 0;         /*< reset the cost */
+
+                        // impose limit on budget -- once the limit is reached, we continue with the next component
+                        if (h_limit_budget >= 0 && h_budget > h_limit_budget) {
+                            s_limit_reached             = true;
+                            s_deterministic_termination = false;
+                            s_term = t_limit;
+                            break;
+                        }
                     }
 
                     // keep vertices which are save to individualize for in-processing
@@ -663,7 +688,7 @@ namespace dejavu {
                                                                                  base_size > 1 || s_restarts > 0);
 
                     m_printer.timer_print("dfs", std::to_string(base_size) + "-" + std::to_string(dfs_level),
-                                   "~" + std::to_string((int) m_dfs.s_grp_sz.mantissa) + "*10^" +
+                                   "~" + std::to_string(static_cast<int>(m_dfs.s_grp_sz.mantissa)) + "*10^" +
                                    std::to_string(m_dfs.s_grp_sz.exponent));
                     s_prunable = s_prunable || (dfs_level < base_size - 5);
                     if (dfs_level == 0) {
@@ -735,19 +760,22 @@ namespace dejavu {
 
                         int s_random_path_trace_cost = s_trace_full_cost - sh_tree.get_current_level_tracepos();
                         if (s_have_rand_estimate) {
-                            s_path_fail1_avg  = (double) m_rand.s_paths_fail1 / (double) m_rand.s_paths;
-                            s_trace_cost1_avg = (double) m_rand.s_trace_cost1 / (double) m_rand.s_paths;
+                            s_path_fail1_avg  = static_cast<double>(m_rand.s_paths_fail1) /
+                                                static_cast<double>(m_rand.s_paths);
+                            s_trace_cost1_avg = static_cast<double>(m_rand.s_trace_cost1) /
+                                                static_cast<double>(m_rand.s_paths);
                         }
 
                         // using this data, we now make a decision
                         next_routine = random_ir; /*< don't have an estimate? let's poke a bit with random! */
-                        double score_rand, score_bfs;
 
                         if (s_have_rand_estimate) {
+                            double score_rand, score_bfs;
+
                             // if we have some data, we attempt to model how effective and costly random search
                             // and BFS is, to then make an informed decision of what to do next
                             const double reset_cost_rand = g->v_size;
-                            const double reset_cost_bfs = std::min(s_trace_cost1_avg, (double) g->v_size);
+                            const double reset_cost_bfs = std::min(s_trace_cost1_avg, static_cast<double>(g->v_size));
                             double s_bfs_estimate  = (s_trace_cost1_avg + reset_cost_bfs) * (s_bfs_next_level_nodes);
                             double s_rand_estimate = (s_random_path_trace_cost + reset_cost_rand) * h_rand_fail_lim_now;
 
@@ -778,8 +806,8 @@ namespace dejavu {
                                                        * lot! */
 
                         // let's stick to the memory limits...
-                        const long s_bfs_est_mem = (long) round(s_bfs_next_level_nodes * (1 - s_path_fail1_avg) *
-                                                                g->v_size);
+                        const long s_bfs_est_mem = static_cast<long>(round(s_bfs_next_level_nodes *
+                                                                     (1 - s_path_fail1_avg) * g->v_size));
                         if (next_routine == bfs_ir && (s_bfs_est_mem > h_bfs_memory_limit)) next_routine = random_ir;
 
                         // let's stick to the budget...
@@ -853,8 +881,9 @@ namespace dejavu {
                                                                   local_state, local_state_left,
                                                                   h_rand_fail_lim_total);
                                 }
-                                finished_symmetries = sh_schreier.any_abort_criterion();
+                                finished_symmetries = sh_schreier.any_abort_criterion()||m_rand.s_support_limit_reached;
                                 s_term = sh_schreier.deterministic_abort_criterion()? t_det_schreier : t_rand_schreier;
+                                s_term = m_rand.s_support_limit_reached? t_limit : s_term;
                                 s_cost += h_rand_fail_lim_now;
 
                                 // TODO this code is duplicated, let's think about this again...
@@ -887,15 +916,16 @@ namespace dejavu {
                                     if (base_size == 2) {
                                         // case for the special code
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0]) *
+                                                static_cast<double>(
+                                                    sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0])) *
                                                 sh_tree.h_bfs_automorphism_pw, 0);
                                     } else if (base_size == 1) {
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0]), 0);
+                                            sh_tree.h_bfs_top_level_orbit.orbit_size(base_vertex[0]), 0);
                                     } else {
                                         // base case which just multiplies the remaining elements of the level
                                         m_inprocess.s_grp_sz.multiply(
-                                                (double) sh_tree.get_level_size(sh_tree.get_finished_up_to()), 0);
+                                            sh_tree.get_level_size(sh_tree.get_finished_up_to()), 0);
                                     }
                                 }
 
