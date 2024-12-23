@@ -718,6 +718,7 @@ namespace dejavu {
 
                     // reset metrics of random search
                     m_rand.reset_statistics();
+                    m_rand.h_schreier_support_limit = h_limit_schreier_support;
 
                     // here, we set up the shared IR tree, which contains computed BFS levels, stored leaves, as well as
                     // further gathered data for heuristics

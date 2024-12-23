@@ -166,7 +166,7 @@ namespace dejavu {namespace search_strategy {
         bool      h_sift_random     = true;               /**< sift random elements into Schreier structure    */
         int       h_sift_random_lim = 8;                  /**< after how many paths random elements are sifted */
         int       h_randomize_up_to = INT32_MAX;          /**< randomize vertex selection up to this level */
-        int       h_schreier_support_limit = -1;          /**< impose a limit on support of Schreier structure */
+        long      h_schreier_support_limit = -1;          /**< impose a limit on support of Schreier structure */
 
         void use_look_close(bool look_close = false) {
             h_look_close = look_close;
