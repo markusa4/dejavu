@@ -274,6 +274,7 @@ namespace dejavu {
 
         int  h_limit_budget           = -1; /**< limit backtracking not due to symmetry */
         long h_limit_schreier_support = -1; /**< limit total support of Schreier table  */
+        long h_limit_component        = -1; /**< limit for maximal component size       */
 
     public:
         /**
@@ -332,6 +333,15 @@ namespace dejavu {
          */
         void set_seed(int seed = 0) {
             h_random_seed = seed;
+        }
+
+        /**
+         * The solver will skip over (non-uniform) components of the graph of this size.
+         *
+         * @param limit_component limit for number of vertices in component (-1 means no limit)
+         */
+        void set_limit_component(long limit_component = -1) {
+            h_limit_component = limit_component;
         }
 
         /**
@@ -526,6 +536,13 @@ namespace dejavu {
                     g      = m_decompose.get_component(i);     // graph of current component
                     colmap = m_decompose.get_colmap(i);        // vertex coloring of current component
                     m_prep.inject_decomposer(&m_decompose, i); // set translation to current component
+                }
+
+                // check component size limit
+                if(h_limit_component >= 0 && g->v_size > h_limit_component) {
+                    s_deterministic_termination = false;
+                    s_limit_reached             = true;
+                    continue;
                 }
 
                 // print that we are solving now...
