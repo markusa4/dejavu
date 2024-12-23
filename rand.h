@@ -103,9 +103,8 @@ namespace dejavu {namespace search_strategy {
                     ++s_succeed;
 
                     // update and check support limits
-                    s_schreier_support += gl_automorphism.nsupp();
                     s_support_limit_reached = (h_schreier_support_limit >= 0) &&
-                                              (s_schreier_support>h_schreier_support_limit);
+                                              (group.get_support() >h_schreier_support_limit);
 
                     // output the automorphism
                     if(hook) (*hook)(g->v_size, gl_automorphism.p(), gl_automorphism.nsupp(),
@@ -156,7 +155,6 @@ namespace dejavu {namespace search_strategy {
         int       s_leaves        = 0;                    /**< how many leaves were added                 */
         int       s_min_split_number = 0;
         bool      s_support_limit_reached = false;        /**< Schreier support limit was reached         */
-        long      s_schreier_support = 0;                 /**< estimated Schreier support                 */
 
         int s_random_sift_success = 0;
 

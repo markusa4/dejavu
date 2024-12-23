@@ -927,10 +927,11 @@ namespace dejavu {
          */
         class generating_set {
             std::vector<stored_automorphism *> generators; /** list of generators */
-            int domain_size = 0;
+            int  domain_size  = 0;
+            long support_size = 0;
         public:
             int s_stored_sparse = 0; /**< how many generators are stored in a sparse manner */
-            int s_stored_dense = 0;  /**< how many generators are stored in a dense manner */
+            int s_stored_dense  = 0; /**< how many generators are stored in a dense manner  */
 
             generating_set() = default;
             generating_set(const generating_set&) = delete;
@@ -952,14 +953,22 @@ namespace dejavu {
              * @return Identifier of the new generator in the generating set.
              */
             int add_generator(schreier_workspace &w, automorphism_workspace &automorphism) {
+                // store the automorphism
                 generators.emplace_back(new stored_automorphism);
                 const auto num = generators.size() - 1;
                 generators[num]->store(domain_size, automorphism, w.scratch2);
 
+                // update statistic on sparse and dense generators
                 s_stored_sparse += (generators[num]->get_store_type() ==
                                     stored_automorphism::stored_automorphism_type::STORE_SPARSE);
                 s_stored_dense += (generators[num]->get_store_type() ==
                                    stored_automorphism::stored_automorphism_type::STORE_DENSE);
+
+                // update support size
+                if (generators[num]->get_store_type() == stored_automorphism::stored_automorphism_type::STORE_DENSE)
+                    support_size += domain_size;
+                else
+                    support_size += automorphism.nsupp();
 
                 return static_cast<int>(num);
             }
@@ -1020,6 +1029,13 @@ namespace dejavu {
              */
             dej_nodiscard int size() const {
                 return static_cast<int>(generators.size());
+            }
+
+            /**
+             * @return memory size of stored generators
+             */
+            dej_nodiscard long get_support() const {
+                return support_size;
             }
 
             void clear() {
@@ -1296,9 +1312,8 @@ namespace dejavu {
          *
          */
         class random_schreier_internal {
-        private:
-            int domain_size    = -1;
-            int finished_up_to = -1;
+            int  domain_size    = -1;
+            int  finished_up_to = -1;
 
             generating_set generators;
             std::vector<shared_transversal> transversals;
@@ -1541,6 +1556,13 @@ namespace dejavu {
              */
             dej_nodiscard bool is_finished(const int base_pos) const {
                 return transversals[base_pos].is_finished();
+            }
+
+            /**
+             * @return memory size of stored generators
+             */
+            dej_nodiscard long get_support() const {
+                return generators.get_support();
             }
 
             /**
@@ -2047,7 +2069,6 @@ namespace dejavu {
          * Internally, stores a `random_schreier_internal` structure in a compressed form using `domain_compressor`.
          */
         class compressed_schreier {
-        private:
             random_schreier_internal internal_schreier;
             domain_compressor*       compressor;
             automorphism_workspace   compressed_automorphism;
@@ -2248,6 +2269,13 @@ namespace dejavu {
              */
             void reset_probabilistic_criterion() {
                 internal_schreier.reset_probabilistic_criterion();
+            }
+
+            /**
+             * @return memory size of stored generators
+             */
+            dej_nodiscard long get_support() const {
+                return internal_schreier.get_support();
             }
 
             /**
