@@ -416,6 +416,14 @@ namespace dejavu {
         }
 
         /**
+         * Did the solver terminate due to reaching resource limits?
+         * @return whether the solver reached a resource limit in the last run
+         */
+        dej_nodiscard bool get_reached_limit() const {
+            return s_limit_reached;
+        }
+
+        /**
          * Wrapper for `automorphisms`. Compute the automorphisms of the graph \p g. Automorphisms are returned using
          * the function pointer \p hook.
          *
