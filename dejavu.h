@@ -633,7 +633,6 @@ namespace dejavu {
 
                         // impose limit on budget -- once the limit is reached, we continue with the next component
                         if (h_limit_budget >= 0 && h_budget > h_limit_budget) {
-                            s_limit_reached             = true;
                             s_deterministic_termination = false;
                             s_term = t_limit;
                             break;
@@ -992,6 +991,7 @@ namespace dejavu {
                 // we are done with this component...
                 // ...did we solve it deterministically?
                 s_deterministic_termination = (s_term != t_rand_schreier) && s_deterministic_termination;
+                s_limit_reached             = s_limit_reached || (s_term == t_limit);
 
                 // let's add up the total group size from all the different modules.
                 s_grp_sz.multiply(m_inprocess.s_grp_sz);
