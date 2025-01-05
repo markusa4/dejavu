@@ -1,6 +1,7 @@
 # Compilation, Library, Tests
-
-Please refer to our [get started guide](https://automorphisms.org/). There is also a [full documentation](https://automorphisms.org/documentation/), which can be built from the code using [doxygen](https://www.doxygen.nl/).
+dejavu is a solver and C++ library for the fast detection and manipulation of [combinatorial symmetry](https://automorphisms.org/quick_start/symmetry/). 
+Below, you can find some information on how to build the solver and include the library.
+More detailed information can be found in our [get started guide](https://automorphisms.org/) or in the [full documentation](https://automorphisms.org/documentation/), which can also be built from the source code using [doxygen](https://www.doxygen.nl/).
 
 
 ## Compilation

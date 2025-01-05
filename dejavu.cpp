@@ -1,9 +1,8 @@
-// Copyright 2024 Markus Anders
+// Copyright 2025 Markus Anders
 // This file is part of dejavu 2.0.
 // See LICENSE for extended copyright information.
 
 #include <iostream>
-#include <thread>
 #include "dejavu.h"
 #include <chrono>
 #include <string>
