@@ -26,6 +26,11 @@ By default, dejavu is compiled without assertions. We recommend activating asser
 Using *cmake*, a test target `dejavu_test` can be produced by setting the following flag:
 ```text
 cmake . -DCOMPILE_TEST_SUITE=1
+make dejavu_test
 ```
 
 In order to run all the tests, the [test graphs](https://automorphisms.org/graphs/graphs.zip) are required to be placed into `tests/graphs/`.
+Then, you may run the tests:
+```text
+./dejavu_test
+```
