@@ -11,20 +11,25 @@ add_compile_options("-Wall" "-Wpointer-arith" "-Wcast-align" "-Wwrite-strings" "
                     "-Wno-strict-overflow")
 add_compile_options("-march=native")
 add_definitions(-DNDEBUG)
-set(COMPILE_TEST_SUITE FALSE CACHE BOOL "Whether to compile the test suite")
-#set(COMPILE_TEST_SUITE TRUE)
 
 add_executable(dejavu dejavu.cpp)
 
-if (${COMPILE_TEST_SUITE})
-    message("Tests active...")
+if (${TEST})
+    message("Tests target active...")
+    message("WARNING: dejavu will be compiled with assertions ON.")
 
     add_compile_definitions("-D_GLIBCXX_ASSERTIONS")
     remove_definitions(-DNDEBUG)
     add_definitions(-DDEJDEBUG)
     add_definitions(-g)
 
+    # Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
+	if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+		cmake_policy(SET CMP0135 NEW)
+    endif()
     include(FetchContent)
+
+    # Download googletest
     FetchContent_Declare(
             googletest
             URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
@@ -32,6 +37,15 @@ if (${COMPILE_TEST_SUITE})
     # For Windows: Prevent overriding the parent project's compiler/linker settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
+
+    # Download graphs and groups used for testing
+    set(TEST_GRAPH_LOCATION ${CMAKE_SOURCE_DIR}/tests/graphs)
+    FetchContent_Declare(
+            testgraphs
+            URL https://automorphisms.org/graphs/graphs.zip
+            SOURCE_DIR ${TEST_GRAPH_LOCATION})
+
+    FetchContent_MakeAvailable(testgraphs)
 
     enable_testing()
     add_executable(

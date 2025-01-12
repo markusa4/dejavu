@@ -1,5 +1,5 @@
 // Copyright 2025 Markus Anders
-// This file is part of dejavu 2.0.
+// This file is part of dejavu 2.1.
 // See LICENSE for extended copyright information.
 
 #include "gtest/gtest.h"
@@ -89,6 +89,7 @@ void test_graph_orbit_check(std::string filename) {
     std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
     parse_dimacs(filename, g, &colmap);
+    EXPECT_TRUE(g->v_size > 0);
 
     dgtest_graph.copy_graph(g);
     const int domain_size = g->v_size;

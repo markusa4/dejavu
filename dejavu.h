@@ -1,12 +1,12 @@
 // Copyright 2025 Markus Anders
-// This file is part of dejavu 2.0.
+// This file is part of dejavu 2.1.
 // See LICENSE for extended copyright information.
 
 #ifndef DEJAVU_DEJAVU_H
 #define DEJAVU_DEJAVU_H
 
 #define DEJAVU_VERSION_MAJOR 2
-#define DEJAVU_VERSION_MINOR 0
+#define DEJAVU_VERSION_MINOR 1
 #define DEJAVU_VERSION_IS_PREVIEW false
 
 #include <utility>

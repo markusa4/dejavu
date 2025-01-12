@@ -5,10 +5,14 @@ bliss/
 tests/graphs/
 .cmake/
 .idea/
+.cache/
+lib/
 Makefile
 cmake-build-default-coverage/
 cmake-build-debug/
 CMakeFiles/
+CMakeCache.txt
+compile_commands.json
 Testing/
 *.zip
 *.cmake
@@ -21,3 +25,5 @@ old_files/
 __pycache__/
 _deps/
 doxygen-awesome-css/
+dejavu_test
+dejavu

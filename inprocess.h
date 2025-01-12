@@ -1,5 +1,5 @@
 // Copyright 2025 Markus Anders
-// This file is part of dejavu 2.0.
+// This file is part of dejavu 2.1.
 // See LICENSE for extended copyright information.
 
 #ifndef DEJAVU_INPROCESS_H
@@ -11,8 +11,6 @@
 #include "components.h"
 
 namespace dejavu { namespace search_strategy {
-    // (need to nest namespaces due to C++ 14)
-
     /**
      * \brief Inprocessing for symmetry detection
      *
