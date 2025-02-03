@@ -15,7 +15,7 @@
 #include <chrono>
 #include <iomanip>
 #include <functional>
-#include <stdint.h>
+#include <cstdint>
 
 #ifndef DEJAVU_UTILITY_H
 #define DEJAVU_UTILITY_H
