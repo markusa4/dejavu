@@ -51,6 +51,7 @@ if (${TEST})
     add_executable(
             dejavu_test
             tests/markset_test.cpp
+            tests/workset_test.cpp
             tests/worklist_test.cpp
             tests/workspace_test.cpp
             tests/automorphism_test.cpp
