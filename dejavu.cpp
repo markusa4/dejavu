@@ -226,7 +226,7 @@ int commandline_mode(int argc, char **argv) {
     d.set_true_random(true_random);
     d.automorphisms(&g, colmap, hook);
 
-    long dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
+    int64_t dejavu_solve_time = (std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() - timer).count());
     dejavu::big_number grp_sz = d.get_automorphism_group_size();
 
     if (print) std::cout << "------------------------------------------------------------------" << std::endl;
