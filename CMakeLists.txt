@@ -5,11 +5,13 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options("-O3")
-add_compile_options("-Wall" "-Wpointer-arith" "-Wcast-align" "-Wwrite-strings" "-Wshadow" "-Wredundant-decls"
-                    "-Wdisabled-optimization" "-Wnon-virtual-dtor" "-Wreorder" "-Woverloaded-virtual" "-Wsign-promo"
-                    "-Wsynth" "-Wcast-qual" "-Wno-long-long" "-Wno-unknown-pragmas" "-Wno-unused-parameter"
-                    "-Wno-strict-overflow")
-add_compile_options("-march=native")
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options("-Wall" "-Wpointer-arith" "-Wcast-align" "-Wwrite-strings" "-Wshadow" "-Wredundant-decls"
+        "-Wdisabled-optimization" "-Wnon-virtual-dtor" "-Wreorder" "-Woverloaded-virtual" "-Wsign-promo"
+        "-Wsynth" "-Wcast-qual" "-Wno-long-long" "-Wno-unknown-pragmas" "-Wno-unused-parameter"
+        "-Wno-strict-overflow")
+    add_compile_options("-march=native")
+endif()
 add_definitions(-DNDEBUG)
 
 add_executable(dejavu dejavu.cpp)
