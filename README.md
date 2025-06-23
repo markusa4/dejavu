@@ -5,7 +5,10 @@ More detailed information can be found in our [get started guide](https://automo
 
 
 ## Compilation
-Using *cmake*, the project should compile without any further dependencies:
+There are [release binaries](https://github.com/markusa4/dejavu/releases) available, as well as binaries of the [very latest version](https://github.com/markusa4/dejavu/actions/workflows/build.yml).
+
+
+Using *cmake*, the project should however also compile without any further dependencies:
 ```text
 cmake . -DTEST=0
 make
