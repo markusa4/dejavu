@@ -1,0 +1,39 @@
+name: Build and Upload Binaries
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: latest
+
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release 
+        shell: bash
+
+      - name: Build Dejavu
+        run: cmake --build build --config Release
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: dejavu-${{ runner.os }}-binary
+          path: |
+            build/*dejavu*
