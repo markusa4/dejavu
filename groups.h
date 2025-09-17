@@ -1302,6 +1302,30 @@ namespace dejavu {
                 dej_assert(automorphism.p()[fixed] == fixed);
                 return automorphism.nsupp() == 0;
             }
+
+            /**
+             * Fix \a fixed in \p automorphism.
+             *
+             * @param generators The underlying generating set.
+             * @param automorphism Automorphism where \a fixed will be fixed.
+             * @return whether \p automorphism is now the identity
+             */
+            bool fixing_automorphism(schreier_workspace &w, generating_set &generators,
+                                  automorphism_workspace &automorphism, const int v) const {
+                automorphism.reset();
+                if(find_point(v) == -1) return false;
+
+                // as long as v != fixed, apply elements
+                while (fixed != automorphism[v]) {
+                    const int pos = find_point(automorphism[v]); // Where are we storing the information for `fixed_map`?
+                    dej_assert(pos >= 0);
+                    const int perm = fixed_orbit_to_perm[pos]; // generator to apply for `fixed_map`
+                    const int pwr  = fixed_orbit_to_pwr[pos];  // power to use for `fixed_map`
+                    apply_perm(w, automorphism, generators, perm, pwr);
+                }
+                dej_assert(automorphism.p()[fixed] == fixed);
+                return true;
+            }
         };
 
         /**
@@ -1671,6 +1695,19 @@ namespace dejavu {
             }
 
             /**
+             * Returns the fixing permutation of vertex v at base point base_pos. If it does not exist, returns false.
+             *
+             * @param base_pos position of base to look at
+             * @param v        vertex we want to fix 
+             * @param automorphism where the result will be stored
+             * @return if fixing permutation could be found
+             */
+            bool get_transversal_element(schreier_workspace &w, const int base_pos, const int v, 
+                                         automorphism_workspace& automorphism) {
+                return transversals[base_pos].fixing_automorphism(w, generators, automorphism, v);
+            }
+
+            /**
              * Records a sift result for the probabilistic abort criterion.
              *
              * @param changed Whether the sift was successful or not.
@@ -1849,6 +1886,18 @@ namespace dejavu {
              */
             const std::vector<int>& get_fixed_orbit(const int base_pos) {
                 return schreier.get_fixed_orbit(base_pos);
+            }
+
+            /**
+             * Returns the fixing permutation of vertex v at base point base_pos. If it does not exist, returns false.
+             *
+             * @param base_pos position of base to look at
+             * @param v        vertex we want to fix 
+             * @param automorphism where the result will be stored
+             * @return if fixing permutation could be found
+             */
+            bool get_transversal_element(const int base_pos, const int v, automorphism_workspace& automorphism) {
+                return schreier.get_transversal_element(ws_schreier, base_pos, v, automorphism);
             }
 
             /**
