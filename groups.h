@@ -1304,11 +1304,13 @@ namespace dejavu {
             }
 
             /**
-             * Fix \a fixed in \p automorphism.
+             * Compute an automorphism that maps \p v to \a fixed.
              *
+             * @param w Schreier workspace to use
              * @param generators The underlying generating set.
-             * @param automorphism Automorphism where \a fixed will be fixed.
-             * @return whether \p automorphism is now the identity
+             * @param automorphism Resulting automorphism.
+             * @param v  Vertex which should be mapped to \a fixed 
+             * @return whether a fixing automorphism could be found
              */
             bool fixing_automorphism(schreier_workspace &w, generating_set &generators,
                                   automorphism_workspace &automorphism, const int v) const {
@@ -1323,7 +1325,8 @@ namespace dejavu {
                     const int pwr  = fixed_orbit_to_pwr[pos];  // power to use for `fixed_map`
                     apply_perm(w, automorphism, generators, perm, pwr);
                 }
-                dej_assert(automorphism.p()[fixed] == fixed);
+
+                dej_assert(automorphism[v] == fixed);
                 return true;
             }
         };
