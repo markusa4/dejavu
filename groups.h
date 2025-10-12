@@ -842,6 +842,7 @@ namespace dejavu {
              */
             void store(int new_domain_size, automorphism_workspace &automorphism, markset &helper) {
                 domain_size = new_domain_size;
+                data.reset();
                 dej_assert(data.empty());
 
                 // automorphism may be encoded with support01, hence we compute the support if necessary
