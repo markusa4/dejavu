@@ -1924,6 +1924,13 @@ namespace dejavu {
             }
 
             /**
+             * @return Computational cost incurred by this Schreier structure.
+             */
+            dej_nodiscard uint64_t get_computational_cost() const {
+                return schreier.get_computational_cost();
+            }
+
+            /**
              * Checks whether a vertex \p v is contained in the transversal at position \p s_base_pos.
              *
              * @param base_pos Position in base.
