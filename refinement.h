@@ -191,7 +191,8 @@ namespace dejavu {
                     // we choose a separate algorithm depending on the size and density of the graph and/or color class
                     const int  test_deg   = g->d[c->lab[next_color_class]];
                     const bool very_dense = test_deg > (g->v_size / (next_color_class_sz + 1));
-                    computational_cost += (test_deg * next_color_class_sz * 32);
+                    computational_cost += (static_cast<uint64_t>(test_deg) * 
+                                           static_cast<uint64_t>(next_color_class_sz) * 32);
                     //const bool cell_dense = test_deg > (c->cells);
 
                     if (next_color_class_sz == 1 && !(g->dense && very_dense)) { // singleton
@@ -309,7 +310,8 @@ namespace dejavu {
                     const int next_color_class_sz = c->ptn[next_color_class] + 1;
                     const int  test_deg   = g->d[c->lab[next_color_class]];
                     const bool very_dense = (test_deg > (g->v_size / (next_color_class_sz + 1)));
-                    computational_cost += test_deg * next_color_class_sz * 16;
+                    computational_cost += (static_cast<uint64_t>(test_deg) * 
+                                           static_cast<uint64_t>(next_color_class_sz) * 16);
 
                     if (next_color_class_sz == 1 && !(g->dense && very_dense)) {
                         // singleton
