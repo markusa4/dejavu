@@ -1116,6 +1116,7 @@ namespace dejavu {
              * @param w The schreier_workspace to which the orbit is loaded.
              */
             void load_orbit_to_scratch(schreier_workspace &w) const {
+                if(s_computational_cost) *s_computational_cost += fixed_orbit.size();
                 w.scratch1.reset();
                 for (int p : fixed_orbit) {
                     w.scratch1.set(p);
@@ -1315,6 +1316,8 @@ namespace dejavu {
                     }
                 }
 
+                if(s_computational_cost) *s_computational_cost += fixed_orbit.size();
+
                 // We reached upper bound for the size of this transversal? Then mark transversal as "finished"!
                 if (sz_upb == (int) fixed_orbit.size() && !finished) {
                     finished = true;
@@ -1467,7 +1470,7 @@ namespace dejavu {
 
                 finished_up_to = -1;
                 transversals.resize(new_size);
-
+                s_computational_cost += new_size;
 
                 for (int i = 0; i < keep_until; ++i) { transversals[i].set_size_upper_bound(INT32_MAX); }
                 for (int i = keep_until; i < new_size; ++i) {
@@ -1720,8 +1723,10 @@ namespace dejavu {
                     auto next_gen = generators[next_gen_num];
                     dej_assert(next_gen != nullptr);
                     next_gen->load(w.loader, w.scratch_auto);
+                    s_computational_cost += w.scratch_auto.nsupp();
 
                     // multiply
+                    s_computational_cost += domain_size;
                     automorphism.apply(w.scratch_apply1, w.scratch_apply2, w.scratch_apply3, w.loader.p(), 1);
                     w.scratch_auto.reset();
                 }
