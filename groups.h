@@ -1279,13 +1279,12 @@ namespace dejavu {
              * @return whether transversal was extended
              */
             bool extend_with_automorphism(schreier_workspace &w, generating_set &generators,
-                                          automorphism_workspace &automorphism) {
+                                          automorphism_workspace &automorphism, int gen_num = -1) {
                 if (finished) return false; // Already finished transversal? Nothing to do, then!
 
                 // load orbit of this transversal to our workspace, such that we have random access to points in O(1)
                 load_orbit_to_scratch(w);
                 bool changed = false; /*< we changed this transversal? */
-                int  gen_num = -1;    /*< the generator we added to extend this transversal, -1 means no generator */
 
                 // watch out, we may enlarge fixed_orbit in the loop below
                 for (int i = 0; i < static_cast<int>(fixed_orbit.size()); ++i) {
@@ -1703,6 +1702,59 @@ namespace dejavu {
             }
 
             /**
+             * Extend orbits using generators already present in structure.
+             *
+             * @param w Auxiliary workspace used for procedures.
+             * @param automorphism Will be used to load generators. Will be manipulated by the method.
+             * @return Whether orbit was extended or not.
+             */
+            bool extend(schreier_workspace &w, automorphism_workspace &automorphism) {
+                bool changed = false;
+                markset level_finished(static_cast<int>(transversals.size()));
+                markset level_changed(static_cast<int>(transversals.size()));
+
+                // we perform the orbit algorithm on each level until fixpoint
+                bool changed_it = true;
+                while(changed_it) {
+                    level_changed.reset();
+                    changed_it = false;
+                    for (int gen = 0; gen < generators.size(); ++gen) { 
+                        // we proceed generator-by-generator
+                        auto stored_gen = generators.get_generator(gen);
+                        automorphism.reset();
+                        stored_gen->load(w.loader, automorphism);
+                        for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
+                            // extend the transversal using the generator
+                            if(!level_finished.get(level)) {
+                                const bool this_changed = 
+                                    transversals[level].extend_with_automorphism(w, generators, automorphism, gen);
+                                if(this_changed) level_changed.set(level);
+
+                                // track cost
+                                s_computational_cost += transversals[level].size();
+                            }
+
+                            // only check on next level, if generator is valid there
+                            const int fixed_point = transversals[level].get_fixed_point();
+                            if(automorphism[fixed_point] != fixed_point) break;
+                        }
+                    }
+
+                    // check whether things have changed
+                    for (int level = 0; level < static_cast<int>(transversals.size()); ++level) {
+                        if(!level_changed.get(level)) {
+                            level_finished.set(level);
+                        } else {
+                            changed    = true;
+                            changed_it = true;
+                        }
+                    }
+                }
+
+                return changed;
+            }
+
+            /**
              * Generate a (semi-)random element from the generators.
              *
              * @param w Auxiliary workspace used for procedures.
@@ -1911,6 +1963,13 @@ namespace dejavu {
              */
             void sift_random() {
                 schreier.sift_random(ws_schreier, ws_auto, rng, h_error_bound);
+            }
+
+            /**
+             * Extend fixed orbits the automorphisms present in structure.
+             */
+            void extend() {
+                schreier.extend(ws_schreier, ws_auto);
             }
 
             /**
