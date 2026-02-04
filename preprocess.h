@@ -6,7 +6,7 @@
 #define SASSY_H
 
 #define SASSY_VERSION_MAJOR 2
-#define SASSY_VERSION_MINOR 0
+#define SASSY_VERSION_MINOR 1
 
 #include "graph.h"
 #include "ds.h"
