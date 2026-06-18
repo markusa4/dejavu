@@ -222,7 +222,7 @@ namespace dejavu {
         class orbit_hook : public hook_interface {
             dejavu_hook my_hook;
             groups::orbit& my_orbit;
-            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+            void hook_func(int, const int *p, int nsupp, const int *supp) {
                 my_orbit.add_automorphism_to_orbit(p, nsupp, supp);
             }
         public:
