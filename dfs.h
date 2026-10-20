@@ -262,11 +262,16 @@ namespace dejavu {
                                 state_left.move_to_child(g, base_vertex); // need to move left to base vertex
 
                                 dej_assert(state_left.T->trace_equal());
-                                dej_assert(state_left.T->get_position() == state_right.T->get_position());
 
-                                auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
-                                found_auto = (return_code == 1);
-                                pruned     = (return_code == 2);
+
+                                if(state_left.T->get_position() == state_right.T->get_position()) {
+                                    auto return_code = paired_recurse_to_equal_leaf(g, state_left, state_right);
+                                    found_auto = (return_code == 1);
+                                    pruned     = (return_code == 2);
+                                } else {
+                                    found_auto = false;
+                                    pruned     = true;
+                                }
                             }
                         }
 

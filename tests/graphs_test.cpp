@@ -4,8 +4,13 @@
 
 #include "gtest/gtest.h"
 #include "../dejavu.h"
+#include "../parser.h"
 #include "helper_functions_test.h"
-#include <filesystem>
+#include <string>
+#include <fstream>
+#include <dirent.h>
+#include <algorithm>
+#include <vector>
 
 
 dejavu::groups::orbit orbits1;
@@ -25,29 +30,33 @@ void read_symmetry_file(const std::string& filename, int domain_size, dejavu_hoo
     dejavu::groups::automorphism_workspace auto_ws(domain_size);
     std::ifstream infile(filename);
     std::string line;
-    while (std::getline(infile, line)){
+    while (std::getline(infile, line)) {
         auto_ws.reset();
-        std::string from_str;
-        std::string to_str;
-        int read_mode = 0;
-        for(std::string::size_type i = 0; i < line.size(); ++i) {
-            if (line[i] == '(' && read_mode == 0) {
-                read_mode = 1;
-                from_str = "";
-                to_str   = "";
-            } else if (read_mode == 1 && line[i] != '-') {
-                from_str += line[i];
-            } else if (read_mode == 1 && line[i] == '-') {
-                read_mode = 2;
-            } else if (read_mode == 2 && line[i] == '>') {
-                read_mode = 3;
-            } else if (read_mode == 3 && line[i] != ')') {
-                to_str += line[i];
-            } else if (read_mode == 3 && line[i] == ')') {
-                read_mode = 0;
-                const int from = std::stoi(from_str);
-                const int to   = std::stoi(to_str);
-                auto_ws.write_single_map(from, to);
+        std::string vert_str;
+        int first_in_cycle = -1;
+        int prev_in_cycle  = -1;
+        for(size_t i = 0; i < line.size(); ++i) {
+            if (line[i] == '(') {
+                vert_str = "";
+                first_in_cycle = -1;
+                prev_in_cycle  = -1;
+            } else if ((line[i] != ' ') && (line[i] != ')')) {
+                vert_str += line[i];
+            } else {
+                if(vert_str != "") {
+                    const int vert = std::stoi(vert_str);
+                    if(first_in_cycle == -1) first_in_cycle = vert;
+                    else {
+                        const int from = prev_in_cycle;
+                        const int to   = vert;
+                        auto_ws.write_single_map(from-1, to-1);
+                    }
+                    prev_in_cycle = vert;
+                    vert_str = "";
+                }
+                if (line[i] == ')') {
+                    auto_ws.write_single_map(prev_in_cycle-1, first_in_cycle-1);
+                }
             }
         }
         (*hook)(domain_size, auto_ws.p(), auto_ws.nsupp(), auto_ws.supp());
@@ -59,35 +68,31 @@ dejavu::big_number read_grp_sz_file(const std::string& filename) {
     std::ifstream infile(filename);
     std::string line;
     dejavu::big_number result;
+    result.set(0, 0);
+    double divide_by = 1;
     while (std::getline(infile, line)){
-        std::string man_str;
-        std::string exp_str;
-        int read_mode = 0;
-        for(std::string::size_type i = 0; i < line.size(); ++i) {
-            if (read_mode == 0 && line[i] != '*') {
-                man_str += line[i];
-            } else if (read_mode == 0 && line[i] == '*') {
-                read_mode = 1;
-            } else if (read_mode == 1 && line[i] == '^') {
-                read_mode = 2;
-            } else if (read_mode == 2) {
-                exp_str += line[i];
+        for(size_t i = 0; i < line.size(); ++i) {
+            if(line[i] >= '0' && line[i] <= '9') {
+                if(i > 0) result.multiply(10);
+                const int dec_place = line[i] - '0';
+                if(divide_by < 1000000000) {
+                    result.mantissa += 1.0*dec_place / divide_by;
+                    divide_by *= 10;
+                }
             }
         }
-        result.mantissa = std::stod(man_str);
-        result.exponent = std::stoi(exp_str);
         break;
     }
 
     return result;
 }
 
-void test_graph_orbit_check(std::string filename) {
+bool test_graph_orbit_check(std::string filename) {
     std::string sym_filename = filename + ".sym";
-    std::string grp_sz_filename = filename + ".grp_sz";
+    std::string grp_sz_filename = filename + ".grpsz";
     dejavu::sgraph *g = new dejavu::sgraph();
-    std::cout << "Parsing " << filename << "..." << std::endl;
     int* colmap = nullptr;
+    std::cout << console_blue << filename << console_neutral << std::flush;
     parse_dimacs(filename, g, &colmap);
     EXPECT_TRUE(g->v_size > 0);
 
@@ -98,7 +103,7 @@ void test_graph_orbit_check(std::string filename) {
 
     auto test_hook_dejavu = dejavu_hook(orbit1_test_hook);
 
-    std::cout << "Running dejavu " << filename << "..." << std::endl;
+    //std::cout << "Running dejavu " << filename << "..." << std::endl;
     dejavu::solver d;
     d.set_error_bound(20); // in theory, due to the probabilistic nature of the algorithm, some tests could fail without
                           // there being a bug -- but this "almost ensures" that it will be a bug...
@@ -106,73 +111,65 @@ void test_graph_orbit_check(std::string filename) {
     d.automorphisms(g, colmap, &test_hook_dejavu);
 
     auto test_hook_sym_file = dejavu_hook(orbit2_test_hook);
-    std::cout << "Reading symmetry file " << sym_filename << "..." << std::endl;
+    //std::cout << "Reading symmetry file " << sym_filename << "..." << std::endl;
     read_symmetry_file(sym_filename, domain_size, &test_hook_sym_file);
 
-    std::cout << "Comparing orbits..." << std::endl;
+    //std::cout << "Comparing orbits..." << std::endl;
     EXPECT_TRUE(orbits1 == orbits2);
+    const bool check1 = orbits1 == orbits2;
 
     dejavu::big_number file_grp_sz = read_grp_sz_file(grp_sz_filename);
     file_grp_sz.multiply(1);
     dejavu::big_number dejavu_grp_sz = d.get_automorphism_group_size();
-    std::cout << "Comparing group size " << file_grp_sz << ":" << dejavu_grp_sz << "..." << std::endl;
+    //std::cout << "Comparing group size " << file_grp_sz << ":" << dejavu_grp_sz << "..." << std::endl;
     EXPECT_EQ(dejavu_grp_sz.exponent, file_grp_sz.exponent);
+    const bool check2 = dejavu_grp_sz.exponent == file_grp_sz.exponent;
     EXPECT_NEAR(dejavu_grp_sz.mantissa, file_grp_sz.mantissa, 0.1);
+    if(check1 && check2)
+        std::cout << console_green << " OK " << console_neutral << std::endl;
+    else
+        std::cout << console_red << "FAIL" << console_neutral << std::endl;
+
+    return (check1 && check2);
 }
 
-TEST(graphs_test, graph_suite_comb) {
+TEST(graphs_test, graph_suite) {
     std::string directory = TEST_RESOURCE_DIR;
-    test_graph_orbit_check(directory + "X2.bliss");
-    //test_graph(directory + "Ranreg1024.bliss");
-    test_graph_orbit_check(directory + "pp-16-10.dimacs");
-    test_graph_orbit_check(directory + "pp-25-100");
-    test_graph_orbit_check(directory + "ag2-49.dimacs");
-    test_graph_orbit_check(directory + "pg2-47.dimacs");
-    test_graph_orbit_check(directory + "NCKL900K.bliss");
-    test_graph_orbit_check(directory + "kef14.dimacs");
-    test_graph_orbit_check(directory + "had-188.dimacs");
-    test_graph_orbit_check(directory + "had-sw-40-6.dimacs");
-    test_graph_orbit_check(directory + "f-lex-reg-20-1.dimacs");
-    test_graph_orbit_check(directory + "f-lex-srg-14-1.dimacs");
-    test_graph_orbit_check(directory + "latin-20.dimacs");
-    test_graph_orbit_check(directory + "latin-30.dimacs");
-    test_graph_orbit_check(directory + "latin-sw-23-4.dimacs");
-    test_graph_orbit_check(directory + "cfi-172.dimacs");
-    //test_graph_orbit_check(directory + "usr4_116-1.dimacs");
-    //test_graph_orbit_check(directory + "CHH_cc7-7_1078-1.dimacs");
-    test_graph_orbit_check(directory + "sts-79.dimacs");
-    test_graph_orbit_check(directory + "sts-sw-49-8.dimacs");
-    test_graph_orbit_check(directory + "triang-20.dimacs");
-    test_graph_orbit_check(directory + "cmz-50.dimacs");
-    test_graph_orbit_check(directory + "mz-aug-50.dimacs");
-    test_graph_orbit_check(directory + "mz-aug2-50.dimacs");
-    test_graph_orbit_check(directory + "grid-3-19.dimacs");
-    test_graph_orbit_check(directory + "17cube.bliss");
-    test_graph_orbit_check(directory + "tran_2880_12960.bliss");
-    test_graph_orbit_check(directory + "paley-461.dimacs");
-    test_graph_orbit_check(directory + "cfi-rigid-t2-0384-01-2");
-    test_graph_orbit_check(directory + "sat_cfi_mult_4000_a.dmc");
-    test_graph_orbit_check(directory + "group_128_164.dimacs");
-    test_graph_orbit_check(directory + "flag6.bliss");
-}
 
-TEST(graphs_test, graph_suite_prep) {
-    std::string directory = TEST_RESOURCE_DIR;
-    test_graph_orbit_check(directory + "k-100.dimacs");
-    test_graph_orbit_check(directory + "e-100.dimacs");
-    test_graph_orbit_check(directory + "rantree-100.bliss");
-    test_graph_orbit_check(directory + "highschool1-aigio.dimacs");
-    test_graph_orbit_check(directory + "AS.bliss");
-    test_graph_orbit_check(directory + "s4-4-3-5.bliss");
-    test_graph_orbit_check(directory + "academictimetablesmall.dimacs");
-    test_graph_orbit_check(directory + "heuristic_199.dimacs");
-    test_graph_orbit_check(directory + "vlsat2_11_26.cnf.dimacs");
-    test_graph_orbit_check(directory + "vlsat2_44_545.cnf.dimacs");
-}
+    std::vector<std::string> graphs;
 
-TEST(graphs_test, graph_suite_ref) {
-    std::string directory = TEST_RESOURCE_DIR;
-    test_graph_orbit_check(directory + "ransq_1000_a.bliss");
-    test_graph_orbit_check(directory + "ran10_500_a.bliss");
-    test_graph_orbit_check(directory + "ran2_200_a.bliss");
+    DIR* dir = opendir(directory.c_str());
+    ASSERT_NE(dir, nullptr) << "Could not open directory: " << directory;
+
+    while (dirent* entry = readdir(dir)) {
+        std::string name = entry->d_name;
+
+        if (name.size() < 7 || name.substr(name.size() - 7) != ".dimacs") {
+            continue;
+        }
+
+        std::string graph = directory + name;
+
+        if (std::ifstream(graph + ".sym").good()
+            && std::ifstream(graph + ".grpsz").good()) {
+            graphs.push_back(graph);
+        }
+    }
+
+    closedir(dir);
+
+    std::sort(graphs.begin(), graphs.end());
+
+    ASSERT_FALSE(graphs.empty()) << "No graph/reference triples found in " << directory;
+
+    size_t c = 1;
+    int fails = 0;
+    for (const std::string& graph : graphs) {
+        SCOPED_TRACE(graph);
+        if(fails > 0) std::cout << console_red;
+        std::cout << "[" << c << "/" << graphs.size() << "] "; 
+        std::cout << console_neutral;
+        fails += !test_graph_orbit_check(graph);
+        ++c;
+    }
 }

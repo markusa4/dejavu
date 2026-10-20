@@ -132,6 +132,7 @@ TEST(orbit_test, hook_test) {
     g1.add_edge(0, 2);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     ASSERT_TRUE(o.are_in_same_orbit(0, 1));
@@ -152,6 +153,7 @@ TEST(orbit_test, hook_test) {
     o.reset();
     ASSERT_FALSE(o.are_in_same_orbit(0, 1));
 
+    d1.set_print(false);
     dejavu::static_graph g2;
     g2.initialize_graph(8, 3);
     g2.add_vertex(0,2);
@@ -167,6 +169,7 @@ TEST(orbit_test, hook_test) {
     g2.add_edge(0, 2);
 
     dejavu::solver d2;
+    d2.set_print(false);
     d2.automorphisms(&g2, hook.get_hook());
 
     ASSERT_TRUE(o.are_in_same_orbit(0, 1));

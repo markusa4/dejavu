@@ -47,6 +47,29 @@
 #define dej_nodiscard
 #endif
 
+#define console_bold "\033[1m"
+#define console_green "\033[32m"
+#define console_blue "\033[36m"
+#define console_orange "\033[33m"
+#define console_bright_blue "\033[96m"
+#define console_magenta "\033[35m"
+#define console_red "\033[33m"
+#define console_neutral "\033[0m"
+
+#if defined (__unix__) || (defined (__APPLE__) && defined (__MACH__))
+// should be POSIX, where "_unlocked" is available
+#define dejavu_getc(f) getc_unlocked(f)
+#define dejavu_putc(f, c) putc_unlocked(f, c)
+#define dejavu_flockfile(f) flockfile(f);
+#define dejavu_funlockfile(f) funlockfile(f);
+#else
+// otherwise, "_unlocked" versions may not be available, so we use the normal ones
+#define dejavu_getc(f) getc(f)
+#define dejavu_putc(f, c) putc(f, c)
+#define dejavu_flockfile(f) {};
+#define dejavu_funlockfile(f) {};
+#endif
+
 // use these options to prevent dejavu from using certain C++ language features
 // #define dej_nolambda
 // #define dej_nothreadlocal

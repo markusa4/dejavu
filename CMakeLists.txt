@@ -5,13 +5,6 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options("-O3")
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options("-Wall" "-Wpointer-arith" "-Wcast-align" "-Wwrite-strings" "-Wshadow" "-Wredundant-decls"
-        "-Wdisabled-optimization" "-Wnon-virtual-dtor" "-Wreorder" "-Woverloaded-virtual" "-Wsign-promo"
-        "-Wsynth" "-Wcast-qual" "-Wno-long-long" "-Wno-unknown-pragmas" "-Wno-unused-parameter"
-        "-Wno-strict-overflow")
-    add_compile_options("-march=native")
-endif()
 add_definitions(-DNDEBUG)
 
 add_executable(dejavu dejavu.cpp)
@@ -44,7 +37,7 @@ if (${TEST})
     set(TEST_GRAPH_LOCATION ${CMAKE_SOURCE_DIR}/tests/graphs)
     FetchContent_Declare(
             testgraphs
-            URL https://automorphisms.org/graphs/graphs.zip
+            URL https://automorphisms.org/graphs/graphs-v2.zip
             SOURCE_DIR ${TEST_GRAPH_LOCATION})
 
     FetchContent_MakeAvailable(testgraphs)
