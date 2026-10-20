@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include "dejavu.h"
+#include "parser.h"
 #include <chrono>
 #include <string>
 

@@ -60,6 +60,7 @@ TEST(schreier_test, schreier_basic_group) {
     g1.add_edge(0, 2);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     dejavu::big_number grp_sz = s.group_size();
@@ -92,6 +93,7 @@ TEST(schreier_test, schreier_orbit_at_level1) {
     g1.add_vertex(0,0);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     dejavu::big_number grp_sz = s.group_size();
@@ -144,6 +146,7 @@ TEST(schreier_test, schreier_orbit_at_level2) {
     g1.add_vertex(1,0);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     dejavu::big_number grp_sz = s.group_size();
@@ -200,6 +203,7 @@ TEST(schreier_test, schreier_generator_at_level2) {
     g1.add_vertex(1,0);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     dejavu::big_number grp_sz = s.group_size();
@@ -279,6 +283,7 @@ TEST(schreier_test, schreier_base_change) {
     g1.add_edge(0, 2);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
 
     dejavu::big_number grp_sz = s.group_size();
@@ -341,6 +346,7 @@ TEST(schreier_test, schreier_incremental_base) {
     g1.add_edge(0+6, 2+6);
 
     dejavu::solver d1;
+    d1.set_print(false);
     d1.automorphisms(&g1, hook.get_hook());
     orbit o(9);
 

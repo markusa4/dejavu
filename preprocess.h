@@ -610,13 +610,13 @@ namespace dejavu {
         // never walks to 'block', if adjacent to 'start'
         // watch out! won't terminate on cycles
         static std::pair<int, int> walk_to_endpoint(dejavu::sgraph *g, const int start, const int block,
-                                                    dejavu::markset* path_done) {
+                                                    dejavu::markset* path_done, bool abort_if_done = false) {
             int current_vertex = start;
             int last_vertex    = block;
 
             while(g->d[current_vertex] == 2) {
-                if(path_done)
-                    path_done->set(current_vertex);
+                if(abort_if_done && path_done && path_done->get(current_vertex)) return {-1, -1};
+                if(path_done) path_done->set(current_vertex);
 
                 const int next_vertex1 = g->e[g->v[current_vertex] + 0];
                 const int next_vertex2 = g->e[g->v[current_vertex] + 1];
@@ -1070,18 +1070,27 @@ namespace dejavu {
                         aux_on_deg2 = true;
                         break;
                     }
-                    hub_vertex_position[i] = -1;
                     if(!recovery_strings[translate_back(i)].empty()) {
-                        path_done.set(i); // not ideal...
+                       path_done.set(i);
                     }
-                    if(path_done.get(i))
-                        continue;
+                }
+            }
+
+            if(aux_on_deg2) return;
+
+            for (int i = 0; i < g->v_size; ++i) {
+                if(g->d[i] == 2) {
+                    hub_vertex_position[i] = -1;
+
+                    if(path_done.get(i)) continue;
                     const int n1 = g->e[g->v[i] + 0];
                     const int n2 = g->e[g->v[i] + 1];
                     // n1 or n2 is endpoint? then walk to other endpoint and collect information...
                     if(g->d[n1] != 2) {
-                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done);
+                        const auto other_endpoint = walk_to_endpoint(g, i, n1, &path_done, true);
                         if(other_endpoint.first == n1) // big self-loop
+                            continue;
+                        if(other_endpoint.first < 0) // non-trivial recovery on path
                             continue;
                         connected_paths[g->v[n1] + endpoint_cnt[n1]]     = i;
                         connected_endpoints[g->v[n1] + endpoint_cnt[n1]] = other_endpoint.first;
@@ -1095,8 +1104,10 @@ namespace dejavu {
                         dej_assert(n1 != other_endpoint.first);
                         ++total_paths;
                     } else if(g->d[n2] != 2) {
-                        const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done);
+                        const auto other_endpoint = walk_to_endpoint(g, i, n2, &path_done, true);
                         if(other_endpoint.first == n2) // big self-loop
+                            continue;
+                        if(other_endpoint.first < 0) // non-trivial recovery on path
                             continue;
                         connected_paths[g->v[n2] + endpoint_cnt[n2]] = i;
                         connected_endpoints[g->v[n2] + endpoint_cnt[n2]] = other_endpoint.first;
@@ -1115,7 +1126,7 @@ namespace dejavu {
 
             // let's not apply this reduction unless there is a substantial amount of degree 2 vertices -- performing
             // the technique adds some bloat to the lifting process, so we should not overdo it
-            if(total_paths < g->v_size/10 || aux_on_deg2) return;
+            if(total_paths < g->v_size/10) return;
 
             recovery_edge_adjacent.resize(domain_size);
             path_done.reset();
