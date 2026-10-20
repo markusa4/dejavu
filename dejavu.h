@@ -9,6 +9,7 @@
 #define DEJAVU_VERSION_MINOR 1
 #define DEJAVU_VERSION_IS_PREVIEW false
 
+#include <functional>
 #include <utility>
 #include <string>
 
@@ -222,7 +223,7 @@ namespace dejavu {
         class orbit_hook : public hook_interface {
             dejavu_hook my_hook;
             groups::orbit& my_orbit;
-            void hook_func(int n, const int *p, int nsupp, const int *supp) {
+            void hook_func(int, const int *p, int nsupp, const int *supp) {
                 my_orbit.add_automorphism_to_orbit(p, nsupp, supp);
             }
         public:
@@ -275,6 +276,9 @@ namespace dejavu {
         int     h_limit_budget           = -1; /**< limit backtracking not due to symmetry */
         int64_t h_limit_schreier_support = -1; /**< limit total support of Schreier table  */
         int64_t h_limit_component        = -1; /**< limit for maximal component size       */
+
+        // NOTE: not part of upstream dejavu 2.1 -- patched in by Exact to support external interruption
+        std::function<bool()> h_terminate; /**< user-provided termination check, polled between search rounds */
 
     public:
         /**
@@ -362,6 +366,19 @@ namespace dejavu {
          */
         void set_limit_schreier_support(int limit_support = -1) {
             h_limit_schreier_support = limit_support;
+        }
+
+        /**
+         * User-provided termination check, polled between search rounds. When it returns `true`, the solver
+         * terminates as if a resource limit was reached, with potentially incomplete results (generators found
+         * so far are still reported through the hook, and `get_reached_limit()` will return `true`).
+         *
+         * NOTE: not part of upstream dejavu 2.1 -- patched in by Exact to support external interruption.
+         *
+         * @param terminate the termination check (an empty function means no check)
+         */
+        void set_terminate(std::function<bool()> terminate) {
+            h_terminate = std::move(terminate);
         }
 
         /**
@@ -627,7 +644,16 @@ namespace dejavu {
 
                 // now that we are set up, let's start solving the graph
                 // loop for restarts
+                bool s_terminated = false; /*< external termination check (`h_terminate`) fired */
                 while (true) {
+                    // check for external termination -- once requested, we terminate as if a limit was reached
+                    if (h_terminate && h_terminate()) {
+                        s_terminated = true;
+                        s_deterministic_termination = false;
+                        s_term = t_limit;
+                        break;
+                    }
+
                     // "Dry land is not a myth, I've seen it!"
                     const bool s_hard = h_budget   > 256; /* graph is "hard" (was 10000)*/
                     const bool s_easy = s_restarts == -1; /* graph is "easy" */
@@ -772,6 +798,12 @@ namespace dejavu {
                     last_routine = restart;
 
                     while (!do_a_restart && !finished_symmetries) {
+                        // check for external termination -- break out here and again below, skipping inprocessing
+                        if (h_terminate && h_terminate()) {
+                            s_terminated = true;
+                            break;
+                        }
+
                         // What do we do next? Random search, BFS, or a restart?
                         // here are our decision heuristics (AKA dark magic)
 
@@ -967,6 +999,13 @@ namespace dejavu {
                         }
 
                         last_routine = next_routine;
+                    }
+
+                    // externally terminated? exit as if a limit was reached, skipping inprocessing
+                    if (s_terminated) {
+                        s_deterministic_termination = false;
+                        s_term = t_limit;
+                        break;
                     }
 
                     // Are we done or just restarting?

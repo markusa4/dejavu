@@ -965,7 +965,7 @@ namespace dejavu {
          * @param help_array an array of `domain_size` required for auxiliary data
          */
         void recovery_attached_edges_to_automorphism(int v, int* aut, dejavu::ds::worklist* aut_supp,
-                                                     dejavu::ds::worklist* help_array1,
+                                                     dejavu::ds::worklist*,
                                                      dejavu::ds::worklist* help_array2) {
             if(recovery_edge_adjacent[v].empty()) return;
             const int v_map    = aut[v];
